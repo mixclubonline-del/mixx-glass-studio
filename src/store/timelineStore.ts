@@ -29,6 +29,11 @@ interface TimelineState {
   selectedRegions: Set<string>;
   selectedTracks: Set<string>;
   
+  // Tool & editing
+  currentTool: 'select' | 'range' | 'split' | 'trim' | 'fade' | 'pencil' | 'zoom' | 'multi';
+  snapMode: 'grid' | 'relative' | 'transient' | 'marker' | 'region' | 'off';
+  rippleEdit: boolean;
+  
   // Actions
   setCurrentTime: (time: number) => void;
   setDuration: (duration: number) => void;
@@ -46,6 +51,9 @@ interface TimelineState {
   toggleRegionSelection: (id: string) => void;
   clearSelection: () => void;
   selectTrack: (id: string) => void;
+  setCurrentTool: (tool: 'select' | 'range' | 'split' | 'trim' | 'fade' | 'pencil' | 'zoom' | 'multi') => void;
+  setSnapMode: (mode: 'grid' | 'relative' | 'transient' | 'marker' | 'region' | 'off') => void;
+  toggleRippleEdit: () => void;
 }
 
 export const useTimelineStore = create<TimelineState>((set) => ({
@@ -68,6 +76,10 @@ export const useTimelineStore = create<TimelineState>((set) => ({
   
   selectedRegions: new Set(),
   selectedTracks: new Set(),
+  
+  currentTool: 'select',
+  snapMode: 'grid',
+  rippleEdit: false,
   
   // Actions
   setCurrentTime: (time) => set({ currentTime: time }),
@@ -97,4 +109,7 @@ export const useTimelineStore = create<TimelineState>((set) => ({
     
   clearSelection: () => set({ selectedRegions: new Set() }),
   selectTrack: (id) => set({ selectedTracks: new Set([id]) }),
+  setCurrentTool: (tool) => set({ currentTool: tool }),
+  setSnapMode: (mode) => set({ snapMode: mode }),
+  toggleRippleEdit: () => set((state) => ({ rippleEdit: !state.rippleEdit })),
 }));

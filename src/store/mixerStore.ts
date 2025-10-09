@@ -21,6 +21,11 @@ interface MixerState {
   masterPeakLevel: { left: number; right: number };
   selectedChannelId: string | null;
   
+  // Enhanced metering
+  truePeakEnabled: boolean;
+  meteringStandard: 'ITU-R-BS.1770-5' | 'EBU-R128';
+  targetLoudness: -23 | -16 | -14 | -8;
+  
   // Actions
   addChannel: (channel: ChannelState) => void;
   updateChannel: (id: string, updates: Partial<ChannelState>) => void;
@@ -29,6 +34,11 @@ interface MixerState {
   setMasterPeakLevel: (level: { left: number; right: number }) => void;
   updatePeakLevel: (id: string, level: { left: number; right: number }) => void;
   selectChannel: (id: string | null) => void;
+  
+  // New actions
+  setTruePeakEnabled: (enabled: boolean) => void;
+  setMeteringStandard: (standard: 'ITU-R-BS.1770-5' | 'EBU-R128') => void;
+  setTargetLoudness: (loudness: -23 | -16 | -14 | -8) => void;
 }
 
 export const useMixerStore = create<MixerState>((set) => ({
@@ -36,6 +46,11 @@ export const useMixerStore = create<MixerState>((set) => ({
   masterVolume: 0.75,
   masterPeakLevel: { left: -60, right: -60 },
   selectedChannelId: null,
+  
+  // New defaults
+  truePeakEnabled: true,
+  meteringStandard: 'ITU-R-BS.1770-5',
+  targetLoudness: -14,
   
   addChannel: (channel) => set((state) => {
     const newChannels = new Map(state.channels);
@@ -71,5 +86,10 @@ export const useMixerStore = create<MixerState>((set) => ({
     return { channels: newChannels };
   }),
   
-  selectChannel: (id) => set({ selectedChannelId: id })
+  selectChannel: (id) => set({ selectedChannelId: id }),
+  
+  // New actions
+  setTruePeakEnabled: (enabled) => set({ truePeakEnabled: enabled }),
+  setMeteringStandard: (standard) => set({ meteringStandard: standard }),
+  setTargetLoudness: (loudness) => set({ targetLoudness: loudness })
 }));

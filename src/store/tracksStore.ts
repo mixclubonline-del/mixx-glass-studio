@@ -9,6 +9,7 @@ interface TracksState {
   tracks: TimelineTrack[];
   regions: Region[];
   selectedTrackId: string | null;
+  addTrackDialogOpen: boolean;
   
   // Actions
   addTrack: (track: TimelineTrack) => void;
@@ -19,12 +20,14 @@ interface TracksState {
   removeRegion: (id: string) => void;
   selectTrack: (id: string | null) => void;
   getTrackRegions: (trackId: string) => Region[];
+  setAddTrackDialogOpen: (open: boolean) => void;
 }
 
 export const useTracksStore = create<TracksState>((set, get) => ({
   tracks: [],
   regions: [],
   selectedTrackId: null,
+  addTrackDialogOpen: false,
   
   addTrack: (track) => set((state) => ({
     tracks: [...state.tracks, track]
@@ -55,5 +58,7 @@ export const useTracksStore = create<TracksState>((set, get) => ({
   
   getTrackRegions: (trackId) => {
     return get().regions.filter(r => r.trackId === trackId);
-  }
+  },
+  
+  setAddTrackDialogOpen: (open) => set({ addTrackDialogOpen: open })
 }));

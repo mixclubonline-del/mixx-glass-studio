@@ -8,6 +8,8 @@ export { TimelineRuler } from './Timeline/TimelineRuler';
 export { Playhead } from './Timeline/Playhead';
 export { GridOverlay } from './Timeline/GridOverlay';
 export { WaveformRenderer } from './Timeline/WaveformRenderer';
+export { TimelineToolbar } from './Timeline/TimelineToolbar';
+export { AddTrackDialog } from './Timeline/AddTrackDialog';
 
 // Mixer
 export { NextGenMixerView } from './Mixer/NextGenMixerView';
@@ -19,6 +21,12 @@ export { Fader } from './Mixer/Fader';
 // Metering
 export { MeteringDashboard } from './Metering/MeteringDashboard';
 export { SpectrumAnalyzer } from './Metering/SpectrumAnalyzer';
+export { MasterMeteringPanel } from './Metering/MasterMeteringPanel';
+export { ProfessionalPeakMeter } from './Metering/ProfessionalPeakMeter';
+
+// Controls
+export { IceFireFader } from './Controls/IceFireFader';
+export { IceFireKnob } from './Controls/IceFireKnob';
 
 // Edit
 export { WaveformEditor } from './Edit/WaveformEditor';
