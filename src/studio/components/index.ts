@@ -31,6 +31,9 @@ export { IceFireKnob } from './Controls/IceFireKnob';
 // Edit
 export { WaveformEditor } from './Edit/WaveformEditor';
 
+// Editing utilities
+export * from './Editing';
+
 // Navigation
 export { ViewSwitcher } from './Navigation/ViewSwitcher';
 export { TopMenuBar } from './Navigation/TopMenuBar';

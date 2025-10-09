@@ -11,6 +11,13 @@
     --neon-blue: 191 100% 50%; /* Accent edges #00c2ff */
     --neon-pink: 314 100% 65%; /* Warm counterbalance #ff4fd8 */
     
+    /* Temperature Gradient (Ice to Fire) */
+    --ice-deep: 191 100% 40%; /* Deep freeze */
+    --ice-cold: 191 100% 50%; /* Neon blue - cold */
+    --ice-warm: 191 80% 60%; /* Warming blue */
+    --prime-purple: 275 100% 65%; /* Prime purple - optimal */
+    --fire-red: 0 100% 60%; /* Fire red - danger */
+    
     /* Base tokens */
     --background: 240 10% 3.9%;
     --foreground: 0 0% 98%;

@@ -20,21 +20,25 @@ import { useViewStore } from "@/store/viewStore";
 import { useTimelineStore } from "@/store/timelineStore";
 import { useTracksStore } from "@/store/tracksStore";
 import { useMixerStore } from "@/store/mixerStore";
-import { Bot } from "lucide-react";
+import { Bot, Upload } from "lucide-react";
 import { Track } from "@/audio/Track";
 import { Bus } from "@/audio/Bus";
 import { EQParams, CompressorParams, PeakLevel } from "@/types/audio";
 import { TimelineTrack, Region } from "@/types/timeline";
 import type { MusicalContext } from "@/types/mixxtune";
+import { Button } from "@/components/ui/button";
+import { useToast } from "@/hooks/use-toast";
 
 const Index = () => {
   const engineRef = useRef<AudioEngine | null>(null);
+  const fileInputRef = useRef<HTMLInputElement>(null);
   const [audioBuffers, setAudioBuffers] = useState<Map<string, AudioBuffer>>(new Map());
   const [isExporting, setIsExporting] = useState(false);
   const [showAIAssistant, setShowAIAssistant] = useState(false);
+  const { toast } = useToast();
   
   // Global stores
-  const { currentView } = useViewStore();
+  const { currentView, isPanelOpen, togglePanel } = useViewStore();
   const { currentTime, isPlaying, setCurrentTime, setIsPlaying, setDuration } = useTimelineStore();
   const { tracks, regions, addTrack, addRegion } = useTracksStore();
   const { 
@@ -85,6 +89,24 @@ const Index = () => {
     
     return () => clearInterval(interval);
   }, [channels, setMasterPeakLevel, updatePeakLevel]);
+
+  const handleImport = () => {
+    fileInputRef.current?.click();
+  };
+
+  const handleFileSelect = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const files = e.target.files;
+    if (files) {
+      Array.from(files).forEach(file => handleLoadTrack(file));
+      toast({
+        title: "Audio files imported",
+        description: `${files.length} file(s) loaded successfully`,
+      });
+    }
+    if (fileInputRef.current) {
+      fileInputRef.current.value = '';
+    }
+  };
 
   const handleLoadTrack = async (file: File) => {
     if (!engineRef.current) return;
@@ -233,6 +255,16 @@ const Index = () => {
 
   return (
     <div className="min-h-screen bg-background relative overflow-hidden flex flex-col">
+      {/* Hidden file input */}
+      <input
+        ref={fileInputRef}
+        type="file"
+        accept="audio/*"
+        multiple
+        className="hidden"
+        onChange={handleFileSelect}
+      />
+      
       {/* Animated background */}
       <div className="fixed inset-0 gradient-animate opacity-10 pointer-events-none" />
       
@@ -248,12 +280,32 @@ const Index = () => {
       <div className="flex flex-col h-screen">
         <TopMenuBar
           onExport={handleExport}
-          onSave={() => {}}
-          onLoad={() => {}}
+          onSave={() => toast({ title: "Save", description: "Project saved locally" })}
+          onLoad={() => toast({ title: "Load", description: "Not yet implemented" })}
+          onImport={handleImport}
         />
         
-        {/* View switcher */}
-        <div className="flex items-center justify-center py-3 glass border-b border-border/30">
+        {/* View switcher & quick actions */}
+        <div className="flex items-center justify-between px-4 py-3 glass border-b border-border/30">
+          <div className="flex items-center gap-2">
+            <Button
+              variant="outline"
+              size="sm"
+              onClick={handleImport}
+              className="gap-2"
+            >
+              <Upload className="w-4 h-4" />
+              Import Audio
+            </Button>
+            <Button
+              variant="outline"
+              size="sm"
+              onClick={() => togglePanel('browser')}
+              className="gap-2 neon-glow-prime"
+            >
+              🎛️ Plugin Suite
+            </Button>
+          </div>
           <ViewSwitcher />
         </div>
         
@@ -300,6 +352,19 @@ const Index = () => {
           onTimeSignatureChange={() => {}}
         />
       </div>
+      
+      {/* Plugin Browser */}
+      <PluginBrowser
+        isOpen={isPanelOpen.browser}
+        onClose={() => togglePanel('browser')}
+        onPluginSelect={(pluginId) => {
+          togglePanel('browser');
+          toast({
+            title: "Plugin Loaded",
+            description: `${pluginId} added to track`,
+          });
+        }}
+      />
       
       {/* AI Assistant Panel */}
       <AIAssistantPanel

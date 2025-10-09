@@ -12,16 +12,21 @@ import {
   MenubarTrigger,
 } from "@/components/ui/menubar";
 import { useViewStore } from '@/store/viewStore';
-import { Brain, Save, FolderOpen, FileDown, Undo2, Redo2 } from 'lucide-react';
+import { useTimelineStore } from '@/store/timelineStore';
+import { useToast } from '@/hooks/use-toast';
+import { Brain, Save, FolderOpen, FileDown, Undo2, Redo2, Upload } from 'lucide-react';
 
 interface TopMenuBarProps {
   onExport?: () => void;
   onSave?: () => void;
   onLoad?: () => void;
+  onImport?: () => void;
 }
 
-export function TopMenuBar({ onExport, onSave, onLoad }: TopMenuBarProps) {
+export function TopMenuBar({ onExport, onSave, onLoad, onImport }: TopMenuBarProps) {
   const { setView, togglePanel } = useViewStore();
+  const { setCurrentTool, toggleRippleEdit, rippleEdit } = useTimelineStore();
+  const { toast } = useToast();
   
   return (
     <Menubar className="border-b border-border bg-secondary/30 backdrop-blur-sm rounded-none">
@@ -40,6 +45,12 @@ export function TopMenuBar({ onExport, onSave, onLoad }: TopMenuBarProps) {
             <MenubarShortcut>⌘O</MenubarShortcut>
           </MenubarItem>
           <MenubarSeparator />
+          <MenubarItem onClick={onImport}>
+            <Upload className="w-4 h-4 mr-2" />
+            Import Audio Files
+            <MenubarShortcut>⌘I</MenubarShortcut>
+          </MenubarItem>
+          <MenubarSeparator />
           <MenubarItem onClick={onExport}>
             <FileDown className="w-4 h-4 mr-2" />
             Export Mix
@@ -52,21 +63,39 @@ export function TopMenuBar({ onExport, onSave, onLoad }: TopMenuBarProps) {
       <MenubarMenu>
         <MenubarTrigger className="cursor-pointer">Edit</MenubarTrigger>
         <MenubarContent>
-          <MenubarItem>
+          <MenubarItem onClick={() => toast({ title: "Undo", description: "Not yet implemented" })}>
             <Undo2 className="w-4 h-4 mr-2" />
             Undo
             <MenubarShortcut>⌘Z</MenubarShortcut>
           </MenubarItem>
-          <MenubarItem>
+          <MenubarItem onClick={() => toast({ title: "Redo", description: "Not yet implemented" })}>
             <Redo2 className="w-4 h-4 mr-2" />
             Redo
             <MenubarShortcut>⌘⇧Z</MenubarShortcut>
           </MenubarItem>
           <MenubarSeparator />
-          <MenubarItem>Cut<MenubarShortcut>⌘X</MenubarShortcut></MenubarItem>
-          <MenubarItem>Copy<MenubarShortcut>⌘C</MenubarShortcut></MenubarItem>
-          <MenubarItem>Paste<MenubarShortcut>⌘V</MenubarShortcut></MenubarItem>
-          <MenubarItem>Duplicate<MenubarShortcut>⌘D</MenubarShortcut></MenubarItem>
+          <MenubarItem onClick={() => toast({ title: "Cut", description: "Not yet implemented" })}>
+            Cut<MenubarShortcut>⌘X</MenubarShortcut>
+          </MenubarItem>
+          <MenubarItem onClick={() => toast({ title: "Copy", description: "Not yet implemented" })}>
+            Copy<MenubarShortcut>⌘C</MenubarShortcut>
+          </MenubarItem>
+          <MenubarItem onClick={() => toast({ title: "Paste", description: "Not yet implemented" })}>
+            Paste<MenubarShortcut>⌘V</MenubarShortcut>
+          </MenubarItem>
+          <MenubarItem onClick={() => toast({ title: "Duplicate", description: "Not yet implemented" })}>
+            Duplicate<MenubarShortcut>⌘D</MenubarShortcut>
+          </MenubarItem>
+          <MenubarSeparator />
+          <MenubarItem onClick={() => {
+            toggleRippleEdit();
+            toast({ 
+              title: "Ripple Edit", 
+              description: rippleEdit ? "Disabled" : "Enabled" 
+            });
+          }}>
+            {rippleEdit ? "✓" : ""} Ripple Edit<MenubarShortcut>⌘R</MenubarShortcut>
+          </MenubarItem>
         </MenubarContent>
       </MenubarMenu>
       
@@ -119,17 +148,17 @@ export function TopMenuBar({ onExport, onSave, onLoad }: TopMenuBarProps) {
           AI Tools
         </MenubarTrigger>
         <MenubarContent>
-          <MenubarItem>
+          <MenubarItem onClick={() => toast({ title: "AI Mix Assistant", description: "Coming soon!" })}>
             AI Mix Assistant
           </MenubarItem>
-          <MenubarItem>
+          <MenubarItem onClick={() => toast({ title: "Stem Separation", description: "Coming soon!" })}>
             Stem Separation
           </MenubarItem>
-          <MenubarItem>
+          <MenubarItem onClick={() => toast({ title: "Auto-Master", description: "Coming soon!" })}>
             Auto-Master
           </MenubarItem>
           <MenubarSeparator />
-          <MenubarItem>
+          <MenubarItem onClick={() => toast({ title: "Voice Control", description: "Coming soon!" })}>
             Voice Control
           </MenubarItem>
         </MenubarContent>
@@ -139,14 +168,14 @@ export function TopMenuBar({ onExport, onSave, onLoad }: TopMenuBarProps) {
       <MenubarMenu>
         <MenubarTrigger className="cursor-pointer">Help</MenubarTrigger>
         <MenubarContent>
-          <MenubarItem>
+          <MenubarItem onClick={() => toast({ title: "Keyboard Shortcuts", description: "Press ? to view shortcuts" })}>
             Keyboard Shortcuts
           </MenubarItem>
-          <MenubarItem>
+          <MenubarItem onClick={() => window.open('https://docs.mixxclub.com', '_blank')}>
             Documentation
           </MenubarItem>
           <MenubarSeparator />
-          <MenubarItem>
+          <MenubarItem onClick={() => toast({ title: "Mixx Club Pro Studio 2027", description: "Revolutionary DAW Interface v1.0" })}>
             About Mixx Club Pro
           </MenubarItem>
         </MenubarContent>
