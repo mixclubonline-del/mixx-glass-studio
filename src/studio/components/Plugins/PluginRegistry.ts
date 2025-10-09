@@ -10,6 +10,14 @@ import { MixxCompressor } from './MixxCompressor';
 import { MixxSaturator } from './MixxSaturator';
 import { MixxChorus } from './MixxChorus';
 import { MixxLimiter } from './MixxLimiter';
+import { MixxGate } from './MixxGate';
+import { MixxPhaser } from './MixxPhaser';
+import { MixxFlanger } from './MixxFlanger';
+import { MixxStereoImager } from './MixxStereoImager';
+import { MixxTransient } from './MixxTransient';
+import { MixxMultiBandComp } from './MixxMultiBandComp';
+import { MixxExciter } from './MixxExciter';
+import { MixxDeEsser } from './MixxDeEsser';
 
 // Register MixxReverb
 PluginManager.register({
@@ -170,5 +178,197 @@ PluginManager.register({
     gain: 0.5,
     mode: 0.5,
     link: 1,
+  },
+});
+
+// Register MixxGate
+PluginManager.register({
+  metadata: {
+    id: 'mixxgate',
+    name: 'MixxGate',
+    category: 'dynamics',
+    description: 'Gate/Expander - Noise gate with expander mode for clean recordings',
+    manufacturer: 'Mixx Club',
+    version: '1.0.0',
+    tags: ['gate', 'expander', 'noise', 'dynamics', 'clean'],
+    presetCount: 16,
+  },
+  component: MixxGate,
+  defaultParameters: {
+    threshold: 0.3,
+    range: 0.5,
+    attack: 0.2,
+    hold: 0.3,
+    release: 0.4,
+    ratio: 0.2,
+  },
+});
+
+// Register MixxPhaser
+PluginManager.register({
+  metadata: {
+    id: 'mixxphaser',
+    name: 'MixxPhaser',
+    category: 'effects',
+    description: 'Phase Shifter - Vintage phaser with multi-stage filtering',
+    manufacturer: 'Mixx Club',
+    version: '1.0.0',
+    tags: ['phaser', 'modulation', 'vintage', 'sweep', 'notch'],
+    presetCount: 20,
+  },
+  component: MixxPhaser,
+  defaultParameters: {
+    rate: 0.4,
+    depth: 0.6,
+    feedback: 0.3,
+    stages: 0.5,
+    mix: 0.5,
+    stereo: 0.5,
+  },
+});
+
+// Register MixxFlanger
+PluginManager.register({
+  metadata: {
+    id: 'mixxflanger',
+    name: 'MixxFlanger',
+    category: 'effects',
+    description: 'Jet Flanger - Classic flanging effect with feedback control',
+    manufacturer: 'Mixx Club',
+    version: '1.0.0',
+    tags: ['flanger', 'modulation', 'jet', 'sweep', 'comb'],
+    presetCount: 18,
+  },
+  component: MixxFlanger,
+  defaultParameters: {
+    rate: 0.3,
+    depth: 0.5,
+    feedback: 0.4,
+    delay: 0.2,
+    mix: 0.5,
+    invert: 0,
+  },
+});
+
+// Register MixxStereoImager
+PluginManager.register({
+  metadata: {
+    id: 'mixxstereoimager',
+    name: 'MixxStereoImager',
+    category: 'mastering',
+    description: 'Stereo Imager - Advanced stereo width and spatial control',
+    manufacturer: 'Mixx Club',
+    version: '1.0.0',
+    tags: ['stereo', 'width', 'imaging', 'spatial', 'mid-side'],
+    presetCount: 15,
+  },
+  component: MixxStereoImager,
+  defaultParameters: {
+    width: 0.5,
+    mono: 0.5,
+    balance: 0.5,
+    rotation: 0.5,
+    lowWidth: 0.3,
+    highWidth: 0.7,
+  },
+});
+
+// Register MixxTransient
+PluginManager.register({
+  metadata: {
+    id: 'mixxtransient',
+    name: 'MixxTransient',
+    category: 'dynamics',
+    description: 'Transient Designer - Shape attack and sustain independently',
+    manufacturer: 'Mixx Club',
+    version: '1.0.0',
+    tags: ['transient', 'attack', 'sustain', 'punch', 'envelope'],
+    presetCount: 24,
+  },
+  component: MixxTransient,
+  defaultParameters: {
+    attack: 0.5,
+    sustain: 0.5,
+    speed: 0.5,
+    highEmphasis: 0.3,
+    clipGuard: 0.8,
+    output: 0.5,
+  },
+});
+
+// Register MixxMultiBandComp
+PluginManager.register({
+  metadata: {
+    id: 'mixxmultibandcomp',
+    name: 'MixxMultiBandComp',
+    category: 'mastering',
+    description: 'Multiband Dynamics - 3-band compressor for mastering and bus processing',
+    manufacturer: 'Mixx Club',
+    version: '1.0.0',
+    tags: ['multiband', 'compressor', 'mastering', 'frequency', 'dynamics'],
+    presetCount: 32,
+  },
+  component: MixxMultiBandComp,
+  defaultParameters: {
+    lowThreshold: 0.6,
+    lowRatio: 0.3,
+    midThreshold: 0.6,
+    midRatio: 0.3,
+    highThreshold: 0.6,
+    highRatio: 0.3,
+    attack: 0.3,
+    release: 0.5,
+    crossover1: 0.2,
+    crossover2: 0.8,
+    lowGain: 0.5,
+    midGain: 0.5,
+    highGain: 0.5,
+    output: 0.5,
+  },
+});
+
+// Register MixxExciter
+PluginManager.register({
+  metadata: {
+    id: 'mixxexciter',
+    name: 'MixxExciter',
+    category: 'creative',
+    description: 'Harmonic Exciter - Add brightness and presence with harmonic generation',
+    manufacturer: 'Mixx Club',
+    version: '1.0.0',
+    tags: ['exciter', 'harmonics', 'brightness', 'presence', 'air'],
+    presetCount: 22,
+  },
+  component: MixxExciter,
+  defaultParameters: {
+    amount: 0.4,
+    frequency: 0.6,
+    harmonics: 0.5,
+    mix: 0.5,
+    mode: 0.5,
+    output: 0.5,
+  },
+});
+
+// Register MixxDeEsser
+PluginManager.register({
+  metadata: {
+    id: 'mixxdeesser',
+    name: 'MixxDeEsser',
+    category: 'dynamics',
+    description: 'De-Esser - Intelligent sibilance reduction for vocals',
+    manufacturer: 'Mixx Club',
+    version: '1.0.0',
+    tags: ['deesser', 'vocal', 'sibilance', 'dynamics', 'processing'],
+    presetCount: 14,
+  },
+  component: MixxDeEsser,
+  defaultParameters: {
+    threshold: 0.6,
+    frequency: 0.75,
+    range: 0.5,
+    speed: 0.5,
+    mode: 0.5,
+    amount: 0.5,
   },
 });
