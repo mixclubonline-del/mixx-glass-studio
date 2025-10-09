@@ -48,8 +48,10 @@ export function TrackLane({
     
     // Background with track color tint
     const gradient = ctx.createLinearGradient(0, 0, 0, height);
-    gradient.addColorStop(0, `${trackColor}15`);
-    gradient.addColorStop(1, `${trackColor}05`);
+    // Convert hsl(h,s,l) to hsla(h,s,l,a) for opacity
+    const colorWithAlpha = (alpha: number) => trackColor.replace('hsl(', 'hsla(').replace(')', `, ${alpha})`);
+    gradient.addColorStop(0, colorWithAlpha(0.15));
+    gradient.addColorStop(1, colorWithAlpha(0.05));
     ctx.fillStyle = gradient;
     ctx.fillRect(0, 0, width, height);
     
@@ -70,11 +72,12 @@ export function TrackLane({
     const isSelected = selectedRegions.has(region.id);
     
     // Region background
-    ctx.fillStyle = region.color + (isSelected ? '40' : '25');
+    const regionColorWithAlpha = (alpha: number) => region.color.replace('hsl(', 'hsla(').replace(')', `, ${alpha})`);
+    ctx.fillStyle = regionColorWithAlpha(isSelected ? 0.25 : 0.15);
     ctx.fillRect(regionX, 0, regionWidth, height);
     
     // Border
-    ctx.strokeStyle = region.color + (isSelected ? 'AA' : '66');
+    ctx.strokeStyle = regionColorWithAlpha(isSelected ? 0.67 : 0.4);
     ctx.lineWidth = isSelected ? 2 : 1;
     ctx.strokeRect(regionX, 0, regionWidth, height);
     
