@@ -6,7 +6,10 @@ import { Switch } from '@/components/ui/switch';
 import { Label } from '@/components/ui/label';
 import { Separator } from '@/components/ui/separator';
 import { Badge } from '@/components/ui/badge';
+import { Loader2, Sparkles, Brain } from 'lucide-react';
+import { useToast } from '@/hooks/use-toast';
 import { MixxTuneSettings, PitchData, MusicalContext } from '@/types/mixxtune';
+import { MixxTuneAIService } from '@/services/MixxTuneAIService';
 
 interface MixxTuneProps {
   onClose: () => void;
@@ -15,6 +18,7 @@ interface MixxTuneProps {
 }
 
 export function MixxTune({ onClose, parameters, onChange }: MixxTuneProps) {
+  const { toast } = useToast();
   const [settings, setSettings] = useState<MixxTuneSettings>({
     speed: parameters.speed || 50,
     strength: parameters.strength || 80,
@@ -32,6 +36,8 @@ export function MixxTune({ onClose, parameters, onChange }: MixxTuneProps) {
   const [currentPitch, setCurrentPitch] = useState<PitchData | null>(null);
   const [context, setContext] = useState<MusicalContext | null>(null);
   const [activeStyle, setActiveStyle] = useState<string>('natural');
+  const [isOptimizing, setIsOptimizing] = useState(false);
+  const [aiInsight, setAiInsight] = useState<string>('');
   
   const handleKnobChange = (param: string, value: number) => {
     setSettings(prev => ({ ...prev, [param]: value }));
@@ -56,6 +62,55 @@ export function MixxTune({ onClose, parameters, onChange }: MixxTuneProps) {
     onChange({ ...parameters, ...preset });
   };
   
+  const handleAIOptimize = async () => {
+    setIsOptimizing(true);
+    try {
+      // Simulate audio feature analysis (in real implementation, would analyze actual audio)
+      const mockFeatures = {
+        pitchVariance: 'Medium' as const,
+        hasVibrato: settings.preserveVibrato,
+        breathiness: 'Medium' as const
+      };
+
+      const aiSettings = await MixxTuneAIService.getSuggestedSettings(
+        mockFeatures,
+        'Hip-Hop Vocal',
+        'Trap/R&B'
+      );
+
+      setSettings(prev => ({
+        ...prev,
+        speed: aiSettings.speed,
+        strength: aiSettings.strength,
+        tolerance: aiSettings.tolerance,
+        style: aiSettings.style
+      }));
+      
+      setActiveStyle(aiSettings.style);
+      setAiInsight(aiSettings.explanation);
+      
+      onChange({
+        ...parameters,
+        speed: aiSettings.speed,
+        strength: aiSettings.strength,
+        tolerance: aiSettings.tolerance
+      });
+
+      toast({
+        title: "AI Optimization Complete",
+        description: `Applied ${aiSettings.style} preset with custom tuning`,
+      });
+    } catch (error) {
+      toast({
+        title: "Optimization Failed",
+        description: "Could not get AI recommendations. Using default settings.",
+        variant: "destructive"
+      });
+    } finally {
+      setIsOptimizing(false);
+    }
+  };
+
   const getNoteNameFromMidi = (midi: number): string => {
     const noteNames = ['C', 'C#', 'D', 'D#', 'E', 'F', 'F#', 'G', 'G#', 'A', 'A#', 'B'];
     const octave = Math.floor(midi / 12) - 1;
@@ -152,6 +207,44 @@ export function MixxTune({ onClose, parameters, onChange }: MixxTuneProps) {
           </div>
         )}
         
+        {/* AI Optimize Button */}
+        <div className="bg-gradient-to-r from-cyan-500/10 to-blue-500/10 rounded-lg p-4 border border-cyan-500/30">
+          <div className="flex items-center justify-between mb-3">
+            <div>
+              <div className="flex items-center gap-2 mb-1">
+                <Brain className="w-4 h-4 text-cyan-400" />
+                <Label className="text-sm font-semibold text-cyan-400">AI AUTO-OPTIMIZE</Label>
+              </div>
+              <p className="text-xs text-muted-foreground">
+                Let AI analyze your vocal and suggest optimal settings
+              </p>
+            </div>
+          </div>
+          <Button
+            onClick={handleAIOptimize}
+            disabled={isOptimizing}
+            className="w-full bg-gradient-to-r from-cyan-500 to-blue-500 hover:from-cyan-600 hover:to-blue-600"
+            size="sm"
+          >
+            {isOptimizing ? (
+              <>
+                <Loader2 className="w-4 h-4 mr-2 animate-spin" />
+                Analyzing...
+              </>
+            ) : (
+              <>
+                <Sparkles className="w-4 h-4 mr-2" />
+                Optimize with AI
+              </>
+            )}
+          </Button>
+          {aiInsight && (
+            <div className="mt-3 p-2 bg-black/40 rounded text-xs text-cyan-400">
+              {aiInsight}
+            </div>
+          )}
+        </div>
+
         {/* Style Presets */}
         <div>
           <Label className="text-xs text-muted-foreground mb-3 block">STYLE PRESETS</Label>
