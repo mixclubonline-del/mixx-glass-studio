@@ -32,12 +32,21 @@ export function ChannelFader({
 }: ChannelFaderProps) {
   const [isDragging, setIsDragging] = useState(false);
   
-  const handleMouseDown = (e: React.MouseEvent) => {
+  const handleMouseDown = (e: React.MouseEvent<HTMLDivElement>) => {
     setIsDragging(true);
-    updateValue(e);
+    const element = e.currentTarget;
+    const rect = element.getBoundingClientRect();
+    
+    const updateValueFromEvent = (clientY: number) => {
+      const y = clientY - rect.top;
+      const percent = 100 - Math.max(0, Math.min(100, (y / rect.height) * 100));
+      onChange?.(percent);
+    };
+    
+    updateValueFromEvent(e.clientY);
     
     const handleMouseMove = (e: MouseEvent) => {
-      updateValue(e as any);
+      updateValueFromEvent(e.clientY);
     };
     
     const handleMouseUp = () => {
@@ -48,13 +57,6 @@ export function ChannelFader({
     
     document.addEventListener('mousemove', handleMouseMove);
     document.addEventListener('mouseup', handleMouseUp);
-  };
-  
-  const updateValue = (e: React.MouseEvent) => {
-    const rect = (e.currentTarget as HTMLElement).getBoundingClientRect();
-    const y = e.clientY - rect.top;
-    const percent = 100 - Math.max(0, Math.min(100, (y / rect.height) * 100));
-    onChange?.(percent);
   };
   
   return (

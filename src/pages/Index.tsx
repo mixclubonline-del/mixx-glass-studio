@@ -5,9 +5,12 @@ import { HorizontalTimeline } from '@/studio/components/Timeline/HorizontalTimel
 import { TrackLoader } from '@/studio/components/TrackLoader';
 import { EffectsRack } from '@/studio/components/EffectsRack';
 import { MixerPanel } from '@/studio/components/Mixer/MixerPanel';
+import { AutomationPanel } from '@/studio/components/Automation';
+import { AIAssistantPanel } from '@/studio/components/AI';
 import { useToast } from '@/hooks/use-toast';
 import { PeakLevel } from '@/types/audio';
 import { PluginBrowser, PluginWindow, MixxReverb, MixxTune } from '@/studio/components/Plugins';
+import { Sparkles } from 'lucide-react';
 import '@/studio/components/Plugins/PluginRegistry'; // Register all plugins
 import { PluginManager } from '@/audio/plugins/PluginManager';
 import { TopMenuBar, ViewContainer } from '@/studio/components/Navigation';
@@ -30,6 +33,7 @@ const Index = () => {
   // View state from Zustand
   const { currentView, activePluginId, pluginParams, isPanelOpen, setActivePlugin } = useViewStore();
   const [activePluginParamsLocal, setActivePluginParamsLocal] = useState<Record<string, number>>({});
+  const [showAIAssistant, setShowAIAssistant] = useState(false);
   
   // Effect parameters
   const [effects, setEffects] = useState({
@@ -199,6 +203,7 @@ const Index = () => {
     onPause: handlePause,
     onStop: handleStop,
     onExport: handleExport,
+    onAIAssistant: () => setShowAIAssistant(prev => !prev),
   });
 
   return (
@@ -241,6 +246,8 @@ const Index = () => {
         {/* Main workspace with horizontal timeline and mixer */}
         <ViewContainer className="flex flex-col">
           <HorizontalTimeline />
+          
+          <AutomationPanel />
           
           <MixerPanel />
           
@@ -295,6 +302,20 @@ const Index = () => {
           onChange={(newParams) => setActivePluginParamsLocal(newParams)}
         />
       )}
+      
+      {/* AI Assistant Panel */}
+      <AIAssistantPanel
+        isOpen={showAIAssistant}
+        onClose={() => setShowAIAssistant(false)}
+      />
+      
+      {/* AI Assistant Toggle FAB */}
+      <button
+        onClick={() => setShowAIAssistant(!showAIAssistant)}
+        className="fixed right-4 bottom-24 w-14 h-14 rounded-full bg-primary text-primary-foreground shadow-lg hover:shadow-xl transition-all hover:scale-110 flex items-center justify-center z-40"
+      >
+        <Sparkles className="w-6 h-6" />
+      </button>
     </div>
   );
 };

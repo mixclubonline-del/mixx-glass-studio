@@ -15,6 +15,7 @@ interface ShortcutHandlers {
   onExport?: () => void;
   onUndo?: () => void;
   onRedo?: () => void;
+  onAIAssistant?: () => void;
 }
 
 export function useKeyboardShortcuts(handlers: ShortcutHandlers) {
@@ -113,6 +114,12 @@ export function useKeyboardShortcuts(handlers: ShortcutHandlers) {
       if (e.code === 'KeyE' && !cmdOrCtrl) {
         e.preventDefault();
         togglePanel('effects');
+        return;
+      }
+      
+      if (e.code === 'KeyI' && !cmdOrCtrl) {
+        e.preventDefault();
+        if (handlers.onAIAssistant) handlers.onAIAssistant();
         return;
       }
     };
