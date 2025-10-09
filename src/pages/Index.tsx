@@ -5,13 +5,14 @@ import { AdvancedTimeline } from '@/studio/components/Timeline/AdvancedTimeline'
 import { TrackLoader } from '@/studio/components/TrackLoader';
 import { EffectsRack } from '@/studio/components/EffectsRack';
 import { MixerWindow } from '@/studio/components/Mixer/MixerWindow';
-import { Button } from '@/components/ui/button';
 import { useToast } from '@/hooks/use-toast';
-import { PeakLevel, EQParams, CompressorParams } from '@/types/audio';
+import { PeakLevel } from '@/types/audio';
 import { PluginBrowser, PluginWindow, MixxReverb, MixxTune } from '@/studio/components/Plugins';
 import '@/studio/components/Plugins/PluginRegistry'; // Register all plugins
-import { Package } from 'lucide-react';
 import { PluginManager } from '@/audio/plugins/PluginManager';
+import { TopMenuBar, ViewContainer } from '@/studio/components/Navigation';
+import { useViewStore } from '@/store/viewStore';
+import { useKeyboardShortcuts } from '@/hooks/useKeyboardShortcuts';
 
 const Index = () => {
   const { toast } = useToast();
@@ -21,12 +22,14 @@ const Index = () => {
   const [duration, setDuration] = useState(0);
   const [isExporting, setIsExporting] = useState(false);
   const [tracks, setTracks] = useState<any[]>([]);
-  const [view, setView] = useState<'arrange' | 'mix'>('arrange');
+  const [bpm, setBpm] = useState(120);
+  const [timeSignature, setTimeSignature] = useState({ numerator: 4, denominator: 4 });
   const [peakLevels, setPeakLevels] = useState<Map<string, PeakLevel>>(new Map());
   const [masterPeak, setMasterPeak] = useState<PeakLevel>({ left: -60, right: -60 });
-  const [isPluginBrowserOpen, setIsPluginBrowserOpen] = useState(false);
-  const [activePlugin, setActivePlugin] = useState<string | null>(null);
-  const [activePluginParams, setActivePluginParams] = useState<Record<string, number>>({});
+  
+  // View state from Zustand
+  const { currentView, activePluginId, pluginParams, isPanelOpen, setActivePlugin } = useViewStore();
+  const [activePluginParamsLocal, setActivePluginParamsLocal] = useState<Record<string, number>>({});
   
   // Effect parameters
   const [effects, setEffects] = useState({
@@ -189,9 +192,17 @@ const Index = () => {
       setIsExporting(false);
     }
   };
+  
+  // Keyboard shortcuts
+  useKeyboardShortcuts({
+    onPlay: handlePlay,
+    onPause: handlePause,
+    onStop: handleStop,
+    onExport: handleExport,
+  });
 
   return (
-    <div className="min-h-screen bg-background relative overflow-hidden">
+    <div className="min-h-screen bg-background relative overflow-hidden flex flex-col">
       {/* Animated background */}
       <div className="fixed inset-0 gradient-animate opacity-10 pointer-events-none" />
       
@@ -204,7 +215,16 @@ const Index = () => {
         }}
       />
 
-      <div className="relative z-10 container mx-auto px-4 py-8 space-y-6">
+      {/* Top Menu Bar */}
+      <div className="relative z-20">
+        <TopMenuBar 
+          onExport={handleExport}
+          onSave={() => toast({ title: 'Save feature coming soon!' })}
+          onLoad={() => toast({ title: 'Load feature coming soon!' })}
+        />
+      </div>
+
+      <div className="relative z-10 flex-1 flex flex-col px-4 py-6 space-y-6 overflow-auto">
         {/* Header */}
         <header className="text-center space-y-2 mb-8">
           <h1 className="text-5xl font-bold neon-text tracking-tight">
@@ -226,6 +246,10 @@ const Index = () => {
           onStop={handleStop}
           onExport={handleExport}
           isExporting={isExporting}
+          bpm={bpm}
+          timeSignature={timeSignature}
+          onBpmChange={setBpm}
+          onTimeSignatureChange={setTimeSignature}
         />
 
         {/* Advanced Timeline */}
@@ -248,32 +272,9 @@ const Index = () => {
           />
         </div>
 
-        {/* View Switcher & Plugin Browser Button */}
-        <div className="flex gap-2 justify-center">
-          <Button
-            variant={view === 'arrange' ? 'default' : 'outline'}
-            onClick={() => setView('arrange')}
-          >
-            Arrange
-          </Button>
-          <Button
-            variant={view === 'mix' ? 'default' : 'outline'}
-            onClick={() => setView('mix')}
-          >
-            Mix
-          </Button>
-          <Button
-            variant="outline"
-            onClick={() => setIsPluginBrowserOpen(true)}
-            className="ml-4"
-          >
-            <Package className="w-4 h-4 mr-2" />
-            Plugin Browser
-          </Button>
-        </div>
-
-        {/* Main workspace */}
-        {view === 'arrange' ? (
+        {/* Main workspace with view container */}
+        <ViewContainer>
+          {currentView === 'arrange' ? (
           <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
             <div className="lg:col-span-2">
               <TrackLoader
@@ -295,9 +296,9 @@ const Index = () => {
               />
             </div>
           </div>
-        ) : (
-          <div className="h-[600px]">
-            <MixerWindow
+          ) : currentView === 'mix' ? (
+            <div className="h-[600px]">
+              <MixerWindow
               tracks={audioEngineRef.current?.getTracks() || []}
               buses={audioEngineRef.current?.getBuses() || []}
               masterBus={audioEngineRef.current?.['masterBus']}
@@ -314,8 +315,13 @@ const Index = () => {
               onExport={handleExport}
               isExporting={isExporting}
             />
-          </div>
-        )}
+            </div>
+          ) : (
+            <div className="flex items-center justify-center h-[600px]">
+              <p className="text-muted-foreground">Edit view coming soon...</p>
+            </div>
+          )}
+        </ViewContainer>
 
         {/* Footer branding */}
         <footer className="text-center text-sm text-muted-foreground/50 pt-8">
@@ -326,17 +332,17 @@ const Index = () => {
       
       {/* Plugin Browser */}
       <PluginBrowser
-        isOpen={isPluginBrowserOpen}
-        onClose={() => setIsPluginBrowserOpen(false)}
+        isOpen={isPanelOpen.browser}
+        onClose={() => useViewStore.getState().togglePanel('browser')}
         onPluginSelect={(pluginId) => {
           const pluginDef = PluginManager.getPlugins().find(p => p.metadata.id === pluginId);
-          setActivePlugin(pluginId);
-          setActivePluginParams(pluginDef?.defaultParameters || {});
+          setActivePlugin(pluginId, pluginDef?.defaultParameters || {});
+          setActivePluginParamsLocal(pluginDef?.defaultParameters || {});
         }}
       />
       
       {/* Active Plugin Windows */}
-      {activePlugin === 'mixxreverb' && (
+      {activePluginId === 'mixxreverb' && (
         <PluginWindow
           title="MixxReverb - Atmos Designer"
           onClose={() => setActivePlugin(null)}
@@ -347,11 +353,11 @@ const Index = () => {
         </PluginWindow>
       )}
       
-      {activePlugin === 'mixxtune' && (
+      {activePluginId === 'mixxtune' && (
         <MixxTune
           onClose={() => setActivePlugin(null)}
-          parameters={activePluginParams}
-          onChange={(newParams) => setActivePluginParams(newParams)}
+          parameters={activePluginParamsLocal}
+          onChange={(newParams) => setActivePluginParamsLocal(newParams)}
         />
       )}
     </div>
