@@ -16,3 +16,4 @@ export { MixxTransient } from './MixxTransient';
 export { MixxMultiBandComp } from './MixxMultiBandComp';
 export { MixxExciter } from './MixxExciter';
 export { MixxDeEsser } from './MixxDeEsser';
+export { MixxTune } from './MixxTune';
