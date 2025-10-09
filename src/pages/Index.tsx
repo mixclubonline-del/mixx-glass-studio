@@ -1,8 +1,7 @@
 import { useState, useEffect, useRef } from 'react';
 import { AudioEngine, EffectParams } from '@/audio/AudioEngine';
 import { TransportControls } from '@/studio/components/TransportControls';
-import { Timeline } from '@/studio/components/Timeline';
-import { TimelineContainer } from '@/studio/components/Timeline/TimelineContainer';
+import { AdvancedTimeline } from '@/studio/components/Timeline/AdvancedTimeline';
 import { TrackLoader } from '@/studio/components/TrackLoader';
 import { EffectsRack } from '@/studio/components/EffectsRack';
 import { MixerWindow } from '@/studio/components/Mixer/MixerWindow';
@@ -222,14 +221,23 @@ const Index = () => {
           isExporting={isExporting}
         />
 
-        {/* Timeline */}
-        <div className="h-64">
-          <TimelineContainer
+        {/* Advanced Timeline */}
+        <div className="h-96">
+          <AdvancedTimeline
+            tracks={tracks}
             currentTime={currentTime}
             duration={duration}
             isPlaying={isPlaying}
             bpm={audioEngineRef.current?.bpm || 120}
             onSeek={handleSeek}
+            onTrackMuteToggle={handleMuteToggle}
+            onTrackSoloToggle={(id) => {
+              const track = tracks.find(t => t.id === id);
+              if (track && audioEngineRef.current) {
+                audioEngineRef.current.setTrackSolo(id, !track.channelStrip.isSolo());
+                setTracks([...audioEngineRef.current.getTracks()]);
+              }
+            }}
           />
         </div>
 
