@@ -68,7 +68,19 @@ export function PluginBrowser({ isOpen, onClose, onPluginSelect }: PluginBrowser
       {/* Header */}
       <div className="flex items-center justify-between px-6 py-4 border-b border-border bg-secondary/30">
         <div className="flex items-center gap-4">
-          <h2 className="text-2xl font-bold neon-text">Plugin Browser</h2>
+          <Button
+            variant="outline"
+            size="lg"
+            onClick={onClose}
+            className="gap-2 neon-glow-prime"
+          >
+            <X className="w-5 h-5" />
+            Close Browser
+          </Button>
+          
+          <div className="h-8 w-px bg-border" />
+          
+          <h2 className="text-2xl font-bold neon-text">Plugin Suite</h2>
           
           {/* Search */}
           <div className="relative w-96">
@@ -95,13 +107,17 @@ export function PluginBrowser({ isOpen, onClose, onPluginSelect }: PluginBrowser
             AI Recommendations
           </Button>
           
-          <Button variant="ghost" size="sm">
+          <Button 
+            variant="ghost" 
+            size="sm"
+            onClick={() => {
+              setSearchQuery('');
+              setSelectedCategory('all');
+              setSelectedPlugin(null);
+            }}
+          >
             <RefreshCw className="w-4 h-4 mr-2" />
-            Refresh
-          </Button>
-          
-          <Button variant="ghost" size="icon" onClick={onClose}>
-            <X className="w-4 h-4" />
+            Reset
           </Button>
         </div>
       </div>

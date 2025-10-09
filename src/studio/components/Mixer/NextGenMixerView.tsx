@@ -15,15 +15,49 @@ import { Layers, ChevronRight } from 'lucide-react';
 interface NextGenMixerViewProps {
   onExport: () => void;
   isExporting: boolean;
+  onVolumeChange?: (id: string, volume: number) => void;
+  onPanChange?: (id: string, pan: number) => void;
+  onMuteToggle?: (id: string) => void;
+  onSoloToggle?: (id: string) => void;
 }
 
 export const NextGenMixerView: React.FC<NextGenMixerViewProps> = ({
   onExport,
-  isExporting
+  isExporting,
+  onVolumeChange,
+  onPanChange,
+  onMuteToggle,
+  onSoloToggle
 }) => {
   const { channels, masterVolume, masterPeakLevel, selectedChannelId, selectChannel, updateChannel, setMasterVolume } = useMixerStore();
   const { setAddTrackDialogOpen } = useTracksStore();
   const channelArray = Array.from(channels.values());
+  
+  const handleVolumeChange = (id: string, volume: number) => {
+    updateChannel(id, { volume });
+    onVolumeChange?.(id, volume);
+  };
+  
+  const handlePanChange = (id: string, pan: number) => {
+    updateChannel(id, { pan });
+    onPanChange?.(id, pan);
+  };
+  
+  const handleMuteToggle = (id: string) => {
+    const ch = channels.get(id);
+    if (ch) {
+      updateChannel(id, { muted: !ch.muted });
+      onMuteToggle?.(id);
+    }
+  };
+  
+  const handleSoloToggle = (id: string) => {
+    const ch = channels.get(id);
+    if (ch) {
+      updateChannel(id, { solo: !ch.solo });
+      onSoloToggle?.(id);
+    }
+  };
   
   return (
     <div className="h-full flex bg-background">
@@ -69,16 +103,10 @@ export const NextGenMixerView: React.FC<NextGenMixerViewProps> = ({
                   channel={channel}
                   isSelected={selectedChannelId === channel.id}
                   onSelect={selectChannel}
-                  onVolumeChange={(id, volume) => updateChannel(id, { volume })}
-                  onPanChange={(id, pan) => updateChannel(id, { pan })}
-                  onMuteToggle={(id) => {
-                    const ch = channels.get(id);
-                    if (ch) updateChannel(id, { muted: !ch.muted });
-                  }}
-                  onSoloToggle={(id) => {
-                    const ch = channels.get(id);
-                    if (ch) updateChannel(id, { solo: !ch.solo });
-                  }}
+                  onVolumeChange={handleVolumeChange}
+                  onPanChange={handlePanChange}
+                  onMuteToggle={handleMuteToggle}
+                  onSoloToggle={handleSoloToggle}
                 />
               ))}
             </div>

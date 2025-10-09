@@ -119,11 +119,15 @@ const Index = () => {
       const loadedTrack = audioTracks.find(t => t.id === id);
       
       if (loadedTrack && loadedTrack.buffer) {
+        // Generate color
+        const hue = Math.floor(Math.random() * 360);
+        const color = `hsl(${hue}, 70%, 50%)`;
+        
         // Add to timeline store
         const timelineTrack: TimelineTrack = {
           id,
           name: file.name,
-          color: `hsl(${Math.random() * 360}, 70%, 50%)`,
+          color,
           height: 100,
           regions: [],
           muted: false,
@@ -141,7 +145,7 @@ const Index = () => {
           duration: loadedTrack.buffer.duration,
           bufferOffset: 0,
           bufferDuration: loadedTrack.buffer.duration,
-          color: timelineTrack.color,
+          color,
           fadeIn: 0,
           fadeOut: 0,
           gain: 1,
@@ -153,7 +157,7 @@ const Index = () => {
         // Store audio buffer
         setAudioBuffers(prev => new Map(prev).set(region.id, loadedTrack.buffer!));
         
-        // Add to mixer
+        // Add to mixer - sync state
         addChannel({
           id,
           name: file.name,
@@ -161,15 +165,29 @@ const Index = () => {
           pan: 0,
           muted: false,
           solo: false,
-          color: timelineTrack.color,
+          color,
           peakLevel: { left: -60, right: -60 }
         });
         
+        // Sync initial volume to audio engine
+        engineRef.current.setTrackVolume(id, 0.75);
+        
         // Update duration
-        setDuration(Math.max(region.startTime + region.duration, 0));
+        const totalDuration = Math.max(region.startTime + region.duration, currentTime);
+        setDuration(totalDuration);
+        
+        toast({
+          title: "Track loaded",
+          description: `${file.name} added to timeline and mixer`,
+        });
       }
     } catch (error) {
       console.error("Failed to load track:", error);
+      toast({
+        title: "Error",
+        description: "Failed to load audio file",
+        variant: "destructive"
+      });
     }
   };
 
@@ -183,21 +201,31 @@ const Index = () => {
   const handleVolumeChange = (id: string, volume: number) => {
     if (engineRef.current) {
       engineRef.current.setTrackVolume(id, volume);
+      // Sync to mixer store
+      const channel = channels.get(id);
+      if (channel) {
+        useMixerStore.getState().updateChannel(id, { volume });
+      }
     }
   };
 
   const handleMuteToggle = (id: string) => {
     if (engineRef.current) {
-      const track = Array.from(channels.values()).find(t => t.id === id);
-      if (track) {
-        engineRef.current.setTrackMute(id, !track.muted);
+      const channel = channels.get(id);
+      if (channel) {
+        const newMuted = !channel.muted;
+        engineRef.current.setTrackMute(id, newMuted);
+        // Sync to stores
+        useMixerStore.getState().updateChannel(id, { muted: newMuted });
+        useTracksStore.getState().updateTrack(id, { muted: newMuted });
       }
     }
   };
 
   const handlePlay = () => {
     if (engineRef.current) {
-      engineRef.current.play();
+      // Resume from current timeline position
+      engineRef.current.play(currentTime);
       setIsPlaying(true);
     }
   };
@@ -219,8 +247,19 @@ const Index = () => {
   
   const handleSeek = (time: number) => {
     if (engineRef.current) {
+      const wasPlaying = isPlaying;
       engineRef.current.stop();
       setCurrentTime(time);
+      
+      // If we were playing, resume playback from new position
+      if (wasPlaying) {
+        setTimeout(() => {
+          if (engineRef.current) {
+            engineRef.current.play(time);
+            setIsPlaying(true);
+          }
+        }, 10);
+      }
     }
   };
 
@@ -324,6 +363,22 @@ const Index = () => {
                 <NextGenMixerView
                   onExport={handleExport}
                   isExporting={isExporting}
+                  onVolumeChange={handleVolumeChange}
+                  onPanChange={(id, pan) => {
+                    if (engineRef.current) {
+                      engineRef.current.setTrackPan(id, pan);
+                    }
+                  }}
+                  onMuteToggle={handleMuteToggle}
+                  onSoloToggle={(id) => {
+                    if (engineRef.current) {
+                      const channel = channels.get(id);
+                      if (channel) {
+                        engineRef.current.setTrackSolo(id, !channel.solo);
+                        useMixerStore.getState().updateChannel(id, { solo: !channel.solo });
+                      }
+                    }
+                  }}
                 />
               )}
               

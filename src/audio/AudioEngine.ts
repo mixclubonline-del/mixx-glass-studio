@@ -176,10 +176,11 @@ export class AudioEngine {
   }
   
   // Playback
-  play() {
+  play(fromTime: number = 0) {
     if (this.isPlaying) return;
     
-    const offset = this.pauseTime;
+    // If resuming from pause, use pauseTime, otherwise use fromTime
+    const offset = this.pauseTime > 0 ? this.pauseTime : fromTime;
     this.startTime = this.context.currentTime - offset;
     
     this.tracks.forEach((track) => {
@@ -187,8 +188,18 @@ export class AudioEngine {
         const source = this.context.createBufferSource();
         source.buffer = track.buffer;
         source.connect(track.channelStrip.input);
-        source.start(0, offset + track.offset);
-        track.source = source;
+        
+        // Start from the correct offset position
+        const startOffset = Math.max(0, offset + track.offset);
+        if (startOffset < track.buffer.duration) {
+          source.start(0, startOffset);
+          track.source = source;
+          
+          // Auto-stop at end
+          source.onended = () => {
+            track.source = null;
+          };
+        }
       }
     });
     
@@ -211,9 +222,34 @@ export class AudioEngine {
   }
   
   stop() {
-    this.pause();
+    this.tracks.forEach((track) => {
+      if (track.source) {
+        try {
+          track.source.stop();
+        } catch (e) {
+          // Source may already be stopped
+        }
+        track.source = null;
+      }
+    });
+    
+    this.isPlaying = false;
     this.pauseTime = 0;
     this.startTime = 0;
+  }
+  
+  seek(time: number) {
+    const wasPlaying = this.isPlaying;
+    
+    if (this.isPlaying) {
+      this.stop();
+    }
+    
+    this.pauseTime = time;
+    
+    if (wasPlaying) {
+      this.play(time);
+    }
   }
   
   getCurrentTime(): number {
