@@ -8,6 +8,9 @@ import { MixerWindow } from '@/studio/components/Mixer/MixerWindow';
 import { Button } from '@/components/ui/button';
 import { useToast } from '@/hooks/use-toast';
 import { PeakLevel, EQParams, CompressorParams } from '@/types/audio';
+import { PluginBrowser, PluginWindow, MixxReverb } from '@/studio/components/Plugins';
+import '@/studio/components/Plugins/PluginRegistry'; // Register all plugins
+import { Package } from 'lucide-react';
 
 const Index = () => {
   const { toast } = useToast();
@@ -20,6 +23,8 @@ const Index = () => {
   const [view, setView] = useState<'arrange' | 'mix'>('arrange');
   const [peakLevels, setPeakLevels] = useState<Map<string, PeakLevel>>(new Map());
   const [masterPeak, setMasterPeak] = useState<PeakLevel>({ left: -60, right: -60 });
+  const [isPluginBrowserOpen, setIsPluginBrowserOpen] = useState(false);
+  const [activePlugin, setActivePlugin] = useState<string | null>(null);
   
   // Effect parameters
   const [effects, setEffects] = useState({
@@ -241,7 +246,7 @@ const Index = () => {
           />
         </div>
 
-        {/* View Switcher */}
+        {/* View Switcher & Plugin Browser Button */}
         <div className="flex gap-2 justify-center">
           <Button
             variant={view === 'arrange' ? 'default' : 'outline'}
@@ -254,6 +259,14 @@ const Index = () => {
             onClick={() => setView('mix')}
           >
             Mix
+          </Button>
+          <Button
+            variant="outline"
+            onClick={() => setIsPluginBrowserOpen(true)}
+            className="ml-4"
+          >
+            <Package className="w-4 h-4 mr-2" />
+            Plugin Browser
           </Button>
         </div>
 
@@ -308,6 +321,27 @@ const Index = () => {
           <p className="text-xs mt-1">Prime built it for the future — 2030-ready</p>
         </footer>
       </div>
+      
+      {/* Plugin Browser */}
+      <PluginBrowser
+        isOpen={isPluginBrowserOpen}
+        onClose={() => setIsPluginBrowserOpen(false)}
+        onPluginSelect={(pluginId) => {
+          setActivePlugin(pluginId);
+        }}
+      />
+      
+      {/* Active Plugin Window */}
+      {activePlugin === 'mixxreverb' && (
+        <PluginWindow
+          title="MixxReverb - Atmos Designer"
+          onClose={() => setActivePlugin(null)}
+          defaultWidth={700}
+          defaultHeight={450}
+        >
+          <MixxReverb />
+        </PluginWindow>
+      )}
     </div>
   );
 };
