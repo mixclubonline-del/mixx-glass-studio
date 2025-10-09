@@ -3,9 +3,10 @@
  */
 
 import React from 'react';
-import { PeakMeter } from './PeakMeter';
-import { Fader } from './Fader';
+import { IceFireFader } from '../Controls/IceFireFader';
+import { ProfessionalPeakMeter } from '../Metering/ProfessionalPeakMeter';
 import { SpectrumAnalyzer } from '../Metering/SpectrumAnalyzer';
+import { LUFSMeter } from '../Metering/LUFSMeter';
 import { Download } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 
@@ -41,38 +42,33 @@ export const MasterChannelStrip: React.FC<MasterChannelStripProps> = ({
       </div>
       
       {/* Peak meters */}
-      <div className="mb-4 flex justify-center gap-2">
-        <PeakMeter
+      <div className="mb-3 flex justify-center">
+        <ProfessionalPeakMeter
           level={peakLevel}
-          height={200}
+          height={220}
+          width={20}
           stereo={true}
+          showRMS={true}
+          clipIndicator={true}
         />
       </div>
       
       {/* Master fader */}
-      <div className="flex-1 flex items-center justify-center mb-4">
-        <Fader
+      <div className="flex-1 flex items-center justify-center mb-3">
+        <IceFireFader
           value={volume}
           onChange={onVolumeChange}
-          color="hsl(var(--primary))"
-          height={250}
-          label="MASTER"
+          height={240}
+          width={28}
+          showScale={true}
         />
-      </div>
-      
-      {/* LUFS display */}
-      <div className="text-center mb-4 glass rounded p-2">
-        <div className="text-[10px] text-muted-foreground mb-1">LUFS</div>
-        <div className="text-lg font-mono text-primary">
-          -14.2
-        </div>
       </div>
       
       {/* Export button */}
       <Button
         onClick={onExport}
         disabled={isExporting}
-        className="w-full neon-glow-prime"
+        className="w-full shadow-[0_0_15px_hsl(var(--primary)/0.4)]"
         size="sm"
       >
         {isExporting ? (
@@ -83,15 +79,10 @@ export const MasterChannelStrip: React.FC<MasterChannelStripProps> = ({
         ) : (
           <span className="flex items-center gap-2">
             <Download size={14} />
-            Export
+            Export Mix
           </span>
         )}
       </Button>
-      
-      {/* Format info */}
-      <div className="text-[10px] text-center text-muted-foreground mt-2">
-        WAV • 44.1kHz • 16bit
-      </div>
     </div>
   );
 };

@@ -2,14 +2,17 @@
  * Advanced Timeline View - Revolutionary 2027 timeline with intelligent features
  */
 
-import React, { useRef, useEffect } from 'react';
+import React, { useRef, useEffect, useState } from 'react';
 import { useTimelineStore } from '@/store/timelineStore';
 import { useTracksStore } from '@/store/tracksStore';
 import { TimelineRuler } from './TimelineRuler';
 import { TimelineTrackRow } from './TimelineTrackRow';
 import { Playhead } from './Playhead';
 import { GridOverlay } from './GridOverlay';
-import { ZoomIn, ZoomOut, Grid3x3, Maximize2 } from 'lucide-react';
+import { TimelineToolbar } from './TimelineToolbar';
+import { AddTrackDialog, TrackConfig } from './AddTrackDialog';
+import { ZoomIn, ZoomOut, Grid3x3, Maximize2, Plus } from 'lucide-react';
+import { Button } from '@/components/ui/button';
 
 interface AdvancedTimelineViewProps {
   audioBuffers: Map<string, AudioBuffer>;
@@ -28,21 +31,45 @@ export const AdvancedTimelineView: React.FC<AdvancedTimelineViewProps> = ({
     zoom, 
     scrollX,
     gridSnap,
+    currentTool,
+    snapMode,
+    rippleEdit,
     setZoom,
     setScrollX,
     selectedRegions,
     toggleRegionSelection,
-    clearSelection
+    clearSelection,
+    setSnapMode,
+    toggleRippleEdit
   } = useTimelineStore();
   
   const {
     tracks,
     regions,
     selectedTrackId,
+    addTrackDialogOpen,
     selectTrack,
     updateRegion,
-    getTrackRegions
+    getTrackRegions,
+    setAddTrackDialogOpen,
+    addTrack
   } = useTracksStore();
+  
+  const handleCreateTrack = (config: TrackConfig) => {
+    for (let i = 0; i < config.count; i++) {
+      const trackNumber = tracks.length + i + 1;
+      addTrack({
+        id: `track-${Date.now()}-${i}`,
+        name: `${config.name} ${config.count > 1 ? trackNumber : ''}`.trim(),
+        color: config.color,
+        muted: false,
+        solo: false,
+        recordArmed: false,
+        height: config.height === 'compact' ? 60 : config.height === 'tall' ? 150 : 100,
+        regions: []
+      });
+    }
+  };
   
   // Handle scroll
   const handleScroll = (e: React.UIEvent<HTMLDivElement>) => {
@@ -83,8 +110,11 @@ export const AdvancedTimelineView: React.FC<AdvancedTimelineViewProps> = ({
   
   return (
     <div className="flex flex-col h-full bg-background">
-      {/* Timeline controls */}
-      <div className="flex items-center gap-2 px-4 py-2 glass border-b border-border/30">
+      {/* Timeline toolbar with tools */}
+      <div className="flex items-center justify-between gap-3 px-4 py-2 glass border-b border-border/30">
+        <TimelineToolbar />
+        
+        <div className="flex items-center gap-2">
         <button 
           onClick={() => setZoom(zoom * 0.8)}
           className="p-1.5 rounded hover:bg-muted/50 transition-colors"
@@ -107,21 +137,26 @@ export const AdvancedTimelineView: React.FC<AdvancedTimelineViewProps> = ({
         
         <div className="w-px h-4 bg-border/50 mx-2" />
         
-        <button 
-          className={`p-1.5 rounded transition-colors ${
-            gridSnap ? 'bg-primary/20 text-primary' : 'hover:bg-muted/50'
-          }`}
-          title="Grid Snap"
-        >
-          <Grid3x3 size={16} />
-        </button>
-        
-        <button 
-          className="p-1.5 rounded hover:bg-muted/50 transition-colors ml-auto"
-          title="Fit to Window"
-        >
-          <Maximize2 size={16} />
-        </button>
+          <button 
+            onClick={() => setSnapMode(snapMode === 'off' ? 'grid' : 'off')}
+            className={`p-1.5 rounded transition-colors ${
+              snapMode !== 'off' ? 'bg-primary/20 text-primary' : 'hover:bg-muted/50'
+            }`}
+            title={`Snap: ${snapMode}`}
+          >
+            <Grid3x3 size={16} />
+          </button>
+          
+          <Button
+            size="sm"
+            variant="outline"
+            onClick={() => setAddTrackDialogOpen(true)}
+            className="gap-1"
+          >
+            <Plus size={14} />
+            Add Track
+          </Button>
+        </div>
       </div>
       
       {/* Timeline ruler */}
@@ -185,6 +220,13 @@ export const AdvancedTimelineView: React.FC<AdvancedTimelineViewProps> = ({
           )}
         </div>
       </div>
+      
+      {/* Add Track Dialog */}
+      <AddTrackDialog
+        open={addTrackDialogOpen}
+        onOpenChange={setAddTrackDialogOpen}
+        onCreateTrack={handleCreateTrack}
+      />
     </div>
   );
 };

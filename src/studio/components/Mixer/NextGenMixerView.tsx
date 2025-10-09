@@ -6,6 +6,10 @@ import React from 'react';
 import { useMixerStore } from '@/store/mixerStore';
 import { GlassChannelStrip } from './GlassChannelStrip';
 import { MasterChannelStrip } from './MasterChannelStrip';
+import { MasterMeteringPanel } from '../Metering/MasterMeteringPanel';
+import { Button } from '@/components/ui/button';
+import { Plus } from 'lucide-react';
+import { useTracksStore } from '@/store/tracksStore';
 import { Layers, ChevronRight } from 'lucide-react';
 
 interface NextGenMixerViewProps {
@@ -17,47 +21,48 @@ export const NextGenMixerView: React.FC<NextGenMixerViewProps> = ({
   onExport,
   isExporting
 }) => {
-  const {
-    channels,
-    masterVolume,
-    masterPeakLevel,
-    selectedChannelId,
-    updateChannel,
-    selectChannel,
-    setMasterVolume
-  } = useMixerStore();
-  
+  const { channels, masterVolume, masterPeakLevel, selectedChannelId, selectChannel, updateChannel, setMasterVolume } = useMixerStore();
+  const { setAddTrackDialogOpen } = useTracksStore();
   const channelArray = Array.from(channels.values());
   
   return (
-    <div className="flex flex-col h-full bg-background">
-      {/* Mixer header */}
-      <div className="flex items-center gap-3 px-4 py-3 glass border-b border-border/30">
-        <Layers className="text-primary" size={20} />
-        <h2 className="text-lg font-bold neon-text">Spatial Mixer</h2>
-        <div className="text-xs text-muted-foreground ml-auto">
-          {channelArray.length} channels
+    <div className="h-full flex bg-background">
+      {/* Mixer channels */}
+      <div className="flex-1 flex flex-col">
+        {/* Header */}
+        <div className="px-6 py-3 glass border-b border-border/30 flex items-center justify-between">
+          <div>
+            <h2 className="text-xl font-bold neon-text">Professional Mixer</h2>
+            <p className="text-xs text-muted-foreground mt-0.5">
+              {channelArray.length} channels • ITU-R BS.1770-5 Metering
+            </p>
+          </div>
+          <Button
+            size="sm"
+            onClick={() => setAddTrackDialogOpen(true)}
+            className="gap-1 shadow-[0_0_15px_hsl(var(--primary)/0.3)]"
+          >
+            <Plus size={14} />
+            Add Channel
+          </Button>
         </div>
-      </div>
-      
-      {/* Mixer content */}
-      <div className="flex-1 overflow-x-auto overflow-y-hidden p-6">
-        <div className="flex gap-4 h-full min-w-min">
-          {/* Master channel (fixed left) */}
-          <MasterChannelStrip
-            volume={masterVolume}
-            peakLevel={masterPeakLevel}
-            onVolumeChange={setMasterVolume}
-            onExport={onExport}
-            isExporting={isExporting}
-          />
-          
-          {/* Separator */}
-          <div className="w-px bg-gradient-to-b from-transparent via-border to-transparent" />
+        
+        {/* Mixer content */}
+        <div className="flex-1 flex items-start gap-4 p-4 overflow-x-auto">
+          {/* Master channel (fixed on left) */}
+          <div className="flex-shrink-0">
+            <MasterChannelStrip
+              volume={masterVolume}
+              peakLevel={masterPeakLevel}
+              onVolumeChange={setMasterVolume}
+              onExport={onExport}
+              isExporting={isExporting}
+            />
+          </div>
           
           {/* Channel strips */}
           {channelArray.length > 0 ? (
-            <div className="flex gap-3 h-full">
+            <div className="flex gap-3">
               {channelArray.map((channel) => (
                 <GlassChannelStrip
                   key={channel.id}
@@ -78,15 +83,20 @@ export const NextGenMixerView: React.FC<NextGenMixerViewProps> = ({
               ))}
             </div>
           ) : (
-            <div className="flex items-center justify-center flex-1 text-muted-foreground">
-              <div className="text-center">
-                <p className="text-lg mb-2">No channels</p>
-                <p className="text-sm">Load tracks to see mixer channels</p>
+            <div className="flex items-center justify-center flex-1 text-center">
+              <div className="glass-glow rounded-lg p-8">
+                <p className="text-muted-foreground mb-2">No channels loaded</p>
+                <p className="text-sm text-muted-foreground">
+                  Load audio tracks to see mixer channels
+                </p>
               </div>
             </div>
           )}
         </div>
       </div>
+      
+      {/* Master Metering Panel (right side) */}
+      <MasterMeteringPanel />
     </div>
   );
 };

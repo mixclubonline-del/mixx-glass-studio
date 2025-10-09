@@ -6,6 +6,10 @@
 import { EQ3Band } from './effects/EQ3Band';
 import { SimpleCompressor } from './effects/SimpleCompressor';
 import { EQParams, CompressorParams, SendConfig, PeakLevel } from '@/types/audio';
+import { TruePeakDetector } from './metering/TruePeakDetector';
+import { LUFSCalculator } from './metering/LUFSCalculator';
+import { PhaseCorrelationAnalyzer } from './metering/PhaseCorrelationAnalyzer';
+import { DynamicRangeCalculator } from './metering/DynamicRangeCalculator';
 
 export class ChannelStrip {
   private context: AudioContext;
@@ -24,6 +28,12 @@ export class ChannelStrip {
   // Metering
   private analyser: AnalyserNode;
   private analyserDataArray: Float32Array<ArrayBuffer>;
+  
+  // Professional metering
+  private truePeakDetector: TruePeakDetector;
+  private lufsCalculator: LUFSCalculator;
+  private phaseAnalyzer: PhaseCorrelationAnalyzer;
+  private drCalculator: DynamicRangeCalculator;
   
   // State
   private _muted: boolean = false;
@@ -58,6 +68,12 @@ export class ChannelStrip {
     
     // Connect to analyser for metering (after fader)
     this.fader.connect(this.analyser);
+    
+    // Initialize professional metering
+    this.truePeakDetector = new TruePeakDetector(context);
+    this.lufsCalculator = new LUFSCalculator(context);
+    this.phaseAnalyzer = new PhaseCorrelationAnalyzer();
+    this.drCalculator = new DynamicRangeCalculator();
   }
   
   // EQ controls
@@ -159,7 +175,7 @@ export class ChannelStrip {
     }
   }
   
-  // Peak metering
+  // Peak metering (standard)
   getPeakLevel(): PeakLevel {
     this.analyser.getFloatTimeDomainData(this.analyserDataArray);
     
@@ -173,6 +189,41 @@ export class ChannelStrip {
     
     // Return same for both channels (mono meter for now)
     return { left: db, right: db };
+  }
+  
+  // True Peak metering (ITU-R BS.1770-5)
+  getTruePeak(): number {
+    this.analyser.getFloatTimeDomainData(this.analyserDataArray);
+    return this.truePeakDetector.detectTruePeak(this.analyserDataArray);
+  }
+  
+  // LUFS calculations
+  getLUFS(): { integrated: number; shortTerm: number; momentary: number; range: number } {
+    this.analyser.getFloatTimeDomainData(this.analyserDataArray);
+    
+    return {
+      integrated: this.lufsCalculator.calculateIntegrated(this.analyserDataArray),
+      shortTerm: this.lufsCalculator.calculateShortTerm(this.analyserDataArray),
+      momentary: this.lufsCalculator.calculateMomentary(this.analyserDataArray),
+      range: this.lufsCalculator.calculateLRA(this.analyserDataArray)
+    };
+  }
+  
+  // Phase correlation
+  getPhaseCorrelation(): number {
+    this.analyser.getFloatTimeDomainData(this.analyserDataArray);
+    // For now, use same data for L/R (mono)
+    return this.phaseAnalyzer.calculateCorrelation(this.analyserDataArray, this.analyserDataArray);
+  }
+  
+  // Dynamic range
+  getDynamicRange(): { dr: number; crest: number } {
+    this.analyser.getFloatTimeDomainData(this.analyserDataArray);
+    
+    return {
+      dr: this.drCalculator.calculateDRScore(this.analyserDataArray),
+      crest: this.drCalculator.calculateCrestFactor(this.analyserDataArray)
+    };
   }
   
   dispose() {

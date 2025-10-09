@@ -5,8 +5,10 @@
 import React from 'react';
 import { ChannelState } from '@/store/mixerStore';
 import { Volume2, Mic, Lock } from 'lucide-react';
-import { PeakMeter } from './PeakMeter';
-import { Fader } from './Fader';
+import { ProfessionalPeakMeter } from '../Metering/ProfessionalPeakMeter';
+import { IceFireFader } from '../Controls/IceFireFader';
+import { IceFireKnob } from '../Controls/IceFireKnob';
+import { dbToNormalized, normalizedToDb } from '@/studio/utils/TemperatureGradient';
 
 interface GlassChannelStripProps {
   channel: ChannelState;
@@ -40,50 +42,44 @@ export const GlassChannelStrip: React.FC<GlassChannelStripProps> = ({
       }}
     >
       {/* Channel name */}
-      <div className="text-xs font-medium text-foreground mb-3 truncate text-center">
+      <div className="text-xs font-medium text-foreground mb-2 truncate text-center">
         {channel.name}
       </div>
       
       {/* Peak meter */}
-      <div className="mb-3">
-        <PeakMeter
+      <div className="mb-2 flex justify-center">
+        <ProfessionalPeakMeter
           level={channel.peakLevel}
-          height={120}
+          height={180}
+          width={12}
           stereo={true}
+          showRMS={true}
+          clipIndicator={true}
+        />
+      </div>
+      
+      {/* Pan knob */}
+      <div className="mb-2">
+        <IceFireKnob
+          value={(channel.pan + 1) / 2}
+          onChange={(value) => onPanChange(channel.id, (value * 2) - 1)}
+          size={40}
+          label="PAN"
+          valueLabel={channel.pan === 0 ? 'C' : channel.pan < 0 ? `L${Math.abs(channel.pan * 100).toFixed(0)}` : `R${(channel.pan * 100).toFixed(0)}`}
+          min={-100}
+          max={100}
         />
       </div>
       
       {/* Fader */}
-      <div className="flex-1 flex items-center justify-center mb-3">
-        <Fader
+      <div className="flex-1 flex items-center justify-center mb-2">
+        <IceFireFader
           value={channel.volume}
           onChange={(value) => onVolumeChange(channel.id, value)}
-          color={channel.color}
           height={200}
+          width={20}
+          showScale={false}
         />
-      </div>
-      
-      {/* Pan control */}
-      <div className="mb-3">
-        <div className="text-[10px] text-muted-foreground text-center mb-1">PAN</div>
-        <input
-          type="range"
-          min="-1"
-          max="1"
-          step="0.01"
-          value={channel.pan}
-          onChange={(e) => onPanChange(channel.id, parseFloat(e.target.value))}
-          className="w-full h-1 bg-muted rounded-full appearance-none cursor-pointer"
-          style={{
-            background: `linear-gradient(to right, 
-              hsl(var(--primary)) 0%, 
-              hsl(var(--muted)) 50%, 
-              hsl(var(--primary)) 100%)`
-          }}
-        />
-        <div className="text-[10px] text-center text-muted-foreground mt-1">
-          {channel.pan === 0 ? 'C' : channel.pan < 0 ? `L${Math.abs(channel.pan * 100).toFixed(0)}` : `R${(channel.pan * 100).toFixed(0)}`}
-        </div>
       </div>
       
       {/* Transport buttons */}
@@ -119,9 +115,9 @@ export const GlassChannelStrip: React.FC<GlassChannelStripProps> = ({
         </button>
       </div>
       
-      {/* Volume readout */}
-      <div className="text-[10px] text-center text-muted-foreground mt-2">
-        {(channel.volume * 100).toFixed(0)}%
+      {/* dB readout */}
+      <div className="text-[10px] text-center text-muted-foreground mt-2 font-mono">
+        {normalizedToDb(channel.volume).toFixed(1)} dB
       </div>
     </div>
   );

@@ -31,6 +31,7 @@ interface TimelineState {
   
   // Tool & editing
   currentTool: 'select' | 'range' | 'split' | 'trim' | 'fade' | 'pencil' | 'zoom' | 'multi';
+  gridMode: 'bars' | 'beats' | 'seconds' | 'samples' | 'adaptive';
   snapMode: 'grid' | 'relative' | 'transient' | 'marker' | 'region' | 'off';
   rippleEdit: boolean;
   
@@ -52,6 +53,7 @@ interface TimelineState {
   clearSelection: () => void;
   selectTrack: (id: string) => void;
   setCurrentTool: (tool: 'select' | 'range' | 'split' | 'trim' | 'fade' | 'pencil' | 'zoom' | 'multi') => void;
+  setGridMode: (mode: 'bars' | 'beats' | 'seconds' | 'samples' | 'adaptive') => void;
   setSnapMode: (mode: 'grid' | 'relative' | 'transient' | 'marker' | 'region' | 'off') => void;
   toggleRippleEdit: () => void;
 }
@@ -78,6 +80,7 @@ export const useTimelineStore = create<TimelineState>((set) => ({
   selectedTracks: new Set(),
   
   currentTool: 'select',
+  gridMode: 'adaptive',
   snapMode: 'grid',
   rippleEdit: false,
   
@@ -110,6 +113,7 @@ export const useTimelineStore = create<TimelineState>((set) => ({
   clearSelection: () => set({ selectedRegions: new Set() }),
   selectTrack: (id) => set({ selectedTracks: new Set([id]) }),
   setCurrentTool: (tool) => set({ currentTool: tool }),
+  setGridMode: (mode) => set({ gridMode: mode }),
   setSnapMode: (mode) => set({ snapMode: mode }),
   toggleRippleEdit: () => set((state) => ({ rippleEdit: !state.rippleEdit })),
 }));
