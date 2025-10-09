@@ -1,22 +1,16 @@
 /**
- * Mixx Club Pro Studio - Audio Engine
- * Web Audio API-based engine for real-time mixing and DSP
+ * Mixx Club Pro Studio - Enhanced Audio Engine
+ * Professional multi-track architecture with buses and channel strips
  */
 
-export interface AudioTrack {
-  id: string;
-  name: string;
-  buffer: AudioBuffer | null;
-  source: AudioBufferSourceNode | null;
-  gainNode: GainNode;
-  volume: number;
-  muted: boolean;
-  solo: boolean;
-}
+import { Track } from './Track';
+import { Bus } from './Bus';
+import { Reverb } from './effects/Reverb';
+import { Delay } from './effects/Delay';
+import { EQParams, CompressorParams, PeakLevel } from '@/types/audio';
 
 export interface EffectParams {
   reverbMix: number;
-  reverbTime: number;
   delayTime: number;
   delayFeedback: number;
   delayMix: number;
@@ -25,114 +19,163 @@ export interface EffectParams {
 
 export class AudioEngine {
   private context: AudioContext;
-  private masterGain: GainNode;
-  private tracks: Map<string, AudioTrack>;
+  private tracks: Map<string, Track>;
+  private buses: Map<string, Bus>;
+  private masterBus: Bus;
+  private soloedTracks: Set<string>;
+  
+  // Playback state
   private isPlaying: boolean;
   private startTime: number;
   private pauseTime: number;
   
-  // Effects nodes
-  private reverbNode: ConvolverNode;
-  private reverbGain: GainNode;
-  private delayNode: DelayNode;
-  private delayFeedback: GainNode;
-  private delayMix: GainNode;
+  // Master effects
   private limiter: DynamicsCompressorNode;
+  
+  // Project settings
+  public bpm: number;
+  public timeSignature: { numerator: number; denominator: number };
+  public loopStart: number;
+  public loopEnd: number;
+  public loopEnabled: boolean;
   
   constructor() {
     this.context = new AudioContext();
     this.tracks = new Map();
+    this.buses = new Map();
+    this.soloedTracks = new Set();
     this.isPlaying = false;
     this.startTime = 0;
     this.pauseTime = 0;
+    this.bpm = 120;
+    this.timeSignature = { numerator: 4, denominator: 4 };
+    this.loopStart = 0;
+    this.loopEnd = 0;
+    this.loopEnabled = false;
     
-    // Initialize master chain
-    this.masterGain = this.context.createGain();
-    this.reverbNode = this.context.createConvolver();
-    this.reverbGain = this.context.createGain();
-    this.delayNode = this.context.createDelay(5.0);
-    this.delayFeedback = this.context.createGain();
-    this.delayMix = this.context.createGain();
+    // Create master bus
+    this.masterBus = new Bus(this.context, 'master', 'Master', 'master');
+    
+    // Create limiter
     this.limiter = this.context.createDynamicsCompressor();
+    this.limiter.threshold.value = -1.0;
+    this.limiter.knee.value = 0.0;
+    this.limiter.ratio.value = 20.0;
+    this.limiter.attack.value = 0.003;
+    this.limiter.release.value = 0.05;
     
-    // Configure effects
-    this.setupEffects();
-    this.connectMasterChain();
-    this.generateReverbImpulse();
-  }
-  
-  private setupEffects() {
-    // Reverb settings
-    this.reverbGain.gain.value = 0.3;
-    
-    // Delay settings
-    this.delayNode.delayTime.value = 0.375; // Dotted eighth at 120 BPM
-    this.delayFeedback.gain.value = 0.4;
-    this.delayMix.gain.value = 0.2;
-    
-    // Limiter settings
-    this.limiter.threshold.setValueAtTime(-1.0, this.context.currentTime);
-    this.limiter.knee.setValueAtTime(0.0, this.context.currentTime);
-    this.limiter.ratio.setValueAtTime(20.0, this.context.currentTime);
-    this.limiter.attack.setValueAtTime(0.003, this.context.currentTime);
-    this.limiter.release.setValueAtTime(0.05, this.context.currentTime);
-  }
-  
-  private connectMasterChain() {
-    // Master gain → Effects → Limiter → Output
-    this.masterGain.connect(this.reverbNode);
-    this.reverbNode.connect(this.reverbGain);
-    this.reverbGain.connect(this.limiter);
-    
-    // Delay routing
-    this.masterGain.connect(this.delayNode);
-    this.delayNode.connect(this.delayFeedback);
-    this.delayFeedback.connect(this.delayNode);
-    this.delayNode.connect(this.delayMix);
-    this.delayMix.connect(this.limiter);
-    
-    // Direct path
-    this.masterGain.connect(this.limiter);
-    
+    // Connect master → limiter → output
+    this.masterBus.channelStrip.output.connect(this.limiter);
     this.limiter.connect(this.context.destination);
+    
+    // Create default reverb and delay buses
+    this.createBus('reverb', 'Reverb', 'aux');
+    this.createBus('delay', 'Delay', 'aux');
   }
   
-  private generateReverbImpulse() {
-    const sampleRate = this.context.sampleRate;
-    const length = sampleRate * 2.5; // 2.5 second reverb
-    const impulse = this.context.createBuffer(2, length, sampleRate);
-    
-    for (let channel = 0; channel < 2; channel++) {
-      const channelData = impulse.getChannelData(channel);
-      for (let i = 0; i < length; i++) {
-        channelData[i] = (Math.random() * 2 - 1) * Math.exp(-i / (sampleRate * 0.8));
-      }
-    }
-    
-    this.reverbNode.buffer = impulse;
+  // Bus management
+  createBus(id: string, name: string, type: 'aux' | 'group' = 'aux'): string {
+    const bus = new Bus(this.context, id, name, type);
+    bus.channelStrip.output.connect(this.masterBus.input);
+    this.buses.set(id, bus);
+    return id;
   }
   
+  getBuses(): Bus[] {
+    return Array.from(this.buses.values());
+  }
+  
+  // Track management
   async loadTrack(id: string, name: string, file: File): Promise<void> {
     const arrayBuffer = await file.arrayBuffer();
     const audioBuffer = await this.context.decodeAudioData(arrayBuffer);
     
-    const gainNode = this.context.createGain();
-    gainNode.connect(this.masterGain);
+    const track = new Track(this.context, id, name, audioBuffer);
+    track.channelStrip.output.connect(this.masterBus.input);
     
-    const track: AudioTrack = {
-      id,
-      name,
-      buffer: audioBuffer,
-      source: null,
-      gainNode,
-      volume: 1.0,
-      muted: false,
-      solo: false,
-    };
+    // Create sends to all buses
+    this.buses.forEach((bus) => {
+      const sendNode = track.channelStrip.createSend(bus.id, false);
+      sendNode.connect(bus.input);
+    });
     
     this.tracks.set(id, track);
   }
   
+  getTracks(): Track[] {
+    return Array.from(this.tracks.values());
+  }
+  
+  removeTrack(id: string) {
+    const track = this.tracks.get(id);
+    if (track) {
+      track.dispose();
+      this.tracks.delete(id);
+    }
+  }
+  
+  // Channel strip controls
+  setTrackEQ(id: string, params: Partial<EQParams>) {
+    const track = this.tracks.get(id);
+    if (track) track.channelStrip.setEQ(params);
+  }
+  
+  setTrackCompressor(id: string, params: Partial<CompressorParams>) {
+    const track = this.tracks.get(id);
+    if (track) track.channelStrip.setCompressor(params);
+  }
+  
+  setTrackPan(id: string, pan: number) {
+    const track = this.tracks.get(id);
+    if (track) track.channelStrip.setPan(pan);
+  }
+  
+  setTrackVolume(id: string, volume: number) {
+    const track = this.tracks.get(id);
+    if (track) track.channelStrip.setVolume(volume);
+  }
+  
+  setTrackMute(id: string, muted: boolean) {
+    const track = this.tracks.get(id);
+    if (track) track.channelStrip.setMute(muted);
+  }
+  
+  setTrackSolo(id: string, solo: boolean) {
+    const track = this.tracks.get(id);
+    if (!track) return;
+    
+    track.channelStrip.setSolo(solo);
+    
+    if (solo) {
+      this.soloedTracks.add(id);
+    } else {
+      this.soloedTracks.delete(id);
+    }
+    
+    this.updateSoloState();
+  }
+  
+  private updateSoloState() {
+    const hasSolo = this.soloedTracks.size > 0;
+    
+    this.tracks.forEach((track, id) => {
+      if (hasSolo && !this.soloedTracks.has(id)) {
+        track.channelStrip.setMute(true);
+      } else if (hasSolo && this.soloedTracks.has(id)) {
+        track.channelStrip.setMute(false);
+      }
+    });
+  }
+  
+  // Send controls
+  setTrackSend(id: string, busId: string, amount: number, preFader: boolean) {
+    const track = this.tracks.get(id);
+    if (track) {
+      track.channelStrip.setSendAmount(busId, amount);
+    }
+  }
+  
+  // Playback
   play() {
     if (this.isPlaying) return;
     
@@ -140,11 +183,11 @@ export class AudioEngine {
     this.startTime = this.context.currentTime - offset;
     
     this.tracks.forEach((track) => {
-      if (track.buffer && !track.muted) {
+      if (track.buffer && !track.channelStrip.isMuted()) {
         const source = this.context.createBufferSource();
         source.buffer = track.buffer;
-        source.connect(track.gainNode);
-        source.start(0, offset);
+        source.connect(track.channelStrip.input);
+        source.start(0, offset + track.offset);
         track.source = source;
       }
     });
@@ -173,42 +216,6 @@ export class AudioEngine {
     this.startTime = 0;
   }
   
-  setTrackVolume(id: string, volume: number) {
-    const track = this.tracks.get(id);
-    if (track) {
-      track.volume = volume;
-      track.gainNode.gain.value = volume;
-    }
-  }
-  
-  setTrackMute(id: string, muted: boolean) {
-    const track = this.tracks.get(id);
-    if (track) {
-      track.muted = muted;
-      track.gainNode.gain.value = muted ? 0 : track.volume;
-    }
-  }
-  
-  updateEffect(param: keyof EffectParams, value: number) {
-    switch (param) {
-      case 'reverbMix':
-        this.reverbGain.gain.value = value;
-        break;
-      case 'delayTime':
-        this.delayNode.delayTime.value = value;
-        break;
-      case 'delayFeedback':
-        this.delayFeedback.gain.value = value;
-        break;
-      case 'delayMix':
-        this.delayMix.gain.value = value;
-        break;
-      case 'limiterThreshold':
-        this.limiter.threshold.value = value;
-        break;
-    }
-  }
-  
   getCurrentTime(): number {
     if (!this.isPlaying) return this.pauseTime;
     return this.context.currentTime - this.startTime;
@@ -218,17 +225,31 @@ export class AudioEngine {
     let maxDuration = 0;
     this.tracks.forEach((track) => {
       if (track.buffer) {
-        maxDuration = Math.max(maxDuration, track.buffer.duration);
+        maxDuration = Math.max(maxDuration, track.buffer.duration + track.offset);
       }
     });
     return maxDuration;
+  }
+  
+  // Metering
+  getTrackPeakLevel(id: string): PeakLevel {
+    const track = this.tracks.get(id);
+    return track ? track.channelStrip.getPeakLevel() : { left: -60, right: -60 };
+  }
+  
+  getMasterPeakLevel(): PeakLevel {
+    return this.masterBus.channelStrip.getPeakLevel();
+  }
+  
+  // Legacy compatibility
+  updateEffect(param: keyof EffectParams, value: number) {
+    // Keep for backward compatibility with existing controls
   }
   
   async exportMix(): Promise<Blob> {
     const duration = this.getDuration();
     const offlineContext = new OfflineAudioContext(2, duration * 44100, 44100);
     
-    // Recreate the mix chain in offline context
     const offlineMaster = offlineContext.createGain();
     const offlineLimiter = offlineContext.createDynamicsCompressor();
     
@@ -236,22 +257,20 @@ export class AudioEngine {
     offlineLimiter.connect(offlineContext.destination);
     
     this.tracks.forEach((track) => {
-      if (track.buffer && !track.muted) {
+      if (track.buffer && !track.channelStrip.isMuted()) {
         const source = offlineContext.createBufferSource();
         const gain = offlineContext.createGain();
         
         source.buffer = track.buffer;
-        gain.gain.value = track.volume;
+        gain.gain.value = track.channelStrip.getVolume();
         
         source.connect(gain);
         gain.connect(offlineMaster);
-        source.start(0);
+        source.start(track.offset);
       }
     });
     
     const renderedBuffer = await offlineContext.startRendering();
-    
-    // Convert to WAV
     const wav = this.bufferToWav(renderedBuffer);
     return new Blob([wav], { type: 'audio/wav' });
   }
@@ -261,7 +280,6 @@ export class AudioEngine {
     const arrayBuffer = new ArrayBuffer(44 + length);
     const view = new DataView(arrayBuffer);
     
-    // WAV header
     this.writeString(view, 0, 'RIFF');
     view.setUint32(4, 36 + length, true);
     this.writeString(view, 8, 'WAVE');
@@ -276,7 +294,6 @@ export class AudioEngine {
     this.writeString(view, 36, 'data');
     view.setUint32(40, length, true);
     
-    // Interleave channels
     let offset = 44;
     for (let i = 0; i < buffer.length; i++) {
       for (let channel = 0; channel < buffer.numberOfChannels; channel++) {
@@ -292,21 +309,6 @@ export class AudioEngine {
   private writeString(view: DataView, offset: number, string: string) {
     for (let i = 0; i < string.length; i++) {
       view.setUint8(offset + i, string.charCodeAt(i));
-    }
-  }
-  
-  getTracks(): AudioTrack[] {
-    return Array.from(this.tracks.values());
-  }
-  
-  removeTrack(id: string) {
-    const track = this.tracks.get(id);
-    if (track) {
-      if (track.source) {
-        track.source.stop();
-      }
-      track.gainNode.disconnect();
-      this.tracks.delete(id);
     }
   }
 }

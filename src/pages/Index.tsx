@@ -4,7 +4,10 @@ import { TransportControls } from '@/studio/components/TransportControls';
 import { Timeline } from '@/studio/components/Timeline';
 import { TrackLoader } from '@/studio/components/TrackLoader';
 import { EffectsRack } from '@/studio/components/EffectsRack';
+import { MixerWindow } from '@/studio/components/Mixer/MixerWindow';
+import { Button } from '@/components/ui/button';
 import { useToast } from '@/hooks/use-toast';
+import { PeakLevel, EQParams, CompressorParams } from '@/types/audio';
 
 const Index = () => {
   const { toast } = useToast();
@@ -14,6 +17,9 @@ const Index = () => {
   const [duration, setDuration] = useState(0);
   const [isExporting, setIsExporting] = useState(false);
   const [tracks, setTracks] = useState<any[]>([]);
+  const [view, setView] = useState<'arrange' | 'mix'>('arrange');
+  const [peakLevels, setPeakLevels] = useState<Map<string, PeakLevel>>(new Map());
+  const [masterPeak, setMasterPeak] = useState<PeakLevel>({ left: -60, right: -60 });
   
   // Effect parameters
   const [effects, setEffects] = useState({
@@ -45,6 +51,14 @@ const Index = () => {
         if (time >= duration && duration > 0) {
           handleStop();
         }
+        
+        // Update peak meters
+        const newPeaks = new Map<string, PeakLevel>();
+        audioEngineRef.current.getTracks().forEach(track => {
+          newPeaks.set(track.id, audioEngineRef.current!.getTrackPeakLevel(track.id));
+        });
+        setPeakLevels(newPeaks);
+        setMasterPeak(audioEngineRef.current.getMasterPeakLevel());
       }
     }, 50);
 
@@ -215,31 +229,66 @@ const Index = () => {
           onSeek={handleSeek}
         />
 
-        {/* Main workspace */}
-        <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
-          {/* Track Loader */}
-          <div className="lg:col-span-2">
-            <TrackLoader
-              tracks={tracks}
-              onLoadTrack={handleLoadTrack}
-              onRemoveTrack={handleRemoveTrack}
-              onVolumeChange={handleVolumeChange}
-              onMuteToggle={handleMuteToggle}
-            />
-          </div>
-
-          {/* Effects Rack */}
-          <div>
-            <EffectsRack
-              reverbMix={effects.reverbMix}
-              delayTime={effects.delayTime}
-              delayFeedback={effects.delayFeedback}
-              delayMix={effects.delayMix}
-              limiterThreshold={effects.limiterThreshold}
-              onEffectChange={handleEffectChange}
-            />
-          </div>
+        {/* View Switcher */}
+        <div className="flex gap-2 justify-center">
+          <Button
+            variant={view === 'arrange' ? 'default' : 'outline'}
+            onClick={() => setView('arrange')}
+          >
+            Arrange
+          </Button>
+          <Button
+            variant={view === 'mix' ? 'default' : 'outline'}
+            onClick={() => setView('mix')}
+          >
+            Mix
+          </Button>
         </div>
+
+        {/* Main workspace */}
+        {view === 'arrange' ? (
+          <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
+            <div className="lg:col-span-2">
+              <TrackLoader
+                tracks={tracks}
+                onLoadTrack={handleLoadTrack}
+                onRemoveTrack={handleRemoveTrack}
+                onVolumeChange={handleVolumeChange}
+                onMuteToggle={handleMuteToggle}
+              />
+            </div>
+            <div>
+              <EffectsRack
+                reverbMix={effects.reverbMix}
+                delayTime={effects.delayTime}
+                delayFeedback={effects.delayFeedback}
+                delayMix={effects.delayMix}
+                limiterThreshold={effects.limiterThreshold}
+                onEffectChange={handleEffectChange}
+              />
+            </div>
+          </div>
+        ) : (
+          <div className="h-[600px]">
+            <MixerWindow
+              tracks={audioEngineRef.current?.getTracks() || []}
+              buses={audioEngineRef.current?.getBuses() || []}
+              masterBus={audioEngineRef.current?.['masterBus']}
+              peakLevels={peakLevels}
+              masterPeakLevel={masterPeak}
+              onTrackEQChange={(id, params) => audioEngineRef.current?.setTrackEQ(id, params)}
+              onTrackCompressorChange={(id, params) => audioEngineRef.current?.setTrackCompressor(id, params)}
+              onTrackSendChange={(id, busId, amount) => audioEngineRef.current?.setTrackSend(id, busId, amount, false)}
+              onTrackPanChange={(id, pan) => audioEngineRef.current?.setTrackPan(id, pan)}
+              onTrackVolumeChange={(id, vol) => audioEngineRef.current?.setTrackVolume(id, vol)}
+              onTrackSoloToggle={(id) => audioEngineRef.current?.setTrackSolo(id, !audioEngineRef.current.getTracks().find(t => t.id === id)?.channelStrip.isSolo())}
+              onTrackMuteToggle={(id) => handleMuteToggle(id)}
+              onMasterVolumeChange={(vol) => audioEngineRef.current?.['masterBus']?.channelStrip.setVolume(vol)}
+              onExport={handleExport}
+              isExporting={isExporting}
+            />
+          </div>
+        )}
 
         {/* Footer branding */}
         <footer className="text-center text-sm text-muted-foreground/50 pt-8">
