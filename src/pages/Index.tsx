@@ -1,10 +1,10 @@
 import { useState, useEffect, useRef } from 'react';
 import { AudioEngine, EffectParams } from '@/audio/AudioEngine';
 import { TransportControls } from '@/studio/components/TransportControls';
-import { AdvancedTimeline } from '@/studio/components/Timeline/AdvancedTimeline';
+import { HorizontalTimeline } from '@/studio/components/Timeline/HorizontalTimeline';
 import { TrackLoader } from '@/studio/components/TrackLoader';
 import { EffectsRack } from '@/studio/components/EffectsRack';
-import { MixerWindow } from '@/studio/components/Mixer/MixerWindow';
+import { MixerPanel } from '@/studio/components/Mixer/MixerPanel';
 import { useToast } from '@/hooks/use-toast';
 import { PeakLevel } from '@/types/audio';
 import { PluginBrowser, PluginWindow, MixxReverb, MixxTune } from '@/studio/components/Plugins';
@@ -238,89 +238,24 @@ const Index = () => {
           </div>
         </header>
 
-        {/* Transport Controls */}
-        <TransportControls
-          isPlaying={isPlaying}
-          onPlay={handlePlay}
-          onPause={handlePause}
-          onStop={handleStop}
-          onExport={handleExport}
-          isExporting={isExporting}
-          bpm={bpm}
-          timeSignature={timeSignature}
-          onBpmChange={setBpm}
-          onTimeSignatureChange={setTimeSignature}
-        />
-
-        {/* Advanced Timeline */}
-        <div className="h-96">
-          <AdvancedTimeline
-            tracks={tracks}
-            currentTime={currentTime}
-            duration={duration}
+        {/* Main workspace with horizontal timeline and mixer */}
+        <ViewContainer className="flex flex-col">
+          <HorizontalTimeline />
+          
+          <MixerPanel />
+          
+          <TransportControls
             isPlaying={isPlaying}
-            bpm={audioEngineRef.current?.bpm || 120}
-            onSeek={handleSeek}
-            onTrackMuteToggle={handleMuteToggle}
-            onTrackSoloToggle={(id) => {
-              const track = tracks.find(t => t.id === id);
-              if (track && audioEngineRef.current) {
-                audioEngineRef.current.setTrackSolo(id, !track.channelStrip.isSolo());
-                setTracks([...audioEngineRef.current.getTracks()]);
-              }
-            }}
+            onPlay={handlePlay}
+            onPause={handlePause}
+            onStop={handleStop}
+            onExport={handleExport}
+            isExporting={isExporting}
+            bpm={bpm}
+            timeSignature={timeSignature}
+            onBpmChange={setBpm}
+            onTimeSignatureChange={setTimeSignature}
           />
-        </div>
-
-        {/* Main workspace with view container */}
-        <ViewContainer>
-          {currentView === 'arrange' ? (
-          <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
-            <div className="lg:col-span-2">
-              <TrackLoader
-                tracks={tracks}
-                onLoadTrack={handleLoadTrack}
-                onRemoveTrack={handleRemoveTrack}
-                onVolumeChange={handleVolumeChange}
-                onMuteToggle={handleMuteToggle}
-              />
-            </div>
-            <div>
-              <EffectsRack
-                reverbMix={effects.reverbMix}
-                delayTime={effects.delayTime}
-                delayFeedback={effects.delayFeedback}
-                delayMix={effects.delayMix}
-                limiterThreshold={effects.limiterThreshold}
-                onEffectChange={handleEffectChange}
-              />
-            </div>
-          </div>
-          ) : currentView === 'mix' ? (
-            <div className="h-[600px]">
-              <MixerWindow
-              tracks={audioEngineRef.current?.getTracks() || []}
-              buses={audioEngineRef.current?.getBuses() || []}
-              masterBus={audioEngineRef.current?.['masterBus']}
-              peakLevels={peakLevels}
-              masterPeakLevel={masterPeak}
-              onTrackEQChange={(id, params) => audioEngineRef.current?.setTrackEQ(id, params)}
-              onTrackCompressorChange={(id, params) => audioEngineRef.current?.setTrackCompressor(id, params)}
-              onTrackSendChange={(id, busId, amount) => audioEngineRef.current?.setTrackSend(id, busId, amount, false)}
-              onTrackPanChange={(id, pan) => audioEngineRef.current?.setTrackPan(id, pan)}
-              onTrackVolumeChange={(id, vol) => audioEngineRef.current?.setTrackVolume(id, vol)}
-              onTrackSoloToggle={(id) => audioEngineRef.current?.setTrackSolo(id, !audioEngineRef.current.getTracks().find(t => t.id === id)?.channelStrip.isSolo())}
-              onTrackMuteToggle={(id) => handleMuteToggle(id)}
-              onMasterVolumeChange={(vol) => audioEngineRef.current?.['masterBus']?.channelStrip.setVolume(vol)}
-              onExport={handleExport}
-              isExporting={isExporting}
-            />
-            </div>
-          ) : (
-            <div className="flex items-center justify-center h-[600px]">
-              <p className="text-muted-foreground">Edit view coming soon...</p>
-            </div>
-          )}
         </ViewContainer>
 
         {/* Footer branding */}
