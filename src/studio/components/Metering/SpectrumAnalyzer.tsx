@@ -33,6 +33,14 @@ export const SpectrumAnalyzer: React.FC<SpectrumAnalyzerProps> = ({
     canvas.style.height = `${height}px`;
     ctx.scale(dpr, dpr);
     
+    // Get computed CSS color values
+    const primaryColor = getComputedStyle(document.documentElement)
+      .getPropertyValue('--primary').trim();
+    const primaryHsl = `hsl(${primaryColor})`;
+    const mutedForeground = getComputedStyle(document.documentElement)
+      .getPropertyValue('--muted-foreground').trim();
+    const mutedHsl = `hsl(${mutedForeground})`;
+    
     // Mock spectrum data (in real implementation, would use AnalyserNode)
     const draw = () => {
       ctx.clearRect(0, 0, width, height);
@@ -41,7 +49,7 @@ export const SpectrumAnalyzer: React.FC<SpectrumAnalyzerProps> = ({
       const barCount = 32;
       const barWidth = width / barCount;
       const gradient = ctx.createLinearGradient(0, height, 0, 0);
-      gradient.addColorStop(0, 'hsl(var(--primary))');
+      gradient.addColorStop(0, primaryHsl);
       gradient.addColorStop(0.5, 'hsl(191 100% 50%)'); // neon blue
       gradient.addColorStop(1, 'hsl(314 100% 65%)'); // neon pink
       
@@ -60,7 +68,7 @@ export const SpectrumAnalyzer: React.FC<SpectrumAnalyzerProps> = ({
         
         // Glow effect
         ctx.shadowBlur = 10;
-        ctx.shadowColor = 'hsl(var(--primary))';
+        ctx.shadowColor = primaryHsl;
         ctx.fillRect(
           i * barWidth + 1,
           height - barHeight,
@@ -71,7 +79,7 @@ export const SpectrumAnalyzer: React.FC<SpectrumAnalyzerProps> = ({
       }
       
       // Draw frequency labels
-      ctx.fillStyle = 'hsl(var(--muted-foreground))';
+      ctx.fillStyle = mutedHsl;
       ctx.font = '8px monospace';
       ctx.fillText('20Hz', 2, height - 2);
       ctx.fillText('20kHz', width - 30, height - 2);
