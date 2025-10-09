@@ -8,9 +8,10 @@ import { MixerWindow } from '@/studio/components/Mixer/MixerWindow';
 import { Button } from '@/components/ui/button';
 import { useToast } from '@/hooks/use-toast';
 import { PeakLevel, EQParams, CompressorParams } from '@/types/audio';
-import { PluginBrowser, PluginWindow, MixxReverb } from '@/studio/components/Plugins';
+import { PluginBrowser, PluginWindow, MixxReverb, MixxTune } from '@/studio/components/Plugins';
 import '@/studio/components/Plugins/PluginRegistry'; // Register all plugins
 import { Package } from 'lucide-react';
+import { PluginManager } from '@/audio/plugins/PluginManager';
 
 const Index = () => {
   const { toast } = useToast();
@@ -25,6 +26,7 @@ const Index = () => {
   const [masterPeak, setMasterPeak] = useState<PeakLevel>({ left: -60, right: -60 });
   const [isPluginBrowserOpen, setIsPluginBrowserOpen] = useState(false);
   const [activePlugin, setActivePlugin] = useState<string | null>(null);
+  const [activePluginParams, setActivePluginParams] = useState<Record<string, number>>({});
   
   // Effect parameters
   const [effects, setEffects] = useState({
@@ -327,11 +329,13 @@ const Index = () => {
         isOpen={isPluginBrowserOpen}
         onClose={() => setIsPluginBrowserOpen(false)}
         onPluginSelect={(pluginId) => {
+          const pluginDef = PluginManager.getPlugins().find(p => p.metadata.id === pluginId);
           setActivePlugin(pluginId);
+          setActivePluginParams(pluginDef?.defaultParameters || {});
         }}
       />
       
-      {/* Active Plugin Window */}
+      {/* Active Plugin Windows */}
       {activePlugin === 'mixxreverb' && (
         <PluginWindow
           title="MixxReverb - Atmos Designer"
@@ -341,6 +345,14 @@ const Index = () => {
         >
           <MixxReverb />
         </PluginWindow>
+      )}
+      
+      {activePlugin === 'mixxtune' && (
+        <MixxTune
+          onClose={() => setActivePlugin(null)}
+          parameters={activePluginParams}
+          onChange={(newParams) => setActivePluginParams(newParams)}
+        />
       )}
     </div>
   );

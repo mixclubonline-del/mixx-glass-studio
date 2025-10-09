@@ -18,6 +18,27 @@ import { MixxTransient } from './MixxTransient';
 import { MixxMultiBandComp } from './MixxMultiBandComp';
 import { MixxExciter } from './MixxExciter';
 import { MixxDeEsser } from './MixxDeEsser';
+import { MixxTune } from './MixxTune';
+
+// Register MixxTune - AI-Powered Pitch Correction
+PluginManager.register({
+  metadata: {
+    id: 'mixxtune',
+    name: 'MixxTune AI',
+    category: 'ai',
+    description: 'AI-powered context-aware pitch correction. Listens to your full mix to understand chords, key, and melody—adapting in real-time for natural, musical results. Perfect for modern hip-hop, trap, and R&B.',
+    manufacturer: 'Mixx Club',
+    version: '1.0.0',
+    tags: ['pitch', 'auto-tune', 'vocal', 'ai', 'context-aware', 'hip-hop', 'trap', 'r&b'],
+    presetCount: 4
+  },
+  component: MixxTune,
+  defaultParameters: {
+    speed: 50,
+    strength: 80,
+    tolerance: 30
+  }
+});
 
 // Register MixxReverb
 PluginManager.register({
