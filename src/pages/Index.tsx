@@ -2,6 +2,7 @@ import { useState, useEffect, useRef } from 'react';
 import { AudioEngine, EffectParams } from '@/audio/AudioEngine';
 import { TransportControls } from '@/studio/components/TransportControls';
 import { Timeline } from '@/studio/components/Timeline';
+import { TimelineContainer } from '@/studio/components/Timeline/TimelineContainer';
 import { TrackLoader } from '@/studio/components/TrackLoader';
 import { EffectsRack } from '@/studio/components/EffectsRack';
 import { MixerWindow } from '@/studio/components/Mixer/MixerWindow';
@@ -222,12 +223,15 @@ const Index = () => {
         />
 
         {/* Timeline */}
-        <Timeline
-          currentTime={currentTime}
-          duration={duration}
-          isPlaying={isPlaying}
-          onSeek={handleSeek}
-        />
+        <div className="h-64">
+          <TimelineContainer
+            currentTime={currentTime}
+            duration={duration}
+            isPlaying={isPlaying}
+            bpm={audioEngineRef.current?.bpm || 120}
+            onSeek={handleSeek}
+          />
+        </div>
 
         {/* View Switcher */}
         <div className="flex gap-2 justify-center">
