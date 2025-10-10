@@ -12,6 +12,7 @@ interface InsertRackProps {
   onAddPlugin: (slotNumber: number) => void;
   onRemovePlugin: (slotNumber: number) => void;
   onBypassToggle: (slotNumber: number) => void;
+  onDoubleClick?: (slotNumber: number) => void;
 }
 
 export const InsertRack: React.FC<InsertRackProps> = ({
@@ -20,6 +21,7 @@ export const InsertRack: React.FC<InsertRackProps> = ({
   onAddPlugin,
   onRemovePlugin,
   onBypassToggle,
+  onDoubleClick,
 }) => {
   return (
     <div className="space-y-1">
@@ -37,6 +39,7 @@ export const InsertRack: React.FC<InsertRackProps> = ({
           onAddPlugin={() => onAddPlugin(insert.slotNumber)}
           onRemovePlugin={() => onRemovePlugin(insert.slotNumber)}
           onBypassToggle={() => onBypassToggle(insert.slotNumber)}
+          onDoubleClick={onDoubleClick ? () => onDoubleClick(insert.slotNumber) : undefined}
         />
       ))}
     </div>

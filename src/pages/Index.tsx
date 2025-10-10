@@ -12,9 +12,7 @@ import {
   AIAssistantPanel
 } from "@/studio/components";
 import { PluginBrowser } from "@/studio/components/Plugins/PluginBrowser";
-import { PluginWindow } from "@/studio/components/Plugins/PluginWindow";
-import { MixxReverb } from "@/studio/components/Plugins/MixxReverb";
-import { MixxTune } from "@/studio/components/Plugins/MixxTune";
+import { PluginWindowManager } from "@/studio/components/Plugins/PluginWindowManager";
 import { useKeyboardShortcuts } from "@/hooks/useKeyboardShortcuts";
 import { useViewStore } from "@/store/viewStore";
 import { useTimelineStore } from "@/store/timelineStore";
@@ -38,6 +36,7 @@ const Index = () => {
   const [pluginBrowserOpen, setPluginBrowserOpen] = useState(false);
   const [selectedTrackForPlugin, setSelectedTrackForPlugin] = useState<string | null>(null);
   const [selectedSlotForPlugin, setSelectedSlotForPlugin] = useState<number>(1);
+  const [openPluginWindows, setOpenPluginWindows] = useState<Map<string, { trackId: string; slotNumber: number; pluginId: string }>>(new Map());
   const { toast } = useToast();
   
   // Global stores
@@ -142,12 +141,13 @@ const Index = () => {
         };
         addTrack(timelineTrack);
         
-        // Create region
+        // Create region - start at bar 1 (using project offset)
+        const projectStartOffset = engineRef.current.projectStartOffset || 0;
         const region: Region = {
           id: `region-${id}`,
           trackId: id,
           name: file.name,
-          startTime: 0,
+          startTime: projectStartOffset, // Start at bar 1
           duration: loadedTrack.buffer.duration,
           bufferOffset: 0,
           bufferDuration: loadedTrack.buffer.duration,
@@ -340,6 +340,33 @@ const Index = () => {
     setSelectedTrackForPlugin(trackId);
     setSelectedSlotForPlugin(slotNumber);
     setPluginBrowserOpen(true);
+  };
+  
+  const handleOpenPluginWindow = (trackId: string, slotNumber: number, pluginId: string) => {
+    const windowId = `${trackId}_${slotNumber}`;
+    setOpenPluginWindows(prev => {
+      const newMap = new Map(prev);
+      newMap.set(windowId, { trackId, slotNumber, pluginId });
+      return newMap;
+    });
+  };
+  
+  const handleClosePluginWindow = (windowId: string) => {
+    setOpenPluginWindows(prev => {
+      const newMap = new Map(prev);
+      newMap.delete(windowId);
+      return newMap;
+    });
+  };
+  
+  const handlePluginParameterChange = (trackId: string, slotNumber: number, paramName: string, value: number) => {
+    if (engineRef.current) {
+      const pluginInstance = engineRef.current.getPluginInstance(trackId, slotNumber);
+      if (pluginInstance && 'setParams' in pluginInstance) {
+        // Call setParams if the plugin has this method
+        (pluginInstance as any).setParams({ [paramName]: value });
+      }
+    }
   };
   
   // Bus management  
@@ -610,6 +637,7 @@ const Index = () => {
                   onBypassPlugin={handleBypassPlugin}
                   onSendChange={handleSendChange}
                   onCreateBus={handleCreateBus}
+                  onOpenPluginWindow={handleOpenPluginWindow}
                 />
               )}
               
@@ -683,6 +711,13 @@ const Index = () => {
       <AIAssistantPanel
         isOpen={showAIAssistant}
         onClose={() => setShowAIAssistant(false)}
+      />
+      
+      {/* Plugin Window Manager */}
+      <PluginWindowManager
+        openWindows={openPluginWindows}
+        onCloseWindow={handleClosePluginWindow}
+        onParameterChange={handlePluginParameterChange}
       />
       
       {/* AI Assistant Toggle FAB */}

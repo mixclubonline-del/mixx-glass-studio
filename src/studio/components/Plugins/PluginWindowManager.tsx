@@ -4,88 +4,65 @@
 
 import React, { useState, useCallback } from 'react';
 import { PluginWindow } from './PluginWindow';
-import { useViewStore } from '@/store/viewStore';
 import { PluginManager } from '@/audio/plugins/PluginManager';
 
-interface WindowState {
-  id: string;
-  pluginId: string;
-  trackId: string;
-  slotNumber: number;
-  zIndex: number;
-  minimized: boolean;
-  position?: { x: number; y: number };
+interface PluginWindowManagerProps {
+  openWindows: Map<string, { trackId: string; slotNumber: number; pluginId: string }>;
+  onCloseWindow: (windowId: string) => void;
+  onParameterChange: (trackId: string, slotNumber: number, paramName: string, value: number) => void;
 }
 
-export const PluginWindowManager: React.FC = () => {
-  const { activePluginId, pluginParams, closeAllPlugins } = useViewStore();
-  const [windows, setWindows] = useState<WindowState[]>([]);
+export const PluginWindowManager: React.FC<PluginWindowManagerProps> = ({
+  openWindows,
+  onCloseWindow,
+  onParameterChange,
+}) => {
   const [nextZIndex, setNextZIndex] = useState(1000);
-
-  const handleCloseWindow = useCallback((windowId: string) => {
-    setWindows(prev => prev.filter(w => w.id !== windowId));
-    if (activePluginId === windowId) {
-      closeAllPlugins();
-    }
-  }, [activePluginId, closeAllPlugins]);
+  const [windowZIndexes, setWindowZIndexes] = useState<Map<string, number>>(new Map());
 
   const bringToFront = useCallback((windowId: string) => {
-    setWindows(prev => prev.map(w => 
-      w.id === windowId 
-        ? { ...w, zIndex: nextZIndex }
-        : w
-    ));
+    setWindowZIndexes(prev => {
+      const newMap = new Map(prev);
+      newMap.set(windowId, nextZIndex);
+      return newMap;
+    });
     setNextZIndex(prev => prev + 1);
   }, [nextZIndex]);
 
-  const toggleMinimize = useCallback((windowId: string) => {
-    setWindows(prev => prev.map(w =>
-      w.id === windowId
-        ? { ...w, minimized: !w.minimized }
-        : w
-    ));
-  }, []);
-
-  // Sync active plugin from store
-  React.useEffect(() => {
-    if (activePluginId && !windows.find(w => w.id === activePluginId)) {
-      const newWindow: WindowState = {
-        id: activePluginId,
-        pluginId: activePluginId,
-        trackId: '', // Should come from context
-        slotNumber: 0,
-        zIndex: nextZIndex,
-        minimized: false,
-      };
-      setWindows(prev => [...prev, newWindow]);
-      setNextZIndex(prev => prev + 1);
-    }
-  }, [activePluginId, windows, nextZIndex]);
-
   return (
     <>
-      {windows.map(window => {
-        const plugin = PluginManager.getMetadata(window.pluginId);
-        if (!plugin || window.minimized) return null;
+      {Array.from(openWindows.entries()).map(([windowId, windowData]) => {
+        const plugin = PluginManager.getMetadata(windowData.pluginId);
+        if (!plugin) return null;
+
+        const zIndex = windowZIndexes.get(windowId) || 1000;
 
         return (
           <div
-            key={window.id}
+            key={windowId}
             style={{
               position: 'fixed',
-              zIndex: window.zIndex,
+              zIndex,
               pointerEvents: 'auto',
             }}
-            onClick={() => bringToFront(window.id)}
+            onClick={() => bringToFront(windowId)}
           >
             <PluginWindow
-              title={plugin.name}
-              onClose={() => handleCloseWindow(window.id)}
+              title={`${plugin.name} - Track ${windowData.trackId} / Slot ${windowData.slotNumber}`}
+              onClose={() => onCloseWindow(windowId)}
               defaultWidth={600}
               defaultHeight={400}
             >
-              <div className="text-sm text-muted-foreground">
-                Plugin content: {plugin.name}
+              <div className="p-4 space-y-4">
+                <div className="text-sm text-muted-foreground">
+                  Plugin: {plugin.name}
+                </div>
+                <div className="text-xs text-muted-foreground">
+                  Track: {windowData.trackId} | Slot: {windowData.slotNumber}
+                </div>
+                <div className="text-xs text-muted-foreground italic">
+                  Plugin UI coming soon - Parameter controls will appear here
+                </div>
               </div>
             </PluginWindow>
           </div>

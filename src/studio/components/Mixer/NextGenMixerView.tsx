@@ -26,6 +26,7 @@ interface NextGenMixerViewProps {
   onBypassPlugin: (trackId: string, slotNumber: number, bypass: boolean) => void;
   onSendChange: (trackId: string, busId: string, amount: number) => void;
   onCreateBus: (name: string, color: string, type: 'aux' | 'group') => void;
+  onOpenPluginWindow: (trackId: string, slotNumber: number, pluginId: string) => void;
 }
 
 export const NextGenMixerView: React.FC<NextGenMixerViewProps> = ({
@@ -39,7 +40,8 @@ export const NextGenMixerView: React.FC<NextGenMixerViewProps> = ({
   onUnloadPlugin,
   onBypassPlugin,
   onSendChange,
-  onCreateBus
+  onCreateBus,
+  onOpenPluginWindow
 }) => {
   const { channels, masterVolume, masterPeakLevel, selectedChannelId, selectChannel, updateChannel, setMasterVolume, buses } = useMixerStore();
   const { setAddTrackDialogOpen } = useTracksStore();
@@ -146,6 +148,7 @@ export const NextGenMixerView: React.FC<NextGenMixerViewProps> = ({
                     onUnloadPlugin={(slotNumber) => onUnloadPlugin(channel.id, slotNumber)}
                     onBypassPlugin={(slotNumber, bypass) => onBypassPlugin(channel.id, slotNumber, bypass)}
                     onSendChange={(busId, amount) => onSendChange(channel.id, busId, amount)}
+                    onOpenPluginWindow={(slotNumber, pluginId) => onOpenPluginWindow(channel.id, slotNumber, pluginId)}
                   />
                 );
               })}

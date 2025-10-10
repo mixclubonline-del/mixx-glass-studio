@@ -57,7 +57,11 @@ export class AudioEngine {
     this.loopStart = 0;
     this.loopEnd = 0;
     this.loopEnabled = false;
-    this.projectStartOffset = 0;
+    
+    // Calculate project start offset (1 bar before bar 1 for proper alignment)
+    const secondsPerBeat = 60 / this.bpm;
+    const beatsPerBar = this.timeSignature.numerator;
+    this.projectStartOffset = secondsPerBeat * beatsPerBar; // Start at bar 1 (after 1 bar offset)
     
     // Create master bus
     this.masterBus = new Bus(this.context, 'master', 'Master', 'master');

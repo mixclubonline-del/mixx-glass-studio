@@ -15,6 +15,7 @@ interface InsertSlotProps {
   onAddPlugin: () => void;
   onRemovePlugin: () => void;
   onBypassToggle: () => void;
+  onDoubleClick?: () => void;
 }
 
 export const InsertSlot: React.FC<InsertSlotProps> = ({
@@ -26,6 +27,7 @@ export const InsertSlot: React.FC<InsertSlotProps> = ({
   onAddPlugin,
   onRemovePlugin,
   onBypassToggle,
+  onDoubleClick,
 }) => {
   const isEmpty = !pluginId;
   
@@ -37,9 +39,10 @@ export const InsertSlot: React.FC<InsertSlotProps> = ({
           ? "border-border/30 bg-background/20 hover:border-primary/30 hover:bg-background/30 cursor-pointer"
           : bypass
           ? "border-muted bg-muted/20"
-          : "border-primary/40 bg-primary/5 hover:border-primary/60"
+          : "border-primary/40 bg-primary/5 hover:border-primary/60 cursor-pointer"
       )}
       onClick={isEmpty ? onAddPlugin : onPluginClick}
+      onDoubleClick={isEmpty ? undefined : onDoubleClick}
     >
       <div className="flex items-center justify-between h-full">
         {/* Slot number */}
