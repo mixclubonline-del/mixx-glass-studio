@@ -27,6 +27,9 @@ import type { MusicalContext } from "@/types/mixxtune";
 import { Button } from "@/components/ui/button";
 import { useToast } from "@/hooks/use-toast";
 import { AudioAnalyzer } from "@/audio/analysis/AudioAnalyzer";
+import { MixxAmbientOverlay } from "@/components/MixxAmbientOverlay";
+import { primeBrain } from "@/ai/primeBrain";
+import { predictionEngine } from "@/ai/predictionEngine";
 
 const Index = () => {
   const engineRef = useRef<AudioEngine | null>(null);
@@ -50,6 +53,16 @@ const Index = () => {
   const { currentView, isPanelOpen, togglePanel } = useViewStore();
   const { currentTime, isPlaying, setCurrentTime, setIsPlaying, setDuration } = useTimelineStore();
   const { tracks, regions, addTrack, addRegion } = useTracksStore();
+
+  // Track view changes for Prime Brain
+  useEffect(() => {
+    primeBrain.processSceneChange({
+      sceneId: currentView,
+      sceneName: currentView === 'arrange' ? 'Arrange View' : 
+                currentView === 'mix' ? 'Mixer View' : 'Editor View',
+      timestamp: Date.now()
+    });
+  }, [currentView]);
   const { 
     channels, 
     masterPeakLevel,
@@ -80,6 +93,12 @@ const Index = () => {
     const interval = setInterval(() => {
       const time = engineRef.current?.getCurrentTime() || 0;
       setCurrentTime(time);
+      
+      // Update prediction engine with current bar
+      const bpm = engineRef.current?.bpm || 120;
+      const barDuration = (60 / bpm) * 4; // 4 beats per bar
+      const currentBar = Math.floor(time / barDuration);
+      predictionEngine.updatePosition(currentBar, bpm);
     }, 50);
     
     return () => clearInterval(interval);
@@ -242,12 +261,29 @@ const Index = () => {
       if (channel) {
         useMixerStore.getState().updateChannel(id, { volume });
       }
+      
+      // Send to Prime Brain
+      primeBrain.processControlEvent({
+        type: 'fader',
+        controlId: `volume_${id}`,
+        value: volume,
+        previousValue: channel?.volume,
+        timestamp: Date.now()
+      });
     }
   };
   
   const handlePanChange = (id: string, pan: number) => {
     if (engineRef.current) {
       engineRef.current.setTrackPan(id, pan);
+      
+      // Send to Prime Brain
+      primeBrain.processControlEvent({
+        type: 'knob',
+        controlId: `pan_${id}`,
+        value: pan,
+        timestamp: Date.now()
+      });
     }
   };
   
@@ -591,6 +627,9 @@ const Index = () => {
         onChange={handleFileSelect}
       />
       
+      {/* Mixx Ambient Lighting Overlay */}
+      <MixxAmbientOverlay />
+      
       {/* Animated background */}
       <div className="fixed inset-0 gradient-animate opacity-10 pointer-events-none" />
       
@@ -761,6 +800,14 @@ const Index = () => {
               onMasterVolumeChange={(volume) => {
                 if (engineRef.current) {
                   engineRef.current.setMasterGain(volume);
+                  
+                  // Send to Prime Brain
+                  primeBrain.processControlEvent({
+                    type: 'fader',
+                    controlId: 'master_volume',
+                    value: volume,
+                    timestamp: Date.now()
+                  });
                 }
               }}
             />
