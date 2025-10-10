@@ -4,15 +4,15 @@
 
 import React from 'react';
 import { useMixerStore } from '@/store/mixerStore';
-import { GlassChannelStrip } from './GlassChannelStrip';
-import { MasterChannelStrip } from './MasterChannelStrip';
-import { MasterMeteringPanel } from '../Metering/MasterMeteringPanel';
-import { MixerSidePanels } from './MixerSidePanels';
-import { Button } from '@/components/ui/button';
-import { Plus } from 'lucide-react';
 import { useTracksStore } from '@/store/tracksStore';
 import { useTimelineStore } from '@/store/timelineStore';
-import { Layers, ChevronRight } from 'lucide-react';
+import { useViewStore } from '@/store/viewStore';
+import { GlassChannelStrip } from './GlassChannelStrip';
+import { MasterChannelStrip } from './MasterChannelStrip';
+import { CollapsibleMeteringPanel } from '../Metering/CollapsibleMeteringPanel';
+import { MixerSidePanels } from './MixerSidePanels';
+import { Button } from '@/components/ui/button';
+import { Plus, Activity, ChevronLeft, ChevronRight } from 'lucide-react';
 import mixxclubLogo from '@/assets/mixxclub-logo.png';
 
 interface NextGenMixerViewProps {
@@ -49,7 +49,32 @@ export const NextGenMixerView: React.FC<NextGenMixerViewProps> = ({
   const { channels, masterVolume, masterPeakLevel, selectedChannelId, selectChannel, updateChannel, setMasterVolume, buses } = useMixerStore();
   const { setAddTrackDialogOpen } = useTracksStore();
   const { loopEnabled, loopStart, loopEnd, setLoopEnabled, setLoopStart, setLoopEnd } = useTimelineStore();
+  const { isPanelOpen, togglePanel } = useViewStore();
   const channelArray = Array.from(channels.values());
+  const scrollRef = React.useRef<HTMLDivElement>(null);
+  const [showLeftScroll, setShowLeftScroll] = React.useState(false);
+  const [showRightScroll, setShowRightScroll] = React.useState(false);
+  
+  // Check scroll indicators
+  React.useEffect(() => {
+    const checkScroll = () => {
+      if (scrollRef.current) {
+        const { scrollLeft, scrollWidth, clientWidth } = scrollRef.current;
+        setShowLeftScroll(scrollLeft > 0);
+        setShowRightScroll(scrollLeft + clientWidth < scrollWidth - 5);
+      }
+    };
+    
+    checkScroll();
+    const ref = scrollRef.current;
+    ref?.addEventListener('scroll', checkScroll);
+    window.addEventListener('resize', checkScroll);
+    
+    return () => {
+      ref?.removeEventListener('scroll', checkScroll);
+      window.removeEventListener('resize', checkScroll);
+    };
+  }, [channelArray]);
   
   const handleVolumeChange = (id: string, volume: number) => {
     updateChannel(id, { volume });
@@ -78,68 +103,96 @@ export const NextGenMixerView: React.FC<NextGenMixerViewProps> = ({
   };
   
   return (
-    <div className="h-full flex bg-background">
-      {/* Mixer channels */}
-      <div className="flex-1 flex flex-col">
-        {/* Header */}
-        <div className="px-3 py-2 glass border-b border-border/30 flex items-center justify-between">
-          <div className="flex items-center gap-3">
-            <img 
-              src={mixxclubLogo} 
-              alt="MixxClub Studio" 
-              className="h-7 w-auto logo-glow" 
-            />
-            <div className="border-l border-border/30 h-6"></div>
-            <div>
-              <h2 className="text-sm font-bold gradient-flow">
-                Mix View
-              </h2>
-              <p className="text-[0.65rem] text-muted-foreground">
-                {channelArray.length} channels • Pro Metering
+    <div className="h-full flex flex-col bg-background">
+      {/* Header */}
+      <div className="px-3 py-2 glass border-b border-border/30 flex items-center justify-between">
+        <div className="flex items-center gap-3">
+          <img 
+            src={mixxclubLogo} 
+            alt="MixxClub Studio" 
+            className="h-7 w-auto logo-glow" 
+          />
+          <div className="border-l border-border/30 h-6"></div>
+          <div>
+            <h2 className="text-sm font-bold gradient-flow">
+              Mix View
+            </h2>
+            <p className="text-[0.65rem] text-muted-foreground">
+              {channelArray.length} channels • Pro Metering
+            </p>
+          </div>
+        </div>
+        <div className="flex items-center gap-2">
+          <Button
+            variant={isPanelOpen.metering ? "default" : "outline"}
+            size="sm"
+            onClick={() => togglePanel('metering')}
+            className="gap-2"
+          >
+            <Activity size={16} />
+            Metering
+          </Button>
+          <MixerSidePanels
+            buses={Array.from(buses.values())}
+            loopEnabled={loopEnabled}
+            loopStart={loopStart}
+            loopEnd={loopEnd}
+            onCreateBus={onCreateBus}
+            onDeleteBus={(id) => {
+              // Delete bus logic
+            }}
+            onLoopEnabledChange={setLoopEnabled}
+            onLoopStartChange={setLoopStart}
+            onLoopEndChange={setLoopEnd}
+          />
+          <Button
+            size="sm"
+            onClick={() => setAddTrackDialogOpen(true)}
+            className="gap-1 shadow-[0_0_15px_hsl(var(--primary)/0.3)]"
+          >
+            <Plus size={14} />
+            Add Channel
+          </Button>
+        </div>
+      </div>
+      
+      {/* Mixer Content with horizontal scroll */}
+      <div className="flex-1 overflow-hidden relative">
+        {channelArray.length === 0 ? (
+          <div className="h-full flex items-center justify-center text-center">
+            <div className="glass-glow rounded-lg p-8">
+              <p className="text-muted-foreground mb-2">No channels loaded</p>
+              <p className="text-sm text-muted-foreground">
+                Load audio tracks to see mixer channels
               </p>
             </div>
           </div>
-          <div className="flex items-center gap-2">
-            <MixerSidePanels
-              buses={Array.from(buses.values())}
-              loopEnabled={loopEnabled}
-              loopStart={loopStart}
-              loopEnd={loopEnd}
-              onCreateBus={onCreateBus}
-              onDeleteBus={(id) => {
-                // Delete bus logic
+        ) : (
+          <div className="h-full flex">
+            {/* Master channel - Fixed on left */}
+            <div className="flex-shrink-0 p-2 border-r border-border/30">
+              <MasterChannelStrip
+                volume={masterVolume}
+                peakLevel={masterPeakLevel}
+                onVolumeChange={setMasterVolume}
+                onExport={onExport}
+                isExporting={isExporting}
+              />
+            </div>
+            
+            {/* Scrollable channels area */}
+            <div 
+              ref={scrollRef}
+              className="flex-1 overflow-x-auto overflow-y-hidden p-2 flex gap-1 scroll-smooth"
+              onWheel={(e) => {
+                if (e.shiftKey) {
+                  e.preventDefault();
+                  if (scrollRef.current) {
+                    scrollRef.current.scrollLeft += e.deltaY;
+                  }
+                }
               }}
-              onLoopEnabledChange={setLoopEnabled}
-              onLoopStartChange={setLoopStart}
-              onLoopEndChange={setLoopEnd}
-            />
-            <Button
-              size="sm"
-              onClick={() => setAddTrackDialogOpen(true)}
-              className="gap-1 shadow-[0_0_15px_hsl(var(--primary)/0.3)]"
             >
-              <Plus size={14} />
-              Add Channel
-            </Button>
-          </div>
-        </div>
-        
-        {/* Mixer content */}
-        <div className="flex-1 flex items-start gap-2 p-2 overflow-x-auto">
-          {/* Master channel (fixed on left) */}
-          <div className="flex-shrink-0">
-            <MasterChannelStrip
-              volume={masterVolume}
-              peakLevel={masterPeakLevel}
-              onVolumeChange={setMasterVolume}
-              onExport={onExport}
-              isExporting={isExporting}
-            />
-          </div>
-          
-          {/* Channel strips */}
-          {channelArray.length > 0 ? (
-            <div className="flex gap-1">
               {channelArray.map((channel) => {
                 // Get inserts from tracks store
                 const { tracks: tracksArray } = useTracksStore.getState();
@@ -167,21 +220,24 @@ export const NextGenMixerView: React.FC<NextGenMixerViewProps> = ({
                 );
               })}
             </div>
-          ) : (
-            <div className="flex items-center justify-center flex-1 text-center">
-              <div className="glass-glow rounded-lg p-8">
-                <p className="text-muted-foreground mb-2">No channels loaded</p>
-                <p className="text-sm text-muted-foreground">
-                  Load audio tracks to see mixer channels
-                </p>
+            
+            {/* Scroll Indicators */}
+            {showLeftScroll && (
+              <div className="absolute left-[110px] top-0 bottom-0 w-12 bg-gradient-to-r from-background/80 to-transparent pointer-events-none flex items-center justify-start pl-2">
+                <ChevronLeft className="text-primary animate-pulse" size={24} />
               </div>
-            </div>
-          )}
-        </div>
+            )}
+            {showRightScroll && (
+              <div className="absolute right-0 top-0 bottom-0 w-12 bg-gradient-to-l from-background/80 to-transparent pointer-events-none flex items-center justify-end pr-2">
+                <ChevronRight className="text-primary animate-pulse" size={24} />
+              </div>
+            )}
+          </div>
+        )}
       </div>
       
-      {/* Master Metering Panel (right side) */}
-      <MasterMeteringPanel />
+      {/* Collapsible Metering Panel */}
+      <CollapsibleMeteringPanel />
     </div>
   );
 };

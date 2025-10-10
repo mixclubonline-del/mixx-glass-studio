@@ -58,7 +58,7 @@ export const MasterChannelStrip: React.FC<MasterChannelStripProps> = ({
         <IceFireFader
           value={volume}
           onChange={onVolumeChange}
-          height={240}
+          height={280}
           width={14}
           showScale={true}
         />

@@ -5,6 +5,7 @@ export { TimelineRegion } from './TimelineRegion';
 export { Playhead } from './Playhead';
 export { GridOverlay } from './GridOverlay';
 export { TimelineToolbar } from './TimelineToolbar';
+export { CollapsibleTimelineToolbar } from './CollapsibleTimelineToolbar';
 export { AddTrackDialog } from './AddTrackDialog';
 export { TimelineContainer } from './TimelineContainer';
 export { WaveformRenderer } from './WaveformRenderer';

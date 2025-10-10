@@ -9,13 +9,15 @@ interface SpectrumAnalyzerProps {
   height: number;
   peakLevel?: { left: number; right: number };
   analyserNode?: AnalyserNode; // Real FFT connection
+  mode?: 'spectrum' | 'phase' | 'waveform';
 }
 
-export const SpectrumAnalyzer: React.FC<SpectrumAnalyzerProps> = ({
-  width,
-  height,
+export const SpectrumAnalyzer: React.FC<SpectrumAnalyzerProps> = ({ 
+  width, 
+  height, 
   peakLevel,
-  analyserNode
+  analyserNode,
+  mode = 'spectrum'
 }) => {
   const canvasRef = useRef<HTMLCanvasElement>(null);
   const animationRef = useRef<number>();
