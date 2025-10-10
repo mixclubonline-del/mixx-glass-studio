@@ -32,7 +32,7 @@ export const MasterMeteringPanel: React.FC = () => {
           <ProfessionalPeakMeter
             level={masterPeakLevel}
             height={300}
-            width={20}
+            width={6}
             stereo={true}
             showRMS={true}
             rmsLevel={{ left: masterPeakLevel.left - 6, right: masterPeakLevel.right - 6 }}

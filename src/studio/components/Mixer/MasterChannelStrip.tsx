@@ -26,7 +26,7 @@ export const MasterChannelStrip: React.FC<MasterChannelStripProps> = ({
   isExporting
 }) => {
   return (
-    <div className="relative flex flex-col h-full w-40 glass-glow rounded-lg p-4 border-l-4 border-primary">
+    <div className="relative flex flex-col h-full w-28 glass-glow rounded-lg p-3 border-l-4 border-primary">
       {/* Master label */}
       <div className="text-sm font-bold text-primary mb-4 text-center neon-text">
         MASTER
@@ -46,7 +46,7 @@ export const MasterChannelStrip: React.FC<MasterChannelStripProps> = ({
         <ProfessionalPeakMeter
           level={peakLevel}
           height={220}
-          width={20}
+          width={6}
           stereo={true}
           showRMS={true}
           clipIndicator={true}
@@ -59,7 +59,7 @@ export const MasterChannelStrip: React.FC<MasterChannelStripProps> = ({
           value={volume}
           onChange={onVolumeChange}
           height={240}
-          width={28}
+          width={14}
           showScale={true}
         />
       </div>
