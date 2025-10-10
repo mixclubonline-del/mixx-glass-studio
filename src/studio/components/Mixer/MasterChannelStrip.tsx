@@ -33,10 +33,10 @@ export const MasterChannelStrip: React.FC<MasterChannelStripProps> = ({
       </div>
       
       {/* Spectrum analyzer */}
-      <div className="mb-4 h-32">
+      <div className="mb-4 h-20 flex justify-center">
         <SpectrumAnalyzer
-          width={128}
-          height={128}
+          width={80}
+          height={80}
           peakLevel={peakLevel}
         />
       </div>
