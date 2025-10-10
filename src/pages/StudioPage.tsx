@@ -9,6 +9,7 @@ import { TransportControls } from "../studio/components/TransportControls";
 import { MixxAIStudio } from "../studio/components/AI/MixxAIStudio";
 import { ViewSwitcher } from "../studio/components/Navigation/ViewSwitcher";
 import { ViewContainer } from "../studio/components/Navigation/ViewContainer";
+import { CollapsibleMeteringPanel } from "../studio/components/Metering/CollapsibleMeteringPanel";
 
 export default function StudioPage() {
   const { currentView } = useViewStore();
@@ -86,6 +87,9 @@ export default function StudioPage() {
           </div>
         )}
       </ViewContainer>
+
+      {/* Global Collapsible Metering Panel - accessible from View menu */}
+      <CollapsibleMeteringPanel />
     </div>
   );
 }

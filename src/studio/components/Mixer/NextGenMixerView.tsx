@@ -6,13 +6,11 @@ import React from 'react';
 import { useMixerStore } from '@/store/mixerStore';
 import { useTracksStore } from '@/store/tracksStore';
 import { useTimelineStore } from '@/store/timelineStore';
-import { useViewStore } from '@/store/viewStore';
 import { GlassChannelStrip } from './GlassChannelStrip';
 import { MasterChannelStrip } from './MasterChannelStrip';
-import { CollapsibleMeteringPanel } from '../Metering/CollapsibleMeteringPanel';
 import { MixerSidePanels } from './MixerSidePanels';
 import { Button } from '@/components/ui/button';
-import { Plus, Activity, ChevronLeft, ChevronRight } from 'lucide-react';
+import { Plus, ChevronLeft, ChevronRight } from 'lucide-react';
 import mixxclubLogo from '@/assets/mixxclub-logo.png';
 
 interface NextGenMixerViewProps {
@@ -49,7 +47,6 @@ export const NextGenMixerView: React.FC<NextGenMixerViewProps> = ({
   const { channels, masterVolume, masterPeakLevel, selectedChannelId, selectChannel, updateChannel, setMasterVolume, buses } = useMixerStore();
   const { setAddTrackDialogOpen } = useTracksStore();
   const { loopEnabled, loopStart, loopEnd, setLoopEnabled, setLoopStart, setLoopEnd } = useTimelineStore();
-  const { isPanelOpen, togglePanel } = useViewStore();
   const channelArray = Array.from(channels.values());
   const scrollRef = React.useRef<HTMLDivElement>(null);
   const [showLeftScroll, setShowLeftScroll] = React.useState(false);
@@ -123,15 +120,6 @@ export const NextGenMixerView: React.FC<NextGenMixerViewProps> = ({
           </div>
         </div>
         <div className="flex items-center gap-2">
-          <Button
-            variant={isPanelOpen.metering ? "default" : "outline"}
-            size="sm"
-            onClick={() => togglePanel('metering')}
-            className="gap-2"
-          >
-            <Activity size={16} />
-            Metering
-          </Button>
           <MixerSidePanels
             buses={Array.from(buses.values())}
             loopEnabled={loopEnabled}
@@ -235,9 +223,6 @@ export const NextGenMixerView: React.FC<NextGenMixerViewProps> = ({
           </div>
         )}
       </div>
-      
-      {/* Collapsible Metering Panel */}
-      <CollapsibleMeteringPanel />
     </div>
   );
 };

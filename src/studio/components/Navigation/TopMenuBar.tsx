@@ -164,6 +164,10 @@ export function TopMenuBar({
           <MenubarItem onClick={() => togglePanel('effects')}>
             Effects Rack<MenubarShortcut>E</MenubarShortcut>
           </MenubarItem>
+          <MenubarSeparator />
+          <MenubarItem onClick={() => togglePanel('metering')}>
+            Analysis Dashboard<MenubarShortcut>⌘A</MenubarShortcut>
+          </MenubarItem>
         </MenubarContent>
       </MenubarMenu>
       
