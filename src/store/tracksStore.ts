@@ -31,7 +31,15 @@ export const useTracksStore = create<TracksState>((set, get) => ({
   addTrackDialogOpen: false,
   
   addTrack: (track) => set((state) => ({
-    tracks: [...state.tracks, track]
+    tracks: [...state.tracks, {
+      ...track,
+      inserts: track.inserts || Array(8).fill(null).map((_, i) => ({
+        slotNumber: i + 1,
+        pluginId: null,
+        instanceId: null,
+        bypass: false
+      }))
+    }]
   })),
   
   removeTrack: (id) => set((state) => ({

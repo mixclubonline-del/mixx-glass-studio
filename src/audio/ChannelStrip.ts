@@ -231,6 +231,10 @@ export class ChannelStrip {
     };
   }
   
+  getAnalyser(): AnalyserNode {
+    return this.analyser;
+  }
+  
   dispose() {
     this.input.disconnect();
     this.eq.dispose();

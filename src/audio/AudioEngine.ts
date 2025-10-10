@@ -308,6 +308,10 @@ export class AudioEngine {
     return this.masterBus.channelStrip.getPeakLevel();
   }
   
+  getMasterAnalyser(): AnalyserNode | undefined {
+    return this.masterBus.channelStrip.getAnalyser();
+  }
+  
   // Legacy compatibility
   updateEffect(param: keyof EffectParams, value: number) {
     // Keep for backward compatibility with existing controls

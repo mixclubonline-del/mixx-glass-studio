@@ -35,6 +35,9 @@ const Index = () => {
   const [audioBuffers, setAudioBuffers] = useState<Map<string, AudioBuffer>>(new Map());
   const [isExporting, setIsExporting] = useState(false);
   const [showAIAssistant, setShowAIAssistant] = useState(false);
+  const [pluginBrowserOpen, setPluginBrowserOpen] = useState(false);
+  const [selectedTrackForPlugin, setSelectedTrackForPlugin] = useState<string | null>(null);
+  const [selectedSlotForPlugin, setSelectedSlotForPlugin] = useState<number>(1);
   const { toast } = useToast();
   
   // Global stores
@@ -231,23 +234,80 @@ const Index = () => {
   // Plugin management
   const handleLoadPlugin = (trackId: string, slotNumber: number, pluginId: string) => {
     if (engineRef.current) {
-      engineRef.current.loadPluginToTrack(trackId, pluginId, slotNumber);
-      toast({
-        title: "Plugin Loaded",
-        description: `${pluginId} loaded to slot ${slotNumber}`,
-      });
+      const instanceId = engineRef.current.loadPluginToTrack(trackId, pluginId, slotNumber);
+      
+      if (instanceId) {
+        // Update tracks store with plugin info
+        const { tracks: tracksArray, updateTrack } = useTracksStore.getState();
+        const track = tracksArray.find(t => t.id === trackId);
+        
+        if (track && track.inserts) {
+          const updatedInserts = [...track.inserts];
+          const insertIndex = updatedInserts.findIndex(i => i.slotNumber === slotNumber);
+          if (insertIndex !== -1) {
+            updatedInserts[insertIndex] = {
+              slotNumber,
+              pluginId,
+              instanceId,
+              bypass: false
+            };
+            updateTrack(trackId, { inserts: updatedInserts });
+          }
+        }
+        
+        toast({
+          title: "Plugin Loaded",
+          description: `${pluginId} loaded to slot ${slotNumber}`,
+        });
+      }
     }
   };
   
   const handleUnloadPlugin = (trackId: string, slotNumber: number) => {
     if (engineRef.current) {
       engineRef.current.unloadPluginFromTrack(trackId, slotNumber);
+      
+      // Update tracks store
+      const { tracks: tracksArray, updateTrack } = useTracksStore.getState();
+      const track = tracksArray.find(t => t.id === trackId);
+      
+      if (track && track.inserts) {
+        const updatedInserts = [...track.inserts];
+        const insertIndex = updatedInserts.findIndex(i => i.slotNumber === slotNumber);
+        if (insertIndex !== -1) {
+          updatedInserts[insertIndex] = {
+            slotNumber,
+            pluginId: null,
+            instanceId: null,
+            bypass: false
+          };
+          updateTrack(trackId, { inserts: updatedInserts });
+        }
+      }
+      
+      toast({
+        title: "Plugin Removed",
+        description: `Removed plugin from slot ${slotNumber}`,
+      });
     }
   };
   
   const handleBypassPlugin = (trackId: string, slotNumber: number, bypass: boolean) => {
     if (engineRef.current) {
       engineRef.current.bypassPluginOnTrack(trackId, slotNumber, bypass);
+      
+      // Update tracks store
+      const { tracks: tracksArray, updateTrack } = useTracksStore.getState();
+      const track = tracksArray.find(t => t.id === trackId);
+      
+      if (track && track.inserts) {
+        const updatedInserts = [...track.inserts];
+        const insertIndex = updatedInserts.findIndex(i => i.slotNumber === slotNumber);
+        if (insertIndex !== -1) {
+          updatedInserts[insertIndex].bypass = bypass;
+          updateTrack(trackId, { inserts: updatedInserts });
+        }
+      }
     }
   };
   
@@ -256,9 +316,30 @@ const Index = () => {
     if (engineRef.current) {
       const track = engineRef.current.getTracks().find(t => t.id === trackId);
       if (track) {
-        track.channelStrip.updateSend(busId, amount);
+        track.channelStrip.setSendAmount(busId, amount);
+        
+        // Update mixer store
+        const channel = channels.get(trackId);
+        if (channel) {
+          const sends = channel.sends || new Map();
+          sends.set(busId, amount);
+          useMixerStore.getState().updateChannel(trackId, { sends });
+        }
       }
     }
+  };
+  
+  const handlePluginSelect = (pluginId: string) => {
+    if (selectedTrackForPlugin && engineRef.current) {
+      handleLoadPlugin(selectedTrackForPlugin, selectedSlotForPlugin, pluginId);
+    }
+    setPluginBrowserOpen(false);
+  };
+  
+  const handleOpenPluginBrowser = (trackId: string, slotNumber: number) => {
+    setSelectedTrackForPlugin(trackId);
+    setSelectedSlotForPlugin(slotNumber);
+    setPluginBrowserOpen(true);
   };
   
   // Bus management  
@@ -451,7 +532,7 @@ const Index = () => {
             <Button
               variant="outline"
               size="sm"
-              onClick={() => togglePanel('browser')}
+              onClick={() => setPluginBrowserOpen(true)}
               className="gap-2 neon-glow-prime"
             >
               🎛️ Plugin Suite
@@ -495,6 +576,7 @@ const Index = () => {
             {/* Metering dashboard (right side) */}
             <MeteringDashboard
               masterPeakLevel={masterPeakLevel}
+              analyserNode={engineRef.current?.getMasterAnalyser()}
             />
           </div>
         </ViewContainer>

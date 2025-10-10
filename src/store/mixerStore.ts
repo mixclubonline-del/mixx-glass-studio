@@ -13,6 +13,7 @@ export interface ChannelState {
   solo: boolean;
   color: string;
   peakLevel: { left: number; right: number };
+  sends?: Map<string, number>; // Bus ID -> send amount
 }
 
 export interface BusState {

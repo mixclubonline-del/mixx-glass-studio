@@ -8,15 +8,18 @@ interface SpectrumAnalyzerProps {
   width: number;
   height: number;
   peakLevel?: { left: number; right: number };
+  analyserNode?: AnalyserNode; // Real FFT connection
 }
 
 export const SpectrumAnalyzer: React.FC<SpectrumAnalyzerProps> = ({
   width,
   height,
-  peakLevel
+  peakLevel,
+  analyserNode
 }) => {
   const canvasRef = useRef<HTMLCanvasElement>(null);
   const animationRef = useRef<number>();
+  const frequencyDataRef = useRef<Uint8Array | null>(null);
   
   useEffect(() => {
     const canvas = canvasRef.current;
@@ -41,9 +44,21 @@ export const SpectrumAnalyzer: React.FC<SpectrumAnalyzerProps> = ({
       .getPropertyValue('--muted-foreground').trim();
     const mutedHsl = `hsl(${mutedForeground})`;
     
-    // Mock spectrum data (in real implementation, would use AnalyserNode)
+    // Initialize frequency data array if we have analyser
+    if (analyserNode && !frequencyDataRef.current) {
+      frequencyDataRef.current = new Uint8Array(analyserNode.frequencyBinCount);
+    }
+    
     const draw = () => {
       ctx.clearRect(0, 0, width, height);
+      
+      // Get real FFT data if available
+      let fftData: Uint8Array | null = null;
+      if (analyserNode && frequencyDataRef.current) {
+        fftData = frequencyDataRef.current;
+        // @ts-ignore - TypeScript strict check, but works at runtime
+        analyserNode.getByteFrequencyData(fftData);
+      }
       
       // Draw frequency bars
       const barCount = 32;
@@ -54,8 +69,17 @@ export const SpectrumAnalyzer: React.FC<SpectrumAnalyzerProps> = ({
       gradient.addColorStop(1, 'hsl(314 100% 65%)'); // neon pink
       
       for (let i = 0; i < barCount; i++) {
-        // Mock data with some variation
-        const value = Math.random() * 0.3 + 0.1 + (peakLevel ? (peakLevel.left + 60) / 60 * 0.4 : 0);
+        let value: number;
+        
+        // Use real FFT data if available
+        if (fftData) {
+          const binIndex = Math.floor(i * fftData.length / barCount);
+          value = fftData[binIndex] / 255; // Normalize to 0-1
+        } else {
+          // Fallback to mock data
+          value = Math.random() * 0.3 + 0.1 + (peakLevel ? (peakLevel.left + 60) / 60 * 0.4 : 0);
+        }
+        
         const barHeight = value * height;
         
         ctx.fillStyle = gradient;
@@ -94,7 +118,7 @@ export const SpectrumAnalyzer: React.FC<SpectrumAnalyzerProps> = ({
         cancelAnimationFrame(animationRef.current);
       }
     };
-  }, [width, height, peakLevel]);
+  }, [width, height, peakLevel, analyserNode]);
   
   return (
     <canvas

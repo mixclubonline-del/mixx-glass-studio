@@ -107,23 +107,30 @@ export const NextGenMixerView: React.FC<NextGenMixerViewProps> = ({
           {/* Channel strips */}
           {channelArray.length > 0 ? (
             <div className="flex gap-3">
-              {channelArray.map((channel) => (
-                <GlassChannelStrip
-                  key={channel.id}
-                  channel={channel}
-                  isSelected={selectedChannelId === channel.id}
-                  onSelect={selectChannel}
-                  onVolumeChange={handleVolumeChange}
-                  onPanChange={handlePanChange}
-                  onMuteToggle={handleMuteToggle}
-                  onSoloToggle={handleSoloToggle}
-                  buses={Array.from(buses.values())}
-                  onLoadPlugin={(slotNumber, pluginId) => onLoadPlugin(channel.id, slotNumber, pluginId)}
-                  onUnloadPlugin={(slotNumber) => onUnloadPlugin(channel.id, slotNumber)}
-                  onBypassPlugin={(slotNumber, bypass) => onBypassPlugin(channel.id, slotNumber, bypass)}
-                  onSendChange={(busId, amount) => onSendChange(channel.id, busId, amount)}
-                />
-              ))}
+              {channelArray.map((channel) => {
+                // Get inserts from tracks store
+                const { tracks: tracksArray } = useTracksStore.getState();
+                const track = tracksArray.find(t => t.id === channel.id);
+                
+                return (
+                  <GlassChannelStrip
+                    key={channel.id}
+                    channel={channel}
+                    isSelected={selectedChannelId === channel.id}
+                    inserts={track?.inserts}
+                    onSelect={selectChannel}
+                    onVolumeChange={handleVolumeChange}
+                    onPanChange={handlePanChange}
+                    onMuteToggle={handleMuteToggle}
+                    onSoloToggle={handleSoloToggle}
+                    buses={Array.from(buses.values())}
+                    onLoadPlugin={(slotNumber, pluginId) => onLoadPlugin(channel.id, slotNumber, pluginId)}
+                    onUnloadPlugin={(slotNumber) => onUnloadPlugin(channel.id, slotNumber)}
+                    onBypassPlugin={(slotNumber, bypass) => onBypassPlugin(channel.id, slotNumber, bypass)}
+                    onSendChange={(busId, amount) => onSendChange(channel.id, busId, amount)}
+                  />
+                );
+              })}
             </div>
           ) : (
             <div className="flex items-center justify-center flex-1 text-center">

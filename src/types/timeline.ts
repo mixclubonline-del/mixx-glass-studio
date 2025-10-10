@@ -46,6 +46,7 @@ export interface TimelineTrack {
   muted: boolean;
   solo: boolean;
   recordArmed: boolean;
+  inserts?: import('@/audio/Track').PluginInsert[];
 }
 
 export type GridResolution = '1/4' | '1/8' | '1/16' | '1/32' | '1/64';

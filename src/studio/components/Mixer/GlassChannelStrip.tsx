@@ -86,6 +86,29 @@ export const GlassChannelStrip: React.FC<GlassChannelStripProps> = ({
         />
       </div>
       
+      {/* Insert Rack */}
+      {inserts && inserts.length > 0 && (
+        <div className="mb-2">
+          <InsertRack
+            inserts={inserts}
+            onPluginClick={(slotNumber) => {
+              const insert = inserts.find(i => i.slotNumber === slotNumber);
+              if (insert?.pluginId && onLoadPlugin) {
+                onLoadPlugin(slotNumber, insert.pluginId);
+              }
+            }}
+            onAddPlugin={(slotNumber) => onLoadPlugin && onLoadPlugin(slotNumber, '')}
+            onRemovePlugin={onUnloadPlugin || (() => {})}
+            onBypassToggle={(slotNumber) => {
+              const insert = inserts.find(i => i.slotNumber === slotNumber);
+              if (insert && onBypassPlugin) {
+                onBypassPlugin(slotNumber, !insert.bypass);
+              }
+            }}
+          />
+        </div>
+      )}
+      
       {/* Send Controls */}
       {buses && buses.length > 0 && onSendChange && (
         <div className="mb-2 space-y-2 max-h-32 overflow-y-auto scrollbar-thin">
@@ -95,7 +118,7 @@ export const GlassChannelStrip: React.FC<GlassChannelStripProps> = ({
               key={bus.id}
               busName={bus.name}
               busColor={bus.color}
-              amount={0} // TODO: Get actual send amount from channel strip
+              amount={channel.sends?.get(bus.id) || 0}
               onAmountChange={(amount) => onSendChange(bus.id, amount)}
             />
           ))}

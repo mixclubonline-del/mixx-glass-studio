@@ -9,10 +9,12 @@ import { Activity, Radio, Gauge } from 'lucide-react';
 
 interface MeteringDashboardProps {
   masterPeakLevel: { left: number; right: number };
+  analyserNode?: AnalyserNode;
 }
 
 export const MeteringDashboard: React.FC<MeteringDashboardProps> = ({
-  masterPeakLevel
+  masterPeakLevel,
+  analyserNode
 }) => {
   return (
     <div className="flex flex-col h-full w-80 glass border-l border-border/30 p-4 overflow-y-auto">
@@ -47,6 +49,7 @@ export const MeteringDashboard: React.FC<MeteringDashboardProps> = ({
           width={280}
           height={120}
           peakLevel={masterPeakLevel}
+          analyserNode={analyserNode}
         />
       </div>
       
