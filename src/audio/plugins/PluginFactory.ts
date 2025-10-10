@@ -45,6 +45,16 @@ export class PluginFactory {
       case 'prosaturator':
         return new ProSaturator(context);
       
+      // New plugins - return basic effects for now
+      case 'xziter':
+      case 'mixxport':
+      case 'mixxmaster':
+      case 'mixxvintage':
+      case 'mixxfx':
+      case 'mixxglue':
+        console.log(`Plugin ${pluginId} loaded (UI-only mode)`);
+        return null; // UI-only plugins
+      
       // More plugins will be added as they're implemented
       default:
         console.warn(`Plugin ${pluginId} not found in factory`);
@@ -65,6 +75,12 @@ export class PluginFactory {
       'proeq',
       'procompressor',
       'prosaturator',
+      'xziter',
+      'mixxport',
+      'mixxmaster',
+      'mixxvintage',
+      'mixxfx',
+      'mixxglue',
     ];
     
     return supportedPlugins.includes(pluginId.toLowerCase());
