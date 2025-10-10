@@ -13,6 +13,17 @@ import mixxtuneCover from '@/assets/plugins/mixxtune-cover.png';
 import mixxreverbCover from '@/assets/plugins/mixxreverb-cover.png';
 import mixxdelayCover from '@/assets/plugins/mixxdelay-cover.png';
 import mixxeqCover from '@/assets/plugins/mixxeq-cover.png';
+import mixxchorusCover from '@/assets/plugins/mixxchorus-cover.png';
+import mixxcompressorCover from '@/assets/plugins/mixxcompressor-cover.png';
+import mixxexciterCover from '@/assets/plugins/mixxexciter-cover.png';
+import mixxflangerCover from '@/assets/plugins/mixxflanger-cover.png';
+import mixxgateCover from '@/assets/plugins/mixxgate-cover.png';
+import mixxlimiterCover from '@/assets/plugins/mixxlimiter-cover.png';
+import mixxmultibandcompCover from '@/assets/plugins/mixxmultibandcomp-cover.png';
+import mixxphaserCover from '@/assets/plugins/mixxphaser-cover.png';
+import mixxsaturatorCover from '@/assets/plugins/mixxsaturator-cover.png';
+import mixxstereoimagerCover from '@/assets/plugins/mixxstereoimager-cover.png';
+import mixxtransientCover from '@/assets/plugins/mixxtransient-cover.png';
 
 interface PluginBrowserProps {
   isOpen: boolean;
@@ -166,6 +177,28 @@ export function PluginBrowser({ isOpen, onClose, onPluginSelect }: PluginBrowser
                     <img src={mixxdelayCover} alt={plugin.metadata.name} className="w-full h-full object-cover" />
                   ) : plugin.metadata.id === 'mixxeq' ? (
                     <img src={mixxeqCover} alt={plugin.metadata.name} className="w-full h-full object-cover" />
+                  ) : plugin.metadata.id === 'mixxchorus' ? (
+                    <img src={mixxchorusCover} alt={plugin.metadata.name} className="w-full h-full object-cover" />
+                  ) : plugin.metadata.id === 'mixxcompressor' ? (
+                    <img src={mixxcompressorCover} alt={plugin.metadata.name} className="w-full h-full object-cover" />
+                  ) : plugin.metadata.id === 'mixxexciter' ? (
+                    <img src={mixxexciterCover} alt={plugin.metadata.name} className="w-full h-full object-cover" />
+                  ) : plugin.metadata.id === 'mixxflanger' ? (
+                    <img src={mixxflangerCover} alt={plugin.metadata.name} className="w-full h-full object-cover" />
+                  ) : plugin.metadata.id === 'mixxgate' ? (
+                    <img src={mixxgateCover} alt={plugin.metadata.name} className="w-full h-full object-cover" />
+                  ) : plugin.metadata.id === 'mixxlimiter' ? (
+                    <img src={mixxlimiterCover} alt={plugin.metadata.name} className="w-full h-full object-cover" />
+                  ) : plugin.metadata.id === 'mixxmultibandcomp' ? (
+                    <img src={mixxmultibandcompCover} alt={plugin.metadata.name} className="w-full h-full object-cover" />
+                  ) : plugin.metadata.id === 'mixxphaser' ? (
+                    <img src={mixxphaserCover} alt={plugin.metadata.name} className="w-full h-full object-cover" />
+                  ) : plugin.metadata.id === 'mixxsaturator' ? (
+                    <img src={mixxsaturatorCover} alt={plugin.metadata.name} className="w-full h-full object-cover" />
+                  ) : plugin.metadata.id === 'mixxstereoimager' ? (
+                    <img src={mixxstereoimagerCover} alt={plugin.metadata.name} className="w-full h-full object-cover" />
+                  ) : plugin.metadata.id === 'mixxtransient' ? (
+                    <img src={mixxtransientCover} alt={plugin.metadata.name} className="w-full h-full object-cover" />
                   ) : (
                     <div className="text-4xl">∞</div>
                   )}
@@ -221,6 +254,28 @@ export function PluginBrowser({ isOpen, onClose, onPluginSelect }: PluginBrowser
                     <img src={mixxdelayCover} alt={selectedPlugin.metadata.name} className="w-full h-full object-cover" />
                   ) : selectedPlugin.metadata.id === 'mixxeq' ? (
                     <img src={mixxeqCover} alt={selectedPlugin.metadata.name} className="w-full h-full object-cover" />
+                  ) : selectedPlugin.metadata.id === 'mixxchorus' ? (
+                    <img src={mixxchorusCover} alt={selectedPlugin.metadata.name} className="w-full h-full object-cover" />
+                  ) : selectedPlugin.metadata.id === 'mixxcompressor' ? (
+                    <img src={mixxcompressorCover} alt={selectedPlugin.metadata.name} className="w-full h-full object-cover" />
+                  ) : selectedPlugin.metadata.id === 'mixxexciter' ? (
+                    <img src={mixxexciterCover} alt={selectedPlugin.metadata.name} className="w-full h-full object-cover" />
+                  ) : selectedPlugin.metadata.id === 'mixxflanger' ? (
+                    <img src={mixxflangerCover} alt={selectedPlugin.metadata.name} className="w-full h-full object-cover" />
+                  ) : selectedPlugin.metadata.id === 'mixxgate' ? (
+                    <img src={mixxgateCover} alt={selectedPlugin.metadata.name} className="w-full h-full object-cover" />
+                  ) : selectedPlugin.metadata.id === 'mixxlimiter' ? (
+                    <img src={mixxlimiterCover} alt={selectedPlugin.metadata.name} className="w-full h-full object-cover" />
+                  ) : selectedPlugin.metadata.id === 'mixxmultibandcomp' ? (
+                    <img src={mixxmultibandcompCover} alt={selectedPlugin.metadata.name} className="w-full h-full object-cover" />
+                  ) : selectedPlugin.metadata.id === 'mixxphaser' ? (
+                    <img src={mixxphaserCover} alt={selectedPlugin.metadata.name} className="w-full h-full object-cover" />
+                  ) : selectedPlugin.metadata.id === 'mixxsaturator' ? (
+                    <img src={mixxsaturatorCover} alt={selectedPlugin.metadata.name} className="w-full h-full object-cover" />
+                  ) : selectedPlugin.metadata.id === 'mixxstereoimager' ? (
+                    <img src={mixxstereoimagerCover} alt={selectedPlugin.metadata.name} className="w-full h-full object-cover" />
+                  ) : selectedPlugin.metadata.id === 'mixxtransient' ? (
+                    <img src={mixxtransientCover} alt={selectedPlugin.metadata.name} className="w-full h-full object-cover" />
                   ) : (
                     <div className="text-6xl">∞</div>
                   )}
