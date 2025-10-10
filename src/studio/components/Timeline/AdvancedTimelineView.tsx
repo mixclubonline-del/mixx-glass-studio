@@ -17,6 +17,18 @@ import { ZoomIn, ZoomOut, Grid3x3, Maximize2, Plus } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import mixxclubLogo from '@/assets/mixxclub-logo.png';
 
+// Dynamic hip-hop encouragement messages based on session time
+const getHipHopEncouragement = (minutes: number): string => {
+  if (minutes < 5) return "Let's Get It Started 🔥";
+  if (minutes < 15) return "Keep Cookin' 🎵";
+  if (minutes < 30) return "Heat Rising! 🌡️";
+  if (minutes < 45) return "You're In The Zone! ⚡";
+  if (minutes < 60) return "This Beat Is Fire! 🔥";
+  if (minutes < 90) return "Legendary Session! 👑";
+  if (minutes < 120) return "You're On Fire! 💯";
+  return "Classic In The Making! 🏆";
+};
+
 interface AdvancedTimelineViewProps {
   audioBuffers: Map<string, AudioBuffer>;
   onSeek: (time: number) => void;
@@ -40,6 +52,19 @@ export const AdvancedTimelineView: React.FC<AdvancedTimelineViewProps> = ({
     const saved = localStorage.getItem('browserCollapsed');
     return saved === 'true';
   });
+  
+  // Track session time for dynamic encouragement
+  const [sessionMinutes, setSessionMinutes] = useState(0);
+  const [sessionStartTime] = useState(() => Date.now());
+  
+  useEffect(() => {
+    const interval = setInterval(() => {
+      const elapsed = Math.floor((Date.now() - sessionStartTime) / 60000);
+      setSessionMinutes(elapsed);
+    }, 60000); // Update every minute
+    
+    return () => clearInterval(interval);
+  }, [sessionStartTime]);
   
   const { 
     currentTime, 
@@ -193,7 +218,7 @@ export const AdvancedTimelineView: React.FC<AdvancedTimelineViewProps> = ({
                 Arrange View
               </h3>
               <p className="text-xs text-[#ec4899] font-bold text-glow-hype uppercase tracking-wider">
-                Create Your Masterpiece 🎵
+                {getHipHopEncouragement(sessionMinutes)}
               </p>
             </div>
             <div className="border-l-2 border-[#a855f7]/50 h-12 mx-2"></div>

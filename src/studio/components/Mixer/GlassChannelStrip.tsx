@@ -50,7 +50,7 @@ export const GlassChannelStrip: React.FC<GlassChannelStripProps> = ({
 }) => {
   return (
     <div 
-      className={`relative flex flex-col h-full w-24 glass-glow rounded-lg p-3 transition-all cursor-pointer ${
+      className={`relative flex-1 flex flex-col h-full glass border border-border/30 ${
         isSelected 
           ? 'ring-2 ring-primary shadow-[0_0_30px_hsl(var(--primary)/0.4)]' 
           : 'hover:ring-1 hover:ring-primary/30'
@@ -61,7 +61,7 @@ export const GlassChannelStrip: React.FC<GlassChannelStripProps> = ({
       }}
     >
       {/* Channel name */}
-      <div className="text-xs font-medium text-foreground mb-2 truncate text-center">
+      <div className="text-xs font-medium text-foreground mb-2 truncate text-center px-2">
         {channel.name}
       </div>
       
@@ -69,8 +69,8 @@ export const GlassChannelStrip: React.FC<GlassChannelStripProps> = ({
       <div className="mb-2 flex justify-center">
         <ProfessionalPeakMeter
           level={channel.peakLevel}
-          height={180}
-          width={12}
+          height={200}
+          width={10}
           stereo={true}
           showRMS={true}
           clipIndicator={true}
@@ -82,7 +82,7 @@ export const GlassChannelStrip: React.FC<GlassChannelStripProps> = ({
         <IceFireKnob
           value={(channel.pan + 1) / 2}
           onChange={(value) => onPanChange(channel.id, (value * 2) - 1)}
-          size={40}
+          size={36}
           label="PAN"
           valueLabel={channel.pan === 0 ? 'C' : channel.pan < 0 ? `L${Math.abs(channel.pan * 100).toFixed(0)}` : `R${(channel.pan * 100).toFixed(0)}`}
           min={-100}
@@ -144,8 +144,8 @@ export const GlassChannelStrip: React.FC<GlassChannelStripProps> = ({
         <IceFireFader
           value={channel.volume}
           onChange={(value) => onVolumeChange(channel.id, value)}
-          height={200}
-          width={20}
+          height={240}
+          width={18}
           showScale={false}
         />
       </div>
