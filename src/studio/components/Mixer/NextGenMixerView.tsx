@@ -125,7 +125,7 @@ export const NextGenMixerView: React.FC<NextGenMixerViewProps> = ({
         </div>
         
         {/* Mixer content */}
-        <div className="flex-1 flex items-start gap-4 p-4 overflow-x-auto">
+        <div className="flex-1 flex items-start gap-2 p-2 overflow-x-auto">
           {/* Master channel (fixed on left) */}
           <div className="flex-shrink-0">
             <MasterChannelStrip
@@ -139,7 +139,7 @@ export const NextGenMixerView: React.FC<NextGenMixerViewProps> = ({
           
           {/* Channel strips */}
           {channelArray.length > 0 ? (
-            <div className="flex gap-3">
+            <div className="flex gap-1">
               {channelArray.map((channel) => {
                 // Get inserts from tracks store
                 const { tracks: tracksArray } = useTracksStore.getState();

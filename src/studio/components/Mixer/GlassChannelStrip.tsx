@@ -2,9 +2,9 @@
  * Glass Channel Strip - Next-gen mixer channel with glass morphism
  */
 
-import React from 'react';
+import React, { useState } from 'react';
 import { ChannelState, BusState } from '@/store/mixerStore';
-import { Volume2, Mic, Lock } from 'lucide-react';
+import { Volume2, Mic, ChevronDown, ChevronUp } from 'lucide-react';
 import { ProfessionalPeakMeter } from '../Metering/ProfessionalPeakMeter';
 import { IceFireFader } from '../Controls/IceFireFader';
 import { IceFireKnob } from '../Controls/IceFireKnob';
@@ -48,9 +48,12 @@ export const GlassChannelStrip: React.FC<GlassChannelStripProps> = ({
   onOpenPluginWindow,
   onOpenPluginBrowser,
 }) => {
+  const [showInserts, setShowInserts] = useState(false);
+  const [showSends, setShowSends] = useState(false);
+  
   return (
     <div 
-      className={`relative flex-1 flex flex-col h-full glass border border-border/30 ${
+      className={`relative flex flex-col h-full glass border border-border/30 w-[90px] ${
         isSelected 
           ? 'ring-2 ring-primary shadow-[0_0_30px_hsl(var(--primary)/0.4)]' 
           : 'hover:ring-1 hover:ring-primary/30'
@@ -61,28 +64,28 @@ export const GlassChannelStrip: React.FC<GlassChannelStripProps> = ({
       }}
     >
       {/* Channel name */}
-      <div className="text-xs font-medium text-foreground mb-2 truncate text-center px-2">
+      <div className="text-[10px] font-medium text-foreground mb-1 truncate text-center px-1">
         {channel.name}
       </div>
       
       {/* Peak meter */}
-      <div className="mb-2 flex justify-center">
+      <div className="mb-1 flex justify-center">
         <ProfessionalPeakMeter
           level={channel.peakLevel}
-          height={200}
-          width={10}
+          height={160}
+          width={3}
           stereo={true}
-          showRMS={true}
+          showRMS={false}
           clipIndicator={true}
         />
       </div>
       
       {/* Pan knob */}
-      <div className="mb-2">
+      <div className="mb-1 flex justify-center">
         <IceFireKnob
           value={(channel.pan + 1) / 2}
           onChange={(value) => onPanChange(channel.id, (value * 2) - 1)}
-          size={36}
+          size={28}
           label="PAN"
           valueLabel={channel.pan === 0 ? 'C' : channel.pan < 0 ? `L${Math.abs(channel.pan * 100).toFixed(0)}` : `R${(channel.pan * 100).toFixed(0)}`}
           min={-100}
@@ -90,81 +93,108 @@ export const GlassChannelStrip: React.FC<GlassChannelStripProps> = ({
         />
       </div>
       
-      {/* Insert Rack */}
+      {/* Collapsible Insert Rack */}
       {inserts && inserts.length > 0 && (
-        <div className="mb-2">
-          <InsertRack
-            inserts={inserts}
-            onPluginClick={(slotNumber) => {
-              const insert = inserts.find(i => i.slotNumber === slotNumber);
-              if (insert?.pluginId && onLoadPlugin) {
-                onLoadPlugin(slotNumber, insert.pluginId);
-              }
+        <div className="mb-1">
+          <button
+            onClick={(e) => {
+              e.stopPropagation();
+              setShowInserts(!showInserts);
             }}
-            onAddPlugin={(slotNumber) => {
-              if (onOpenPluginBrowser) {
-                onOpenPluginBrowser(slotNumber);
-              }
-            }}
-            onRemovePlugin={onUnloadPlugin || (() => {})}
-            onBypassToggle={(slotNumber) => {
-              const insert = inserts.find(i => i.slotNumber === slotNumber);
-              if (insert && onBypassPlugin) {
-                onBypassPlugin(slotNumber, !insert.bypass);
-              }
-            }}
-            onDoubleClick={(slotNumber) => {
-              const insert = inserts.find(i => i.slotNumber === slotNumber);
-              if (insert?.pluginId && onOpenPluginWindow) {
-                onOpenPluginWindow(slotNumber, insert.pluginId);
-              }
-            }}
-          />
+            className="w-full flex items-center justify-between px-1 py-0.5 text-[9px] text-muted-foreground hover:text-foreground transition-colors"
+          >
+            <span>FX</span>
+            {showInserts ? <ChevronUp size={10} /> : <ChevronDown size={10} />}
+          </button>
+          {showInserts && (
+            <div className="mt-1 px-1">
+              <InsertRack
+                inserts={inserts}
+                onPluginClick={(slotNumber) => {
+                  const insert = inserts.find(i => i.slotNumber === slotNumber);
+                  if (insert?.pluginId && onLoadPlugin) {
+                    onLoadPlugin(slotNumber, insert.pluginId);
+                  }
+                }}
+                onAddPlugin={(slotNumber) => {
+                  if (onOpenPluginBrowser) {
+                    onOpenPluginBrowser(slotNumber);
+                  }
+                }}
+                onRemovePlugin={onUnloadPlugin || (() => {})}
+                onBypassToggle={(slotNumber) => {
+                  const insert = inserts.find(i => i.slotNumber === slotNumber);
+                  if (insert && onBypassPlugin) {
+                    onBypassPlugin(slotNumber, !insert.bypass);
+                  }
+                }}
+                onDoubleClick={(slotNumber) => {
+                  const insert = inserts.find(i => i.slotNumber === slotNumber);
+                  if (insert?.pluginId && onOpenPluginWindow) {
+                    onOpenPluginWindow(slotNumber, insert.pluginId);
+                  }
+                }}
+              />
+            </div>
+          )}
         </div>
       )}
       
-      {/* Send Controls */}
+      {/* Collapsible Send Controls */}
       {buses && buses.length > 0 && onSendChange && (
-        <div className="mb-2 space-y-2 max-h-32 overflow-y-auto scrollbar-thin">
-          <div className="text-[10px] text-muted-foreground font-medium px-1">SENDS</div>
-          {buses.map((bus) => (
-            <SendKnobSimple
-              key={bus.id}
-              busName={bus.name}
-              busColor={bus.color}
-              amount={channel.sends?.get(bus.id) || 0}
-              onAmountChange={(amount) => onSendChange(bus.id, amount)}
-            />
-          ))}
+        <div className="mb-1">
+          <button
+            onClick={(e) => {
+              e.stopPropagation();
+              setShowSends(!showSends);
+            }}
+            className="w-full flex items-center justify-between px-1 py-0.5 text-[9px] text-muted-foreground hover:text-foreground transition-colors"
+          >
+            <span>SENDS</span>
+            {showSends ? <ChevronUp size={10} /> : <ChevronDown size={10} />}
+          </button>
+          {showSends && (
+            <div className="mt-1 space-y-1 max-h-24 overflow-y-auto scrollbar-thin">
+              {buses.map((bus) => (
+                <SendKnobSimple
+                  key={bus.id}
+                  busName={bus.name}
+                  busColor={bus.color}
+                  amount={channel.sends?.get(bus.id) || 0}
+                  onAmountChange={(amount) => onSendChange(bus.id, amount)}
+                />
+              ))}
+            </div>
+          )}
         </div>
       )}
       
       {/* Fader */}
-      <div className="flex-1 flex items-center justify-center mb-2">
+      <div className="flex-1 flex items-center justify-center mb-1 min-h-[200px]">
         <IceFireFader
           value={channel.volume}
           onChange={(value) => onVolumeChange(channel.id, value)}
-          height={240}
-          width={18}
+          height={280}
+          width={12}
           showScale={false}
         />
       </div>
       
       {/* Transport buttons */}
-      <div className="flex gap-1 justify-center">
+      <div className="flex gap-0.5 justify-center mb-1">
         <button
           onClick={(e) => {
             e.stopPropagation();
             onMuteToggle(channel.id);
           }}
-          className={`p-1.5 rounded transition-all ${
+          className={`p-1 rounded transition-all ${
             channel.muted 
               ? 'bg-destructive/20 text-destructive shadow-[0_0_10px_hsl(var(--destructive)/0.3)]' 
               : 'hover:bg-muted/50 text-muted-foreground'
           }`}
           title="Mute"
         >
-          <Volume2 size={14} />
+          <Volume2 size={11} />
         </button>
         
         <button
@@ -172,20 +202,20 @@ export const GlassChannelStrip: React.FC<GlassChannelStripProps> = ({
             e.stopPropagation();
             onSoloToggle(channel.id);
           }}
-          className={`p-1.5 rounded transition-all ${
+          className={`p-1 rounded transition-all ${
             channel.solo 
               ? 'bg-primary/20 text-primary shadow-[0_0_10px_hsl(var(--primary)/0.3)]' 
               : 'hover:bg-muted/50 text-muted-foreground'
           }`}
           title="Solo"
         >
-          <Mic size={14} />
+          <Mic size={11} />
         </button>
       </div>
       
       {/* dB readout */}
-      <div className="text-[10px] text-center text-muted-foreground mt-2 font-mono">
-        {normalizedToDb(channel.volume).toFixed(1)} dB
+      <div className="text-[8px] text-center text-muted-foreground mb-1 font-mono">
+        {normalizedToDb(channel.volume).toFixed(1)}
       </div>
     </div>
   );
