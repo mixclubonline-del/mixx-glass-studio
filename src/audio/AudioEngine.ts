@@ -8,6 +8,7 @@ import { Bus } from './Bus';
 import { Reverb } from './effects/Reverb';
 import { Delay } from './effects/Delay';
 import { EQParams, CompressorParams, PeakLevel } from '@/types/audio';
+import { PluginFactory } from './plugins/PluginFactory';
 
 export interface EffectParams {
   reverbMix: number;
@@ -443,10 +444,32 @@ export class AudioEngine {
   // Plugin management on tracks
   loadPluginToTrack(trackId: string, pluginId: string, slotNumber: number): string | null {
     const track = this.tracks.get(trackId);
-    if (!track) return null;
+    if (!track) {
+      console.error(`Track ${trackId} not found`);
+      return null;
+    }
     
+    // Check if plugin is supported
+    if (!PluginFactory.isSupported(pluginId)) {
+      console.error(`Plugin ${pluginId} is not supported`);
+      return null;
+    }
+    
+    // Create audio effect instance
+    const audioEffect = PluginFactory.createInstance(pluginId, this.context);
+    if (!audioEffect) {
+      console.error(`Failed to create plugin instance: ${pluginId}`);
+      return null;
+    }
+    
+    // Load into channel strip (this connects it to the audio graph)
+    track.channelStrip.loadInsert(slotNumber, audioEffect);
+    
+    // Update track metadata
     const instanceId = `${trackId}_${pluginId}_${slotNumber}`;
     track.loadPlugin(slotNumber, pluginId, instanceId);
+    
+    console.log(`✅ Loaded ${pluginId} to track ${trackId} slot ${slotNumber}`);
     
     return instanceId;
   }
@@ -454,14 +477,34 @@ export class AudioEngine {
   unloadPluginFromTrack(trackId: string, slotNumber: number) {
     const track = this.tracks.get(trackId);
     if (track) {
+      // Unload from channel strip (disconnects from audio graph)
+      track.channelStrip.unloadInsert(slotNumber);
+      
+      // Update track metadata
       track.unloadPlugin(slotNumber);
+      
+      console.log(`✅ Unloaded plugin from track ${trackId} slot ${slotNumber}`);
     }
   }
   
   bypassPluginOnTrack(trackId: string, slotNumber: number, bypass: boolean) {
     const track = this.tracks.get(trackId);
     if (track) {
+      // Bypass in channel strip (affects audio processing)
+      track.channelStrip.bypassInsert(slotNumber, bypass);
+      
+      // Update track metadata
       track.bypassPlugin(slotNumber, bypass);
+      
+      console.log(`✅ ${bypass ? 'Bypassed' : 'Enabled'} plugin on track ${trackId} slot ${slotNumber}`);
     }
+  }
+  
+  // Get plugin effect instance for parameter updates
+  getPluginInstance(trackId: string, slotNumber: number) {
+    const track = this.tracks.get(trackId);
+    if (!track) return null;
+    
+    return track.channelStrip.getInsert(slotNumber);
   }
 }

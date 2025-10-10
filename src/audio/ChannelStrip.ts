@@ -10,6 +10,7 @@ import { TruePeakDetector } from './metering/TruePeakDetector';
 import { LUFSCalculator } from './metering/LUFSCalculator';
 import { PhaseCorrelationAnalyzer } from './metering/PhaseCorrelationAnalyzer';
 import { DynamicRangeCalculator } from './metering/DynamicRangeCalculator';
+import { EffectBase } from './effects/EffectBase';
 
 export class ChannelStrip {
   private context: AudioContext;
@@ -41,6 +42,9 @@ export class ChannelStrip {
   private _volume: number = 1.0;
   private _pan: number = 0;
   
+  // Insert slots (8 slots for plugin chain)
+  private insertSlots: (EffectBase | null)[] = Array(8).fill(null);
+  
   constructor(context: AudioContext) {
     this.context = context;
     this.sends = new Map();
@@ -59,12 +63,8 @@ export class ChannelStrip {
     this.analyser.smoothingTimeConstant = 0.8;
     this.analyserDataArray = new Float32Array(this.analyser.frequencyBinCount);
     
-    // Connect chain: input → EQ → comp → pan → fader → output
-    this.input.connect(this.eq.inputNode);
-    this.eq.outputNode.connect(this.compressor.inputNode);
-    this.compressor.outputNode.connect(this.panNode);
-    this.panNode.connect(this.fader);
-    this.fader.connect(this.output);
+    // Build initial audio graph
+    this.rebuildAudioGraph();
     
     // Connect to analyser for metering (after fader)
     this.fader.connect(this.analyser);
@@ -137,6 +137,111 @@ export class ChannelStrip {
   
   isSolo(): boolean {
     return this._solo;
+  }
+  
+  // Insert slot management
+  loadInsert(slotNumber: number, effect: EffectBase): void {
+    if (slotNumber < 1 || slotNumber > 8) {
+      console.error('Insert slot must be between 1 and 8');
+      return;
+    }
+    
+    // Dispose old effect if exists
+    const oldEffect = this.insertSlots[slotNumber - 1];
+    if (oldEffect) {
+      oldEffect.dispose();
+    }
+    
+    // Store new effect
+    this.insertSlots[slotNumber - 1] = effect;
+    
+    // Rebuild audio graph with new insert
+    this.rebuildAudioGraph();
+  }
+  
+  unloadInsert(slotNumber: number): void {
+    if (slotNumber < 1 || slotNumber > 8) {
+      console.error('Insert slot must be between 1 and 8');
+      return;
+    }
+    
+    // Dispose effect
+    const effect = this.insertSlots[slotNumber - 1];
+    if (effect) {
+      effect.dispose();
+      this.insertSlots[slotNumber - 1] = null;
+    }
+    
+    // Rebuild audio graph without this insert
+    this.rebuildAudioGraph();
+  }
+  
+  bypassInsert(slotNumber: number, bypass: boolean): void {
+    if (slotNumber < 1 || slotNumber > 8) {
+      console.error('Insert slot must be between 1 and 8');
+      return;
+    }
+    
+    const effect = this.insertSlots[slotNumber - 1];
+    if (effect) {
+      effect.bypass = bypass;
+      this.rebuildAudioGraph();
+    }
+  }
+  
+  getInsert(slotNumber: number): EffectBase | null {
+    if (slotNumber < 1 || slotNumber > 8) {
+      return null;
+    }
+    return this.insertSlots[slotNumber - 1];
+  }
+  
+  /**
+   * Rebuild the audio graph with current insert chain
+   * Chain: input → EQ → comp → [inserts 1-8] → pan → fader → output
+   */
+  private rebuildAudioGraph(): void {
+    // Disconnect everything first
+    try {
+      this.input.disconnect();
+      this.eq.outputNode.disconnect();
+      this.compressor.outputNode.disconnect();
+      this.insertSlots.forEach(insert => {
+        if (insert) {
+          try { insert.outputNode.disconnect(); } catch (e) {}
+        }
+      });
+      this.panNode.disconnect();
+      this.fader.disconnect();
+    } catch (e) {
+      // Nodes may not be connected yet
+    }
+    
+    // Build new chain
+    let currentNode: AudioNode = this.input;
+    
+    // Connect EQ and compressor first
+    currentNode.connect(this.eq.inputNode);
+    currentNode = this.eq.outputNode;
+    
+    currentNode.connect(this.compressor.inputNode);
+    currentNode = this.compressor.outputNode;
+    
+    // Connect insert chain
+    for (const insert of this.insertSlots) {
+      if (insert && !insert.bypass) {
+        currentNode.connect(insert.inputNode);
+        currentNode = insert.outputNode;
+      }
+    }
+    
+    // Connect to pan and fader
+    currentNode.connect(this.panNode);
+    this.panNode.connect(this.fader);
+    this.fader.connect(this.output);
+    
+    // Reconnect analyser
+    this.fader.connect(this.analyser);
   }
   
   // Send management
@@ -236,6 +341,13 @@ export class ChannelStrip {
   }
   
   dispose() {
+    // Dispose insert effects
+    this.insertSlots.forEach(insert => {
+      if (insert) {
+        insert.dispose();
+      }
+    });
+    
     this.input.disconnect();
     this.eq.dispose();
     this.compressor.dispose();
