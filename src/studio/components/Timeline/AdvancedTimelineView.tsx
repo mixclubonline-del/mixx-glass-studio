@@ -50,6 +50,8 @@ export const AdvancedTimelineView: React.FC<AdvancedTimelineViewProps> = ({
     addTrackDialogOpen,
     selectTrack,
     updateRegion,
+    removeRegion,
+    addRegion,
     getTrackRegions,
     setAddTrackDialogOpen,
     addTrack
@@ -69,6 +71,37 @@ export const AdvancedTimelineView: React.FC<AdvancedTimelineViewProps> = ({
         regions: []
       });
     }
+  };
+  
+  const handleSplitRegion = (regionId: string, splitTime: number) => {
+    const region = regions.find(r => r.id === regionId);
+    if (!region) return;
+    
+    const splitDuration = splitTime - region.startTime;
+    
+    // Create two new regions
+    const region1 = {
+      ...region,
+      id: `${region.id}-1`,
+      duration: splitDuration,
+      bufferDuration: splitDuration,
+      fadeOut: 0
+    };
+    
+    const region2 = {
+      ...region,
+      id: `${region.id}-2`,
+      startTime: splitTime,
+      duration: region.duration - splitDuration,
+      bufferOffset: region.bufferOffset + splitDuration,
+      bufferDuration: region.bufferDuration - splitDuration,
+      fadeIn: 0
+    };
+    
+    // Remove original and add two new regions
+    removeRegion(regionId);
+    addRegion(region1);
+    addRegion(region2);
   };
   
   // Handle scroll
@@ -206,6 +239,7 @@ export const AdvancedTimelineView: React.FC<AdvancedTimelineViewProps> = ({
               onSelectTrack={selectTrack}
               onUpdateRegion={updateRegion}
               onSelectRegion={toggleRegionSelection}
+              onSplitRegion={handleSplitRegion}
               selectedRegionIds={selectedRegions}
             />
           ))}

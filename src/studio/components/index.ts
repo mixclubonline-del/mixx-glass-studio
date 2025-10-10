@@ -10,6 +10,9 @@ export { GridOverlay } from './Timeline/GridOverlay';
 export { WaveformRenderer } from './Timeline/WaveformRenderer';
 export { TimelineToolbar } from './Timeline/TimelineToolbar';
 export { AddTrackDialog } from './Timeline/AddTrackDialog';
+export { IORoutingPanel } from './Timeline/IORoutingPanel';
+export { LoopPanel } from './Timeline/LoopPanel';
+export * from './Timeline/CursorTools';
 
 // Mixer
 export { NextGenMixerView } from './Mixer/NextGenMixerView';

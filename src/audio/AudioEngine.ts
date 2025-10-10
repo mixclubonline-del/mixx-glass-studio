@@ -177,7 +177,7 @@ export class AudioEngine {
     }
   }
   
-  // Playback
+  // Playback with loop support
   play(fromTime: number = 0) {
     if (this.isPlaying) return;
     
@@ -187,25 +187,53 @@ export class AudioEngine {
     
     this.tracks.forEach((track) => {
       if (track.buffer && !track.channelStrip.isMuted()) {
-        const source = this.context.createBufferSource();
-        source.buffer = track.buffer;
-        source.connect(track.channelStrip.input);
-        
-        // Start from the correct offset position
-        const startOffset = Math.max(0, offset + track.offset);
-        if (startOffset < track.buffer.duration) {
-          source.start(0, startOffset);
-          track.source = source;
-          
-          // Auto-stop at end
-          source.onended = () => {
-            track.source = null;
-          };
-        }
+        this.playTrackSource(track, offset);
       }
     });
     
     this.isPlaying = true;
+    
+    // Setup loop monitoring if enabled
+    if (this.loopEnabled && this.loopEnd > this.loopStart) {
+      this.scheduleLoopCheck();
+    }
+  }
+  
+  private playTrackSource(track: Track, offset: number) {
+    const source = this.context.createBufferSource();
+    source.buffer = track.buffer;
+    source.connect(track.channelStrip.input);
+    
+    // Start from the correct offset position
+    const startOffset = Math.max(0, offset + track.offset);
+    if (startOffset < track.buffer!.duration) {
+      source.start(0, startOffset);
+      track.source = source;
+      
+      // Auto-stop at end
+      source.onended = () => {
+        track.source = null;
+      };
+    }
+  }
+  
+  private scheduleLoopCheck() {
+    if (!this.isPlaying || !this.loopEnabled) return;
+    
+    const checkInterval = setInterval(() => {
+      if (!this.isPlaying) {
+        clearInterval(checkInterval);
+        return;
+      }
+      
+      const currentTime = this.getCurrentTime();
+      
+      // Check if we've reached loop end
+      if (currentTime >= this.loopEnd) {
+        // Jump back to loop start
+        this.seek(this.loopStart);
+      }
+    }, 50); // Check every 50ms
   }
   
   pause() {

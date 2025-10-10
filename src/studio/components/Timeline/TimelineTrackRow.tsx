@@ -16,6 +16,7 @@ interface TimelineTrackRowProps {
   onSelectTrack: (id: string) => void;
   onUpdateRegion: (id: string, updates: Partial<Region>) => void;
   onSelectRegion: (id: string) => void;
+  onSplitRegion: (id: string, splitTime: number) => void;
   selectedRegionIds: Set<string>;
 }
 
@@ -28,6 +29,7 @@ export const TimelineTrackRow: React.FC<TimelineTrackRowProps> = ({
   onSelectTrack,
   onUpdateRegion,
   onSelectRegion,
+  onSplitRegion,
   selectedRegionIds
 }) => {
   return (
@@ -92,6 +94,7 @@ export const TimelineTrackRow: React.FC<TimelineTrackRowProps> = ({
             zoom={zoom}
             onUpdate={onUpdateRegion}
             onSelect={onSelectRegion}
+            onSplit={onSplitRegion}
             isSelected={selectedRegionIds.has(region.id)}
           />
         ))}

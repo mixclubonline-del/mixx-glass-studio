@@ -11,37 +11,69 @@ import {
   StepForward,
   FileDown, 
   Loader2,
-  Circle
+  Circle,
+  Repeat
 } from 'lucide-react';
 import { useState } from 'react';
 
 interface TransportControlsProps {
   isPlaying: boolean;
+  isRecording?: boolean;
+  isLooping?: boolean;
   onPlay: () => void;
   onPause: () => void;
   onStop: () => void;
+  onRecord?: () => void;
+  onLoopToggle?: () => void;
   onExport: () => void;
   isExporting?: boolean;
   bpm?: number;
   timeSignature?: { numerator: number; denominator: number };
   onBpmChange?: (bpm: number) => void;
   onTimeSignatureChange?: (sig: { numerator: number; denominator: number }) => void;
+  onPrevBar?: () => void;
+  onNextBar?: () => void;
 }
 
 export function TransportControls({
   isPlaying,
+  isRecording: externalIsRecording,
+  isLooping: externalIsLooping,
   onPlay,
   onPause,
   onStop,
+  onRecord,
+  onLoopToggle,
   onExport,
   isExporting = false,
   bpm = 120,
   timeSignature = { numerator: 4, denominator: 4 },
   onBpmChange,
   onTimeSignatureChange,
+  onPrevBar,
+  onNextBar,
 }: TransportControlsProps) {
   const [isRecording, setIsRecording] = useState(false);
   const [isLooping, setIsLooping] = useState(false);
+  
+  const handleRecordToggle = () => {
+    if (onRecord) {
+      onRecord();
+    } else {
+      setIsRecording(!isRecording);
+    }
+  };
+  
+  const handleLoopToggle = () => {
+    if (onLoopToggle) {
+      onLoopToggle();
+    } else {
+      setIsLooping(!isLooping);
+    }
+  };
+  
+  const activeIsRecording = externalIsRecording !== undefined ? externalIsRecording : isRecording;
+  const activeIsLooping = externalIsLooping !== undefined ? externalIsLooping : isLooping;
   
   return (
     <div className="glass rounded-xl p-4 border border-border shadow-lg">
@@ -61,6 +93,7 @@ export function TransportControls({
           <Button
             variant="outline"
             size="icon"
+            onClick={onPrevBar}
             className="hover:bg-secondary"
             title="Previous bar"
           >
@@ -80,6 +113,7 @@ export function TransportControls({
           <Button
             variant="outline"
             size="icon"
+            onClick={onNextBar}
             className="hover:bg-secondary"
             title="Next bar"
           >
@@ -97,13 +131,13 @@ export function TransportControls({
           </Button>
           
           <Button
-            variant={isRecording ? 'destructive' : 'outline'}
+            variant={activeIsRecording ? 'destructive' : 'outline'}
             size="icon"
-            onClick={() => setIsRecording(!isRecording)}
-            className={isRecording ? 'animate-pulse' : ''}
+            onClick={handleRecordToggle}
+            className={activeIsRecording ? 'animate-pulse' : ''}
             title="Record (Shift+Space)"
           >
-            <Circle className={`h-4 w-4 ${isRecording ? 'fill-current' : ''}`} />
+            <Circle className={`h-4 w-4 ${activeIsRecording ? 'fill-current' : ''}`} />
           </Button>
         </div>
         
@@ -151,11 +185,13 @@ export function TransportControls({
           </div>
           
           <Button
-            variant={isLooping ? 'default' : 'outline'}
+            variant={activeIsLooping ? 'default' : 'outline'}
             size="sm"
-            onClick={() => setIsLooping(!isLooping)}
-            title="Loop/Cycle"
+            onClick={handleLoopToggle}
+            className={activeIsLooping ? 'bg-accent hover:bg-accent/90 shadow-[0_0_15px_hsl(var(--accent)/0.4)]' : ''}
+            title="Loop/Cycle (Ctrl+L)"
           >
+            <Repeat className="h-4 w-4 mr-1" />
             Loop
           </Button>
         </div>
