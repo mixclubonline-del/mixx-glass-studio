@@ -106,7 +106,10 @@ export const ArrangeBrowserPanel: React.FC<ArrangeBrowserPanelProps> = ({
           </TabsContent>
 
           <TabsContent value="plugins" className="h-full m-0 p-0">
-            <PluginBrowserPanel onPluginSelect={onPluginSelect} />
+            <PluginBrowserPanel 
+              onPluginSelect={onPluginSelect}
+              selectedTrackId={selectedTrackId}
+            />
           </TabsContent>
 
           <TabsContent value="inspector" className="h-full m-0 p-0">

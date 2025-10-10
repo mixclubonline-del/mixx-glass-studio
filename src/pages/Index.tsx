@@ -37,6 +37,7 @@ const Index = () => {
   const [selectedTrackForPlugin, setSelectedTrackForPlugin] = useState<string | null>(null);
   const [selectedSlotForPlugin, setSelectedSlotForPlugin] = useState<number>(1);
   const [openPluginWindows, setOpenPluginWindows] = useState<Map<string, { trackId: string; slotNumber: number; pluginId: string }>>(new Map());
+  const [selectedTrackId, setSelectedTrackId] = useState<string | null>(null);
   const { toast } = useToast();
   
   // Global stores
@@ -330,10 +331,24 @@ const Index = () => {
   };
   
   const handlePluginSelect = (pluginId: string) => {
-    if (selectedTrackForPlugin && engineRef.current) {
-      handleLoadPlugin(selectedTrackForPlugin, selectedSlotForPlugin, pluginId);
+    // Use selectedTrackForPlugin if set (from mixer), otherwise use selectedTrackId (from timeline)
+    const targetTrack = selectedTrackForPlugin || selectedTrackId;
+    
+    if (targetTrack && engineRef.current) {
+      handleLoadPlugin(targetTrack, selectedSlotForPlugin, pluginId);
+      toast({
+        title: "Plugin Loaded",
+        description: `${pluginId} loaded to track`,
+      });
+    } else {
+      toast({
+        title: "No Track Selected",
+        description: "Please select a track first",
+        variant: "destructive"
+      });
     }
     setPluginBrowserOpen(false);
+    setSelectedTrackForPlugin(null); // Reset after use
   };
   
   const handleOpenPluginBrowser = (trackId: string, slotNumber: number) => {
@@ -612,15 +627,17 @@ const Index = () => {
                     handleFileSelect({ target: { files: [file] } } as any);
                   }}
                   onPluginSelect={(pluginId) => {
-                    if (selectedTrackForPlugin) {
+                    if (selectedTrackId) {
                       handlePluginSelect(pluginId);
                     } else {
                       toast({
                         title: "No Track Selected",
-                        description: "Please select a track first",
+                        description: "Click a track in the timeline to select it",
                       });
                     }
                   }}
+                  selectedTrackId={selectedTrackId}
+                  onTrackSelect={setSelectedTrackId}
                 />
               )}
               
@@ -662,6 +679,7 @@ const Index = () => {
               <MeteringDashboard
                 masterPeakLevel={masterPeakLevel}
                 analyserNode={engineRef.current?.getMasterAnalyser()}
+                engineRef={engineRef}
               />
             </div>
           </div>

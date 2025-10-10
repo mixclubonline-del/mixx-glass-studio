@@ -21,13 +21,17 @@ interface AdvancedTimelineViewProps {
   onSeek: (time: number) => void;
   onFileSelect?: (file: File) => void;
   onPluginSelect?: (pluginId: string) => void;
+  selectedTrackId?: string | null;
+  onTrackSelect?: (trackId: string | null) => void;
 }
 
 export const AdvancedTimelineView: React.FC<AdvancedTimelineViewProps> = ({
   audioBuffers,
   onSeek,
   onFileSelect,
-  onPluginSelect
+  onPluginSelect,
+  selectedTrackId: externalSelectedTrackId,
+  onTrackSelect
 }) => {
   const containerRef = useRef<HTMLDivElement>(null);
   const contentRef = useRef<HTMLDivElement>(null);
@@ -82,6 +86,21 @@ export const AdvancedTimelineView: React.FC<AdvancedTimelineViewProps> = ({
       });
     }
   };
+  
+  // Wrapper to sync track selection with parent
+  const handleSelectTrack = (trackId: string | null) => {
+    selectTrack(trackId);
+    if (onTrackSelect) {
+      onTrackSelect(trackId);
+    }
+  };
+  
+  // Sync external selection to internal store
+  useEffect(() => {
+    if (externalSelectedTrackId !== undefined && externalSelectedTrackId !== selectedTrackId) {
+      selectTrack(externalSelectedTrackId);
+    }
+  }, [externalSelectedTrackId, selectedTrackId, selectTrack]);
   
   const handleSplitRegion = (regionId: string, splitTime: number) => {
     const region = regions.find(r => r.id === regionId);
@@ -269,7 +288,7 @@ export const AdvancedTimelineView: React.FC<AdvancedTimelineViewProps> = ({
               audioBuffers={audioBuffers}
               zoom={zoom}
               isSelected={selectedTrackId === track.id}
-              onSelectTrack={selectTrack}
+              onSelectTrack={handleSelectTrack}
               onUpdateRegion={updateRegion}
               onSelectRegion={toggleRegionSelection}
               onSplitRegion={handleSplitRegion}

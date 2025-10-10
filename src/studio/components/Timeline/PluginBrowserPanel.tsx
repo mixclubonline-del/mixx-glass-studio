@@ -10,9 +10,13 @@ import { PluginManager } from '@/audio/plugins/PluginManager';
 
 interface PluginBrowserPanelProps {
   onPluginSelect?: (pluginId: string) => void;
+  selectedTrackId?: string | null;
 }
 
-export const PluginBrowserPanel: React.FC<PluginBrowserPanelProps> = ({ onPluginSelect }) => {
+export const PluginBrowserPanel: React.FC<PluginBrowserPanelProps> = ({ 
+  onPluginSelect,
+  selectedTrackId 
+}) => {
   const [searchQuery, setSearchQuery] = useState('');
   const [selectedCategory, setSelectedCategory] = useState<string | null>(null);
 
@@ -29,6 +33,20 @@ export const PluginBrowserPanel: React.FC<PluginBrowserPanelProps> = ({ onPlugin
 
   return (
     <div className="flex flex-col h-full">
+      {/* Selected Track Indicator */}
+      {selectedTrackId && (
+        <div className="px-3 py-2 bg-primary/10 border-b border-primary/20">
+          <div className="text-xs text-muted-foreground">Loading to:</div>
+          <div className="text-sm font-medium text-primary truncate">{selectedTrackId}</div>
+        </div>
+      )}
+      
+      {!selectedTrackId && (
+        <div className="px-3 py-2 bg-muted/30 border-b border-border/30">
+          <div className="text-xs text-muted-foreground">Select a track first</div>
+        </div>
+      )}
+      
       {/* Search */}
       <div className="p-3 border-b border-border/30">
         <div className="relative">
