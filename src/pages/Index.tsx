@@ -79,7 +79,7 @@ const Index = () => {
     return () => clearInterval(interval);
   }, [isPlaying, setCurrentTime]);
 
-  // Update peak meters
+  // Update peak meters at 30Hz (33ms) for smooth animation
   useEffect(() => {
     const interval = setInterval(() => {
       if (engineRef.current) {
@@ -91,7 +91,7 @@ const Index = () => {
           updatePeakLevel(id, level);
         });
       }
-    }, 100);
+    }, 33); // 30Hz update rate
     
     return () => clearInterval(interval);
   }, [channels, setMasterPeakLevel, updatePeakLevel]);
@@ -537,6 +537,15 @@ const Index = () => {
             >
               🎛️ Plugin Suite
             </Button>
+            <Button
+              variant="outline"
+              size="sm"
+              onClick={() => setShowAIAssistant(!showAIAssistant)}
+              className="gap-2"
+            >
+              <Bot className="w-4 h-4" />
+              AI Assistant
+            </Button>
           </div>
           <ViewSwitcher />
         </div>
@@ -573,11 +582,24 @@ const Index = () => {
               )}
             </div>
             
-            {/* Metering dashboard (right side) */}
-            <MeteringDashboard
-              masterPeakLevel={masterPeakLevel}
-              analyserNode={engineRef.current?.getMasterAnalyser()}
-            />
+            {/* Right side panels */}
+            <div className="flex flex-col gap-2">
+              {/* AI Assistant Panel */}
+              {showAIAssistant && (
+                <div className="w-96">
+                  <AIAssistantPanel 
+                    isOpen={showAIAssistant}
+                    onClose={() => setShowAIAssistant(false)} 
+                  />
+                </div>
+              )}
+              
+              {/* Metering dashboard */}
+              <MeteringDashboard
+                masterPeakLevel={masterPeakLevel}
+                analyserNode={engineRef.current?.getMasterAnalyser()}
+              />
+            </div>
           </div>
         </ViewContainer>
         

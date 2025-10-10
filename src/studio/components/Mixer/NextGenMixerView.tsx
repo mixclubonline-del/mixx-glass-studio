@@ -7,9 +7,11 @@ import { useMixerStore } from '@/store/mixerStore';
 import { GlassChannelStrip } from './GlassChannelStrip';
 import { MasterChannelStrip } from './MasterChannelStrip';
 import { MasterMeteringPanel } from '../Metering/MasterMeteringPanel';
+import { MixerSidePanels } from './MixerSidePanels';
 import { Button } from '@/components/ui/button';
 import { Plus } from 'lucide-react';
 import { useTracksStore } from '@/store/tracksStore';
+import { useTimelineStore } from '@/store/timelineStore';
 import { Layers, ChevronRight } from 'lucide-react';
 
 interface NextGenMixerViewProps {
@@ -41,6 +43,7 @@ export const NextGenMixerView: React.FC<NextGenMixerViewProps> = ({
 }) => {
   const { channels, masterVolume, masterPeakLevel, selectedChannelId, selectChannel, updateChannel, setMasterVolume, buses } = useMixerStore();
   const { setAddTrackDialogOpen } = useTracksStore();
+  const { loopEnabled, loopStart, loopEnd, setLoopEnabled, setLoopStart, setLoopEnd } = useTimelineStore();
   const channelArray = Array.from(channels.values());
   
   const handleVolumeChange = (id: string, volume: number) => {
@@ -81,14 +84,29 @@ export const NextGenMixerView: React.FC<NextGenMixerViewProps> = ({
               {channelArray.length} channels • ITU-R BS.1770-5 Metering
             </p>
           </div>
-          <Button
-            size="sm"
-            onClick={() => setAddTrackDialogOpen(true)}
-            className="gap-1 shadow-[0_0_15px_hsl(var(--primary)/0.3)]"
-          >
-            <Plus size={14} />
-            Add Channel
-          </Button>
+          <div className="flex items-center gap-2">
+            <MixerSidePanels
+              buses={Array.from(buses.values())}
+              loopEnabled={loopEnabled}
+              loopStart={loopStart}
+              loopEnd={loopEnd}
+              onCreateBus={onCreateBus}
+              onDeleteBus={(id) => {
+                // Delete bus logic
+              }}
+              onLoopEnabledChange={setLoopEnabled}
+              onLoopStartChange={setLoopStart}
+              onLoopEndChange={setLoopEnd}
+            />
+            <Button
+              size="sm"
+              onClick={() => setAddTrackDialogOpen(true)}
+              className="gap-1 shadow-[0_0_15px_hsl(var(--primary)/0.3)]"
+            >
+              <Plus size={14} />
+              Add Channel
+            </Button>
+          </div>
         </div>
         
         {/* Mixer content */}

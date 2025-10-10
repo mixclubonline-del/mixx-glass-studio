@@ -8,10 +8,10 @@ import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog';
-import { Bus } from '@/audio/Bus';
+import { BusState } from '@/store/mixerStore';
 
 interface BusManagerProps {
-  buses: Bus[];
+  buses: BusState[];
   onCreateBus: (name: string, type: 'aux' | 'group') => void;
   onDeleteBus: (id: string) => void;
 }
