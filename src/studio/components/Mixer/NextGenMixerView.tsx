@@ -13,6 +13,7 @@ import { Plus } from 'lucide-react';
 import { useTracksStore } from '@/store/tracksStore';
 import { useTimelineStore } from '@/store/timelineStore';
 import { Layers, ChevronRight } from 'lucide-react';
+import mixxclubLogo from '@/assets/mixxclub-logo.png';
 
 interface NextGenMixerViewProps {
   onVolumeChange: (id: string, volume: number) => void;
@@ -82,11 +83,14 @@ export const NextGenMixerView: React.FC<NextGenMixerViewProps> = ({
       <div className="flex-1 flex flex-col">
         {/* Header */}
         <div className="px-6 py-3 glass border-b border-border/30 flex items-center justify-between">
-          <div>
-            <h2 className="text-xl font-bold neon-text">Professional Mixer</h2>
-            <p className="text-xs text-muted-foreground mt-0.5">
-              {channelArray.length} channels • ITU-R BS.1770-5 Metering
-            </p>
+          <div className="flex items-center gap-3">
+            <img src={mixxclubLogo} alt="MixxClub Studio" className="h-8 w-auto" />
+            <div>
+              <h2 className="text-xl font-bold neon-text">MixxClub Studio</h2>
+              <p className="text-xs text-muted-foreground mt-0.5">
+                {channelArray.length} channels • ITU-R BS.1770-5 Metering
+              </p>
+            </div>
           </div>
           <div className="flex items-center gap-2">
             <MixerSidePanels

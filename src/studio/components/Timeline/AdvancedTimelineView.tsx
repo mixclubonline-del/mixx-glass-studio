@@ -15,6 +15,7 @@ import { CrossfadeRenderer } from './CrossfadeRenderer';
 import { ArrangeBrowserPanel } from './ArrangeBrowserPanel';
 import { ZoomIn, ZoomOut, Grid3x3, Maximize2, Plus } from 'lucide-react';
 import { Button } from '@/components/ui/button';
+import mixxclubLogo from '@/assets/mixxclub-logo.png';
 
 interface AdvancedTimelineViewProps {
   audioBuffers: Map<string, AudioBuffer>;
@@ -181,7 +182,10 @@ export const AdvancedTimelineView: React.FC<AdvancedTimelineViewProps> = ({
       <div className="flex-1 flex flex-col">
         {/* Timeline toolbar with tools */}
         <div className="flex items-center justify-between gap-3 px-4 py-2 glass border-b border-border/30">
-          <TimelineToolbar />
+          <div className="flex items-center gap-3">
+            <img src={mixxclubLogo} alt="MixxClub Studio" className="h-7 w-auto" />
+            <TimelineToolbar />
+          </div>
           
           <div className="flex items-center gap-2">
             <button 
