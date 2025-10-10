@@ -7,6 +7,7 @@ import { EffectsRack } from "../studio/components/EffectsRack";
 import { Timeline } from "../studio/components/Timeline";
 import { TransportControls } from "../studio/components/TransportControls";
 import { MixxAIStudio } from "../studio/components/AI/MixxAIStudio";
+import { ProducerLab } from "../studio/components/Producer/ProducerLab";
 import { ViewSwitcher } from "../studio/components/Navigation/ViewSwitcher";
 import { ViewContainer } from "../studio/components/Navigation/ViewContainer";
 import { CollapsibleMeteringPanel } from "../studio/components/Metering/CollapsibleMeteringPanel";
@@ -52,6 +53,8 @@ export default function StudioPage() {
       <ViewContainer className="flex-1">
         {currentView === 'ai-studio' ? (
           <MixxAIStudio />
+        ) : currentView === 'producer-lab' ? (
+          <ProducerLab />
         ) : (
           <div style={{ padding: 12 }}>
             {/* Top timeline/arranger */}
