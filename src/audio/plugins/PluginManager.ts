@@ -10,8 +10,10 @@ export interface PluginMetadata {
   manufacturer: string;
   version: string;
   tags: string[];
-  presetCount: number;
+  presets?: string[];
+  presetCount?: number;
   thumbnail?: string;
+  skinPath?: string;
 }
 
 export interface PluginInstance {

@@ -38,6 +38,8 @@ const Index = () => {
   const [selectedSlotForPlugin, setSelectedSlotForPlugin] = useState<number>(1);
   const [openPluginWindows, setOpenPluginWindows] = useState<Map<string, { trackId: string; slotNumber: number; pluginId: string }>>(new Map());
   const [selectedTrackId, setSelectedTrackId] = useState<string | null>(null);
+  const [transportFloating, setTransportFloating] = useState(false);
+  const [transportCollapsed, setTransportCollapsed] = useState(false);
   const { toast } = useToast();
   
   // Global stores
@@ -142,13 +144,12 @@ const Index = () => {
         };
         addTrack(timelineTrack);
         
-        // Create region - start at bar 1 (using project offset)
-        const projectStartOffset = engineRef.current.projectStartOffset || 0;
+        // Create region - start at time 0
         const region: Region = {
           id: `region-${id}`,
           trackId: id,
           name: file.name,
-          startTime: projectStartOffset, // Start at bar 1
+          startTime: 0, // Start at beginning of timeline
           duration: loadedTrack.buffer.duration,
           bufferOffset: 0,
           bufferDuration: loadedTrack.buffer.duration,
@@ -685,31 +686,58 @@ const Index = () => {
           </div>
         </ViewContainer>
         
-        <TransportControls
-          isPlaying={isPlaying}
-          onPlay={handlePlay}
-          onPause={handlePause}
-          onStop={handleStop}
-          onExport={handleExport}
-          isExporting={isExporting}
-          bpm={120}
-          timeSignature={{ numerator: 4, denominator: 4 }}
-          onBpmChange={() => {}}
-          onTimeSignatureChange={() => {}}
-          isRecording={false}
-          isLooping={useTimelineStore.getState().loopEnabled}
-          onRecord={handleRecord}
-          onLoopToggle={handleLoopToggle}
-          onPrevBar={handlePrevBar}
-          onNextBar={handleNextBar}
-          currentTime={currentTime}
-          masterVolume={engineRef.current?.getMasterGain() || 0.75}
-          onMasterVolumeChange={(volume) => {
-            if (engineRef.current) {
-              engineRef.current.setMasterGain(volume);
-            }
-          }}
-        />
+        {/* Transport Controls - Collapsible and Floatable */}
+        {!transportCollapsed && (
+          <div className={transportFloating ? "fixed bottom-4 right-4 z-50" : ""}>
+            <TransportControls
+              isPlaying={isPlaying}
+              onPlay={handlePlay}
+              onPause={handlePause}
+              onStop={handleStop}
+              onExport={handleExport}
+              isExporting={isExporting}
+              bpm={120}
+              timeSignature={{ numerator: 4, denominator: 4 }}
+              onBpmChange={() => {}}
+              onTimeSignatureChange={() => {}}
+              isRecording={false}
+              isLooping={useTimelineStore.getState().loopEnabled}
+              onRecord={handleRecord}
+              onLoopToggle={handleLoopToggle}
+              onPrevBar={handlePrevBar}
+              onNextBar={handleNextBar}
+              currentTime={currentTime}
+              masterVolume={engineRef.current?.getMasterGain() || 0.75}
+              onMasterVolumeChange={(volume) => {
+                if (engineRef.current) {
+                  engineRef.current.setMasterGain(volume);
+                }
+              }}
+            />
+          </div>
+        )}
+        
+        {/* Transport Toggle Buttons */}
+        <div className="fixed bottom-4 left-4 flex gap-2 z-40">
+          <Button
+            variant="outline"
+            size="sm"
+            onClick={() => setTransportCollapsed(!transportCollapsed)}
+            title={transportCollapsed ? "Show Transport" : "Hide Transport"}
+          >
+            {transportCollapsed ? "Show Transport" : "Hide Transport"}
+          </Button>
+          {!transportCollapsed && (
+            <Button
+              variant="outline"
+              size="sm"
+              onClick={() => setTransportFloating(!transportFloating)}
+              title={transportFloating ? "Dock Transport" : "Float Transport"}
+            >
+              {transportFloating ? "Dock" : "Float"}
+            </Button>
+          )}
+        </div>
       </div>
       
       {/* Plugin Browser */}

@@ -159,6 +159,22 @@ export const AdvancedTimelineView: React.FC<AdvancedTimelineViewProps> = ({
     localStorage.setItem('browserCollapsed', browserCollapsed.toString());
   }, [browserCollapsed]);
   
+  // Auto-scroll follow playhead when enabled
+  const { autoScrollEnabled } = useTimelineStore();
+  useEffect(() => {
+    if (!autoScrollEnabled || !containerRef.current) return;
+    
+    const playheadX = currentTime * zoom;
+    const containerWidth = containerRef.current.clientWidth;
+    const scrollLeft = containerRef.current.scrollLeft;
+    const scrollRight = scrollLeft + containerWidth;
+    
+    // If playhead is outside visible area, scroll to center it
+    if (playheadX < scrollLeft + containerWidth * 0.2 || playheadX > scrollRight - containerWidth * 0.2) {
+      containerRef.current.scrollLeft = playheadX - containerWidth * 0.4;
+    }
+  }, [currentTime, zoom, autoScrollEnabled]);
+  
   return (
     <div className="flex h-full bg-background">
       {/* Main Timeline Area */}

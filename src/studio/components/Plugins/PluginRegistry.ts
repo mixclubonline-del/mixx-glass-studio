@@ -2,6 +2,7 @@
  * Plugin Registry - Register all available plugins
  */
 
+import React from 'react';
 import { PluginManager } from '@/audio/plugins/PluginManager';
 import { MixxReverb } from './MixxReverb';
 import { MixxDelay } from './MixxDelay';
