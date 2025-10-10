@@ -181,14 +181,22 @@ export const AdvancedTimelineView: React.FC<AdvancedTimelineViewProps> = ({
       {/* Main Timeline Area */}
       <div className="flex-1 flex flex-col">
         {/* Timeline toolbar with tools */}
-        <div className="flex items-center justify-between gap-3 px-4 py-3 glass border-b border-border/30">
-          <div className="flex items-center gap-4">
+        <div className="flex items-center justify-between gap-3 px-6 py-4 glass border-b-2 border-[#a855f7]/50 border-glow-hype bg-gradient-to-r from-[#a855f7]/5 via-[#ec4899]/5 to-[#3b82f6]/5">
+          <div className="flex items-center gap-6">
             <img 
               src={mixxclubLogo} 
               alt="MixxClub Studio" 
-              className="h-10 w-auto logo-pulse logo-glow" 
+              className="h-16 w-auto logo-pulse logo-glow" 
             />
-            <div className="border-l border-border/30 h-8 mx-2"></div>
+            <div className="flex flex-col">
+              <h3 className="text-2xl font-black gradient-flow uppercase tracking-wide">
+                Arrange View
+              </h3>
+              <p className="text-xs text-[#ec4899] font-bold text-glow-hype uppercase tracking-wider">
+                Create Your Masterpiece 🎵
+              </p>
+            </div>
+            <div className="border-l-2 border-[#a855f7]/50 h-12 mx-2"></div>
             <TimelineToolbar />
           </div>
           

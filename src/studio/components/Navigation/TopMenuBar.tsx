@@ -53,15 +53,23 @@ export function TopMenuBar({
   const { toast } = useToast();
   
   return (
-    <Menubar className="border-b border-border bg-secondary/30 backdrop-blur-sm rounded-none">
-      <div className="flex items-center gap-3 px-3 py-1">
+    <Menubar className="border-b-2 border-[#a855f7]/40 bg-gradient-to-r from-[#1a1a2e] via-[#16213e] to-[#1a1a2e] backdrop-blur-sm rounded-none">
+      <div className="flex items-center gap-4 px-4 py-2">
         <img 
           src={mixxclubLogo} 
           alt="MixxClub Studio" 
-          className="h-7 w-auto logo-glow cursor-pointer transition-all hover:scale-105" 
+          className="h-10 w-auto logo-glow logo-pulse cursor-pointer transition-all hover:scale-110" 
           onClick={() => setView('arrange')}
         />
-        <div className="h-6 w-px bg-border/50"></div>
+        <div className="flex flex-col">
+          <span className="text-xs font-black gradient-flow uppercase tracking-wider">
+            MixxClub
+          </span>
+          <span className="text-[0.6rem] text-[#ec4899] font-bold uppercase tracking-wide">
+            Studio 2027
+          </span>
+        </div>
+        <div className="h-8 w-px bg-gradient-to-b from-[#a855f7] to-[#ec4899]"></div>
       </div>
       
       {/* File Menu */}
