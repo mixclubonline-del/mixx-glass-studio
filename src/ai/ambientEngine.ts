@@ -36,6 +36,9 @@ class MixxAmbientEngine {
 
   private subscribers: Array<(state: AmbientState) => void> = [];
   private animationFrame: number | null = null;
+  private lastUpdateTime: number = 0;
+  private updateThrottle: number = 200; // Update every 200ms instead of every frame
+  private moodHysteresis: number = 0.05; // Prevent bouncing at thresholds
 
   constructor() {
     this.startAmbientLoop();
@@ -57,36 +60,61 @@ class MixxAmbientEngine {
    */
   processMoodPacket(packet: MoodPacket) {
     const oldMood = this.state.mood;
+    const oldEnergy = this.state.energy;
     
     // Update energy
     this.state.energy = packet.energy;
     
-    // Determine mood from energy and frequencies
-    if (packet.energy > 0.8) {
-      this.state.mood = 'intense';
-      this.state.lightingMode = 'burst';
-      this.state.primaryColor = '#FF4D8D'; // pink
-      this.state.secondaryColor = '#FF67C7';
-    } else if (packet.energy > 0.6) {
+    // Determine mood from energy with hysteresis to prevent threshold bouncing
+    const energy = packet.energy;
+    const hysteresis = this.moodHysteresis;
+    
+    // Use different thresholds when crossing up vs down to prevent oscillation
+    if (this.state.mood === 'intense' && energy < 0.8 - hysteresis) {
       this.state.mood = 'energetic';
-      this.state.lightingMode = 'pulse';
-      this.state.primaryColor = '#FF67C7';
-      this.state.secondaryColor = '#A57CFF'; // violet
-    } else if (packet.energy > 0.4) {
+    } else if (this.state.mood !== 'intense' && energy > 0.8 + hysteresis) {
+      this.state.mood = 'intense';
+    } else if (this.state.mood === 'energetic' && energy < 0.6 - hysteresis) {
       this.state.mood = 'focused';
-      this.state.lightingMode = 'ripple';
-      this.state.primaryColor = '#A57CFF'; // violet
-      this.state.secondaryColor = '#56C8FF'; // blue
-    } else if (packet.energy > 0.2) {
+    } else if (this.state.mood !== 'energetic' && this.state.mood !== 'intense' && energy > 0.6 + hysteresis) {
+      this.state.mood = 'energetic';
+    } else if (this.state.mood === 'focused' && energy < 0.4 - hysteresis) {
       this.state.mood = 'creative';
-      this.state.lightingMode = 'breathe';
-      this.state.primaryColor = '#56C8FF'; // blue
-      this.state.secondaryColor = '#EAF2FF';
-    } else {
+    } else if (this.state.mood !== 'focused' && this.state.mood !== 'energetic' && this.state.mood !== 'intense' && energy > 0.4 + hysteresis) {
+      this.state.mood = 'focused';
+    } else if (this.state.mood === 'creative' && energy < 0.2 - hysteresis) {
       this.state.mood = 'calm';
-      this.state.lightingMode = 'breathe';
-      this.state.primaryColor = '#EAF2FF';
-      this.state.secondaryColor = '#56C8FF'; // blue
+    } else if (this.state.mood === 'calm' && energy > 0.2 + hysteresis) {
+      this.state.mood = 'creative';
+    }
+    
+    // Set lighting based on mood
+    switch (this.state.mood) {
+      case 'intense':
+        this.state.lightingMode = 'burst';
+        this.state.primaryColor = '#FF4D8D';
+        this.state.secondaryColor = '#FF67C7';
+        break;
+      case 'energetic':
+        this.state.lightingMode = 'pulse';
+        this.state.primaryColor = '#FF67C7';
+        this.state.secondaryColor = '#A57CFF';
+        break;
+      case 'focused':
+        this.state.lightingMode = 'ripple';
+        this.state.primaryColor = '#A57CFF';
+        this.state.secondaryColor = '#56C8FF';
+        break;
+      case 'creative':
+        this.state.lightingMode = 'breathe';
+        this.state.primaryColor = '#56C8FF';
+        this.state.secondaryColor = '#EAF2FF';
+        break;
+      case 'calm':
+        this.state.lightingMode = 'breathe';
+        this.state.primaryColor = '#EAF2FF';
+        this.state.secondaryColor = '#56C8FF';
+        break;
     }
 
     // Log mood changes
@@ -99,7 +127,10 @@ class MixxAmbientEngine {
       });
     }
 
-    this.notifySubscribers();
+    // Only notify subscribers if there's a meaningful change
+    if (oldMood !== this.state.mood || Math.abs(oldEnergy - this.state.energy) > 0.05) {
+      this.notifySubscribers();
+    }
   }
 
   /**
@@ -123,19 +154,30 @@ class MixxAmbientEngine {
 
   /**
    * Ambient loop - simulates continuous mood evolution
+   * Throttled to reduce performance impact
    */
   private startAmbientLoop() {
     const loop = () => {
-      // Simulate natural energy fluctuation
-      const time = Date.now() / 1000;
-      const baseEnergy = Math.sin(time * 0.1) * 0.2 + 0.5; // Slow wave 0.3-0.7
-      const noise = Math.random() * 0.1; // Small random variation
+      const now = Date.now();
+      
+      // Throttle updates to prevent excessive re-renders
+      if (now - this.lastUpdateTime < this.updateThrottle) {
+        this.animationFrame = requestAnimationFrame(loop);
+        return;
+      }
+      
+      this.lastUpdateTime = now;
+      
+      // Simulate natural energy fluctuation with smoother, less noisy variation
+      const time = now / 1000;
+      const baseEnergy = Math.sin(time * 0.05) * 0.25 + 0.5; // Very slow wave 0.25-0.75
+      const noise = Math.random() * 0.02; // Minimal random variation
       
       this.processMoodPacket({
         mood: this.state.mood,
         energy: Math.max(0, Math.min(1, baseEnergy + noise)),
         dominantFrequencies: [],
-        timestamp: Date.now()
+        timestamp: now
       });
 
       this.animationFrame = requestAnimationFrame(loop);
