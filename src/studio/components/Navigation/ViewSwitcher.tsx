@@ -4,7 +4,7 @@
 
 import React from 'react';
 import { useViewStore, ViewType } from '@/store/viewStore';
-import { Layout, Sliders, Edit3 } from 'lucide-react';
+import { Layout, Sliders, Edit3, Sparkles } from 'lucide-react';
 
 export const ViewSwitcher: React.FC = () => {
   const { currentView, setView } = useViewStore();
@@ -13,6 +13,7 @@ export const ViewSwitcher: React.FC = () => {
     { id: 'arrange', label: 'Arrange', icon: <Layout size={16} /> },
     { id: 'mix', label: 'Mix', icon: <Sliders size={16} /> },
     { id: 'edit', label: 'Edit', icon: <Edit3 size={16} /> },
+    { id: 'ai-studio', label: 'AI Studio', icon: <Sparkles size={16} /> },
   ];
   
   return (

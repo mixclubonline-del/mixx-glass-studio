@@ -44,6 +44,7 @@ export { ViewContainer } from './Navigation/ViewContainer';
 
 // AI
 export { AIAssistantPanel } from './AI/AIAssistantPanel';
+export { MixxAIStudio } from './AI/MixxAIStudio';
 
 // Transport
 export { TransportControls } from './TransportControls';

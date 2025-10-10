@@ -1,11 +1,17 @@
-// src/pages/StudioPage.tsx
-// Simple studio page with core components
+/**
+ * Studio Page - Main DAW interface with view routing
+ */
 import { useState } from "react";
+import { useViewStore } from "@/store/viewStore";
 import { EffectsRack } from "../studio/components/EffectsRack";
 import { Timeline } from "../studio/components/Timeline";
 import { TransportControls } from "../studio/components/TransportControls";
+import { MixxAIStudio } from "../studio/components/AI/MixxAIStudio";
+import { ViewSwitcher } from "../studio/components/Navigation/ViewSwitcher";
+import { ViewContainer } from "../studio/components/Navigation/ViewContainer";
 
 export default function StudioPage() {
+  const { currentView } = useViewStore();
   const [isPlaying, setIsPlaying] = useState(false);
   const [currentTime, setCurrentTime] = useState(0);
   const [duration, setDuration] = useState(180); // 3 minutes default
@@ -35,37 +41,51 @@ export default function StudioPage() {
   };
 
   return (
-    <div style={{ padding: 12 }}>
-      {/* Top timeline/arranger */}
-      <div style={{ marginBottom: 12 }}>
-        <Timeline 
-          currentTime={currentTime}
-          duration={duration}
-          isPlaying={isPlaying}
-          onSeek={handleSeek}
-        />
+    <div className="h-screen flex flex-col bg-background">
+      {/* View Switcher */}
+      <div className="p-3 border-b border-border/30">
+        <ViewSwitcher />
       </div>
 
-      {/* Main rack (your plugins live here) */}
-      <div style={{ marginBottom: 12 }}>
-        <EffectsRack 
-          reverbMix={reverbMix}
-          delayTime={delayTime}
-          delayFeedback={delayFeedback}
-          delayMix={delayMix}
-          limiterThreshold={limiterThreshold}
-          onEffectChange={handleEffectChange}
-        />
-      </div>
+      {/* View Content */}
+      <ViewContainer className="flex-1">
+        {currentView === 'ai-studio' ? (
+          <MixxAIStudio />
+        ) : (
+          <div style={{ padding: 12 }}>
+            {/* Top timeline/arranger */}
+            <div style={{ marginBottom: 12 }}>
+              <Timeline 
+                currentTime={currentTime}
+                duration={duration}
+                isPlaying={isPlaying}
+                onSeek={handleSeek}
+              />
+            </div>
 
-      {/* Transport / play controls */}
-      <TransportControls 
-        isPlaying={isPlaying}
-        onPlay={handlePlay}
-        onPause={handlePause}
-        onStop={handleStop}
-        onExport={handleExport}
-      />
+            {/* Main rack (your plugins live here) */}
+            <div style={{ marginBottom: 12 }}>
+              <EffectsRack 
+                reverbMix={reverbMix}
+                delayTime={delayTime}
+                delayFeedback={delayFeedback}
+                delayMix={delayMix}
+                limiterThreshold={limiterThreshold}
+                onEffectChange={handleEffectChange}
+              />
+            </div>
+
+            {/* Transport / play controls */}
+            <TransportControls 
+              isPlaying={isPlaying}
+              onPlay={handlePlay}
+              onPause={handlePause}
+              onStop={handleStop}
+              onExport={handleExport}
+            />
+          </div>
+        )}
+      </ViewContainer>
     </div>
   );
 }

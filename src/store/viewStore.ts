@@ -4,7 +4,7 @@
 
 import { create } from 'zustand';
 
-export type ViewType = 'arrange' | 'mix' | 'edit';
+export type ViewType = 'arrange' | 'mix' | 'edit' | 'ai-studio';
 
 interface ViewState {
   currentView: ViewType;
