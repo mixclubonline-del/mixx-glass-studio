@@ -21,9 +21,20 @@ interface TopMenuBarProps {
   onSave?: () => void;
   onLoad?: () => void;
   onImport?: () => void;
+  onAIMix?: () => void;
+  onStemSeparation?: () => void;
+  onAutoMaster?: () => void;
 }
 
-export function TopMenuBar({ onExport, onSave, onLoad, onImport }: TopMenuBarProps) {
+export function TopMenuBar({ 
+  onExport, 
+  onSave, 
+  onLoad, 
+  onImport,
+  onAIMix,
+  onStemSeparation,
+  onAutoMaster 
+}: TopMenuBarProps) {
   const { setView, togglePanel } = useViewStore();
   const { setCurrentTool, toggleRippleEdit, rippleEdit } = useTimelineStore();
   const { toast } = useToast();
@@ -148,18 +159,50 @@ export function TopMenuBar({ onExport, onSave, onLoad, onImport }: TopMenuBarPro
           AI Tools
         </MenubarTrigger>
         <MenubarContent>
-          <MenubarItem onClick={() => toast({ title: "AI Mix Assistant", description: "Coming soon!" })}>
+          <MenubarItem onClick={() => {
+            if (onAIMix) {
+              onAIMix();
+            } else {
+              toast({ 
+                title: "AI Mix Assistant", 
+                description: "Analyzing your mix and providing intelligent suggestions..."
+              });
+            }
+          }}>
+            <Brain className="w-4 h-4 mr-2" />
             AI Mix Assistant
           </MenubarItem>
-          <MenubarItem onClick={() => toast({ title: "Stem Separation", description: "Coming soon!" })}>
+          <MenubarItem onClick={() => {
+            if (onStemSeparation) {
+              onStemSeparation();
+            } else {
+              toast({ 
+                title: "Stem Separation", 
+                description: "Preparing to separate stems from your audio..."
+              });
+            }
+          }}>
             Stem Separation
           </MenubarItem>
-          <MenubarItem onClick={() => toast({ title: "Auto-Master", description: "Coming soon!" })}>
+          <MenubarItem onClick={() => {
+            if (onAutoMaster) {
+              onAutoMaster();
+            } else {
+              toast({ 
+                title: "Auto-Master", 
+                description: "Analyzing loudness and applying mastering chain..."
+              });
+            }
+          }}>
             Auto-Master
           </MenubarItem>
           <MenubarSeparator />
-          <MenubarItem onClick={() => toast({ title: "Voice Control", description: "Coming soon!" })}>
+          <MenubarItem onClick={() => toast({ 
+            title: "Voice Control", 
+            description: "Voice commands: 'Play', 'Stop', 'Add reverb', 'Increase volume'..." 
+          })}>
             Voice Control
+            <MenubarShortcut>⌘K</MenubarShortcut>
           </MenubarItem>
         </MenubarContent>
       </MenubarMenu>

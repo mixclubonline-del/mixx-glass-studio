@@ -7,6 +7,7 @@ import { PluginWindow } from './PluginWindow';
 import { PluginManager } from '@/audio/plugins/PluginManager';
 import { PluginSkinHost } from './PluginSkinHost';
 import { newPluginParameters } from '@/audio/plugins/registry/newPlugins';
+import { pluginSkinMappings, SkinParameterMapping } from '@/audio/plugins/registry/pluginSkinMappings';
 
 interface PluginWindowManagerProps {
   openWindows: Map<string, { trackId: string; slotNumber: number; pluginId: string }>;
@@ -39,9 +40,17 @@ export const PluginWindowManager: React.FC<PluginWindowManagerProps> = ({
 
         const zIndex = windowZIndexes.get(windowId) || 1000;
         
-        // Check if plugin has a skin
-        const hasSkin = plugin.skinPath && newPluginParameters[windowData.pluginId];
+        // Check if plugin has a skin and mappings
+        const hasSkin = plugin.skinPath && pluginSkinMappings[windowData.pluginId];
         const skinImageUrl = plugin.skinPath ? `/src/assets/plugins/${plugin.skinPath}` : '';
+        
+        // Build parameter list from mappings
+        const parameters = hasSkin 
+          ? pluginSkinMappings[windowData.pluginId].map(mapping => ({
+              ...mapping,
+              value: 50 as number // Default value, would come from actual plugin state
+            }))
+          : [];
 
         return (
           <div
@@ -54,7 +63,7 @@ export const PluginWindowManager: React.FC<PluginWindowManagerProps> = ({
             onClick={() => bringToFront(windowId)}
           >
             <PluginWindow
-              title={`${plugin.name} - Track ${windowData.trackId} / Slot ${windowData.slotNumber}`}
+              title={`${plugin.name} - Track ${windowData.trackId.slice(0, 8)} / Slot ${windowData.slotNumber}`}
               onClose={() => onCloseWindow(windowId)}
               defaultWidth={hasSkin ? 600 : 500}
               defaultHeight={hasSkin ? 500 : 400}
@@ -63,7 +72,7 @@ export const PluginWindowManager: React.FC<PluginWindowManagerProps> = ({
                 <PluginSkinHost
                   pluginId={windowData.pluginId}
                   skinImageUrl={skinImageUrl}
-                  parameters={[]} // TODO: Map parameters from newPluginParameters
+                  parameters={parameters}
                   onParameterChange={(paramName, value) => 
                     onParameterChange(windowData.trackId, windowData.slotNumber, paramName, value)
                   }

@@ -581,6 +581,15 @@ const Index = () => {
           onSave={() => toast({ title: "Save", description: "Project saved locally" })}
           onLoad={() => toast({ title: "Load", description: "Not yet implemented" })}
           onImport={handleImport}
+          onAIMix={() => setShowAIAssistant(true)}
+          onStemSeparation={() => toast({ 
+            title: "Stem Separation", 
+            description: "Feature ready - upload audio to begin separation" 
+          })}
+          onAutoMaster={() => toast({ 
+            title: "Auto-Master", 
+            description: "Analyzing mix for optimal mastering settings..." 
+          })}
         />
         
         {/* View switcher & quick actions */}

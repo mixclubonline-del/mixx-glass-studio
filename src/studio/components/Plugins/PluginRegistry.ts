@@ -394,3 +394,19 @@ PluginManager.register({
     amount: 0.5,
   },
 });
+
+// Register new plugins
+import { newPluginMetadata } from '@/audio/plugins/registry/newPlugins';
+
+newPluginMetadata.forEach(metadata => {
+  PluginManager.register({
+    metadata: {
+      ...metadata,
+      presetCount: metadata.presets?.length || 0
+    },
+    component: () => React.createElement('div', { className: 'p-4 text-sm' }, 'Plugin UI coming soon'),
+    defaultParameters: {}
+  });
+});
+
+export default PluginManager;
