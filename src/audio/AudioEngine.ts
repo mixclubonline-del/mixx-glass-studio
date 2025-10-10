@@ -38,6 +38,7 @@ export class AudioEngine {
   public loopStart: number;
   public loopEnd: number;
   public loopEnabled: boolean;
+  public projectStartOffset: number; // Offset before bar 1 (seconds)
   
   constructor() {
     this.context = new AudioContext();
@@ -52,6 +53,7 @@ export class AudioEngine {
     this.loopStart = 0;
     this.loopEnd = 0;
     this.loopEnabled = false;
+    this.projectStartOffset = 0;
     
     // Create master bus
     this.masterBus = new Bus(this.context, 'master', 'Master', 'master');
@@ -345,6 +347,57 @@ export class AudioEngine {
   private writeString(view: DataView, offset: number, string: string) {
     for (let i = 0; i < string.length; i++) {
       view.setUint8(offset + i, string.charCodeAt(i));
+    }
+  }
+  
+  // Bar/Beat Time Conversion
+  timeToBarsBeatsTicks(seconds: number): { bars: number; beats: number; ticks: number } {
+    const secondsPerBeat = 60 / this.bpm;
+    const beatsPerBar = this.timeSignature.numerator;
+    
+    // Account for project start offset
+    const adjustedSeconds = seconds - this.projectStartOffset;
+    
+    const totalBeats = adjustedSeconds / secondsPerBeat;
+    const bars = Math.floor(totalBeats / beatsPerBar) + 1; // Start at bar 1
+    const beats = Math.floor(totalBeats % beatsPerBar) + 1; // Start at beat 1
+    const ticks = Math.floor((totalBeats % 1) * 960); // 960 ticks per beat (MIDI standard)
+    
+    return { bars, beats, ticks };
+  }
+  
+  barsBeatTicksToTime(bars: number, beats: number, ticks: number): number {
+    const secondsPerBeat = 60 / this.bpm;
+    const beatsPerBar = this.timeSignature.numerator;
+    
+    const totalBeats = (bars - 1) * beatsPerBar + (beats - 1) + (ticks / 960);
+    const seconds = totalBeats * secondsPerBeat;
+    
+    return seconds + this.projectStartOffset;
+  }
+  
+  // Plugin management on tracks
+  loadPluginToTrack(trackId: string, pluginId: string, slotNumber: number): string | null {
+    const track = this.tracks.get(trackId);
+    if (!track) return null;
+    
+    const instanceId = `${trackId}_${pluginId}_${slotNumber}`;
+    track.loadPlugin(slotNumber, pluginId, instanceId);
+    
+    return instanceId;
+  }
+  
+  unloadPluginFromTrack(trackId: string, slotNumber: number) {
+    const track = this.tracks.get(trackId);
+    if (track) {
+      track.unloadPlugin(slotNumber);
+    }
+  }
+  
+  bypassPluginOnTrack(trackId: string, slotNumber: number, bypass: boolean) {
+    const track = this.tracks.get(trackId);
+    if (track) {
+      track.bypassPlugin(slotNumber, bypass);
     }
   }
 }

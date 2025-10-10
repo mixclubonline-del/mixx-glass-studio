@@ -37,6 +37,9 @@ export function TimelineContainer({
     setScrollX,
     zoom,
     setZoom,
+    scrollMode,
+    autoScrollEnabled,
+    centerPlayhead,
   } = useTimelineStore();
   
   // Sync props to store
@@ -51,6 +54,32 @@ export function TimelineContainer({
   useEffect(() => {
     setIsPlaying(isPlaying);
   }, [isPlaying, setIsPlaying]);
+  
+  // Auto-scroll during playback
+  useEffect(() => {
+    if (!isPlaying || !autoScrollEnabled) return;
+    
+    const animate = () => {
+      const playheadX = currentTime * zoom;
+      const containerWidth = dimensions.width;
+      
+      if (scrollMode === 'continuous' && centerPlayhead) {
+        // Keep playhead centered
+        const targetScrollX = Math.max(0, playheadX - (containerWidth / 2));
+        setScrollX(targetScrollX);
+      } else if (scrollMode === 'page') {
+        // Page scroll when playhead reaches 90% of visible area
+        const visibleRight = scrollX + containerWidth;
+        if (playheadX > visibleRight * 0.9) {
+          setScrollX(scrollX + containerWidth);
+        }
+      }
+      // scrollMode === 'none' does nothing
+    };
+    
+    const rafId = requestAnimationFrame(animate);
+    return () => cancelAnimationFrame(rafId);
+  }, [isPlaying, currentTime, zoom, scrollX, dimensions.width, scrollMode, autoScrollEnabled, centerPlayhead, setScrollX]);
   
   // Measure container
   useEffect(() => {

@@ -35,6 +35,11 @@ interface TimelineState {
   snapMode: 'grid' | 'relative' | 'transient' | 'marker' | 'region' | 'off';
   rippleEdit: boolean;
   
+  // Auto-scroll modes
+  scrollMode: 'continuous' | 'page' | 'none';
+  autoScrollEnabled: boolean;
+  centerPlayhead: boolean;
+  
   // Actions
   setCurrentTime: (time: number) => void;
   setDuration: (duration: number) => void;
@@ -56,6 +61,9 @@ interface TimelineState {
   setGridMode: (mode: 'bars' | 'beats' | 'seconds' | 'samples' | 'adaptive') => void;
   setSnapMode: (mode: 'grid' | 'relative' | 'transient' | 'marker' | 'region' | 'off') => void;
   toggleRippleEdit: () => void;
+  setScrollMode: (mode: 'continuous' | 'page' | 'none') => void;
+  setAutoScrollEnabled: (enabled: boolean) => void;
+  setCenterPlayhead: (center: boolean) => void;
 }
 
 export const useTimelineStore = create<TimelineState>((set) => ({
@@ -83,6 +91,10 @@ export const useTimelineStore = create<TimelineState>((set) => ({
   gridMode: 'adaptive',
   snapMode: 'grid',
   rippleEdit: false,
+  
+  scrollMode: 'continuous',
+  autoScrollEnabled: true,
+  centerPlayhead: true,
   
   // Actions
   setCurrentTime: (time) => set({ currentTime: time }),
@@ -116,4 +128,7 @@ export const useTimelineStore = create<TimelineState>((set) => ({
   setGridMode: (mode) => set({ gridMode: mode }),
   setSnapMode: (mode) => set({ snapMode: mode }),
   toggleRippleEdit: () => set((state) => ({ rippleEdit: !state.rippleEdit })),
+  setScrollMode: (mode) => set({ scrollMode: mode }),
+  setAutoScrollEnabled: (enabled) => set({ autoScrollEnabled: enabled }),
+  setCenterPlayhead: (center) => set({ centerPlayhead: center }),
 }));

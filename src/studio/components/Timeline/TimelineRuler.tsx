@@ -69,11 +69,11 @@ export function TimelineRuler({ width, height, bpm, onSeek }: TimelineRulerProps
         ctx.lineTo(x, height);
         ctx.stroke();
         
-        // Bar number
+        // Bar number (start at 1, not 0)
         ctx.fillStyle = 'hsl(0, 0%, 70%)';
         ctx.fillText(`${bar + 1}`, x + 4, height / 2);
         
-        // Beat subdivisions
+        // Beat subdivisions (show beats 2, 3, 4)
         for (let beat = 1; beat < 4; beat++) {
           const beatTime = barTime + (beat * secondsPerBeat);
           const beatX = (beatTime * zoom) - scrollX;
@@ -85,6 +85,12 @@ export function TimelineRuler({ width, height, bpm, onSeek }: TimelineRulerProps
             ctx.moveTo(beatX, height * 0.5);
             ctx.lineTo(beatX, height);
             ctx.stroke();
+            
+            // Show beat numbers for clarity
+            ctx.fillStyle = 'hsl(0, 0%, 40%)';
+            ctx.font = '9px Inter';
+            ctx.fillText(`${beat + 1}`, beatX + 2, height * 0.7);
+            ctx.font = '11px Inter';
           }
         }
       }

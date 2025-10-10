@@ -8,26 +8,44 @@ import { Volume2, Mic, Lock } from 'lucide-react';
 import { ProfessionalPeakMeter } from '../Metering/ProfessionalPeakMeter';
 import { IceFireFader } from '../Controls/IceFireFader';
 import { IceFireKnob } from '../Controls/IceFireKnob';
+import { InsertRack } from './InsertRack';
+import { SendKnobSimple } from './SendKnobSimple';
 import { dbToNormalized, normalizedToDb } from '@/studio/utils/TemperatureGradient';
+import { PluginInsert } from '@/audio/Track';
+import { Bus } from '@/audio/Bus';
 
 interface GlassChannelStripProps {
   channel: ChannelState;
   isSelected: boolean;
+  inserts?: PluginInsert[];
+  buses?: Bus[];
   onSelect: (id: string) => void;
   onVolumeChange: (id: string, volume: number) => void;
   onPanChange: (id: string, pan: number) => void;
   onMuteToggle: (id: string) => void;
   onSoloToggle: (id: string) => void;
+  onPluginClick?: (slotNumber: number) => void;
+  onAddPlugin?: (slotNumber: number) => void;
+  onRemovePlugin?: (slotNumber: number) => void;
+  onBypassPlugin?: (slotNumber: number) => void;
+  onSendChange?: (busId: string, amount: number) => void;
 }
 
 export const GlassChannelStrip: React.FC<GlassChannelStripProps> = ({
   channel,
   isSelected,
+  inserts,
+  buses,
   onSelect,
   onVolumeChange,
   onPanChange,
   onMuteToggle,
-  onSoloToggle
+  onSoloToggle,
+  onPluginClick,
+  onAddPlugin,
+  onRemovePlugin,
+  onBypassPlugin,
+  onSendChange,
 }) => {
   return (
     <div 
@@ -58,6 +76,19 @@ export const GlassChannelStrip: React.FC<GlassChannelStripProps> = ({
         />
       </div>
       
+      {/* Insert Rack */}
+      {inserts && inserts.length > 0 && onAddPlugin && onPluginClick && onRemovePlugin && onBypassPlugin && (
+        <div className="mb-2 max-h-40 overflow-y-auto scrollbar-thin">
+          <InsertRack
+            inserts={inserts}
+            onPluginClick={onPluginClick}
+            onAddPlugin={onAddPlugin}
+            onRemovePlugin={onRemovePlugin}
+            onBypassToggle={onBypassPlugin}
+          />
+        </div>
+      )}
+      
       {/* Pan knob */}
       <div className="mb-2">
         <IceFireKnob
@@ -70,6 +101,22 @@ export const GlassChannelStrip: React.FC<GlassChannelStripProps> = ({
           max={100}
         />
       </div>
+      
+      {/* Send Controls */}
+      {buses && buses.length > 0 && onSendChange && (
+        <div className="mb-2 space-y-2 max-h-32 overflow-y-auto scrollbar-thin">
+          <div className="text-[10px] text-muted-foreground font-medium px-1">SENDS</div>
+          {buses.map((bus) => (
+            <SendKnobSimple
+              key={bus.id}
+              busName={bus.name}
+              busColor={`hsl(${bus.color.hue}, ${bus.color.saturation}%, ${bus.color.lightness}%)`}
+              amount={0} // TODO: Get actual send amount from channel strip
+              onAmountChange={(amount) => onSendChange(bus.id, amount)}
+            />
+          ))}
+        </div>
+      )}
       
       {/* Fader */}
       <div className="flex-1 flex items-center justify-center mb-2">

@@ -5,6 +5,7 @@
 
 import { ChannelStrip } from './ChannelStrip';
 import { TrackColor } from '@/types/audio';
+import { PluginInsert } from './Track';
 
 export type BusType = 'aux' | 'group' | 'master';
 
@@ -16,6 +17,7 @@ export class Bus {
   public input: GainNode;
   public color: TrackColor;
   public soloSafe: boolean;
+  public inserts: PluginInsert[];
   
   constructor(
     context: AudioContext,
@@ -36,6 +38,14 @@ export class Bus {
     
     // Connect input to channel strip
     this.input.connect(this.channelStrip.input);
+    
+    // Initialize 8 insert slots
+    this.inserts = Array(8).fill(null).map((_, i) => ({
+      slotNumber: i + 1,
+      pluginId: null,
+      instanceId: null,
+      bypass: false
+    }));
     
     // Default color based on type
     this.color = this.getDefaultColor(type);
