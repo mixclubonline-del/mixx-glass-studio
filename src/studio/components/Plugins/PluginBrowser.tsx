@@ -9,6 +9,7 @@ import { Input } from '@/components/ui/input';
 import { ScrollArea } from '@/components/ui/scroll-area';
 import { PluginManager, PluginDefinition } from '@/audio/plugins/PluginManager';
 import { cn } from '@/lib/utils';
+import mixxtuneCover from '@/assets/plugins/mixxtune-cover.png';
 
 interface PluginBrowserProps {
   isOpen: boolean;
@@ -153,8 +154,12 @@ export function PluginBrowser({ isOpen, onClose, onPluginSelect }: PluginBrowser
                 onDoubleClick={() => handlePluginDoubleClick(plugin)}
               >
                 {/* Thumbnail */}
-                <div className="aspect-square rounded bg-gradient-to-br from-[hsl(var(--prime-500))]/20 to-[hsl(var(--neon-pink))]/20 mb-3 flex items-center justify-center">
-                  <div className="text-4xl">∞</div>
+                <div className="aspect-square rounded bg-gradient-to-br from-[hsl(var(--prime-500))]/20 to-[hsl(var(--neon-pink))]/20 mb-3 flex items-center justify-center overflow-hidden">
+                  {plugin.metadata.id === 'mixxtune' ? (
+                    <img src={mixxtuneCover} alt={plugin.metadata.name} className="w-full h-full object-cover" />
+                  ) : (
+                    <div className="text-4xl">∞</div>
+                  )}
                 </div>
                 
                 {/* Info */}
@@ -198,8 +203,12 @@ export function PluginBrowser({ isOpen, onClose, onPluginSelect }: PluginBrowser
           <div className="w-80 border-l border-border bg-secondary/20 p-6">
             <ScrollArea className="h-full">
               <div className="space-y-4">
-                <div className="aspect-square rounded-lg bg-gradient-to-br from-[hsl(var(--prime-500))]/30 to-[hsl(var(--neon-pink))]/30 flex items-center justify-center">
-                  <div className="text-6xl">∞</div>
+                <div className="aspect-square rounded-lg bg-gradient-to-br from-[hsl(var(--prime-500))]/30 to-[hsl(var(--neon-pink))]/30 flex items-center justify-center overflow-hidden">
+                  {selectedPlugin.metadata.id === 'mixxtune' ? (
+                    <img src={mixxtuneCover} alt={selectedPlugin.metadata.name} className="w-full h-full object-cover" />
+                  ) : (
+                    <div className="text-6xl">∞</div>
+                  )}
                 </div>
                 
                 <div>
