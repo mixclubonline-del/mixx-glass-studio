@@ -12,9 +12,11 @@ import {
   FileDown, 
   Loader2,
   Circle,
-  Repeat
+  Repeat,
+  Volume2
 } from 'lucide-react';
 import { useState } from 'react';
+import { IceFireFader } from '../../studio/components/Controls/IceFireFader';
 
 interface TransportControlsProps {
   isPlaying: boolean;
@@ -33,6 +35,9 @@ interface TransportControlsProps {
   onTimeSignatureChange?: (sig: { numerator: number; denominator: number }) => void;
   onPrevBar?: () => void;
   onNextBar?: () => void;
+  currentTime?: number;
+  masterVolume?: number;
+  onMasterVolumeChange?: (volume: number) => void;
 }
 
 export function TransportControls({
@@ -52,6 +57,9 @@ export function TransportControls({
   onTimeSignatureChange,
   onPrevBar,
   onNextBar,
+  currentTime = 0,
+  masterVolume = 0.75,
+  onMasterVolumeChange,
 }: TransportControlsProps) {
   const [isRecording, setIsRecording] = useState(false);
   const [isLooping, setIsLooping] = useState(false);
@@ -74,6 +82,14 @@ export function TransportControls({
   
   const activeIsRecording = externalIsRecording !== undefined ? externalIsRecording : isRecording;
   const activeIsLooping = externalIsLooping !== undefined ? externalIsLooping : isLooping;
+
+  // Calculate bar/beat/tick from current time
+  const secondsPerBeat = 60 / bpm;
+  const beatsPerBar = timeSignature.numerator;
+  const totalBeats = currentTime / secondsPerBeat;
+  const bars = Math.floor(totalBeats / beatsPerBar) + 1;
+  const beats = Math.floor(totalBeats % beatsPerBar) + 1;
+  const ticks = Math.floor((totalBeats % 1) * 960);
   
   return (
     <div className="glass rounded-xl p-4 border border-border shadow-lg">
@@ -141,8 +157,21 @@ export function TransportControls({
           </Button>
         </div>
         
-        {/* Center: BPM and Time Signature */}
+        {/* Center: Bar/Beat Display, BPM and Time Signature */}
         <div className="flex items-center gap-4">
+          {/* Bar/Beat/Tick Display */}
+          <div className="flex flex-col items-center">
+            <Label className="text-xs text-muted-foreground mb-1">Position</Label>
+            <div className="text-xl font-mono font-bold tabular-nums h-12 flex items-center gap-1">
+              <span className="w-10 text-right">{bars}</span>
+              <span className="text-muted-foreground">.</span>
+              <span className="w-6 text-center">{beats}</span>
+              <span className="text-muted-foreground">.</span>
+              <span className="w-12 text-left text-sm text-muted-foreground">{String(ticks).padStart(3, '0')}</span>
+            </div>
+          </div>
+          
+          <div className="w-px h-12 bg-border/50" />
           <div className="flex flex-col items-center">
             <Label className="text-xs text-muted-foreground mb-1">BPM</Label>
             <Input
@@ -196,8 +225,27 @@ export function TransportControls({
           </Button>
         </div>
 
-        {/* Right: Export */}
-        <div className="flex items-center gap-2">
+        {/* Right: Master Volume & Export */}
+        <div className="flex items-center gap-4">
+          {/* Master Volume */}
+          <div className="flex items-center gap-2">
+            <Volume2 size={16} className="text-muted-foreground" />
+            <div className="w-24">
+              <IceFireFader
+                value={masterVolume}
+                onChange={(value) => onMasterVolumeChange?.(value)}
+                height={40}
+                width={20}
+                showScale={false}
+              />
+            </div>
+            <span className="text-xs font-mono text-muted-foreground w-10">
+              {(masterVolume * 100).toFixed(0)}%
+            </span>
+          </div>
+
+          <div className="w-px h-12 bg-border/50" />
+
           <Button
             variant="outline"
             onClick={onExport}

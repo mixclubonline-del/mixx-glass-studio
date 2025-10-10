@@ -58,6 +58,21 @@ class PluginManagerClass {
   }
   
   /**
+   * Get all plugin metadata (convenience method)
+   */
+  getAllMetadata(): PluginMetadata[] {
+    return this.getPlugins().map(p => p.metadata);
+  }
+  
+  /**
+   * Get specific plugin metadata
+   */
+  getMetadata(pluginId: string): PluginMetadata | undefined {
+    const plugin = this.registry.get(pluginId);
+    return plugin?.metadata;
+  }
+  
+  /**
    * Search plugins by name or tags
    */
   searchPlugins(query: string): PluginDefinition[] {

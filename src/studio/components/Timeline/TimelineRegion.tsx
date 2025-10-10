@@ -6,6 +6,7 @@ import React, { useState, useRef } from 'react';
 import { Region } from '@/types/timeline';
 import { WaveformRenderer } from './WaveformRenderer';
 import { useTimelineStore } from '@/store/timelineStore';
+import { RegionContextMenu } from './RegionContextMenu';
 import { Scissors } from 'lucide-react';
 
 interface TimelineRegionProps {
@@ -159,24 +160,35 @@ export const TimelineRegion: React.FC<TimelineRegionProps> = ({
   }, [isDragging, dragStart, zoom]);
   
   return (
-    <div
-      ref={regionRef}
-      className={`absolute h-full rounded-md overflow-hidden transition-all group ${
-        isSelected 
-          ? 'ring-2 ring-primary shadow-[0_0_20px_hsl(var(--primary)/0.5)]' 
-          : 'hover:ring-1 hover:ring-primary/50'
-      }`}
-      style={{
-        left: `${left}px`,
-        width: `${width}px`,
-        backgroundColor: region.color + '20',
-        borderLeft: `2px solid ${region.color}`,
-        cursor: getCursor(),
-      }}
-      onMouseDown={handleMouseDown}
-      onMouseMove={handleRegionMouseMove}
-      onMouseLeave={() => setHoverX(null)}
+    <RegionContextMenu
+      region={region}
+      onDuplicate={() => console.log('Duplicate region:', region.id)}
+      onSplit={() => onSplit(region.id, region.startTime + region.duration / 2)}
+      onNormalize={() => console.log('Normalize region:', region.id)}
+      onReverse={() => console.log('Reverse region:', region.id)}
+      onLock={(_, locked) => onUpdate(region.id, { locked })}
+      onColorChange={(_, color) => onUpdate(region.id, { color })}
+      onExport={() => console.log('Export region:', region.id)}
+      onRename={() => console.log('Rename region:', region.id)}
     >
+      <div
+        ref={regionRef}
+        className={`absolute h-full rounded-md overflow-hidden transition-all group ${
+          isSelected 
+            ? 'ring-2 ring-primary shadow-[0_0_20px_hsl(var(--primary)/0.5)]' 
+            : 'hover:ring-1 hover:ring-primary/50'
+        }`}
+        style={{
+          left: `${left}px`,
+          width: `${width}px`,
+          backgroundColor: region.color + '20',
+          borderLeft: `2px solid ${region.color}`,
+          cursor: getCursor(),
+        }}
+        onMouseDown={handleMouseDown}
+        onMouseMove={handleRegionMouseMove}
+        onMouseLeave={() => setHoverX(null)}
+      >
       {/* Waveform */}
       {audioBuffer && (
         <WaveformRenderer
@@ -232,6 +244,7 @@ export const TimelineRegion: React.FC<TimelineRegionProps> = ({
           <Scissors size={14} className="absolute -top-5 -left-2 text-accent" />
         </div>
       )}
-    </div>
+      </div>
+    </RegionContextMenu>
   );
 };

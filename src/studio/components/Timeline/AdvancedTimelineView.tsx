@@ -11,6 +11,7 @@ import { Playhead } from './Playhead';
 import { GridOverlay } from './GridOverlay';
 import { TimelineToolbar } from './TimelineToolbar';
 import { AddTrackDialog, TrackConfig } from './AddTrackDialog';
+import { CrossfadeRenderer } from './CrossfadeRenderer';
 import { ZoomIn, ZoomOut, Grid3x3, Maximize2, Plus } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 
@@ -225,6 +226,13 @@ export const AdvancedTimelineView: React.FC<AdvancedTimelineViewProps> = ({
           <Playhead
             containerWidth={containerRef.current?.clientWidth || 800}
             containerHeight={tracks.length * 100}
+          />
+
+          {/* Crossfade Renderer */}
+          <CrossfadeRenderer
+            regions={regions}
+            zoom={zoom}
+            trackHeight={100}
           />
           
           {/* Tracks */}

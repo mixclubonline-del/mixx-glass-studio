@@ -23,6 +23,8 @@ export class AudioEngine {
   private buses: Map<string, Bus>;
   private masterBus: Bus;
   private soloedTracks: Set<string>;
+  private preSoloMuteStates: Map<string, boolean>;
+  private masterGainNode: GainNode;
   
   // Playback state
   private isPlaying: boolean;
@@ -45,6 +47,7 @@ export class AudioEngine {
     this.tracks = new Map();
     this.buses = new Map();
     this.soloedTracks = new Set();
+    this.preSoloMuteStates = new Map();
     this.isPlaying = false;
     this.startTime = 0;
     this.pauseTime = 0;
@@ -58,6 +61,10 @@ export class AudioEngine {
     // Create master bus
     this.masterBus = new Bus(this.context, 'master', 'Master', 'master');
     
+    // Create master gain node
+    this.masterGainNode = this.context.createGain();
+    this.masterGainNode.gain.value = 0.75;
+    
     // Create limiter
     this.limiter = this.context.createDynamicsCompressor();
     this.limiter.threshold.value = -1.0;
@@ -66,8 +73,9 @@ export class AudioEngine {
     this.limiter.attack.value = 0.003;
     this.limiter.release.value = 0.05;
     
-    // Connect master → limiter → output
-    this.masterBus.channelStrip.output.connect(this.limiter);
+    // Connect master → masterGain → limiter → output
+    this.masterBus.channelStrip.output.connect(this.masterGainNode);
+    this.masterGainNode.connect(this.limiter);
     this.limiter.connect(this.context.destination);
     
     // Create default reverb and delay buses
@@ -160,13 +168,36 @@ export class AudioEngine {
   private updateSoloState() {
     const hasSolo = this.soloedTracks.size > 0;
     
-    this.tracks.forEach((track, id) => {
-      if (hasSolo && !this.soloedTracks.has(id)) {
-        track.channelStrip.setMute(true);
-      } else if (hasSolo && this.soloedTracks.has(id)) {
-        track.channelStrip.setMute(false);
-      }
-    });
+    if (hasSolo) {
+      // Save pre-solo mute states and mute non-soloed tracks
+      this.tracks.forEach((track, id) => {
+        if (!this.preSoloMuteStates.has(id)) {
+          this.preSoloMuteStates.set(id, track.channelStrip.isMuted());
+        }
+        
+        if (!this.soloedTracks.has(id)) {
+          track.channelStrip.setMute(true);
+        } else {
+          track.channelStrip.setMute(false);
+        }
+      });
+    } else {
+      // Restore pre-solo mute states
+      this.tracks.forEach((track, id) => {
+        const preSoloMuted = this.preSoloMuteStates.get(id) || false;
+        track.channelStrip.setMute(preSoloMuted);
+      });
+      this.preSoloMuteStates.clear();
+    }
+  }
+  
+  // Master volume control
+  setMasterGain(gain: number) {
+    this.masterGainNode.gain.value = Math.max(0, Math.min(1, gain));
+  }
+
+  getMasterGain(): number {
+    return this.masterGainNode.gain.value;
   }
   
   // Bus management
