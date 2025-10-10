@@ -2,8 +2,7 @@
  * TrackList - left sidebar showing track names and controls
  */
 
-import { Volume2, VolumeX, Circle } from 'lucide-react';
-import { Button } from '@/components/ui/button';
+import { ProfessionalTrackHeader } from './ProfessionalTrackHeader';
 import { cn } from '@/lib/utils';
 
 interface Track {
@@ -12,6 +11,9 @@ interface Track {
   color: string;
   muted: boolean;
   solo: boolean;
+  recordArmed: boolean;
+  locked?: boolean;
+  frozen?: boolean;
 }
 
 interface TrackListProps {
@@ -20,6 +22,8 @@ interface TrackListProps {
   onTrackSelect: (id: string) => void;
   onMuteToggle: (id: string) => void;
   onSoloToggle?: (id: string) => void;
+  onRecordArmToggle?: (id: string) => void;
+  onLockToggle?: (id: string) => void;
   selectedTrackId?: string;
 }
 
@@ -29,6 +33,8 @@ export function TrackList({
   onTrackSelect,
   onMuteToggle,
   onSoloToggle,
+  onRecordArmToggle,
+  onLockToggle,
   selectedTrackId,
 }: TrackListProps) {
   return (
@@ -44,60 +50,24 @@ export function TrackList({
       {/* Track rows */}
       <div className="select-none">
         {tracks.map((track) => (
-          <div
+          <ProfessionalTrackHeader
             key={track.id}
-            className={cn(
-              "flex items-center gap-2 px-2 py-1 border-b border-border/50 hover:bg-secondary/30 transition-colors cursor-pointer",
-              selectedTrackId === track.id && "bg-secondary/50"
-            )}
-            style={{ height: `${trackHeight}px` }}
-            onClick={() => onTrackSelect(track.id)}
-          >
-            {/* Color indicator */}
-            <Circle
-              className="w-2 h-2 shrink-0"
-              fill={track.color}
-              stroke={track.color}
-            />
-            
-            {/* Track name */}
-            <span className="flex-1 text-sm truncate">{track.name}</span>
-            
-            {/* Mute button */}
-            <Button
-              variant="ghost"
-              size="icon"
-              className="w-6 h-6 shrink-0"
-              onClick={(e) => {
-                e.stopPropagation();
-                onMuteToggle(track.id);
-              }}
-            >
-              {track.muted ? (
-                <VolumeX className="w-3 h-3 text-destructive" />
-              ) : (
-                <Volume2 className="w-3 h-3" />
-              )}
-            </Button>
-            
-            {/* Solo button (if handler provided) */}
-            {onSoloToggle && (
-              <Button
-                variant={track.solo ? "default" : "ghost"}
-                size="icon"
-                className={cn(
-                  "w-6 h-6 shrink-0 text-xs font-bold",
-                  track.solo && "bg-primary text-primary-foreground"
-                )}
-                onClick={(e) => {
-                  e.stopPropagation();
-                  onSoloToggle(track.id);
-                }}
-              >
-                S
-              </Button>
-            )}
-          </div>
+            id={track.id}
+            name={track.name}
+            color={track.color}
+            muted={track.muted}
+            solo={track.solo}
+            recordArmed={track.recordArmed}
+            locked={track.locked}
+            frozen={track.frozen}
+            isSelected={selectedTrackId === track.id}
+            height={trackHeight}
+            onSelect={onTrackSelect}
+            onMuteToggle={onMuteToggle}
+            onSoloToggle={onSoloToggle || (() => {})}
+            onRecordArmToggle={onRecordArmToggle || (() => {})}
+            onLockToggle={onLockToggle}
+          />
         ))}
       </div>
     </div>

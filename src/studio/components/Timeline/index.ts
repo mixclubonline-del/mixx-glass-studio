@@ -18,6 +18,7 @@ export { VirtualScrollContainer } from './VirtualScrollContainer';
 export { AdvancedTimeline } from './AdvancedTimeline';
 export { HorizontalTimeline } from './HorizontalTimeline';
 export { TrackList } from './TrackList';
+export { ProfessionalTrackHeader } from './ProfessionalTrackHeader';
 export { ArrangeBrowserPanel } from './ArrangeBrowserPanel';
 export { FileBrowser } from './FileBrowser';
 export { PluginBrowserPanel } from './PluginBrowserPanel';

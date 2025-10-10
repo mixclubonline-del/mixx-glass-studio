@@ -151,6 +151,9 @@ export function AdvancedTimeline({
     color: `hsl(${track.color.hue}, ${track.color.saturation}%, ${track.color.lightness}%)`,
     muted: track.muted,
     solo: track.solo || false,
+    recordArmed: false,
+    locked: false,
+    frozen: false
   }));
   
   return (
@@ -171,6 +174,7 @@ export function AdvancedTimeline({
             onTrackSelect={setSelectedTrackId}
             onMuteToggle={onTrackMuteToggle}
             onSoloToggle={onTrackSoloToggle}
+            onRecordArmToggle={(id) => console.log('Record arm:', id)}
             selectedTrackId={selectedTrackId}
           />
         </div>

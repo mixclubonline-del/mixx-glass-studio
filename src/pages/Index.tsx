@@ -483,6 +483,29 @@ const Index = () => {
     onStop: handleStop,
     onExport: handleExport,
     onAIAssistant: () => setShowAIAssistant(prev => !prev),
+    onDuplicate: () => {
+      const { selectedRegions } = useTimelineStore.getState();
+      if (selectedRegions.size > 0) {
+        console.log('Duplicate regions:', Array.from(selectedRegions));
+        toast({
+          title: "Duplicate",
+          description: `${selectedRegions.size} region(s) duplicated`,
+        });
+      }
+    },
+    onSplit: () => {
+      const { selectedRegions } = useTimelineStore.getState();
+      if (selectedRegions.size > 0) {
+        console.log('Split regions:', Array.from(selectedRegions));
+        toast({
+          title: "Split",
+          description: `${selectedRegions.size} region(s) split`,
+        });
+      }
+    },
+    onLoop: handleLoopToggle,
+    onPrevBar: handlePrevBar,
+    onNextBar: handleNextBar,
   });
 
   return (
@@ -558,6 +581,19 @@ const Index = () => {
                 <AdvancedTimelineView
                   audioBuffers={audioBuffers}
                   onSeek={handleSeek}
+                  onFileSelect={(file) => {
+                    handleFileSelect({ target: { files: [file] } } as any);
+                  }}
+                  onPluginSelect={(pluginId) => {
+                    if (selectedTrackForPlugin) {
+                      handlePluginSelect(pluginId);
+                    } else {
+                      toast({
+                        title: "No Track Selected",
+                        description: "Please select a track first",
+                      });
+                    }
+                  }}
                 />
               )}
               
@@ -620,6 +656,13 @@ const Index = () => {
           onLoopToggle={handleLoopToggle}
           onPrevBar={handlePrevBar}
           onNextBar={handleNextBar}
+          currentTime={currentTime}
+          masterVolume={engineRef.current?.getMasterGain() || 0.75}
+          onMasterVolumeChange={(volume) => {
+            if (engineRef.current) {
+              engineRef.current.setMasterGain(volume);
+            }
+          }}
         />
       </div>
       

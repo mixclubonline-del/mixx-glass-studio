@@ -16,6 +16,13 @@ interface ShortcutHandlers {
   onUndo?: () => void;
   onRedo?: () => void;
   onAIAssistant?: () => void;
+  onDuplicate?: () => void;
+  onSplit?: () => void;
+  onLoop?: () => void;
+  onPrevBar?: () => void;
+  onNextBar?: () => void;
+  onToggleBrowser?: () => void;
+  onToggleInspector?: () => void;
 }
 
 export function useKeyboardShortcuts(handlers: ShortcutHandlers) {
@@ -79,9 +86,35 @@ export function useKeyboardShortcuts(handlers: ShortcutHandlers) {
         return;
       }
       
+      // Region operations
+      if (cmdOrCtrl && e.code === 'KeyD') {
+        e.preventDefault();
+        if (handlers.onDuplicate) handlers.onDuplicate();
+        return;
+      }
+
       if (cmdOrCtrl && e.code === 'KeyE') {
         e.preventDefault();
-        if (handlers.onExport) handlers.onExport();
+        if (handlers.onSplit) handlers.onSplit();
+        return;
+      }
+
+      if (cmdOrCtrl && e.code === 'KeyL') {
+        e.preventDefault();
+        if (handlers.onLoop) handlers.onLoop();
+        return;
+      }
+
+      // Transport navigation
+      if (cmdOrCtrl && e.code === 'BracketLeft') {
+        e.preventDefault();
+        if (handlers.onPrevBar) handlers.onPrevBar();
+        return;
+      }
+
+      if (cmdOrCtrl && e.code === 'BracketRight') {
+        e.preventDefault();
+        if (handlers.onNextBar) handlers.onNextBar();
         return;
       }
       
@@ -99,9 +132,15 @@ export function useKeyboardShortcuts(handlers: ShortcutHandlers) {
       }
       
       // Panel toggles
-      if (cmdOrCtrl && e.code === 'KeyB') {
+      if (e.code === 'KeyB' && !cmdOrCtrl) {
         e.preventDefault();
-        togglePanel('browser');
+        if (handlers.onToggleBrowser) handlers.onToggleBrowser();
+        return;
+      }
+
+      if (e.code === 'KeyI' && !cmdOrCtrl) {
+        e.preventDefault();
+        if (handlers.onToggleInspector) handlers.onToggleInspector();
         return;
       }
       
@@ -111,13 +150,7 @@ export function useKeyboardShortcuts(handlers: ShortcutHandlers) {
         return;
       }
       
-      if (e.code === 'KeyE' && !cmdOrCtrl) {
-        e.preventDefault();
-        togglePanel('effects');
-        return;
-      }
-      
-      if (e.code === 'KeyI' && !cmdOrCtrl) {
+      if (e.code === 'KeyA' && !cmdOrCtrl) {
         e.preventDefault();
         if (handlers.onAIAssistant) handlers.onAIAssistant();
         return;

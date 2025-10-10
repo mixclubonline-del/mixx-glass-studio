@@ -12,20 +12,29 @@ import { GridOverlay } from './GridOverlay';
 import { TimelineToolbar } from './TimelineToolbar';
 import { AddTrackDialog, TrackConfig } from './AddTrackDialog';
 import { CrossfadeRenderer } from './CrossfadeRenderer';
+import { ArrangeBrowserPanel } from './ArrangeBrowserPanel';
 import { ZoomIn, ZoomOut, Grid3x3, Maximize2, Plus } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 
 interface AdvancedTimelineViewProps {
   audioBuffers: Map<string, AudioBuffer>;
   onSeek: (time: number) => void;
+  onFileSelect?: (file: File) => void;
+  onPluginSelect?: (pluginId: string) => void;
 }
 
 export const AdvancedTimelineView: React.FC<AdvancedTimelineViewProps> = ({
   audioBuffers,
-  onSeek
+  onSeek,
+  onFileSelect,
+  onPluginSelect
 }) => {
   const containerRef = useRef<HTMLDivElement>(null);
   const contentRef = useRef<HTMLDivElement>(null);
+  const [browserCollapsed, setBrowserCollapsed] = useState(() => {
+    const saved = localStorage.getItem('browserCollapsed');
+    return saved === 'true';
+  });
   
   const { 
     currentTime, 
@@ -141,9 +150,25 @@ export const AdvancedTimelineView: React.FC<AdvancedTimelineViewProps> = ({
   };
   
   const totalWidth = Math.max(3000, currentTime * zoom + 1000);
+
+  // Save browser collapsed state to localStorage
+  useEffect(() => {
+    localStorage.setItem('browserCollapsed', browserCollapsed.toString());
+  }, [browserCollapsed]);
   
   return (
-    <div className="flex flex-col h-full bg-background">
+    <div className="flex h-full bg-background">
+      {/* Left Browser Panel */}
+      <ArrangeBrowserPanel
+        selectedTrackId={selectedTrackId}
+        onFileSelect={onFileSelect}
+        onPluginSelect={onPluginSelect}
+        isCollapsed={browserCollapsed}
+        onToggleCollapse={() => setBrowserCollapsed(!browserCollapsed)}
+      />
+
+      {/* Main Timeline Area */}
+      <div className="flex-1 flex flex-col">
       {/* Timeline toolbar with tools */}
       <div className="flex items-center justify-between gap-3 px-4 py-2 glass border-b border-border/30">
         <TimelineToolbar />
@@ -263,12 +288,13 @@ export const AdvancedTimelineView: React.FC<AdvancedTimelineViewProps> = ({
         </div>
       </div>
       
-      {/* Add Track Dialog */}
-      <AddTrackDialog
-        open={addTrackDialogOpen}
-        onOpenChange={setAddTrackDialogOpen}
-        onCreateTrack={handleCreateTrack}
-      />
+        {/* Add Track Dialog */}
+        <AddTrackDialog
+          open={addTrackDialogOpen}
+          onOpenChange={setAddTrackDialogOpen}
+          onCreateTrack={handleCreateTrack}
+        />
+      </div>
     </div>
   );
 };
