@@ -162,4 +162,34 @@
   .text-balance {
     text-wrap: balance;
   }
+
+  /* Logo pulse animation */
+  @keyframes logo-pulse {
+    0%, 100% { 
+      filter: drop-shadow(0 0 10px rgba(168, 85, 247, 0.6)) 
+              drop-shadow(0 0 20px rgba(236, 72, 153, 0.4));
+    }
+    50% { 
+      filter: drop-shadow(0 0 20px rgba(168, 85, 247, 0.8)) 
+              drop-shadow(0 0 30px rgba(236, 72, 153, 0.6));
+    }
+  }
+
+  .logo-pulse {
+    animation: logo-pulse 3s ease-in-out infinite;
+  }
+
+  /* Logo glow */
+  .logo-glow {
+    filter: drop-shadow(0 0 15px rgba(168, 85, 247, 0.6))
+            drop-shadow(0 0 25px rgba(236, 72, 153, 0.5))
+            drop-shadow(0 0 35px rgba(59, 130, 246, 0.4));
+  }
+
+  .logo-glow:hover {
+    filter: drop-shadow(0 0 20px rgba(168, 85, 247, 0.8))
+            drop-shadow(0 0 30px rgba(236, 72, 153, 0.7))
+            drop-shadow(0 0 40px rgba(59, 130, 246, 0.6));
+    transition: filter 0.3s ease;
+  }
 }

@@ -15,6 +15,7 @@ import { useViewStore } from '@/store/viewStore';
 import { useTimelineStore } from '@/store/timelineStore';
 import { useToast } from '@/hooks/use-toast';
 import { Brain, Save, FolderOpen, FileDown, Undo2, Redo2, Upload } from 'lucide-react';
+import mixxclubLogo from '@/assets/mixxclub-logo.png';
 
 interface TopMenuBarProps {
   onExport?: () => void;
@@ -53,6 +54,16 @@ export function TopMenuBar({
   
   return (
     <Menubar className="border-b border-border bg-secondary/30 backdrop-blur-sm rounded-none">
+      <div className="flex items-center gap-3 px-3 py-1">
+        <img 
+          src={mixxclubLogo} 
+          alt="MixxClub Studio" 
+          className="h-7 w-auto logo-glow cursor-pointer transition-all hover:scale-105" 
+          onClick={() => setView('arrange')}
+        />
+        <div className="h-6 w-px bg-border/50"></div>
+      </div>
+      
       {/* File Menu */}
       <MenubarMenu>
         <MenubarTrigger className="cursor-pointer">File</MenubarTrigger>

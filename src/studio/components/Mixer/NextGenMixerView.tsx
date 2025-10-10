@@ -82,12 +82,21 @@ export const NextGenMixerView: React.FC<NextGenMixerViewProps> = ({
       {/* Mixer channels */}
       <div className="flex-1 flex flex-col">
         {/* Header */}
-        <div className="px-6 py-3 glass border-b border-border/30 flex items-center justify-between">
-          <div className="flex items-center gap-3">
-            <img src={mixxclubLogo} alt="MixxClub Studio" className="h-8 w-auto" />
+        <div className="px-6 py-4 glass border-b border-border/30 flex items-center justify-between">
+          <div className="flex items-center gap-4">
+            <img 
+              src={mixxclubLogo} 
+              alt="MixxClub Studio" 
+              className="h-12 w-auto logo-pulse logo-glow" 
+            />
             <div>
-              <h2 className="text-xl font-bold neon-text">MixxClub Studio</h2>
-              <p className="text-xs text-muted-foreground mt-0.5">
+              <h2 className="text-2xl font-bold bg-gradient-to-r from-[#ec4899] via-[#a855f7] to-[#3b82f6] bg-clip-text text-transparent">
+                MixxClub Studio
+              </h2>
+              <p className="text-sm font-semibold text-[#a855f7] mt-0.5">
+                The Future of Hip-Hop Production
+              </p>
+              <p className="text-xs text-muted-foreground mt-1">
                 {channelArray.length} channels • ITU-R BS.1770-5 Metering
               </p>
             </div>
