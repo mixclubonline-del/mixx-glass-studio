@@ -23,5 +23,6 @@ export { ArrangeBrowserPanel } from './ArrangeBrowserPanel';
 export { FileBrowser } from './FileBrowser';
 export { PluginBrowserPanel } from './PluginBrowserPanel';
 export { InspectorPanel } from './InspectorPanel';
+export { TrackControlsPanel } from './TrackControlsPanel';
 export * from './CursorTools';
 export * from './MultiRegionOperations';

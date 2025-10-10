@@ -29,13 +29,13 @@ export const ArrangeBrowserPanel: React.FC<ArrangeBrowserPanelProps> = ({
 
   if (isCollapsed) {
     return (
-      <div className="h-full w-12 glass border-r border-border/30 flex flex-col items-center py-4 gap-4">
+      <div className="h-full w-12 glass border-l border-border/30 flex flex-col items-center py-4 gap-4">
         <button
           onClick={onToggleCollapse}
           className="p-2 hover:bg-primary/10 rounded transition-colors"
           title="Expand Browser"
         >
-          <ChevronRight size={18} className="text-muted-foreground" />
+          <ChevronLeft size={18} className="text-muted-foreground" />
         </button>
         <div className="flex flex-col gap-3">
           <Files size={18} className="text-muted-foreground" />
@@ -47,7 +47,7 @@ export const ArrangeBrowserPanel: React.FC<ArrangeBrowserPanelProps> = ({
   }
 
   return (
-    <div className="h-full w-[320px] glass border-r border-border/30 flex flex-col">
+    <div className="h-full w-[160px] glass border-l border-border/30 flex flex-col">
       {/* Header */}
       <div className="flex items-center justify-between px-3 py-2 border-b border-border/30">
         <h3 className="text-sm font-semibold text-foreground">Browser</h3>
@@ -56,7 +56,7 @@ export const ArrangeBrowserPanel: React.FC<ArrangeBrowserPanelProps> = ({
           className="p-1 hover:bg-primary/10 rounded transition-colors"
           title="Collapse Browser"
         >
-          <ChevronLeft size={16} className="text-muted-foreground" />
+          <ChevronRight size={16} className="text-muted-foreground" />
         </button>
       </div>
 
