@@ -10,6 +10,9 @@ import { ScrollArea } from '@/components/ui/scroll-area';
 import { PluginManager, PluginDefinition } from '@/audio/plugins/PluginManager';
 import { cn } from '@/lib/utils';
 import mixxtuneCover from '@/assets/plugins/mixxtune-cover.png';
+import mixxreverbCover from '@/assets/plugins/mixxreverb-cover.png';
+import mixxdelayCover from '@/assets/plugins/mixxdelay-cover.png';
+import mixxeqCover from '@/assets/plugins/mixxeq-cover.png';
 
 interface PluginBrowserProps {
   isOpen: boolean;
@@ -157,6 +160,12 @@ export function PluginBrowser({ isOpen, onClose, onPluginSelect }: PluginBrowser
                 <div className="aspect-square rounded bg-gradient-to-br from-[hsl(var(--prime-500))]/20 to-[hsl(var(--neon-pink))]/20 mb-3 flex items-center justify-center overflow-hidden">
                   {plugin.metadata.id === 'mixxtune' ? (
                     <img src={mixxtuneCover} alt={plugin.metadata.name} className="w-full h-full object-cover" />
+                  ) : plugin.metadata.id === 'mixxreverb' ? (
+                    <img src={mixxreverbCover} alt={plugin.metadata.name} className="w-full h-full object-cover" />
+                  ) : plugin.metadata.id === 'mixxdelay' ? (
+                    <img src={mixxdelayCover} alt={plugin.metadata.name} className="w-full h-full object-cover" />
+                  ) : plugin.metadata.id === 'mixxeq' ? (
+                    <img src={mixxeqCover} alt={plugin.metadata.name} className="w-full h-full object-cover" />
                   ) : (
                     <div className="text-4xl">∞</div>
                   )}
@@ -206,6 +215,12 @@ export function PluginBrowser({ isOpen, onClose, onPluginSelect }: PluginBrowser
                 <div className="aspect-square rounded-lg bg-gradient-to-br from-[hsl(var(--prime-500))]/30 to-[hsl(var(--neon-pink))]/30 flex items-center justify-center overflow-hidden">
                   {selectedPlugin.metadata.id === 'mixxtune' ? (
                     <img src={mixxtuneCover} alt={selectedPlugin.metadata.name} className="w-full h-full object-cover" />
+                  ) : selectedPlugin.metadata.id === 'mixxreverb' ? (
+                    <img src={mixxreverbCover} alt={selectedPlugin.metadata.name} className="w-full h-full object-cover" />
+                  ) : selectedPlugin.metadata.id === 'mixxdelay' ? (
+                    <img src={mixxdelayCover} alt={selectedPlugin.metadata.name} className="w-full h-full object-cover" />
+                  ) : selectedPlugin.metadata.id === 'mixxeq' ? (
+                    <img src={mixxeqCover} alt={selectedPlugin.metadata.name} className="w-full h-full object-cover" />
                   ) : (
                     <div className="text-6xl">∞</div>
                   )}
