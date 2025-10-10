@@ -26,6 +26,7 @@ import { TimelineTrack, Region } from "@/types/timeline";
 import type { MusicalContext } from "@/types/mixxtune";
 import { Button } from "@/components/ui/button";
 import { useToast } from "@/hooks/use-toast";
+import { AudioAnalyzer } from "@/audio/analysis/AudioAnalyzer";
 
 const Index = () => {
   const engineRef = useRef<AudioEngine | null>(null);
@@ -40,6 +41,9 @@ const Index = () => {
   const [selectedTrackId, setSelectedTrackId] = useState<string | null>(null);
   const [transportFloating, setTransportFloating] = useState(false);
   const [transportCollapsed, setTransportCollapsed] = useState(false);
+  const [transportCovered, setTransportCovered] = useState(false);
+  const [detectedBPM, setDetectedBPM] = useState<number | null>(null);
+  const [detectedKey, setDetectedKey] = useState<string | null>(null);
   const { toast } = useToast();
   
   // Global stores
@@ -164,6 +168,30 @@ const Index = () => {
         
         // Store audio buffer
         setAudioBuffers(prev => new Map(prev).set(region.id, loadedTrack.buffer!));
+        
+        // Auto-detect BPM, key, and time signature (client-side, non-blocking)
+        setTimeout(() => {
+          try {
+            const bpm = AudioAnalyzer.detectBPM(loadedTrack.buffer!);
+            const { key, scale } = AudioAnalyzer.detectKey(loadedTrack.buffer!);
+            const timeSignature = AudioAnalyzer.inferTimeSignature(bpm, loadedTrack.buffer!);
+            
+            setDetectedBPM(bpm);
+            setDetectedKey(`${key} ${scale}`);
+            
+            if (engineRef.current) {
+              engineRef.current.bpm = bpm;
+              engineRef.current.timeSignature = timeSignature;
+            }
+            
+            toast({
+              title: "Audio Analysis Complete",
+              description: `BPM: ${bpm} | Key: ${key} ${scale} | Time: ${timeSignature.numerator}/${timeSignature.denominator}`,
+            });
+          } catch (error) {
+            console.error("Audio analysis failed:", error);
+          }
+        }, 100);
         
         // Add to mixer - sync state
         addChannel({
@@ -590,6 +618,12 @@ const Index = () => {
             title: "Auto-Master", 
             description: "Analyzing mix for optimal mastering settings..." 
           })}
+          transportHidden={transportCollapsed}
+          transportFloating={transportFloating}
+          transportCovered={transportCovered}
+          onToggleTransportHide={() => setTransportCollapsed(!transportCollapsed)}
+          onToggleTransportFloat={() => setTransportFloating(!transportFloating)}
+          onToggleTransportCover={() => setTransportCovered(!transportCovered)}
         />
         
         {/* View switcher & quick actions */}
@@ -607,7 +641,7 @@ const Index = () => {
             <Button
               variant="outline"
               size="sm"
-              onClick={() => setPluginBrowserOpen(true)}
+              onClick={() => togglePanel('browser')}
               className="gap-2 neon-glow-prime"
             >
               🎛️ Plugin Suite
@@ -621,6 +655,12 @@ const Index = () => {
               <Bot className="w-4 h-4" />
               AI Assistant
             </Button>
+            {(detectedBPM || detectedKey) && (
+              <div className="flex items-center gap-3 text-xs text-muted-foreground">
+                {detectedBPM && <span className="font-mono">BPM: {detectedBPM}</span>}
+                {detectedKey && <span className="font-mono">Key: {detectedKey}</span>}
+              </div>
+            )}
           </div>
           <ViewSwitcher />
         </div>
@@ -665,6 +705,7 @@ const Index = () => {
                   onSendChange={handleSendChange}
                   onCreateBus={handleCreateBus}
                   onOpenPluginWindow={handleOpenPluginWindow}
+                  onOpenPluginBrowser={handleOpenPluginBrowser}
                 />
               )}
               
@@ -697,7 +738,7 @@ const Index = () => {
         
         {/* Transport Controls - Collapsible and Floatable */}
         {!transportCollapsed && (
-          <div className={transportFloating ? "fixed bottom-4 right-4 z-50" : ""}>
+          <div className={`${transportFloating ? "fixed bottom-4 right-4 z-50" : ""} ${transportCovered ? "opacity-30 hover:opacity-100 transition-opacity" : ""}`}>
             <TransportControls
               isPlaying={isPlaying}
               onPlay={handlePlay}

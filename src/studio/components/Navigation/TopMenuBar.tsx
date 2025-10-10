@@ -24,6 +24,12 @@ interface TopMenuBarProps {
   onAIMix?: () => void;
   onStemSeparation?: () => void;
   onAutoMaster?: () => void;
+  transportHidden?: boolean;
+  transportFloating?: boolean;
+  transportCovered?: boolean;
+  onToggleTransportHide?: () => void;
+  onToggleTransportFloat?: () => void;
+  onToggleTransportCover?: () => void;
 }
 
 export function TopMenuBar({ 
@@ -33,10 +39,16 @@ export function TopMenuBar({
   onImport,
   onAIMix,
   onStemSeparation,
-  onAutoMaster 
+  onAutoMaster,
+  transportHidden = false,
+  transportFloating = false,
+  transportCovered = false,
+  onToggleTransportHide,
+  onToggleTransportFloat,
+  onToggleTransportCover
 }: TopMenuBarProps) {
   const { setView, togglePanel } = useViewStore();
-  const { setCurrentTool, toggleRippleEdit, rippleEdit } = useTimelineStore();
+  const { setCurrentTool, toggleRippleEdit, rippleEdit, autoScrollEnabled, setAutoScrollEnabled } = useTimelineStore();
   const { toast } = useToast();
   
   return (
@@ -148,6 +160,32 @@ export function TopMenuBar({
           </MenubarItem>
           <MenubarItem onClick={() => togglePanel('automation')}>
             Show Automation
+          </MenubarItem>
+        </MenubarContent>
+      </MenubarMenu>
+      
+      {/* Transport Menu */}
+      <MenubarMenu>
+        <MenubarTrigger className="cursor-pointer">Transport</MenubarTrigger>
+        <MenubarContent>
+          <MenubarItem onClick={() => {
+            setAutoScrollEnabled(!autoScrollEnabled);
+            toast({ 
+              title: "Follow Playhead", 
+              description: autoScrollEnabled ? "Disabled" : "Enabled" 
+            });
+          }}>
+            {autoScrollEnabled ? "✓" : ""} Follow Playhead
+          </MenubarItem>
+          <MenubarSeparator />
+          <MenubarItem onClick={onToggleTransportHide}>
+            {transportHidden ? "✓" : ""} Hide Transport
+          </MenubarItem>
+          <MenubarItem onClick={onToggleTransportFloat}>
+            {transportFloating ? "✓" : ""} Float Transport
+          </MenubarItem>
+          <MenubarItem onClick={onToggleTransportCover}>
+            {transportCovered ? "✓" : ""} Cover Transport
           </MenubarItem>
         </MenubarContent>
       </MenubarMenu>

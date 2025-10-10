@@ -28,6 +28,7 @@ interface GlassChannelStripProps {
   onBypassPlugin?: (slotNumber: number, bypass: boolean) => void;
   onSendChange?: (busId: string, amount: number) => void;
   onOpenPluginWindow?: (slotNumber: number, pluginId: string) => void;
+  onOpenPluginBrowser?: (slotNumber: number) => void;
 }
 
 export const GlassChannelStrip: React.FC<GlassChannelStripProps> = ({
@@ -45,6 +46,7 @@ export const GlassChannelStrip: React.FC<GlassChannelStripProps> = ({
   onBypassPlugin,
   onSendChange,
   onOpenPluginWindow,
+  onOpenPluginBrowser,
 }) => {
   return (
     <div 
@@ -99,7 +101,11 @@ export const GlassChannelStrip: React.FC<GlassChannelStripProps> = ({
                 onLoadPlugin(slotNumber, insert.pluginId);
               }
             }}
-            onAddPlugin={(slotNumber) => onLoadPlugin && onLoadPlugin(slotNumber, '')}
+            onAddPlugin={(slotNumber) => {
+              if (onOpenPluginBrowser) {
+                onOpenPluginBrowser(slotNumber);
+              }
+            }}
             onRemovePlugin={onUnloadPlugin || (() => {})}
             onBypassToggle={(slotNumber) => {
               const insert = inserts.find(i => i.slotNumber === slotNumber);
