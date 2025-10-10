@@ -169,12 +169,13 @@ export class AudioEngine {
     });
   }
   
-  // Send controls
-  setTrackSend(id: string, busId: string, amount: number, preFader: boolean) {
-    const track = this.tracks.get(id);
-    if (track) {
-      track.channelStrip.setSendAmount(busId, amount);
-    }
+  // Bus management
+  createAuxBus(id: string, name: string) {
+    return this.createBus(id, name, 'aux');
+  }
+  
+  createGroupBus(id: string, name: string) {
+    return this.createBus(id, name, 'group');
   }
   
   // Playback with loop support

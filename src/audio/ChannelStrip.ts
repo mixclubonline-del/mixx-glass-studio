@@ -162,6 +162,11 @@ export class ChannelStrip {
     }
   }
   
+  // Alias for setSendAmount
+  updateSend(busId: string, amount: number) {
+    this.setSendAmount(busId, amount);
+  }
+  
   getSendAmount(busId: string): number {
     const send = this.sends.get(busId);
     return send ? send.node.gain.value : 0;

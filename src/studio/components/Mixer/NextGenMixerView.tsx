@@ -13,41 +13,51 @@ import { useTracksStore } from '@/store/tracksStore';
 import { Layers, ChevronRight } from 'lucide-react';
 
 interface NextGenMixerViewProps {
+  onVolumeChange: (id: string, volume: number) => void;
+  onPanChange: (id: string, pan: number) => void;
+  onMuteToggle: (id: string) => void;
+  onSoloToggle: (id: string) => void;
   onExport: () => void;
-  isExporting: boolean;
-  onVolumeChange?: (id: string, volume: number) => void;
-  onPanChange?: (id: string, pan: number) => void;
-  onMuteToggle?: (id: string) => void;
-  onSoloToggle?: (id: string) => void;
+  isExporting?: boolean;
+  onLoadPlugin: (trackId: string, slotNumber: number, pluginId: string) => void;
+  onUnloadPlugin: (trackId: string, slotNumber: number) => void;
+  onBypassPlugin: (trackId: string, slotNumber: number, bypass: boolean) => void;
+  onSendChange: (trackId: string, busId: string, amount: number) => void;
+  onCreateBus: (name: string, color: string, type: 'aux' | 'group') => void;
 }
 
 export const NextGenMixerView: React.FC<NextGenMixerViewProps> = ({
-  onExport,
-  isExporting,
   onVolumeChange,
   onPanChange,
   onMuteToggle,
-  onSoloToggle
+  onSoloToggle,
+  onExport,
+  isExporting = false,
+  onLoadPlugin,
+  onUnloadPlugin,
+  onBypassPlugin,
+  onSendChange,
+  onCreateBus
 }) => {
-  const { channels, masterVolume, masterPeakLevel, selectedChannelId, selectChannel, updateChannel, setMasterVolume } = useMixerStore();
+  const { channels, masterVolume, masterPeakLevel, selectedChannelId, selectChannel, updateChannel, setMasterVolume, buses } = useMixerStore();
   const { setAddTrackDialogOpen } = useTracksStore();
   const channelArray = Array.from(channels.values());
   
   const handleVolumeChange = (id: string, volume: number) => {
     updateChannel(id, { volume });
-    onVolumeChange?.(id, volume);
+    onVolumeChange(id, volume);
   };
   
   const handlePanChange = (id: string, pan: number) => {
     updateChannel(id, { pan });
-    onPanChange?.(id, pan);
+    onPanChange(id, pan);
   };
   
   const handleMuteToggle = (id: string) => {
     const ch = channels.get(id);
     if (ch) {
       updateChannel(id, { muted: !ch.muted });
-      onMuteToggle?.(id);
+      onMuteToggle(id);
     }
   };
   
@@ -55,7 +65,7 @@ export const NextGenMixerView: React.FC<NextGenMixerViewProps> = ({
     const ch = channels.get(id);
     if (ch) {
       updateChannel(id, { solo: !ch.solo });
-      onSoloToggle?.(id);
+      onSoloToggle(id);
     }
   };
   
@@ -107,6 +117,11 @@ export const NextGenMixerView: React.FC<NextGenMixerViewProps> = ({
                   onPanChange={handlePanChange}
                   onMuteToggle={handleMuteToggle}
                   onSoloToggle={handleSoloToggle}
+                  buses={Array.from(buses.values())}
+                  onLoadPlugin={(slotNumber, pluginId) => onLoadPlugin(channel.id, slotNumber, pluginId)}
+                  onUnloadPlugin={(slotNumber) => onUnloadPlugin(channel.id, slotNumber)}
+                  onBypassPlugin={(slotNumber, bypass) => onBypassPlugin(channel.id, slotNumber, bypass)}
+                  onSendChange={(busId, amount) => onSendChange(channel.id, busId, amount)}
                 />
               ))}
             </div>

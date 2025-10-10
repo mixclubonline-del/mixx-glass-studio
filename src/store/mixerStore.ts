@@ -15,8 +15,18 @@ export interface ChannelState {
   peakLevel: { left: number; right: number };
 }
 
+export interface BusState {
+  id: string;
+  name: string;
+  type: 'aux' | 'group';
+  color: string;
+  volume: number;
+  sends: string[]; // Track IDs routing to this bus
+}
+
 interface MixerState {
   channels: Map<string, ChannelState>;
+  buses: Map<string, BusState>;
   masterVolume: number;
   masterPeakLevel: { left: number; right: number };
   selectedChannelId: string | null;
@@ -30,6 +40,9 @@ interface MixerState {
   addChannel: (channel: ChannelState) => void;
   updateChannel: (id: string, updates: Partial<ChannelState>) => void;
   removeChannel: (id: string) => void;
+  addBus: (bus: BusState) => void;
+  updateBus: (id: string, updates: Partial<BusState>) => void;
+  removeBus: (id: string) => void;
   setMasterVolume: (volume: number) => void;
   setMasterPeakLevel: (level: { left: number; right: number }) => void;
   updatePeakLevel: (id: string, level: { left: number; right: number }) => void;
@@ -43,6 +56,7 @@ interface MixerState {
 
 export const useMixerStore = create<MixerState>((set) => ({
   channels: new Map(),
+  buses: new Map(),
   masterVolume: 0.75,
   masterPeakLevel: { left: -60, right: -60 },
   selectedChannelId: null,
@@ -71,6 +85,27 @@ export const useMixerStore = create<MixerState>((set) => ({
     const newChannels = new Map(state.channels);
     newChannels.delete(id);
     return { channels: newChannels };
+  }),
+  
+  addBus: (bus) => set((state) => {
+    const newBuses = new Map(state.buses);
+    newBuses.set(bus.id, bus);
+    return { buses: newBuses };
+  }),
+  
+  updateBus: (id, updates) => set((state) => {
+    const newBuses = new Map(state.buses);
+    const bus = newBuses.get(id);
+    if (bus) {
+      newBuses.set(id, { ...bus, ...updates });
+    }
+    return { buses: newBuses };
+  }),
+  
+  removeBus: (id) => set((state) => {
+    const newBuses = new Map(state.buses);
+    newBuses.delete(id);
+    return { buses: newBuses };
   }),
   
   setMasterVolume: (volume) => set({ masterVolume: volume }),

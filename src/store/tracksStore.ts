@@ -18,6 +18,7 @@ interface TracksState {
   addRegion: (region: Region) => void;
   updateRegion: (id: string, updates: Partial<Region>) => void;
   removeRegion: (id: string) => void;
+  duplicateRegion: (id: string) => void;
   selectTrack: (id: string | null) => void;
   getTrackRegions: (trackId: string) => Region[];
   setAddTrackDialogOpen: (open: boolean) => void;
@@ -53,6 +54,22 @@ export const useTracksStore = create<TracksState>((set, get) => ({
   removeRegion: (id) => set((state) => ({
     regions: state.regions.filter(r => r.id !== id)
   })),
+  
+  duplicateRegion: (id) => set((state) => {
+    const region = state.regions.find(r => r.id === id);
+    if (!region) return state;
+    
+    const newRegion: Region = {
+      ...region,
+      id: `${region.id}-copy-${Date.now()}`,
+      startTime: region.startTime + region.duration,
+      name: `${region.name} (copy)`,
+    };
+    
+    return {
+      regions: [...state.regions, newRegion]
+    };
+  }),
   
   selectTrack: (id) => set({ selectedTrackId: id }),
   

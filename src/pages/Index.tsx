@@ -44,9 +44,12 @@ const Index = () => {
   const { 
     channels, 
     masterPeakLevel,
+    buses,
     addChannel,
     updatePeakLevel,
-    setMasterPeakLevel
+    setMasterPeakLevel,
+    addBus,
+    updateBus
   } = useMixerStore();
 
   // Initialize audio engine
@@ -208,6 +211,115 @@ const Index = () => {
       }
     }
   };
+  
+  const handlePanChange = (id: string, pan: number) => {
+    if (engineRef.current) {
+      engineRef.current.setTrackPan(id, pan);
+    }
+  };
+  
+  const handleSoloToggle = (id: string) => {
+    if (engineRef.current) {
+      const channel = channels.get(id);
+      if (channel) {
+        engineRef.current.setTrackSolo(id, !channel.solo);
+        useMixerStore.getState().updateChannel(id, { solo: !channel.solo });
+      }
+    }
+  };
+  
+  // Plugin management
+  const handleLoadPlugin = (trackId: string, slotNumber: number, pluginId: string) => {
+    if (engineRef.current) {
+      engineRef.current.loadPluginToTrack(trackId, pluginId, slotNumber);
+      toast({
+        title: "Plugin Loaded",
+        description: `${pluginId} loaded to slot ${slotNumber}`,
+      });
+    }
+  };
+  
+  const handleUnloadPlugin = (trackId: string, slotNumber: number) => {
+    if (engineRef.current) {
+      engineRef.current.unloadPluginFromTrack(trackId, slotNumber);
+    }
+  };
+  
+  const handleBypassPlugin = (trackId: string, slotNumber: number, bypass: boolean) => {
+    if (engineRef.current) {
+      engineRef.current.bypassPluginOnTrack(trackId, slotNumber, bypass);
+    }
+  };
+  
+  // Send management
+  const handleSendChange = (trackId: string, busId: string, amount: number) => {
+    if (engineRef.current) {
+      const track = engineRef.current.getTracks().find(t => t.id === trackId);
+      if (track) {
+        track.channelStrip.updateSend(busId, amount);
+      }
+    }
+  };
+  
+  // Bus management  
+  const handleCreateBus = (name: string, color: string, type: 'aux' | 'group') => {
+    if (engineRef.current) {
+      const busId = `bus-${Date.now()}`;
+      
+      if (type === 'aux') {
+        engineRef.current.createAuxBus(busId, name);
+      } else {
+        engineRef.current.createGroupBus(busId, name);
+      }
+      
+      addBus({
+        id: busId,
+        name,
+        type,
+        color,
+        volume: 0.75,
+        sends: []
+      });
+      
+      toast({
+        title: "Bus Created",
+        description: `${type === 'aux' ? 'Aux' : 'Group'} bus "${name}" created`,
+      });
+    }
+  };
+  
+  // Loop & recording
+  const handleRecord = () => {
+    toast({
+      title: "Recording",
+      description: "Recording functionality coming soon",
+    });
+  };
+  
+  const handleLoopToggle = () => {
+    const { loopEnabled, setLoopEnabled } = useTimelineStore.getState();
+    setLoopEnabled(!loopEnabled);
+  };
+  
+  const handlePrevBar = () => {
+    if (engineRef.current) {
+      const bpm = 120;
+      const barDuration = (60 / bpm) * 4;
+      const currentBar = Math.floor(currentTime / barDuration);
+      const newTime = Math.max(0, currentBar * barDuration);
+      handleSeek(newTime);
+    }
+  };
+  
+  const handleNextBar = () => {
+    if (engineRef.current) {
+      const bpm = 120;
+      const barDuration = (60 / bpm) * 4;
+      const currentBar = Math.floor(currentTime / barDuration);
+      const newTime = (currentBar + 1) * barDuration;
+      handleSeek(newTime);
+    }
+  };
 
   const handleMuteToggle = (id: string) => {
     if (engineRef.current) {
@@ -364,21 +476,14 @@ const Index = () => {
                   onExport={handleExport}
                   isExporting={isExporting}
                   onVolumeChange={handleVolumeChange}
-                  onPanChange={(id, pan) => {
-                    if (engineRef.current) {
-                      engineRef.current.setTrackPan(id, pan);
-                    }
-                  }}
+                  onPanChange={handlePanChange}
                   onMuteToggle={handleMuteToggle}
-                  onSoloToggle={(id) => {
-                    if (engineRef.current) {
-                      const channel = channels.get(id);
-                      if (channel) {
-                        engineRef.current.setTrackSolo(id, !channel.solo);
-                        useMixerStore.getState().updateChannel(id, { solo: !channel.solo });
-                      }
-                    }
-                  }}
+                  onSoloToggle={handleSoloToggle}
+                  onLoadPlugin={handleLoadPlugin}
+                  onUnloadPlugin={handleUnloadPlugin}
+                  onBypassPlugin={handleBypassPlugin}
+                  onSendChange={handleSendChange}
+                  onCreateBus={handleCreateBus}
                 />
               )}
               
@@ -405,6 +510,12 @@ const Index = () => {
           timeSignature={{ numerator: 4, denominator: 4 }}
           onBpmChange={() => {}}
           onTimeSignatureChange={() => {}}
+          isRecording={false}
+          isLooping={useTimelineStore.getState().loopEnabled}
+          onRecord={handleRecord}
+          onLoopToggle={handleLoopToggle}
+          onPrevBar={handlePrevBar}
+          onNextBar={handleNextBar}
         />
       </div>
       

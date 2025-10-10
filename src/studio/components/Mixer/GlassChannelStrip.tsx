@@ -3,7 +3,7 @@
  */
 
 import React from 'react';
-import { ChannelState } from '@/store/mixerStore';
+import { ChannelState, BusState } from '@/store/mixerStore';
 import { Volume2, Mic, Lock } from 'lucide-react';
 import { ProfessionalPeakMeter } from '../Metering/ProfessionalPeakMeter';
 import { IceFireFader } from '../Controls/IceFireFader';
@@ -12,22 +12,20 @@ import { InsertRack } from './InsertRack';
 import { SendKnobSimple } from './SendKnobSimple';
 import { dbToNormalized, normalizedToDb } from '@/studio/utils/TemperatureGradient';
 import { PluginInsert } from '@/audio/Track';
-import { Bus } from '@/audio/Bus';
 
 interface GlassChannelStripProps {
   channel: ChannelState;
   isSelected: boolean;
   inserts?: PluginInsert[];
-  buses?: Bus[];
+  buses?: BusState[];
   onSelect: (id: string) => void;
   onVolumeChange: (id: string, volume: number) => void;
   onPanChange: (id: string, pan: number) => void;
   onMuteToggle: (id: string) => void;
   onSoloToggle: (id: string) => void;
-  onPluginClick?: (slotNumber: number) => void;
-  onAddPlugin?: (slotNumber: number) => void;
-  onRemovePlugin?: (slotNumber: number) => void;
-  onBypassPlugin?: (slotNumber: number) => void;
+  onLoadPlugin?: (slotNumber: number, pluginId: string) => void;
+  onUnloadPlugin?: (slotNumber: number) => void;
+  onBypassPlugin?: (slotNumber: number, bypass: boolean) => void;
   onSendChange?: (busId: string, amount: number) => void;
 }
 
@@ -41,9 +39,8 @@ export const GlassChannelStrip: React.FC<GlassChannelStripProps> = ({
   onPanChange,
   onMuteToggle,
   onSoloToggle,
-  onPluginClick,
-  onAddPlugin,
-  onRemovePlugin,
+  onLoadPlugin,
+  onUnloadPlugin,
   onBypassPlugin,
   onSendChange,
 }) => {
@@ -76,19 +73,6 @@ export const GlassChannelStrip: React.FC<GlassChannelStripProps> = ({
         />
       </div>
       
-      {/* Insert Rack */}
-      {inserts && inserts.length > 0 && onAddPlugin && onPluginClick && onRemovePlugin && onBypassPlugin && (
-        <div className="mb-2 max-h-40 overflow-y-auto scrollbar-thin">
-          <InsertRack
-            inserts={inserts}
-            onPluginClick={onPluginClick}
-            onAddPlugin={onAddPlugin}
-            onRemovePlugin={onRemovePlugin}
-            onBypassToggle={onBypassPlugin}
-          />
-        </div>
-      )}
-      
       {/* Pan knob */}
       <div className="mb-2">
         <IceFireKnob
@@ -110,7 +94,7 @@ export const GlassChannelStrip: React.FC<GlassChannelStripProps> = ({
             <SendKnobSimple
               key={bus.id}
               busName={bus.name}
-              busColor={`hsl(${bus.color.hue}, ${bus.color.saturation}%, ${bus.color.lightness}%)`}
+              busColor={bus.color}
               amount={0} // TODO: Get actual send amount from channel strip
               onAmountChange={(amount) => onSendChange(bus.id, amount)}
             />
