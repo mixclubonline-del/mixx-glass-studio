@@ -17,6 +17,11 @@ export const CrossfadeRenderer: React.FC<CrossfadeRendererProps> = ({
   region2,
   pixelsPerSecond
 }) => {
+  // Safety check for undefined props
+  if (!region1 || !region2) {
+    return null;
+  }
+  
   // Calculate overlap
   const region1End = region1.startTime + region1.duration;
   const region2Start = region2.startTime;
