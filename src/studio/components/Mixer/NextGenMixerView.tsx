@@ -9,6 +9,7 @@ import { useTimelineStore } from '@/store/timelineStore';
 import { GlassChannelStrip } from './GlassChannelStrip';
 import { MasterChannelStrip } from './MasterChannelStrip';
 import { MixerSidePanels } from './MixerSidePanels';
+import { CollapsibleMeteringPanel } from '../Metering/CollapsibleMeteringPanel';
 import { Button } from '@/components/ui/button';
 import { Plus, ChevronLeft, ChevronRight } from 'lucide-react';
 import mixxclubLogo from '@/assets/mixxclub-logo.png';
@@ -223,6 +224,9 @@ export const NextGenMixerView: React.FC<NextGenMixerViewProps> = ({
           </div>
         )}
       </div>
+      
+      {/* Analysis Dashboard - Only in Mix View */}
+      <CollapsibleMeteringPanel />
     </div>
   );
 };

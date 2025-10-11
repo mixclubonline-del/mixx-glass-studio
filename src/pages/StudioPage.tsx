@@ -13,7 +13,6 @@ import { ProducerLab } from "../studio/components/Producer/ProducerLab";
 import { ViewSwitcher } from "../studio/components/Navigation/ViewSwitcher";
 import { ViewContainer } from "../studio/components/Navigation/ViewContainer";
 import { UnifiedTransportBar } from "../studio/components/Navigation/UnifiedTransportBar";
-import { CollapsibleMeteringPanel } from "../studio/components/Metering/CollapsibleMeteringPanel";
 
 // Inner component that uses ProjectContext
 function StudioPageContent() {
@@ -102,9 +101,6 @@ function StudioPageContent() {
           </div>
         )}
       </ViewContainer>
-
-      {/* Global Collapsible Metering Panel - accessible from View menu */}
-      <CollapsibleMeteringPanel />
     </div>
   );
 }
