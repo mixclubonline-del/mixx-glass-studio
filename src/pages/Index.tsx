@@ -114,7 +114,44 @@ import { MixxAmbientOverlay } from "@/components/MixxAmbientOverlay";
 import { BeastModeAmbient } from "@/components/BeastModeAmbient";
 import { primeBrain } from "@/ai/primeBrain";
 import { predictionEngine } from "@/ai/predictionEngine";
-import { beastModeEngine } from "@/services/BeastModeEngine";
+// temporary SpectralRibbon inline component
+const SpectralRibbon = () => {
+  const eng = engineRef.current;
+  const canvasRef = useRef<HTMLCanvasElement>(null);
+
+  useEffect(() => {
+    if (!eng) return;
+    const ctx = canvasRef.current?.getContext("2d");
+    if (!ctx) return;
+    const analyser = eng.getMasterAnalyser?.();
+    if (!analyser) return;
+    const fft = new Uint8Array(analyser.frequencyBinCount);
+
+    const render = () => {
+      analyser.getByteFrequencyData(fft);
+      const w = ctx.canvas.width,
+        h = ctx.canvas.height;
+      ctx.clearRect(0, 0, w, h);
+      const bars = fft.length / 4;
+      for (let i = 0; i < bars; i++) {
+        const mag = fft[i] / 255;
+        const x = (i / bars) * w;
+        const y = h - mag * h;
+        const hue = 220 + mag * 80;
+        ctx.fillStyle = `hsl(${hue} 100% 60% / 0.6)`;
+        ctx.fillRect(x, y, 2, mag * h);
+      }
+      requestAnimationFrame(render);
+    };
+    render();
+  }, [eng]);
+
+  return (
+    <div className="w-full h-24 relative glass overflow-hidden border border-border/20 rounded-md">
+      <canvas ref={canvasRef} width={600} height={96} className="w-full h-full" />
+    </div>
+  );
+};
 import { useBeastModeStore } from "@/store/beastModeStore";
 import { BeastModePanel } from "@/studio/components/AI/BeastModePanel";
 import { AISuggestionsPanel } from "@/studio/components/AI/AISuggestionsPanel";
@@ -839,7 +876,8 @@ const Index = () => {
             {/* Right side panels */}
             <div className="flex flex-col gap-2">
               {/* Beast Mode Panel */}
-              <BeastModePanel />
+              {/* Spectral Ribbon Visualizer (temporary swap) */}
+              <SpectralRibbon />
 
               {/* AI Suggestions Panel - shows only in mix view */}
               {currentView === "mix" && <AISuggestionsPanel />}
