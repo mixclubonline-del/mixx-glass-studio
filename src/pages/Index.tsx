@@ -28,8 +28,13 @@ import { Button } from "@/components/ui/button";
 import { useToast } from "@/hooks/use-toast";
 import { AudioAnalyzer } from "@/audio/analysis/AudioAnalyzer";
 import { MixxAmbientOverlay } from "@/components/MixxAmbientOverlay";
+import { BeastModeAmbient } from "@/components/BeastModeAmbient";
 import { primeBrain } from "@/ai/primeBrain";
 import { predictionEngine } from "@/ai/predictionEngine";
+import { beastModeEngine } from "@/services/BeastModeEngine";
+import { useBeastModeStore } from "@/store/beastModeStore";
+import { BeastModePanel } from "@/studio/components/AI/BeastModePanel";
+import { AISuggestionsPanel } from "@/studio/components/AI/AISuggestionsPanel";
 
 const Index = () => {
   const engineRef = useRef<AudioEngine | null>(null);
@@ -63,6 +68,21 @@ const Index = () => {
       timestamp: Date.now()
     });
   }, [currentView]);
+  
+  // Beast Mode integration
+  const { isActive: beastModeActive } = useBeastModeStore();
+  
+  useEffect(() => {
+    if (beastModeActive) {
+      beastModeEngine.start();
+    } else {
+      beastModeEngine.stop();
+    }
+    
+    return () => {
+      beastModeEngine.stop();
+    };
+  }, [beastModeActive]);
   const { 
     channels, 
     masterPeakLevel,
@@ -627,8 +647,9 @@ const Index = () => {
         onChange={handleFileSelect}
       />
       
-      {/* Mixx Ambient Lighting Overlay */}
+      {/* Mixx Ambient Lighting Overlays */}
       <MixxAmbientOverlay />
+      <BeastModeAmbient />
       
       {/* Animated background */}
       <div className="fixed inset-0 gradient-animate opacity-10 pointer-events-none" />
@@ -755,6 +776,12 @@ const Index = () => {
             
             {/* Right side panels */}
             <div className="flex flex-col gap-2">
+              {/* Beast Mode Panel */}
+              <BeastModePanel />
+              
+              {/* AI Suggestions Panel - shows only in mix view */}
+              {currentView === 'mix' && <AISuggestionsPanel />}
+              
               {/* AI Assistant Panel */}
               {showAIAssistant && (
                 <div className="w-96">
@@ -765,12 +792,14 @@ const Index = () => {
                 </div>
               )}
               
-              {/* Metering dashboard */}
-              <MeteringDashboard
-                masterPeakLevel={masterPeakLevel}
-                analyserNode={engineRef.current?.getMasterAnalyser()}
-                engineRef={engineRef}
-              />
+              {/* Metering dashboard - only in mix view */}
+              {currentView === 'mix' && (
+                <MeteringDashboard
+                  masterPeakLevel={masterPeakLevel}
+                  analyserNode={engineRef.current?.getMasterAnalyser()}
+                  engineRef={engineRef}
+                />
+              )}
             </div>
           </div>
         </ViewContainer>

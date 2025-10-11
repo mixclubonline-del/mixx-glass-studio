@@ -12,3 +12,4 @@ export type { AmbientState, MoodPacket, MoodState, LightingMode } from './ambien
 export type { ControlEvent, SceneChange, AudioMetrics } from './primeBrain';
 export type { PredictedEvent } from './predictionEngine';
 export type { ArtistProfile } from './artistDNA';
+

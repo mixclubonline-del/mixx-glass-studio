@@ -45,6 +45,8 @@ export { ViewContainer } from './Navigation/ViewContainer';
 // AI
 export { AIAssistantPanel } from './AI/AIAssistantPanel';
 export { MixxAIStudio } from './AI/MixxAIStudio';
+export { BeastModePanel } from './AI/BeastModePanel';
+export { AISuggestionsPanel } from './AI/AISuggestionsPanel';
 
 // Producer
 export { ProducerLab } from './Producer/ProducerLab';
