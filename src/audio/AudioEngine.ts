@@ -37,6 +37,7 @@ export class AudioEngine {
   
   // Project settings
   public bpm: number;
+  public key: string; // Musical key (e.g., "C Major", "A Minor")
   public timeSignature: { numerator: number; denominator: number };
   public loopStart: number;
   public loopEnd: number;
@@ -53,6 +54,7 @@ export class AudioEngine {
     this.startTime = 0;
     this.pauseTime = 0;
     this.bpm = 120;
+    this.key = 'C Major';
     this.timeSignature = { numerator: 4, denominator: 4 };
     this.loopStart = 0;
     this.loopEnd = 0;
@@ -417,8 +419,14 @@ export class AudioEngine {
     }
   }
   
+  // Get current bar position in real-time
+  getBarPosition(): { bar: number; beat: number; tick: number } {
+    const currentTime = this.getCurrentTime();
+    return this.timeToBarsBeatsTicks(currentTime);
+  }
+  
   // Bar/Beat Time Conversion
-  timeToBarsBeatsTicks(seconds: number): { bars: number; beats: number; ticks: number } {
+  timeToBarsBeatsTicks(seconds: number): { bar: number; beat: number; tick: number } {
     const secondsPerBeat = 60 / this.bpm;
     const beatsPerBar = this.timeSignature.numerator;
     
@@ -426,18 +434,18 @@ export class AudioEngine {
     const adjustedSeconds = seconds - this.projectStartOffset;
     
     const totalBeats = adjustedSeconds / secondsPerBeat;
-    const bars = Math.floor(totalBeats / beatsPerBar) + 1; // Start at bar 1
-    const beats = Math.floor(totalBeats % beatsPerBar) + 1; // Start at beat 1
-    const ticks = Math.floor((totalBeats % 1) * 960); // 960 ticks per beat (MIDI standard)
+    const bar = Math.floor(totalBeats / beatsPerBar) + 1; // Start at bar 1
+    const beat = Math.floor(totalBeats % beatsPerBar) + 1; // Start at beat 1
+    const tick = Math.floor((totalBeats % 1) * 960); // 960 ticks per beat (MIDI standard)
     
-    return { bars, beats, ticks };
+    return { bar, beat, tick };
   }
   
-  barsBeatTicksToTime(bars: number, beats: number, ticks: number): number {
+  barsBeatTicksToTime(bar: number, beat: number, tick: number): number {
     const secondsPerBeat = 60 / this.bpm;
     const beatsPerBar = this.timeSignature.numerator;
     
-    const totalBeats = (bars - 1) * beatsPerBar + (beats - 1) + (ticks / 960);
+    const totalBeats = (bar - 1) * beatsPerBar + (beat - 1) + (tick / 960);
     const seconds = totalBeats * secondsPerBeat;
     
     return seconds + this.projectStartOffset;

@@ -3,6 +3,8 @@
  */
 import { useState } from "react";
 import { useViewStore } from "@/store/viewStore";
+import { ProjectProvider, useProject, useTransport } from "@/contexts/ProjectContext";
+import { useGlobalKeyboardShortcuts } from "@/hooks/useGlobalKeyboardShortcuts";
 import { EffectsRack } from "../studio/components/EffectsRack";
 import { Timeline } from "../studio/components/Timeline";
 import { TransportControls } from "../studio/components/TransportControls";
@@ -10,27 +12,41 @@ import { MixxAIStudio } from "../studio/components/AI/MixxAIStudio";
 import { ProducerLab } from "../studio/components/Producer/ProducerLab";
 import { ViewSwitcher } from "../studio/components/Navigation/ViewSwitcher";
 import { ViewContainer } from "../studio/components/Navigation/ViewContainer";
+import { UnifiedTransportBar } from "../studio/components/Navigation/UnifiedTransportBar";
 import { CollapsibleMeteringPanel } from "../studio/components/Metering/CollapsibleMeteringPanel";
 
-export default function StudioPage() {
+// Inner component that uses ProjectContext
+function StudioPageContent() {
   const { currentView } = useViewStore();
-  const [isPlaying, setIsPlaying] = useState(false);
-  const [currentTime, setCurrentTime] = useState(0);
-  const [duration, setDuration] = useState(180); // 3 minutes default
+  const { audioEngine } = useProject();
+  const { transport } = useTransport();
+  const [duration, setDuration] = useState(180);
   const [reverbMix, setReverbMix] = useState(0.3);
   const [delayTime, setDelayTime] = useState(0.5);
   const [delayFeedback, setDelayFeedback] = useState(0.4);
   const [delayMix, setDelayMix] = useState(0.3);
   const [limiterThreshold, setLimiterThreshold] = useState(-1);
 
-  const handlePlay = () => setIsPlaying(true);
-  const handlePause = () => setIsPlaying(false);
-  const handleStop = () => {
-    setIsPlaying(false);
-    setCurrentTime(0);
+  // Enable global keyboard shortcuts
+  useGlobalKeyboardShortcuts();
+
+  const handleSeek = (time: number) => {
+    audioEngine.seek(time);
   };
-  const handleSeek = (time: number) => setCurrentTime(time);
-  const handleExport = () => console.log("Export triggered");
+  
+  const handleExport = async () => {
+    try {
+      const blob = await audioEngine.exportMix();
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement('a');
+      a.href = url;
+      a.download = 'mixx-export.wav';
+      a.click();
+      URL.revokeObjectURL(url);
+    } catch (error) {
+      console.error('Export failed:', error);
+    }
+  };
   
   const handleEffectChange = (param: string, value: number) => {
     switch (param) {
@@ -44,8 +60,13 @@ export default function StudioPage() {
 
   return (
     <div className="h-screen flex flex-col bg-background">
+      {/* Unified Transport Bar - Always visible */}
+      <div className="px-3 pt-3">
+        <UnifiedTransportBar />
+      </div>
+      
       {/* View Switcher */}
-      <div className="p-3 border-b border-border/30">
+      <div className="px-3 py-2 border-b border-border/30">
         <ViewSwitcher />
       </div>
 
@@ -60,9 +81,9 @@ export default function StudioPage() {
             {/* Top timeline/arranger */}
             <div style={{ marginBottom: 12 }}>
               <Timeline 
-                currentTime={currentTime}
+                currentTime={transport.currentTime}
                 duration={duration}
-                isPlaying={isPlaying}
+                isPlaying={transport.isPlaying}
                 onSeek={handleSeek}
               />
             </div>
@@ -78,15 +99,6 @@ export default function StudioPage() {
                 onEffectChange={handleEffectChange}
               />
             </div>
-
-            {/* Transport / play controls */}
-            <TransportControls 
-              isPlaying={isPlaying}
-              onPlay={handlePlay}
-              onPause={handlePause}
-              onStop={handleStop}
-              onExport={handleExport}
-            />
           </div>
         )}
       </ViewContainer>
@@ -94,5 +106,14 @@ export default function StudioPage() {
       {/* Global Collapsible Metering Panel - accessible from View menu */}
       <CollapsibleMeteringPanel />
     </div>
+  );
+}
+
+// Wrap with ProjectProvider
+export default function StudioPage() {
+  return (
+    <ProjectProvider>
+      <StudioPageContent />
+    </ProjectProvider>
   );
 }

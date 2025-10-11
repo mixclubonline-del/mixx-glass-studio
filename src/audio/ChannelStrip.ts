@@ -196,6 +196,61 @@ export class ChannelStrip {
     return this.insertSlots[slotNumber - 1];
   }
   
+  // Get insert chain order (returns array of slot numbers with active inserts)
+  getInsertChainOrder(): number[] {
+    return this.insertSlots
+      .map((insert, index) => (insert ? index + 1 : null))
+      .filter((slot): slot is number => slot !== null);
+  }
+  
+  // Reorder inserts (drag-and-drop support)
+  reorderInsert(fromSlot: number, toSlot: number): void {
+    if (
+      fromSlot < 1 || fromSlot > 8 ||
+      toSlot < 1 || toSlot > 8 ||
+      fromSlot === toSlot
+    ) {
+      return;
+    }
+    
+    const fromEffect = this.insertSlots[fromSlot - 1];
+    const toEffect = this.insertSlots[toSlot - 1];
+    
+    // Swap effects
+    this.insertSlots[fromSlot - 1] = toEffect;
+    this.insertSlots[toSlot - 1] = fromEffect;
+    
+    // Rebuild audio graph with new order
+    this.rebuildAudioGraph();
+  }
+  
+  // Copy insert (for chain management)
+  copyInsert(slotNumber: number): EffectBase | null {
+    if (slotNumber < 1 || slotNumber > 8) {
+      return null;
+    }
+    return this.insertSlots[slotNumber - 1];
+  }
+  
+  // Paste insert (for chain management)
+  pasteInsert(slotNumber: number, effect: EffectBase | null): void {
+    if (slotNumber < 1 || slotNumber > 8) {
+      return;
+    }
+    
+    // Dispose old effect if exists
+    const oldEffect = this.insertSlots[slotNumber - 1];
+    if (oldEffect) {
+      oldEffect.dispose();
+    }
+    
+    // Store new effect
+    this.insertSlots[slotNumber - 1] = effect;
+    
+    // Rebuild audio graph
+    this.rebuildAudioGraph();
+  }
+  
   /**
    * Rebuild the audio graph with current insert chain
    * Chain: input → EQ → comp → [inserts 1-8] → pan → fader → output
