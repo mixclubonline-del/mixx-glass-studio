@@ -39,6 +39,7 @@ export class WaveformCache {
   
   /**
    * Get or generate cached peaks for a region
+   * Phase 3: Enhanced with adaptive quality based on zoom
    */
   getPeaks(regionId: string, buffer: AudioBuffer, zoom: number): Float32Array {
     const cacheKey = `${regionId}-${Math.round(zoom)}`;
@@ -47,11 +48,19 @@ export class WaveformCache {
       return this.cache.get(cacheKey)!;
     }
     
-    // Generate peaks based on zoom level
+    // Generate peaks based on zoom level with adaptive quality
+    // High zoom (zoomed in) = more detail, low zoom (zoomed out) = less detail
     const samplesPerPixel = Math.max(128, Math.floor(buffer.sampleRate / zoom));
     const peaks = this.generatePeaks(buffer, samplesPerPixel);
     
     this.cache.set(cacheKey, peaks);
+    
+    // Auto-cleanup if cache gets too large (> 100 entries)
+    if (this.cache.size > 100) {
+      const keysToDelete = Array.from(this.cache.keys()).slice(0, 20);
+      keysToDelete.forEach(key => this.cache.delete(key));
+    }
+    
     return peaks;
   }
   

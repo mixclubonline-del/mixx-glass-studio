@@ -121,10 +121,12 @@ export function TakeLaneView({
             >
               {/* Take waveform */}
               <WaveformRenderer
+                regionId={take.id}
                 audioBuffer={take.audioBuffer}
                 width={take.duration * zoom}
                 height={64}
                 color={take.isFavorite ? 'hsl(var(--fire-red))' : 'hsl(var(--prime-purple))'}
+                zoom={zoom}
                 startTime={0}
                 duration={take.duration}
               />

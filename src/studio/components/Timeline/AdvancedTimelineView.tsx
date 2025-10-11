@@ -304,13 +304,6 @@ export const AdvancedTimelineView: React.FC<AdvancedTimelineViewProps> = ({
               containerWidth={containerRef.current?.clientWidth || 800}
               containerHeight={tracks.length * 100}
             />
-
-            {/* Crossfade Renderer */}
-            <CrossfadeRenderer
-              regions={regions}
-              zoom={zoom}
-              trackHeight={100}
-            />
             
             {/* Tracks */}
             {tracks.map((track) => (

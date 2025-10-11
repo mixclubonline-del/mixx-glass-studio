@@ -858,8 +858,6 @@ const Index = () => {
       
       {/* Plugin Window Manager */}
       <PluginWindowManager
-        openWindows={openPluginWindows}
-        onCloseWindow={handleClosePluginWindow}
         onParameterChange={handlePluginParameterChange}
       />
       
