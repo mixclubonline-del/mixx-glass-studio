@@ -50,6 +50,9 @@ export { AISuggestionsPanel } from './AI/AISuggestionsPanel';
 
 // Producer
 export { ProducerLab } from './Producer/ProducerLab';
+export { DrumMachine } from './Producer/DrumMachine';
+export { SynthRack } from './Producer/SynthRack';
+export { Sampler } from './Producer/Sampler';
 
 // Transport
 export { TransportControls } from './TransportControls';
