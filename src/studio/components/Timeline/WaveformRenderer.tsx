@@ -1,45 +1,35 @@
 /**
  * Waveform Renderer - High-performance canvas-based waveform visualization
- * Phase 3: Enhanced with WaveformCache integration and zoom-aware rendering
  */
 
 import React, { useEffect, useRef } from 'react';
-import { waveformCache } from '@/audio/WaveformCache';
 
 interface WaveformRendererProps {
-  regionId: string;
   audioBuffer: AudioBuffer | null;
   width: number;
   height: number;
   color: string;
-  zoom?: number; // Pixels per second
+  peaks?: Float32Array;
   startTime?: number;
   duration?: number;
-  fadeIn?: number; // Fade in duration in seconds
-  fadeOut?: number; // Fade out duration in seconds
 }
 
 export const WaveformRenderer: React.FC<WaveformRendererProps> = ({
-  regionId,
   audioBuffer,
   width,
   height,
   color,
-  zoom = 100,
+  peaks,
   startTime = 0,
-  duration,
-  fadeIn = 0,
-  fadeOut = 0
+  duration
 }) => {
   const canvasRef = useRef<HTMLCanvasElement>(null);
-  const renderTimeRef = useRef<number>(0);
   
   useEffect(() => {
-    const startRender = performance.now();
     const canvas = canvasRef.current;
     if (!canvas || !audioBuffer) return;
     
-    const ctx = canvas.getContext('2d', { alpha: true });
+    const ctx = canvas.getContext('2d');
     if (!ctx) return;
     
     // High DPI support
@@ -53,23 +43,30 @@ export const WaveformRenderer: React.FC<WaveformRendererProps> = ({
     // Clear canvas
     ctx.clearRect(0, 0, width, height);
     
-    // Get cached peaks for this zoom level
-    const peaks = waveformCache.getPeaks(regionId, audioBuffer, zoom);
-    const samplesPerPixel = Math.max(128, Math.floor(audioBuffer.sampleRate / zoom));
+    // Draw waveform
+    const channelData = audioBuffer.getChannelData(0);
+    const samplesPerPixel = Math.floor(channelData.length / width);
     const centerY = height / 2;
     
-    // Draw waveform using cached peaks
     ctx.beginPath();
     ctx.strokeStyle = color;
-    ctx.lineWidth = 1.5;
+    ctx.lineWidth = 1;
     
-    const numPixels = Math.min(width, peaks.length / 2);
-    
-    // Top half (max values)
-    for (let x = 0; x < numPixels; x++) {
-      const peakIndex = x * 2;
-      const max = peaks[peakIndex + 1] || 0;
-      const yMax = centerY - (max * centerY * 0.85);
+    for (let x = 0; x < width; x++) {
+      const start = Math.floor(x * samplesPerPixel);
+      const end = Math.floor(start + samplesPerPixel);
+      
+      let min = 1;
+      let max = -1;
+      
+      for (let i = start; i < end; i++) {
+        const sample = channelData[i] || 0;
+        if (sample < min) min = sample;
+        if (sample > max) max = sample;
+      }
+      
+      const yMax = centerY - (max * centerY * 0.9);
+      const yMin = centerY - (min * centerY * 0.9);
       
       if (x === 0) {
         ctx.moveTo(x, yMax);
@@ -78,61 +75,33 @@ export const WaveformRenderer: React.FC<WaveformRendererProps> = ({
       }
     }
     
-    // Bottom half (min values)
-    for (let x = numPixels - 1; x >= 0; x--) {
-      const peakIndex = x * 2;
-      const min = peaks[peakIndex] || 0;
-      const yMin = centerY - (min * centerY * 0.85);
+    // Mirror for bottom half
+    for (let x = width - 1; x >= 0; x--) {
+      const start = Math.floor(x * samplesPerPixel);
+      const end = Math.floor(start + samplesPerPixel);
+      
+      let min = 1;
+      
+      for (let i = start; i < end; i++) {
+        const sample = channelData[i] || 0;
+        if (sample < min) min = sample;
+      }
+      
+      const yMin = centerY - (min * centerY * 0.9);
       ctx.lineTo(x, yMin);
     }
     
     ctx.closePath();
-    
-    // Gradient fill
-    const gradient = ctx.createLinearGradient(0, 0, 0, height);
-    gradient.addColorStop(0, color + '60');
-    gradient.addColorStop(0.5, color + '30');
-    gradient.addColorStop(1, color + '60');
-    ctx.fillStyle = gradient;
+    ctx.fillStyle = color + '40'; // Add transparency
     ctx.fill();
     ctx.stroke();
     
-    // Draw fade overlays
-    if (fadeIn > 0 || fadeOut > 0) {
-      const fadeInPixels = (fadeIn * zoom);
-      const fadeOutPixels = (fadeOut * zoom);
-      
-      // Fade in
-      if (fadeIn > 0 && fadeInPixels > 0) {
-        const fadeGradient = ctx.createLinearGradient(0, 0, fadeInPixels, 0);
-        fadeGradient.addColorStop(0, 'rgba(0,0,0,0.4)');
-        fadeGradient.addColorStop(1, 'rgba(0,0,0,0)');
-        ctx.fillStyle = fadeGradient;
-        ctx.fillRect(0, 0, fadeInPixels, height);
-      }
-      
-      // Fade out
-      if (fadeOut > 0 && fadeOutPixels > 0) {
-        const fadeGradient = ctx.createLinearGradient(width - fadeOutPixels, 0, width, 0);
-        fadeGradient.addColorStop(0, 'rgba(0,0,0,0)');
-        fadeGradient.addColorStop(1, 'rgba(0,0,0,0.4)');
-        ctx.fillStyle = fadeGradient;
-        ctx.fillRect(width - fadeOutPixels, 0, fadeOutPixels, height);
-      }
-    }
-    
-    // Track render performance (target: ≤16ms)
-    renderTimeRef.current = performance.now() - startRender;
-    if (renderTimeRef.current > 16) {
-      console.warn(`⚠️ Waveform render slow: ${renderTimeRef.current.toFixed(2)}ms (target: ≤16ms)`);
-    }
-    
-  }, [regionId, audioBuffer, width, height, color, zoom, fadeIn, fadeOut]);
+  }, [audioBuffer, width, height, color]);
   
   return (
     <canvas
       ref={canvasRef}
-      className="absolute inset-0 pointer-events-none"
+      className="absolute inset-0"
     />
   );
 };

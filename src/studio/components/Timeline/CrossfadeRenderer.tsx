@@ -1,61 +1,124 @@
 /**
- * Crossfade Renderer - Visual and audio crossfade between overlapping regions
- * Phase 3: Advanced region editing
+ * Crossfade Renderer - Detects and visualizes crossfades between overlapping regions
  */
 
 import React from 'react';
 import { Region } from '@/types/timeline';
 
 interface CrossfadeRendererProps {
-  region1: Region;
-  region2: Region;
-  pixelsPerSecond: number;
+  regions: Region[];
+  zoom: number;
+  trackHeight: number;
+}
+
+interface Crossfade {
+  region1Id: string;
+  region2Id: string;
+  startTime: number;
+  endTime: number;
+  duration: number;
 }
 
 export const CrossfadeRenderer: React.FC<CrossfadeRendererProps> = ({
-  region1,
-  region2,
-  pixelsPerSecond
+  regions,
+  zoom,
+  trackHeight,
 }) => {
-  // Safety check for undefined props
-  if (!region1 || !region2) {
-    return null;
-  }
+  // Detect overlapping regions
+  const detectCrossfades = (): Crossfade[] => {
+    const crossfades: Crossfade[] = [];
+    
+    for (let i = 0; i < regions.length; i++) {
+      for (let j = i + 1; j < regions.length; j++) {
+        const r1 = regions[i];
+        const r2 = regions[j];
+        
+        const r1End = r1.startTime + r1.duration;
+        const r2End = r2.startTime + r2.duration;
+        
+        // Check for overlap
+        if (r1.startTime < r2End && r2.startTime < r1End) {
+          const startTime = Math.max(r1.startTime, r2.startTime);
+          const endTime = Math.min(r1End, r2End);
+          
+          crossfades.push({
+            region1Id: r1.id,
+            region2Id: r2.id,
+            startTime,
+            endTime,
+            duration: endTime - startTime,
+          });
+        }
+      }
+    }
+    
+    return crossfades;
+  };
   
-  // Calculate overlap
-  const region1End = region1.startTime + region1.duration;
-  const region2Start = region2.startTime;
-  
-  if (region1End <= region2Start) {
-    // No overlap
-    return null;
-  }
-  
-  const overlapStart = region2Start;
-  const overlapEnd = Math.min(region1End, region2Start + region2.duration);
-  const overlapDuration = overlapEnd - overlapStart;
-  
-  if (overlapDuration <= 0) return null;
-  
-  const left = overlapStart * pixelsPerSecond;
-  const width = overlapDuration * pixelsPerSecond;
+  const crossfades = detectCrossfades();
   
   return (
-    <div
-      className="absolute top-0 bottom-0 pointer-events-none"
-      style={{
-        left: `${left}px`,
-        width: `${width}px`,
-        background: 'linear-gradient(90deg, transparent, rgba(255,255,255,0.1), transparent)',
-        borderLeft: '1px dashed rgba(255,255,255,0.3)',
-        borderRight: '1px dashed rgba(255,255,255,0.3)',
-      }}
-    >
-      <div className="absolute inset-0 flex items-center justify-center">
-        <div className="text-[10px] font-mono text-white/60 bg-black/40 px-2 py-0.5 rounded">
-          X-FADE {overlapDuration.toFixed(2)}s
-        </div>
-      </div>
-    </div>
+    <>
+      {crossfades.map((fade, index) => {
+        const left = fade.startTime * zoom;
+        const width = fade.duration * zoom;
+        
+        return (
+          <div
+            key={`crossfade-${index}`}
+            className="absolute pointer-events-none"
+            style={{
+              left: `${left}px`,
+              width: `${width}px`,
+              height: `${trackHeight}px`,
+              top: 0,
+            }}
+          >
+            {/* Crossfade curve visualization */}
+            <svg
+              width="100%"
+              height="100%"
+              className="opacity-60"
+              style={{ mixBlendMode: 'overlay' }}
+            >
+              {/* Fade out curve (left) */}
+              <path
+                d={`M 0,0 Q ${width / 2},${trackHeight / 2} ${width},${trackHeight}`}
+                stroke="hsl(var(--primary))"
+                strokeWidth="2"
+                fill="none"
+                opacity="0.8"
+              />
+              
+              {/* Fade in curve (right) */}
+              <path
+                d={`M 0,${trackHeight} Q ${width / 2},${trackHeight / 2} ${width},0`}
+                stroke="hsl(var(--primary))"
+                strokeWidth="2"
+                fill="none"
+                opacity="0.8"
+              />
+              
+              {/* Crossfade zone indicator */}
+              <rect
+                x="0"
+                y="0"
+                width="100%"
+                height="100%"
+                fill="hsl(var(--primary) / 0.1)"
+                stroke="hsl(var(--primary))"
+                strokeWidth="1"
+                strokeDasharray="4 4"
+              />
+            </svg>
+            
+            {/* Label */}
+            <div className="absolute bottom-1 left-1/2 -translate-x-1/2 text-[9px] font-medium text-primary bg-background/80 px-1.5 py-0.5 rounded">
+              X-Fade {(fade.duration * 1000).toFixed(0)}ms
+            </div>
+          </div>
+        );
+      })}
+    </>
   );
 };

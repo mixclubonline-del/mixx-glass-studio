@@ -765,14 +765,12 @@ const Index = () => {
                 </div>
               )}
               
-              {/* Metering dashboard - only show in Mix view */}
-              {currentView === 'mix' && (
-                <MeteringDashboard
-                  masterPeakLevel={masterPeakLevel}
-                  analyserNode={engineRef.current?.getMasterAnalyser()}
-                  engineRef={engineRef}
-                />
-              )}
+              {/* Metering dashboard */}
+              <MeteringDashboard
+                masterPeakLevel={masterPeakLevel}
+                analyserNode={engineRef.current?.getMasterAnalyser()}
+                engineRef={engineRef}
+              />
             </div>
           </div>
         </ViewContainer>
@@ -860,14 +858,15 @@ const Index = () => {
       
       {/* Plugin Window Manager */}
       <PluginWindowManager
+        openWindows={openPluginWindows}
+        onCloseWindow={handleClosePluginWindow}
         onParameterChange={handlePluginParameterChange}
       />
       
       {/* AI Assistant Toggle FAB */}
       <button
         onClick={() => setShowAIAssistant(!showAIAssistant)}
-        className={`fixed ${transportFloating ? 'left-4 bottom-24' : 'right-4 bottom-24'} w-14 h-14 rounded-full bg-primary text-primary-foreground shadow-lg hover:shadow-xl transition-all hover:scale-110 flex items-center justify-center z-40 neon-glow-prime`}
-        aria-label="Toggle AI Assistant"
+        className="fixed right-4 bottom-24 w-14 h-14 rounded-full bg-primary text-primary-foreground shadow-lg hover:shadow-xl transition-all hover:scale-110 flex items-center justify-center z-40 neon-glow-prime"
       >
         <Bot className="w-6 h-6" />
       </button>

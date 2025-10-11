@@ -192,16 +192,12 @@ export const TimelineRegion: React.FC<TimelineRegionProps> = ({
       {/* Waveform */}
       {audioBuffer && (
         <WaveformRenderer
-          regionId={region.id}
           audioBuffer={audioBuffer}
           width={width}
           height={80}
           color={region.color}
-          zoom={zoom}
           startTime={region.bufferOffset}
           duration={region.bufferDuration}
-          fadeIn={region.fadeIn}
-          fadeOut={region.fadeOut}
         />
       )}
       
