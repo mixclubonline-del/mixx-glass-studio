@@ -1,12 +1,14 @@
 import { useState, useEffect, useRef } from "react";
 import {
-  TopMenuBar,
+  EnhancedTopMenuBar,
   ViewContainer,
   AdvancedTimelineView,
   ViewSwitcher,
   TransportControls,
   ProfessionalMixerView,
 } from "@/studio/components";
+import { ProfessionalBrowserPanel } from "@/studio/components/Browser";
+import { StartPageDialog } from "@/studio/components/Dialogs";
 import { PluginBrowser } from "@/studio/components/Plugins/PluginBrowser";
 import { PluginWindowManager } from "@/studio/components/Plugins/PluginWindowManager";
 import { useKeyboardShortcuts } from "@/hooks/useKeyboardShortcuts";
@@ -36,6 +38,8 @@ const Index = () => {
   const [transportCovered, setTransportCovered] = useState(false);
   const [detectedBPM, setDetectedBPM] = useState<number | null>(null);
   const [detectedKey, setDetectedKey] = useState<string | null>(null);
+  const [showStartPage, setShowStartPage] = useState(false);
+  const [showBrowser, setShowBrowser] = useState(true);
   const { toast } = useToast();
   
   // Project context - centralized audio engine and transport
@@ -505,25 +509,21 @@ const Index = () => {
       />
 
       <div className="flex flex-col h-screen">
-        <TopMenuBar
+        <EnhancedTopMenuBar
           onExport={handleExport}
           onSave={() => toast({ title: "Save", description: "Project saved locally" })}
           onLoad={() => toast({ title: "Load", description: "Not yet implemented" })}
           onImport={handleImport}
-          onStemSeparation={() => toast({ 
-            title: "Stem Separation", 
-            description: "Feature ready - upload audio to begin separation" 
-          })}
-          onAutoMaster={() => toast({ 
-            title: "Auto-Master", 
-            description: "Analyzing mix for optimal mastering settings..." 
-          })}
-          transportHidden={transportCollapsed}
-          transportFloating={transportFloating}
-          transportCovered={transportCovered}
-          onToggleTransportHide={() => setTransportCollapsed(!transportCollapsed)}
-          onToggleTransportFloat={() => setTransportFloating(!transportFloating)}
-          onToggleTransportCover={() => setTransportCovered(!transportCovered)}
+          onNewProject={() => setShowStartPage(true)}
+        />
+        
+        <StartPageDialog
+          open={showStartPage}
+          onOpenChange={setShowStartPage}
+          onNewProject={(templateId, name) => {
+            console.log('New project:', templateId, name);
+            toast({ title: "New Project", description: `Creating ${name}...` });
+          }}
         />
         
         {/* View switcher & quick actions */}
@@ -558,6 +558,12 @@ const Index = () => {
         
         <ViewContainer>
           <div className="flex h-full">
+            {showBrowser && (
+              <div className="w-80 border-r border-border">
+                <ProfessionalBrowserPanel />
+              </div>
+            )}
+            
             {/* Main view */}
             <div className="flex-1 flex flex-col">
               {currentView === 'arrange' && (

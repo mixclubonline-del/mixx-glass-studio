@@ -41,6 +41,7 @@ export * from './Editing';
 // Navigation
 export { ViewSwitcher } from './Navigation/ViewSwitcher';
 export { TopMenuBar } from './Navigation/TopMenuBar';
+export { EnhancedTopMenuBar } from './Navigation/EnhancedTopMenuBar';
 export { ViewContainer } from './Navigation/ViewContainer';
 
 // AI
