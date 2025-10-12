@@ -77,9 +77,9 @@ export const CanvasTimelineRenderer: React.FC<CanvasTimelineRendererProps> = ({
         : 'rgba(10, 10, 16, 0.5)';
       ctx.fillRect(0, trackY, width, trackHeight);
 
-      // Draw regions
+      // Draw regions with current time for waveform progress
       trackRegions.forEach(region => {
-        drawRegion(ctx, region, trackY, trackHeight, zoom, scrollX);
+        drawRegion(ctx, region, trackY, trackHeight, zoom, scrollX, currentTime);
       });
     });
 
@@ -154,7 +154,8 @@ function drawRegion(
   trackY: number,
   trackHeight: number,
   zoom: number,
-  scrollX: number
+  scrollX: number,
+  currentTime?: number
 ) {
   const x = region.startTime * zoom - scrollX;
   const w = region.duration * zoom;
@@ -181,9 +182,9 @@ function drawRegion(
     ctx.fillText(text, x + padding, y + padding);
   }
 
-  // Waveform (if available)
+  // Waveform (if available) - now with playback progress
   if (region.audioBuffer && w > 20) {
-    drawWaveform(ctx, region, x, y, w, h);
+    drawWaveform(ctx, region, x, y, w, h, currentTime);
   }
 }
 
@@ -196,7 +197,8 @@ function drawWaveform(
   x: number,
   y: number,
   w: number,
-  h: number
+  h: number,
+  currentTime?: number
 ) {
   if (!region.audioBuffer) return;
 
@@ -205,34 +207,69 @@ function drawWaveform(
   const samples = channelData.length;
   const samplesPerPixel = Math.max(1, Math.floor(samples / w));
 
-  ctx.strokeStyle = '#30E1C6';
-  ctx.lineWidth = 1;
-  ctx.beginPath();
-
   const centerY = y + h / 2;
   const amplitude = h * 0.4;
 
-  for (let i = 0; i < w; i++) {
-    const start = Math.floor(i * samplesPerPixel);
-    const end = Math.min(samples, start + samplesPerPixel);
-
-    let min = 0;
-    let max = 0;
-
-    for (let j = start; j < end; j++) {
-      const value = channelData[j];
-      if (value < min) min = value;
-      if (value > max) max = value;
+  // Calculate playback progress position within this region
+  let progressX = -1;
+  if (currentTime !== undefined && currentTime >= region.startTime) {
+    const relativeTime = currentTime - region.startTime;
+    if (relativeTime <= region.duration) {
+      progressX = x + (relativeTime / region.duration) * w;
     }
-
-    const yMin = centerY + min * amplitude;
-    const yMax = centerY + max * amplitude;
-
-    ctx.moveTo(x + i, yMin);
-    ctx.lineTo(x + i, yMax);
   }
 
-  ctx.stroke();
+  // Draw waveform in two parts if playing (played vs unplayed)
+  const drawWaveformSegment = (startPixel: number, endPixel: number, color: string) => {
+    ctx.strokeStyle = color;
+    ctx.lineWidth = 1;
+    ctx.beginPath();
+
+    for (let i = startPixel; i < endPixel; i++) {
+      const start = Math.floor(i * samplesPerPixel);
+      const end = Math.min(samples, start + samplesPerPixel);
+
+      let min = 0;
+      let max = 0;
+
+      for (let j = start; j < end; j++) {
+        const value = channelData[j];
+        if (value < min) min = value;
+        if (value > max) max = value;
+      }
+
+      const yMin = centerY + min * amplitude;
+      const yMax = centerY + max * amplitude;
+
+      ctx.moveTo(x + i, yMin);
+      ctx.lineTo(x + i, yMax);
+    }
+
+    ctx.stroke();
+  };
+
+  if (progressX > x && progressX < x + w) {
+    // Draw played portion (brighter)
+    const playedWidth = Math.floor(progressX - x);
+    drawWaveformSegment(0, playedWidth, '#30E1C6');
+    
+    // Draw unplayed portion (dimmer)
+    drawWaveformSegment(playedWidth, Math.floor(w), 'rgba(48, 225, 198, 0.3)');
+    
+    // Draw progress indicator line
+    ctx.strokeStyle = '#30E1C6';
+    ctx.lineWidth = 2;
+    ctx.shadowColor = '#30E1C6';
+    ctx.shadowBlur = 8;
+    ctx.beginPath();
+    ctx.moveTo(progressX, y);
+    ctx.lineTo(progressX, y + h);
+    ctx.stroke();
+    ctx.shadowBlur = 0;
+  } else {
+    // No progress or outside region - draw normally
+    drawWaveformSegment(0, Math.floor(w), progressX > x + w ? '#30E1C6' : 'rgba(48, 225, 198, 0.3)');
+  }
 }
 
 /**
