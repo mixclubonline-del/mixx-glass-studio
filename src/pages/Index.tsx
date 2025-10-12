@@ -3,12 +3,8 @@ import {
   TopMenuBar,
   ViewContainer,
   AdvancedTimelineView,
-  NextGenMixerView,
-  MeteringDashboard,
-  WaveformEditor,
   ViewSwitcher,
   TransportControls,
-  AIAssistantPanel
 } from "@/studio/components";
 import { PluginBrowser } from "@/studio/components/Plugins/PluginBrowser";
 import { PluginWindowManager } from "@/studio/components/Plugins/PluginWindowManager";
@@ -17,26 +13,18 @@ import { useViewStore } from "@/store/viewStore";
 import { useTimelineStore } from "@/store/timelineStore";
 import { useTracksStore } from "@/store/tracksStore";
 import { useMixerStore } from "@/store/mixerStore";
-import { Bot, Upload } from "lucide-react";
+import { Upload } from "lucide-react";
 import { TimelineTrack, Region } from "@/types/timeline";
 import { Button } from "@/components/ui/button";
 import { useToast } from "@/hooks/use-toast";
 import { AudioAnalyzer } from "@/audio/analysis/AudioAnalyzer";
 import { MixxAmbientOverlay } from "@/components/MixxAmbientOverlay";
-import { BeastModeAmbient } from "@/components/BeastModeAmbient";
-import { primeBrain } from "@/ai/primeBrain";
-import { predictionEngine } from "@/ai/predictionEngine";
-import { beastModeEngine } from "@/services/BeastModeEngine";
-import { useBeastModeStore } from "@/store/beastModeStore";
-import { BeastModePanel } from "@/studio/components/AI/BeastModePanel";
-import { AISuggestionsPanel } from "@/studio/components/AI/AISuggestionsPanel";
 import { useProject, useTransport, useAudioEngine } from "@/contexts/ProjectContext";
 
 const Index = () => {
   const fileInputRef = useRef<HTMLInputElement>(null);
   const [audioBuffers, setAudioBuffers] = useState<Map<string, AudioBuffer>>(new Map());
   const [isExporting, setIsExporting] = useState(false);
-  const [showAIAssistant, setShowAIAssistant] = useState(false);
   const [pluginBrowserOpen, setPluginBrowserOpen] = useState(false);
   const [selectedTrackForPlugin, setSelectedTrackForPlugin] = useState<string | null>(null);
   const [selectedSlotForPlugin, setSelectedSlotForPlugin] = useState<number>(1);
@@ -59,16 +47,6 @@ const Index = () => {
   const { setCurrentTime, setDuration } = useTimelineStore();
   const { tracks, regions, addTrack, addRegion } = useTracksStore();
 
-  // Track view changes for Prime Brain
-  useEffect(() => {
-    primeBrain.processSceneChange({
-      sceneId: currentView,
-      sceneName: currentView === 'arrange' ? 'Arrange View' : 
-                currentView === 'mix' ? 'Mixer View' : 'Editor View',
-      timestamp: Date.now()
-    });
-  }, [currentView]);
-  
   // Mixer store
   const mixerStore = useMixerStore();
   const { 
@@ -82,21 +60,6 @@ const Index = () => {
   } = mixerStore;
   const setMixerMasterPeak = mixerStore.setMasterPeakLevel;
 
-  // Beast Mode integration
-  const { isActive: beastModeActive } = useBeastModeStore();
-  
-  useEffect(() => {
-    if (beastModeActive) {
-      beastModeEngine.start();
-    } else {
-      beastModeEngine.stop();
-    }
-    
-    return () => {
-      beastModeEngine.stop();
-    };
-  }, [beastModeActive]);
-
   // Update playback time from transport
   useEffect(() => {
     if (!transport.isPlaying) return;
@@ -104,11 +67,6 @@ const Index = () => {
     const interval = setInterval(() => {
       const time = transport.currentTime;
       setCurrentTime(time);
-      
-      // Update prediction engine with current bar
-      const barDuration = (60 / bpm) * 4; // 4 beats per bar
-      const currentBar = Math.floor(time / barDuration);
-      predictionEngine.updatePosition(currentBar, bpm);
     }, 50);
     
     return () => clearInterval(interval);
@@ -259,32 +217,15 @@ const Index = () => {
 
   const handleVolumeChange = (id: string, volume: number) => {
     audioEngine.setTrackVolume(id, volume);
-      // Sync to mixer store
-      const channel = channels.get(id);
-      if (channel) {
-        useMixerStore.getState().updateChannel(id, { volume });
-      }
-      
-      // Send to Prime Brain
-      primeBrain.processControlEvent({
-        type: 'fader',
-        controlId: `volume_${id}`,
-        value: volume,
-        previousValue: channel?.volume,
-        timestamp: Date.now()
-      });
+    // Sync to mixer store
+    const channel = channels.get(id);
+    if (channel) {
+      useMixerStore.getState().updateChannel(id, { volume });
+    }
   };
   
   const handlePanChange = (id: string, pan: number) => {
     audioEngine.setTrackPan(id, pan);
-      
-      // Send to Prime Brain
-      primeBrain.processControlEvent({
-        type: 'knob',
-        controlId: `pan_${id}`,
-        value: pan,
-        timestamp: Date.now()
-      });
   };
   
   const handleSoloToggle = (id: string) => {
@@ -510,7 +451,6 @@ const Index = () => {
     onPause: pause,
     onStop: stop,
     onExport: handleExport,
-    onAIAssistant: () => setShowAIAssistant(prev => !prev),
     onDuplicate: () => {
       const { selectedRegions } = useTimelineStore.getState();
       if (selectedRegions.size > 0) {
@@ -548,9 +488,8 @@ const Index = () => {
         onChange={handleFileSelect}
       />
       
-      {/* Mixx Ambient Lighting Overlays */}
+      {/* Mixx Ambient Lighting Overlay */}
       <MixxAmbientOverlay />
-      <BeastModeAmbient />
       
       {/* Animated background */}
       <div className="fixed inset-0 gradient-animate opacity-10 pointer-events-none" />
@@ -570,7 +509,6 @@ const Index = () => {
           onSave={() => toast({ title: "Save", description: "Project saved locally" })}
           onLoad={() => toast({ title: "Load", description: "Not yet implemented" })}
           onImport={handleImport}
-          onAIMix={() => setShowAIAssistant(true)}
           onStemSeparation={() => toast({ 
             title: "Stem Separation", 
             description: "Feature ready - upload audio to begin separation" 
@@ -606,15 +544,6 @@ const Index = () => {
               className="gap-2 neon-glow-prime"
             >
               🎛️ Plugin Suite
-            </Button>
-            <Button
-              variant="outline"
-              size="sm"
-              onClick={() => setShowAIAssistant(!showAIAssistant)}
-              className="gap-2"
-            >
-              <Bot className="w-4 h-4" />
-              AI Assistant
             </Button>
             {(detectedBPM || detectedKey) && (
               <div className="flex items-center gap-3 text-xs text-muted-foreground">
@@ -653,53 +582,21 @@ const Index = () => {
               )}
               
               {currentView === 'mix' && (
-                <NextGenMixerView
-                  onExport={handleExport}
-                  isExporting={isExporting}
-                  onVolumeChange={handleVolumeChange}
-                  onPanChange={handlePanChange}
-                  onMuteToggle={handleMuteToggle}
-                  onSoloToggle={handleSoloToggle}
-                  onLoadPlugin={handleLoadPlugin}
-                  onUnloadPlugin={handleUnloadPlugin}
-                  onBypassPlugin={handleBypassPlugin}
-                  onSendChange={handleSendChange}
-                  onCreateBus={handleCreateBus}
-                  onOpenPluginWindow={handleOpenPluginWindow}
-                  onOpenPluginBrowser={handleOpenPluginBrowser}
-                />
-              )}
-              
-              {currentView === 'edit' && (
-                <WaveformEditor />
-              )}
-            </div>
-            
-            {/* Right side panels */}
-            <div className="flex flex-col gap-2">
-              {/* Beast Mode Panel */}
-              <BeastModePanel />
-              
-              {/* AI Suggestions Panel - shows only in mix view */}
-              {currentView === 'mix' && <AISuggestionsPanel />}
-              
-              {/* AI Assistant Panel */}
-              {showAIAssistant && (
-                <div className="w-96">
-                  <AIAssistantPanel 
-                    isOpen={showAIAssistant}
-                    onClose={() => setShowAIAssistant(false)} 
-                  />
+                <div className="flex-1 flex items-center justify-center">
+                  <div className="text-center space-y-4">
+                    <h2 className="text-2xl font-semibold text-muted-foreground">Mix View</h2>
+                    <p className="text-sm text-muted-foreground">Clean workspace ready for mixer build</p>
+                  </div>
                 </div>
               )}
               
-              {/* Metering dashboard - only in mix view */}
-              {currentView === 'mix' && (
-                <MeteringDashboard
-                  masterPeakLevel={masterPeakLevel}
-                  analyserNode={audioEngine.getMasterAnalyser()}
-                  engineRef={{ current: audioEngine }}
-                />
+              {currentView === 'edit' && (
+                <div className="flex-1 flex items-center justify-center">
+                  <div className="text-center space-y-4">
+                    <h2 className="text-2xl font-semibold text-muted-foreground">Edit View</h2>
+                    <p className="text-sm text-muted-foreground">Clean workspace ready for editor build</p>
+                  </div>
+                </div>
               )}
             </div>
           </div>
@@ -729,14 +626,6 @@ const Index = () => {
               masterVolume={masterVolume}
               onMasterVolumeChange={(volume) => {
                 setMasterVolume(volume);
-                
-                // Send to Prime Brain
-                primeBrain.processControlEvent({
-                  type: 'fader',
-                  controlId: 'master_volume',
-                  value: volume,
-                  timestamp: Date.now()
-                });
               }}
             />
           </div>
@@ -778,26 +667,12 @@ const Index = () => {
         }}
       />
       
-      {/* AI Assistant Panel */}
-      <AIAssistantPanel
-        isOpen={showAIAssistant}
-        onClose={() => setShowAIAssistant(false)}
-      />
-      
       {/* Plugin Window Manager */}
       <PluginWindowManager
         openWindows={openPluginWindows}
         onCloseWindow={handleClosePluginWindow}
         onParameterChange={handlePluginParameterChange}
       />
-      
-      {/* AI Assistant Toggle FAB */}
-      <button
-        onClick={() => setShowAIAssistant(!showAIAssistant)}
-        className="fixed right-4 bottom-24 w-14 h-14 rounded-full bg-primary text-primary-foreground shadow-lg hover:shadow-xl transition-all hover:scale-110 flex items-center justify-center z-40 neon-glow-prime"
-      >
-        <Bot className="w-6 h-6" />
-      </button>
     </div>
   );
 };
