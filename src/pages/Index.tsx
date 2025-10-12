@@ -1,5 +1,4 @@
 import { useState, useEffect, useRef } from "react";
-import { AudioEngine } from "@/audio/AudioEngine";
 import {
   TopMenuBar,
   ViewContainer,
@@ -19,11 +18,7 @@ import { useTimelineStore } from "@/store/timelineStore";
 import { useTracksStore } from "@/store/tracksStore";
 import { useMixerStore } from "@/store/mixerStore";
 import { Bot, Upload } from "lucide-react";
-import { Track } from "@/audio/Track";
-import { Bus } from "@/audio/Bus";
-import { EQParams, CompressorParams, PeakLevel } from "@/types/audio";
 import { TimelineTrack, Region } from "@/types/timeline";
-import type { MusicalContext } from "@/types/mixxtune";
 import { Button } from "@/components/ui/button";
 import { useToast } from "@/hooks/use-toast";
 import { AudioAnalyzer } from "@/audio/analysis/AudioAnalyzer";
@@ -35,9 +30,9 @@ import { beastModeEngine } from "@/services/BeastModeEngine";
 import { useBeastModeStore } from "@/store/beastModeStore";
 import { BeastModePanel } from "@/studio/components/AI/BeastModePanel";
 import { AISuggestionsPanel } from "@/studio/components/AI/AISuggestionsPanel";
+import { useProject, useTransport, useAudioEngine } from "@/contexts/ProjectContext";
 
 const Index = () => {
-  const engineRef = useRef<AudioEngine | null>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
   const [audioBuffers, setAudioBuffers] = useState<Map<string, AudioBuffer>>(new Map());
   const [isExporting, setIsExporting] = useState(false);
@@ -54,9 +49,14 @@ const Index = () => {
   const [detectedKey, setDetectedKey] = useState<string | null>(null);
   const { toast } = useToast();
   
+  // Project context - centralized audio engine and transport
+  const { bpm, setBpm, masterVolume, setMasterVolume } = useProject();
+  const audioEngine = useAudioEngine();
+  const { transport, play, pause, stop, seek: seekTransport, toggleLoop, prevBar, nextBar, getBarPosition } = useTransport();
+  
   // Global stores
   const { currentView, isPanelOpen, togglePanel } = useViewStore();
-  const { currentTime, isPlaying, setCurrentTime, setIsPlaying, setDuration } = useTimelineStore();
+  const { setCurrentTime, setDuration } = useTimelineStore();
   const { tracks, regions, addTrack, addRegion } = useTracksStore();
 
   // Track view changes for Prime Brain
@@ -69,6 +69,19 @@ const Index = () => {
     });
   }, [currentView]);
   
+  // Mixer store
+  const mixerStore = useMixerStore();
+  const { 
+    channels, 
+    masterPeakLevel,
+    buses,
+    addChannel,
+    updatePeakLevel,
+    addBus,
+    updateBus
+  } = mixerStore;
+  const setMixerMasterPeak = mixerStore.setMasterPeakLevel;
+
   // Beast Mode integration
   const { isActive: beastModeActive } = useBeastModeStore();
   
@@ -83,63 +96,42 @@ const Index = () => {
       beastModeEngine.stop();
     };
   }, [beastModeActive]);
-  const { 
-    channels, 
-    masterPeakLevel,
-    buses,
-    addChannel,
-    updatePeakLevel,
-    setMasterPeakLevel,
-    addBus,
-    updateBus
-  } = useMixerStore();
 
-  // Initialize audio engine
+  // Update playback time from transport
   useEffect(() => {
-    const engine = new AudioEngine();
-    engineRef.current = engine;
-    
-    return () => {
-      if (engineRef.current) {
-        engineRef.current.stop();
-      }
-    };
-  }, []);
-
-  // Update playback time
-  useEffect(() => {
-    if (!isPlaying || !engineRef.current) return;
+    if (!transport.isPlaying) return;
     
     const interval = setInterval(() => {
-      const time = engineRef.current?.getCurrentTime() || 0;
+      const time = transport.currentTime;
       setCurrentTime(time);
       
       // Update prediction engine with current bar
-      const bpm = engineRef.current?.bpm || 120;
       const barDuration = (60 / bpm) * 4; // 4 beats per bar
       const currentBar = Math.floor(time / barDuration);
       predictionEngine.updatePosition(currentBar, bpm);
     }, 50);
     
     return () => clearInterval(interval);
-  }, [isPlaying, setCurrentTime]);
+  }, [transport.isPlaying, transport.currentTime, setCurrentTime, bpm]);
 
   // Update peak meters at 30Hz (33ms) for smooth animation
   useEffect(() => {
     const interval = setInterval(() => {
-      if (engineRef.current) {
-        const master = engineRef.current.getMasterPeakLevel();
-        setMasterPeakLevel(master);
-        
-        channels.forEach((_, id) => {
-          const level = engineRef.current!.getTrackPeakLevel(id);
-          updatePeakLevel(id, level);
-        });
-      }
+      const master = audioEngine.getMasterPeakLevel();
+      setMixerMasterPeak(master);
+      
+      channels.forEach((_, id) => {
+        const level = audioEngine.getTrackPeakLevel(id);
+        updatePeakLevel(id, level);
+      });
     }, 33); // 30Hz update rate
     
     return () => clearInterval(interval);
-  }, [channels, setMasterPeakLevel, updatePeakLevel]);
+  }, [channels, setMixerMasterPeak, updatePeakLevel, audioEngine]);
+
+  const handleImport = () => {
+    fileInputRef.current?.click();
+  };
 
   const handleImport = () => {
     fileInputRef.current?.click();
@@ -160,13 +152,13 @@ const Index = () => {
   };
 
   const handleLoadTrack = async (file: File) => {
-    if (!engineRef.current) return;
+    if (!audioEngine) return;
     
     try {
       const id = `track-${Date.now()}`;
-      await engineRef.current.loadTrack(id, file.name, file);
+      await audioEngine.loadTrack(id, file.name, file);
       
-      const audioTracks = engineRef.current.getTracks();
+      const audioTracks = audioEngine.getTracks();
       const loadedTrack = audioTracks.find(t => t.id === id);
       
       if (loadedTrack && loadedTrack.buffer) {
@@ -218,10 +210,8 @@ const Index = () => {
             setDetectedBPM(bpm);
             setDetectedKey(`${key} ${scale}`);
             
-            if (engineRef.current) {
-              engineRef.current.bpm = bpm;
-              engineRef.current.timeSignature = timeSignature;
-            }
+            setBpm(bpm);
+            audioEngine.timeSignature = timeSignature;
             
             toast({
               title: "Audio Analysis Complete",
@@ -245,10 +235,10 @@ const Index = () => {
         });
         
         // Sync initial volume to audio engine
-        engineRef.current.setTrackVolume(id, 0.75);
+        audioEngine.setTrackVolume(id, 0.75);
         
         // Update duration
-        const totalDuration = Math.max(region.startTime + region.duration, currentTime);
+        const totalDuration = Math.max(region.startTime + region.duration, transport.currentTime);
         setDuration(totalDuration);
         
         toast({
@@ -267,15 +257,12 @@ const Index = () => {
   };
 
   const handleRemoveTrack = (id: string) => {
-    if (engineRef.current) {
-      engineRef.current.removeTrack(id);
-      // Stores will handle removal through their own methods
-    }
+    audioEngine.removeTrack(id);
+    // Stores will handle removal through their own methods
   };
 
   const handleVolumeChange = (id: string, volume: number) => {
-    if (engineRef.current) {
-      engineRef.current.setTrackVolume(id, volume);
+    audioEngine.setTrackVolume(id, volume);
       // Sync to mixer store
       const channel = channels.get(id);
       if (channel) {
@@ -290,12 +277,10 @@ const Index = () => {
         previousValue: channel?.volume,
         timestamp: Date.now()
       });
-    }
   };
   
   const handlePanChange = (id: string, pan: number) => {
-    if (engineRef.current) {
-      engineRef.current.setTrackPan(id, pan);
+    audioEngine.setTrackPan(id, pan);
       
       // Send to Prime Brain
       primeBrain.processControlEvent({
@@ -304,23 +289,19 @@ const Index = () => {
         value: pan,
         timestamp: Date.now()
       });
-    }
   };
   
   const handleSoloToggle = (id: string) => {
-    if (engineRef.current) {
-      const channel = channels.get(id);
-      if (channel) {
-        engineRef.current.setTrackSolo(id, !channel.solo);
-        useMixerStore.getState().updateChannel(id, { solo: !channel.solo });
-      }
+    const channel = channels.get(id);
+    if (channel) {
+      audioEngine.setTrackSolo(id, !channel.solo);
+      useMixerStore.getState().updateChannel(id, { solo: !channel.solo });
     }
   };
   
   // Plugin management
   const handleLoadPlugin = (trackId: string, slotNumber: number, pluginId: string) => {
-    if (engineRef.current) {
-      const instanceId = engineRef.current.loadPluginToTrack(trackId, pluginId, slotNumber);
+    const instanceId = audioEngine.loadPluginToTrack(trackId, pluginId, slotNumber);
       
       if (instanceId) {
         // Update tracks store with plugin info
@@ -345,13 +326,11 @@ const Index = () => {
           title: "Plugin Loaded",
           description: `${pluginId} loaded to slot ${slotNumber}`,
         });
-      }
     }
   };
   
   const handleUnloadPlugin = (trackId: string, slotNumber: number) => {
-    if (engineRef.current) {
-      engineRef.current.unloadPluginFromTrack(trackId, slotNumber);
+    audioEngine.unloadPluginFromTrack(trackId, slotNumber);
       
       // Update tracks store
       const { tracks: tracksArray, updateTrack } = useTracksStore.getState();
@@ -379,28 +358,25 @@ const Index = () => {
   };
   
   const handleBypassPlugin = (trackId: string, slotNumber: number, bypass: boolean) => {
-    if (engineRef.current) {
-      engineRef.current.bypassPluginOnTrack(trackId, slotNumber, bypass);
-      
-      // Update tracks store
-      const { tracks: tracksArray, updateTrack } = useTracksStore.getState();
-      const track = tracksArray.find(t => t.id === trackId);
-      
-      if (track && track.inserts) {
-        const updatedInserts = [...track.inserts];
-        const insertIndex = updatedInserts.findIndex(i => i.slotNumber === slotNumber);
-        if (insertIndex !== -1) {
-          updatedInserts[insertIndex].bypass = bypass;
-          updateTrack(trackId, { inserts: updatedInserts });
-        }
+    audioEngine.bypassPluginOnTrack(trackId, slotNumber, bypass);
+    
+    // Update tracks store
+    const { tracks: tracksArray, updateTrack } = useTracksStore.getState();
+    const track = tracksArray.find(t => t.id === trackId);
+    
+    if (track && track.inserts) {
+      const updatedInserts = [...track.inserts];
+      const insertIndex = updatedInserts.findIndex(i => i.slotNumber === slotNumber);
+      if (insertIndex !== -1) {
+        updatedInserts[insertIndex].bypass = bypass;
+        updateTrack(trackId, { inserts: updatedInserts });
       }
     }
   };
   
   // Send management
   const handleSendChange = (trackId: string, busId: string, amount: number) => {
-    if (engineRef.current) {
-      const track = engineRef.current.getTracks().find(t => t.id === trackId);
+    const track = audioEngine.getTracks().find(t => t.id === trackId);
       if (track) {
         track.channelStrip.setSendAmount(busId, amount);
         
@@ -411,7 +387,6 @@ const Index = () => {
           sends.set(busId, amount);
           useMixerStore.getState().updateChannel(trackId, { sends });
         }
-      }
     }
   };
   
@@ -419,7 +394,7 @@ const Index = () => {
     // Use selectedTrackForPlugin if set (from mixer), otherwise use selectedTrackId (from timeline)
     const targetTrack = selectedTrackForPlugin || selectedTrackId;
     
-    if (targetTrack && engineRef.current) {
+    if (targetTrack) {
       handleLoadPlugin(targetTrack, selectedSlotForPlugin, pluginId);
       toast({
         title: "Plugin Loaded",
@@ -460,25 +435,22 @@ const Index = () => {
   };
   
   const handlePluginParameterChange = (trackId: string, slotNumber: number, paramName: string, value: number) => {
-    if (engineRef.current) {
-      const pluginInstance = engineRef.current.getPluginInstance(trackId, slotNumber);
-      if (pluginInstance && 'setParams' in pluginInstance) {
-        // Call setParams if the plugin has this method
-        (pluginInstance as any).setParams({ [paramName]: value });
-      }
+    const pluginInstance = audioEngine.getPluginInstance(trackId, slotNumber);
+    if (pluginInstance && 'setParams' in pluginInstance) {
+      // Call setParams if the plugin has this method
+      (pluginInstance as any).setParams({ [paramName]: value });
     }
   };
   
   // Bus management  
   const handleCreateBus = (name: string, color: string, type: 'aux' | 'group') => {
-    if (engineRef.current) {
-      const busId = `bus-${Date.now()}`;
-      
-      if (type === 'aux') {
-        engineRef.current.createAuxBus(busId, name);
-      } else {
-        engineRef.current.createGroupBus(busId, name);
-      }
+    const busId = `bus-${Date.now()}`;
+    
+    if (type === 'aux') {
+      audioEngine.createAuxBus(busId, name);
+    } else {
+      audioEngine.createGroupBus(busId, name);
+    }
       
       addBus({
         id: busId,
@@ -493,7 +465,6 @@ const Index = () => {
         title: "Bus Created",
         description: `${type === 'aux' ? 'Aux' : 'Group'} bus "${name}" created`,
       });
-    }
   };
   
   // Loop & recording
@@ -503,93 +474,28 @@ const Index = () => {
       description: "Recording functionality coming soon",
     });
   };
-  
-  const handleLoopToggle = () => {
-    const { loopEnabled, setLoopEnabled } = useTimelineStore.getState();
-    setLoopEnabled(!loopEnabled);
-  };
-  
-  const handlePrevBar = () => {
-    if (engineRef.current) {
-      const bpm = 120;
-      const barDuration = (60 / bpm) * 4;
-      const currentBar = Math.floor(currentTime / barDuration);
-      const newTime = Math.max(0, currentBar * barDuration);
-      handleSeek(newTime);
-    }
-  };
-  
-  const handleNextBar = () => {
-    if (engineRef.current) {
-      const bpm = 120;
-      const barDuration = (60 / bpm) * 4;
-      const currentBar = Math.floor(currentTime / barDuration);
-      const newTime = (currentBar + 1) * barDuration;
-      handleSeek(newTime);
-    }
-  };
 
   const handleMuteToggle = (id: string) => {
-    if (engineRef.current) {
-      const channel = channels.get(id);
-      if (channel) {
-        const newMuted = !channel.muted;
-        engineRef.current.setTrackMute(id, newMuted);
-        // Sync to stores
-        useMixerStore.getState().updateChannel(id, { muted: newMuted });
-        useTracksStore.getState().updateTrack(id, { muted: newMuted });
-      }
+    const channel = channels.get(id);
+    if (channel) {
+      const newMuted = !channel.muted;
+      audioEngine.setTrackMute(id, newMuted);
+      // Sync to stores
+      useMixerStore.getState().updateChannel(id, { muted: newMuted });
+      useTracksStore.getState().updateTrack(id, { muted: newMuted });
     }
   };
 
-  const handlePlay = () => {
-    if (engineRef.current) {
-      // Resume from current timeline position
-      engineRef.current.play(currentTime);
-      setIsPlaying(true);
-    }
-  };
-  
-  const handlePause = () => {
-    if (engineRef.current) {
-      engineRef.current.pause();
-      setIsPlaying(false);
-    }
-  };
-  
-  const handleStop = () => {
-    if (engineRef.current) {
-      engineRef.current.stop();
-      setIsPlaying(false);
-      setCurrentTime(0);
-    }
-  };
-  
   const handleSeek = (time: number) => {
-    if (engineRef.current) {
-      const wasPlaying = isPlaying;
-      engineRef.current.stop();
-      setCurrentTime(time);
-      
-      // If we were playing, resume playback from new position
-      if (wasPlaying) {
-        setTimeout(() => {
-          if (engineRef.current) {
-            engineRef.current.play(time);
-            setIsPlaying(true);
-          }
-        }, 10);
-      }
-    }
+    seekTransport(time);
   };
 
   const handleExport = async () => {
-    if (!engineRef.current) return;
     
     setIsExporting(true);
     
     try {
-      const blob = await engineRef.current.exportMix();
+      const blob = await audioEngine.exportMix();
       const url = URL.createObjectURL(blob);
       const a = document.createElement('a');
       a.href = url;
@@ -605,9 +511,9 @@ const Index = () => {
 
   // Keyboard shortcuts
   useKeyboardShortcuts({
-    onPlay: handlePlay,
-    onPause: handlePause,
-    onStop: handleStop,
+    onPlay: play,
+    onPause: pause,
+    onStop: stop,
     onExport: handleExport,
     onAIAssistant: () => setShowAIAssistant(prev => !prev),
     onDuplicate: () => {
@@ -630,9 +536,9 @@ const Index = () => {
         });
       }
     },
-    onLoop: handleLoopToggle,
-    onPrevBar: handlePrevBar,
-    onNextBar: handleNextBar,
+    onLoop: toggleLoop,
+    onPrevBar: prevBar,
+    onNextBar: nextBar,
   });
 
   return (
@@ -796,8 +702,8 @@ const Index = () => {
               {currentView === 'mix' && (
                 <MeteringDashboard
                   masterPeakLevel={masterPeakLevel}
-                  analyserNode={engineRef.current?.getMasterAnalyser()}
-                  engineRef={engineRef}
+                  analyserNode={audioEngine.getMasterAnalyser()}
+                  engineRef={{ current: audioEngine }}
                 />
               )}
             </div>
@@ -808,36 +714,34 @@ const Index = () => {
         {!transportCollapsed && (
           <div className={`${transportFloating ? "fixed bottom-4 right-4 z-50" : ""} ${transportCovered ? "opacity-30 hover:opacity-100 transition-opacity" : ""}`}>
             <TransportControls
-              isPlaying={isPlaying}
-              onPlay={handlePlay}
-              onPause={handlePause}
-              onStop={handleStop}
+              isPlaying={transport.isPlaying}
+              onPlay={play}
+              onPause={pause}
+              onStop={stop}
               onExport={handleExport}
               isExporting={isExporting}
-              bpm={120}
+              bpm={bpm}
               timeSignature={{ numerator: 4, denominator: 4 }}
-              onBpmChange={() => {}}
+              onBpmChange={setBpm}
               onTimeSignatureChange={() => {}}
-              isRecording={false}
-              isLooping={useTimelineStore.getState().loopEnabled}
+              isRecording={transport.isRecording}
+              isLooping={transport.loopEnabled}
               onRecord={handleRecord}
-              onLoopToggle={handleLoopToggle}
-              onPrevBar={handlePrevBar}
-              onNextBar={handleNextBar}
-              currentTime={currentTime}
-              masterVolume={engineRef.current?.getMasterGain() || 0.75}
+              onLoopToggle={toggleLoop}
+              onPrevBar={prevBar}
+              onNextBar={nextBar}
+              currentTime={transport.currentTime}
+              masterVolume={masterVolume}
               onMasterVolumeChange={(volume) => {
-                if (engineRef.current) {
-                  engineRef.current.setMasterGain(volume);
-                  
-                  // Send to Prime Brain
-                  primeBrain.processControlEvent({
-                    type: 'fader',
-                    controlId: 'master_volume',
-                    value: volume,
-                    timestamp: Date.now()
-                  });
-                }
+                setMasterVolume(volume);
+                
+                // Send to Prime Brain
+                primeBrain.processControlEvent({
+                  type: 'fader',
+                  controlId: 'master_volume',
+                  value: volume,
+                  timestamp: Date.now()
+                });
               }}
             />
           </div>
