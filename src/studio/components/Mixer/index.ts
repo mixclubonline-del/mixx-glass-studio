@@ -16,3 +16,6 @@ export { InsertRack } from './InsertRack';
 export { SendKnobSimple } from './SendKnobSimple';
 export { BusManager } from './BusManager';
 export { MixerSidePanels } from './MixerSidePanels';
+export { ProfessionalMixerView } from './ProfessionalMixerView';
+export { ProfessionalChannelStrip } from './ProfessionalChannelStrip';
+export { ProfessionalMasterChannel } from './ProfessionalMasterChannel';

@@ -16,6 +16,7 @@ export * from './Timeline/CursorTools';
 
 // Mixer
 export { NextGenMixerView } from './Mixer/NextGenMixerView';
+export { ProfessionalMixerView } from './Mixer/ProfessionalMixerView';
 export { GlassChannelStrip } from './Mixer/GlassChannelStrip';
 export { MasterChannelStrip } from './Mixer/MasterChannelStrip';
 export { PeakMeter } from './Mixer/PeakMeter';

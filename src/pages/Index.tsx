@@ -5,6 +5,7 @@ import {
   AdvancedTimelineView,
   ViewSwitcher,
   TransportControls,
+  ProfessionalMixerView,
 } from "@/studio/components";
 import { PluginBrowser } from "@/studio/components/Plugins/PluginBrowser";
 import { PluginWindowManager } from "@/studio/components/Plugins/PluginWindowManager";
@@ -582,12 +583,21 @@ const Index = () => {
               )}
               
               {currentView === 'mix' && (
-                <div className="flex-1 flex items-center justify-center">
-                  <div className="text-center space-y-4">
-                    <h2 className="text-2xl font-semibold text-muted-foreground">Mix View</h2>
-                    <p className="text-sm text-muted-foreground">Clean workspace ready for mixer build</p>
-                  </div>
-                </div>
+                <ProfessionalMixerView
+                  onVolumeChange={handleVolumeChange}
+                  onPanChange={handlePanChange}
+                  onMuteToggle={handleMuteToggle}
+                  onSoloToggle={handleSoloToggle}
+                  onExport={handleExport}
+                  isExporting={isExporting}
+                  onLoadPlugin={handleLoadPlugin}
+                  onUnloadPlugin={handleUnloadPlugin}
+                  onBypassPlugin={handleBypassPlugin}
+                  onSendChange={handleSendChange}
+                  onCreateBus={handleCreateBus}
+                  onOpenPluginWindow={handleOpenPluginWindow}
+                  onOpenPluginBrowser={handleOpenPluginBrowser}
+                />
               )}
               
               {currentView === 'edit' && (
