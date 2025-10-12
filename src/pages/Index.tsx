@@ -133,10 +133,6 @@ const Index = () => {
     fileInputRef.current?.click();
   };
 
-  const handleImport = () => {
-    fileInputRef.current?.click();
-  };
-
   const handleFileSelect = (e: React.ChangeEvent<HTMLInputElement>) => {
     const files = e.target.files;
     if (files) {
@@ -354,7 +350,6 @@ const Index = () => {
         title: "Plugin Removed",
         description: `Removed plugin from slot ${slotNumber}`,
       });
-    }
   };
   
   const handleBypassPlugin = (trackId: string, slotNumber: number, bypass: boolean) => {
