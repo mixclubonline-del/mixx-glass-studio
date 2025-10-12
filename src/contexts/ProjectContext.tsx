@@ -5,6 +5,7 @@
 
 import React, { createContext, useContext, useState, useCallback, useRef, useEffect } from 'react';
 import { AudioEngine } from '@/audio/AudioEngine';
+import { StudioEngine, createStudioEngine } from '@/studio/core';
 
 interface TransportState {
   isPlaying: boolean;
@@ -18,6 +19,7 @@ interface TransportState {
 interface ProjectContextValue {
   // Audio Engine
   audioEngine: AudioEngine;
+  studioEngine: StudioEngine;
   
   // Project Settings
   bpm: number;
@@ -54,6 +56,10 @@ export const ProjectProvider: React.FC<{ children: React.ReactNode }> = ({ child
   const audioEngineRef = useRef<AudioEngine>(new AudioEngine());
   const audioEngine = audioEngineRef.current;
   
+  // Studio Engine wraps AudioEngine with enhanced features
+  const studioEngineRef = useRef<StudioEngine>(createStudioEngine(audioEngine));
+  const studioEngine = studioEngineRef.current;
+  
   // Project Settings
   const [bpm, setBpmState] = useState(120);
   const [key, setKey] = useState('C Major');
@@ -73,40 +79,39 @@ export const ProjectProvider: React.FC<{ children: React.ReactNode }> = ({ child
   // Update audio engine when BPM changes
   const setBpm = useCallback((newBpm: number) => {
     setBpmState(newBpm);
-    audioEngine.bpm = newBpm;
-  }, [audioEngine]);
+    studioEngine.setBPM(newBpm);
+  }, [studioEngine]);
   
-  // Transport controls
+  // Transport controls - Use StudioEngine for enhanced logging and events
   const play = useCallback((fromTime?: number) => {
-    audioEngine.play(fromTime);
+    studioEngine.play(fromTime);
     setTransport(prev => ({ ...prev, isPlaying: true }));
-  }, [audioEngine]);
+  }, [studioEngine]);
   
   const pause = useCallback(() => {
-    audioEngine.pause();
+    studioEngine.pause();
     setTransport(prev => ({ ...prev, isPlaying: false }));
-  }, [audioEngine]);
+  }, [studioEngine]);
   
   const stop = useCallback(() => {
-    audioEngine.stop();
+    studioEngine.stop();
     setTransport(prev => ({ ...prev, isPlaying: false, currentTime: 0 }));
-  }, [audioEngine]);
+  }, [studioEngine]);
   
   const seek = useCallback((time: number) => {
-    audioEngine.seek(time);
+    studioEngine.seek(time);
     setTransport(prev => ({ ...prev, currentTime: time }));
-  }, [audioEngine]);
+  }, [studioEngine]);
   
   const toggleLoop = useCallback(() => {
-    audioEngine.loopEnabled = !audioEngine.loopEnabled;
+    studioEngine.toggleLoop();
     setTransport(prev => ({ ...prev, loopEnabled: audioEngine.loopEnabled }));
-  }, [audioEngine]);
+  }, [studioEngine, audioEngine]);
   
   const setLoopRange = useCallback((start: number, end: number) => {
-    audioEngine.loopStart = start;
-    audioEngine.loopEnd = end;
+    studioEngine.setLoopRange(start, end);
     setTransport(prev => ({ ...prev, loopStart: start, loopEnd: end }));
-  }, [audioEngine]);
+  }, [studioEngine]);
   
   const toggleRecord = useCallback(() => {
     setTransport(prev => ({ ...prev, isRecording: !prev.isRecording }));
@@ -133,17 +138,20 @@ export const ProjectProvider: React.FC<{ children: React.ReactNode }> = ({ child
     audioEngine.setMasterGain(volume);
   }, [audioEngine]);
   
-  // Update current time during playback
+  // Update current time during playback using StudioEngine events
   useEffect(() => {
-    if (!transport.isPlaying) return;
-    
-    const intervalId = setInterval(() => {
-      const currentTime = audioEngine.getCurrentTime();
+    const handleTimeUpdate = () => {
+      const currentTime = studioEngine.getCurrentTime();
       setTransport(prev => ({ ...prev, currentTime }));
-    }, 50); // Update every 50ms
+    };
     
-    return () => clearInterval(intervalId);
-  }, [transport.isPlaying, audioEngine]);
+    // Listen to StudioEngine time updates for smooth 60fps synchronization
+    studioEngine.addEventListener('timeUpdate', handleTimeUpdate);
+    
+    return () => {
+      studioEngine.removeEventListener('timeUpdate', handleTimeUpdate);
+    };
+  }, [studioEngine]);
   
   // Initialize audio engine settings
   useEffect(() => {
@@ -154,6 +162,7 @@ export const ProjectProvider: React.FC<{ children: React.ReactNode }> = ({ child
   
   const value: ProjectContextValue = {
     audioEngine,
+    studioEngine,
     bpm,
     setBpm,
     key,
@@ -207,4 +216,10 @@ export const useAudioEngine = () => {
   const context = useContext(ProjectContext);
   if (!context) throw new Error('useAudioEngine must be used within ProjectProvider');
   return context.audioEngine;
+};
+
+export const useStudioEngine = () => {
+  const context = useContext(ProjectContext);
+  if (!context) throw new Error('useStudioEngine must be used within ProjectProvider');
+  return context.studioEngine;
 };
