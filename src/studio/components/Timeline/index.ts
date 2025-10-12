@@ -25,5 +25,8 @@ export { FileBrowser } from './FileBrowser';
 export { PluginBrowserPanel } from './PluginBrowserPanel';
 export { InspectorPanel } from './InspectorPanel';
 export { TrackControlsPanel } from './TrackControlsPanel';
+export { EnhancedTimelineView } from './EnhancedTimelineView';
+export { CanvasTimelineRenderer } from './CanvasTimelineRenderer';
+export { TransportEngine } from './TransportEngine';
 export * from './CursorTools';
 export * from './MultiRegionOperations';

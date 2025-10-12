@@ -2,10 +2,10 @@ import { useState, useEffect, useRef } from "react";
 import {
   EnhancedTopMenuBar,
   ViewContainer,
-  AdvancedTimelineView,
   ViewSwitcher,
   TransportControls,
   ProfessionalMixerView,
+  EnhancedTimelineView,
 } from "@/studio/components";
 import { ProfessionalBrowserPanel } from "@/studio/components/Browser";
 import { StartPageDialog } from "@/studio/components/Dialogs";
@@ -567,24 +567,9 @@ const Index = () => {
             {/* Main view */}
             <div className="flex-1 flex flex-col">
               {currentView === 'arrange' && (
-                <AdvancedTimelineView
-                  audioBuffers={audioBuffers}
-                  onSeek={handleSeek}
-                  onFileSelect={(file) => {
-                    handleFileSelect({ target: { files: [file] } } as any);
-                  }}
-                  onPluginSelect={(pluginId) => {
-                    if (selectedTrackId) {
-                      handlePluginSelect(pluginId);
-                    } else {
-                      toast({
-                        title: "No Track Selected",
-                        description: "Click a track in the timeline to select it",
-                      });
-                    }
-                  }}
-                  selectedTrackId={selectedTrackId}
-                  onTrackSelect={setSelectedTrackId}
+                <EnhancedTimelineView 
+                  bpm={bpm} 
+                  onBPMChange={setBpm}
                 />
               )}
               

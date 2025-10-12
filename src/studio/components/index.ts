@@ -4,6 +4,7 @@
 
 // Timeline
 export { AdvancedTimelineView } from './Timeline/AdvancedTimelineView';
+export { EnhancedTimelineView } from './Timeline/EnhancedTimelineView';
 export { TimelineRuler } from './Timeline/TimelineRuler';
 export { Playhead } from './Timeline/Playhead';
 export { GridOverlay } from './Timeline/GridOverlay';

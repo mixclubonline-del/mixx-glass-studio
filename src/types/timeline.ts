@@ -14,10 +14,13 @@ export interface Region {
   // Audio data
   bufferOffset: number; // start position in source buffer
   bufferDuration: number; // length to play from buffer
+  audioBuffer?: AudioBuffer; // For playback and waveform rendering
   
   // Visual
   color: string;
   waveformData?: Float32Array; // cached waveform peaks
+  peaks?: Float32Array; // Peak data for visualization
+  bins?: number; // Number of bins in peak data
   
   // Editing
   fadeIn: number; // seconds
@@ -40,13 +43,17 @@ export interface Marker {
 export interface TimelineTrack {
   id: string;
   name: string;
+  type?: 'audio' | 'midi' | 'aux' | 'bus';
   color: string;
   height: number;
-  regions: Region[];
+  volume?: number;
+  pan?: number;
+  regions?: Region[];
   muted: boolean;
   solo: boolean;
   recordArmed: boolean;
   inserts?: import('@/audio/Track').PluginInsert[];
+  sends?: Array<{ busId: string; amount: number }>;
 }
 
 export type GridResolution = '1/4' | '1/8' | '1/16' | '1/32' | '1/64';
