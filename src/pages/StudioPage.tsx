@@ -1,7 +1,7 @@
 /**
  * Studio Page - Main DAW interface with view routing
  */
-import { useState } from "react";
+import { useState, useEffect, useRef } from "react";
 import { useViewStore } from "@/store/viewStore";
 import { ProjectProvider, useProject, useTransport } from "@/contexts/ProjectContext";
 import { useGlobalKeyboardShortcuts } from "@/hooks/useGlobalKeyboardShortcuts";
@@ -14,6 +14,9 @@ import { ViewSwitcher } from "../studio/components/Navigation/ViewSwitcher";
 import { ViewContainer } from "../studio/components/Navigation/ViewContainer";
 import { UnifiedTransportBar } from "../studio/components/Navigation/UnifiedTransportBar";
 import { CollapsibleMeteringPanel } from "../studio/components/Metering/CollapsibleMeteringPanel";
+import { AudioPlaybackCoordinator } from "@/audio/AudioPlaybackCoordinator";
+import { useAudioRecording } from "@/hooks/useAudioRecording";
+import { useTracksStore } from "@/store/tracksStore";
 
 // Inner component that uses ProjectContext
 function StudioPageContent() {
@@ -27,11 +30,57 @@ function StudioPageContent() {
   const [delayMix, setDelayMix] = useState(0.3);
   const [limiterThreshold, setLimiterThreshold] = useState(-1);
 
+  // Audio playback coordinator
+  const coordinatorRef = useRef<AudioPlaybackCoordinator | null>(null);
+  
+  // Recording hook
+  const recording = useAudioRecording();
+  const selectedTrackId = useTracksStore(state => state.selectedTrackId);
+
   // Enable global keyboard shortcuts
   useGlobalKeyboardShortcuts();
 
+  // Initialize audio coordinator
+  useEffect(() => {
+    if (!coordinatorRef.current) {
+      coordinatorRef.current = new AudioPlaybackCoordinator(audioEngine);
+      coordinatorRef.current.syncTracksToMixer();
+    }
+    
+    return () => {
+      coordinatorRef.current?.dispose();
+    };
+  }, [audioEngine]);
+
+  // Update coordinator during playback
+  useEffect(() => {
+    if (coordinatorRef.current) {
+      if (transport.isPlaying) {
+        coordinatorRef.current.play(transport.currentTime);
+      } else {
+        coordinatorRef.current.pause();
+      }
+      coordinatorRef.current.update(transport.currentTime);
+    }
+  }, [transport.isPlaying, transport.currentTime]);
+
+  // Sync tracks to mixer when tracks change
+  const tracks = useTracksStore(state => state.tracks);
+  useEffect(() => {
+    coordinatorRef.current?.syncTracksToMixer();
+  }, [tracks]);
+
   const handleSeek = (time: number) => {
     audioEngine.seek(time);
+    coordinatorRef.current?.seek(time);
+  };
+
+  const handleRecord = () => {
+    if (recording.isRecording) {
+      recording.stopRecording();
+    } else if (selectedTrackId) {
+      recording.startRecording(selectedTrackId, transport.currentTime);
+    }
   };
   
   const handleExport = async () => {
