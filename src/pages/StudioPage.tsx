@@ -120,15 +120,15 @@ function StudioPageContent() {
       </div>
 
       {/* View Content */}
-      <ViewContainer className="flex-1">
+      <ViewContainer className="flex-1 overflow-hidden">
         {currentView === 'ai-studio' ? (
           <MixxAIStudio />
         ) : currentView === 'producer-lab' ? (
           <ProducerLab />
         ) : (
-          <div style={{ padding: 12 }}>
-            {/* Top timeline/arranger */}
-            <div style={{ marginBottom: 12 }}>
+          <div className="h-full flex flex-col p-3 gap-3 overflow-hidden">
+            {/* Timeline - Takes up most of the space */}
+            <div className="flex-1 min-h-0 overflow-hidden">
               <Timeline 
                 currentTime={transport.currentTime}
                 duration={duration}
@@ -137,8 +137,8 @@ function StudioPageContent() {
               />
             </div>
 
-            {/* Main rack (your plugins live here) */}
-            <div style={{ marginBottom: 12 }}>
+            {/* Effects Rack - Compact bottom section */}
+            <div className="h-48 flex-shrink-0 overflow-auto">
               <EffectsRack 
                 reverbMix={reverbMix}
                 delayTime={delayTime}

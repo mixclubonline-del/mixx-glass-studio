@@ -92,9 +92,9 @@ export const useTimelineStore = create<TimelineState>((set) => ({
   snapMode: 'grid',
   rippleEdit: false,
   
-  scrollMode: 'continuous',
-  autoScrollEnabled: true,
-  centerPlayhead: true,
+  scrollMode: 'none',
+  autoScrollEnabled: false,
+  centerPlayhead: false,
   
   // Actions
   setCurrentTime: (time) => set({ currentTime: time }),
