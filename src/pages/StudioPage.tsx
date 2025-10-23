@@ -11,6 +11,7 @@ import { TransportControls } from "../studio/components/TransportControls";
 import { MixxAIStudio } from "../studio/components/AI/MixxAIStudio";
 import { ProducerLab } from "../studio/components/Producer/ProducerLab";
 import { ViewSwitcher } from "../studio/components/Navigation/ViewSwitcher";
+import { ArrangeWindow } from "../studio/components/Timeline/ArrangeWindow";
 import { ViewContainer } from "../studio/components/Navigation/ViewContainer";
 import { UnifiedTransportBar } from "../studio/components/Navigation/UnifiedTransportBar";
 import { CollapsibleMeteringPanel } from "../studio/components/Metering/CollapsibleMeteringPanel";
@@ -21,8 +22,8 @@ import { useTracksStore } from "@/store/tracksStore";
 // Inner component that uses ProjectContext
 function StudioPageContent() {
   const { currentView } = useViewStore();
-  const { audioEngine } = useProject();
-  const { transport } = useTransport();
+  const { audioEngine, bpm, setBpm, masterVolume, setMasterVolume } = useProject();
+  const { transport, play, pause, stop } = useTransport();
   const [duration, setDuration] = useState(180);
   const [reverbMix, setReverbMix] = useState(0.3);
   const [delayTime, setDelayTime] = useState(0.5);
@@ -126,29 +127,18 @@ function StudioPageContent() {
         ) : currentView === 'producer-lab' ? (
           <ProducerLab />
         ) : (
-          <div className="h-full flex flex-col p-3 gap-3 overflow-hidden">
-            {/* Timeline - Takes up most of the space */}
-            <div className="flex-1 min-h-0 overflow-hidden">
-              <Timeline 
-                currentTime={transport.currentTime}
-                duration={duration}
-                isPlaying={transport.isPlaying}
-                onSeek={handleSeek}
-              />
-            </div>
-
-            {/* Effects Rack - Compact bottom section */}
-            <div className="h-48 flex-shrink-0 overflow-auto">
-              <EffectsRack 
-                reverbMix={reverbMix}
-                delayTime={delayTime}
-                delayFeedback={delayFeedback}
-                delayMix={delayMix}
-                limiterThreshold={limiterThreshold}
-                onEffectChange={handleEffectChange}
-              />
-            </div>
-          </div>
+          <ArrangeWindow
+            bpm={bpm}
+            onBpmChange={setBpm}
+            isPlaying={transport.isPlaying}
+            onPlay={play}
+            onPause={pause}
+            onStop={stop}
+            onRecord={handleRecord}
+            currentTime={transport.currentTime}
+            masterVolume={masterVolume}
+            onMasterVolumeChange={setMasterVolume}
+          />
         )}
       </ViewContainer>
 
