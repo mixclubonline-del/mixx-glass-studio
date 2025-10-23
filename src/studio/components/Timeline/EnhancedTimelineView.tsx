@@ -196,7 +196,17 @@ export const EnhancedTimelineView: React.FC<EnhancedTimelineViewProps> = ({
     <div ref={containerRef} className="relative w-full h-full flex flex-col glass rounded-lg overflow-hidden">
       {/* Toolbar */}
       <div className="border-b border-border/50" style={{ height: toolbarHeight }}>
-        <CollapsibleTimelineToolbar />
+        <div className="h-full flex items-center justify-between px-3">
+          <CollapsibleTimelineToolbar />
+          {tracks.length === 0 && (
+            <div className="flex items-center gap-3 text-muted-foreground">
+              <span className="text-xs">No tracks yet</span>
+              <Button size="sm" className="h-7 px-3" onClick={() => fileInputRef.current?.click()}>
+                <Upload className="w-3.5 h-3.5 mr-1" /> Load Audio Files
+              </Button>
+            </div>
+          )}
+        </div>
       </div>
 
       {/* Ruler */}
@@ -218,31 +228,7 @@ export const EnhancedTimelineView: React.FC<EnhancedTimelineViewProps> = ({
             height: contentHeight,
           }}
         >
-          {tracks.length === 0 ? (
-            // Empty state
-            <div className="flex flex-col items-center justify-center h-full gap-4">
-              <div className="text-muted-foreground text-center">
-                <p className="text-lg font-medium mb-2">No tracks yet</p>
-                <p className="text-sm">Drop audio files or click to browse</p>
-              </div>
-              <Button
-                onClick={() => fileInputRef.current?.click()}
-                className="gap-2"
-              >
-                <Upload className="w-4 h-4" />
-                Load Audio Files
-              </Button>
-              <input
-                ref={fileInputRef}
-                type="file"
-                multiple
-                accept="audio/*"
-                onChange={(e) => handleFileUpload(e.target.files)}
-                className="hidden"
-              />
-            </div>
-          ) : (
-            // Canvas timeline
+            {/* Canvas timeline always rendered; empty state moved to toolbar */}
             <CanvasTimelineRenderer
               width={dimensions.width}
               height={contentHeight}
@@ -250,7 +236,6 @@ export const EnhancedTimelineView: React.FC<EnhancedTimelineViewProps> = ({
               onRegionClick={handleRegionClick}
               onSeek={handleSeek}
             />
-          )}
         </div>
       </div>
 
