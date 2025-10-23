@@ -198,14 +198,6 @@ export const EnhancedTimelineView: React.FC<EnhancedTimelineViewProps> = ({
       <div className="border-b border-border/50" style={{ height: toolbarHeight }}>
         <div className="h-full flex items-center justify-between px-3">
           <CollapsibleTimelineToolbar />
-          {tracks.length === 0 && (
-            <div className="flex items-center gap-3 text-muted-foreground">
-              <span className="text-xs">No tracks yet</span>
-              <Button size="sm" className="h-7 px-3" onClick={() => fileInputRef.current?.click()}>
-                <Upload className="w-3.5 h-3.5 mr-1" /> Load Audio Files
-              </Button>
-            </div>
-          )}
         </div>
       </div>
 
