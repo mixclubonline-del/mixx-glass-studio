@@ -121,8 +121,8 @@ export function ArrangeWindow({
             <span className="text-sm font-bold tracking-wider text-muted-foreground">TRACKS</span>
           </div>
 
-          {/* Track controls */}
-          <div className="flex-1 overflow-y-auto scrollbar-thin">
+          {/* Track controls - NO AUTO SCROLL */}
+          <div className="flex-1 overflow-hidden">
             {tracks.map((track) => (
               <div
                 key={track.id}
@@ -197,22 +197,24 @@ export function ArrangeWindow({
           {/* Overlay glass effect */}
           <div className="absolute inset-0 bg-background/60 backdrop-blur-sm" />
           
-          {/* Track lanes content */}
-          <div className="relative h-full overflow-y-auto scrollbar-thin">
-            {tracks.map((track, index) => (
-              <div
-                key={track.id}
-                className="border-b border-border/20"
-                style={{ height: trackHeight }}
-              >
-                {/* Track lane - waveform/regions would go here */}
-                <div className="h-full flex items-center justify-center">
-                  <span className="text-xs text-muted-foreground/50 italic">
-                    {track.name} Lane
-                  </span>
+          {/* Track lanes content - NO AUTO SCROLL */}
+          <div className="relative h-full overflow-hidden">
+            <div className="absolute inset-0">
+              {tracks.map((track, index) => (
+                <div
+                  key={track.id}
+                  className="border-b border-border/20"
+                  style={{ height: trackHeight }}
+                >
+                  {/* Track lane - waveform/regions would go here */}
+                  <div className="h-full flex items-center justify-center">
+                    <span className="text-xs text-muted-foreground/50 italic">
+                      {track.name} Lane
+                    </span>
+                  </div>
                 </div>
-              </div>
-            ))}
+              ))}
+            </div>
           </div>
 
           {/* Energy visualization overlay */}
