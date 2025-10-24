@@ -1,10 +1,10 @@
 /**
- * Transport Engine - Syncs to Master Clock
+ * Transport Engine - Syncs to Prime Brain (Master Clock)
  */
 
 import { useEffect, useRef } from 'react';
 import { useTimelineStore } from '@/store/timelineStore';
-import { masterClock } from '@/studio/core/MasterClock';
+import { primeBrain } from '@/ai/primeBrain';
 
 interface TransportEngineProps {
   onTick?: (deltaTime: number) => void;
@@ -28,21 +28,21 @@ export const TransportEngine: React.FC<TransportEngineProps> = ({
 
   const lastBeatRef = useRef<number>(-1);
 
-  // Sync master clock with timeline store
+  // Sync Prime Brain clock with timeline store
   useEffect(() => {
-    masterClock.setLoop(loopEnabled, loopStart, loopEnd);
+    primeBrain.setLoop(loopEnabled, loopStart, loopEnd);
   }, [loopEnabled, loopStart, loopEnd]);
 
-  // Subscribe to master clock updates
+  // Subscribe to Prime Brain clock updates
   useEffect(() => {
     if (!isPlaying) {
-      masterClock.pause();
+      primeBrain.pause();
       return;
     }
 
-    masterClock.start(currentTime);
+    primeBrain.start(currentTime);
 
-    const unsubscribe = masterClock.subscribe((time, deltaTime) => {
+    const unsubscribe = primeBrain.subscribe((time, deltaTime) => {
       setCurrentTime(time);
       onTick?.(deltaTime);
 

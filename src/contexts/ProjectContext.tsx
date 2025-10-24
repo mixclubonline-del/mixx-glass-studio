@@ -1,11 +1,13 @@
 /**
  * Project Context - Global state synchronization for entire studio
  * Single source of truth for BPM, Key, Transport, and AudioEngine
+ * Routes transport control through Prime Brain (Master Clock)
  */
 
 import React, { createContext, useContext, useState, useCallback, useRef, useEffect } from 'react';
 import { AudioEngine } from '@/audio/AudioEngine';
 import { StudioEngine, createStudioEngine } from '@/studio/core';
+import { primeBrain } from '@/ai/primeBrain';
 
 interface TransportState {
   isPlaying: boolean;
@@ -82,34 +84,40 @@ export const ProjectProvider: React.FC<{ children: React.ReactNode }> = ({ child
     studioEngine.setBPM(newBpm);
   }, [studioEngine]);
   
-  // Transport controls - Use StudioEngine for enhanced logging and events
+  // Transport controls - Route through Prime Brain first, then to StudioEngine
   const play = useCallback((fromTime?: number) => {
+    primeBrain.start(fromTime);
     studioEngine.play(fromTime);
     setTransport(prev => ({ ...prev, isPlaying: true }));
   }, [studioEngine]);
   
   const pause = useCallback(() => {
+    primeBrain.pause();
     studioEngine.pause();
     setTransport(prev => ({ ...prev, isPlaying: false }));
   }, [studioEngine]);
   
   const stop = useCallback(() => {
+    primeBrain.stop();
     studioEngine.stop();
     setTransport(prev => ({ ...prev, isPlaying: false, currentTime: 0 }));
   }, [studioEngine]);
   
   const seek = useCallback((time: number) => {
+    primeBrain.seek(time);
     studioEngine.seek(time);
     setTransport(prev => ({ ...prev, currentTime: time }));
   }, [studioEngine]);
   
   const toggleLoop = useCallback(() => {
     studioEngine.toggleLoop();
+    primeBrain.setLoop(audioEngine.loopEnabled, audioEngine.loopStart, audioEngine.loopEnd);
     setTransport(prev => ({ ...prev, loopEnabled: audioEngine.loopEnabled }));
   }, [studioEngine, audioEngine]);
   
   const setLoopRange = useCallback((start: number, end: number) => {
     studioEngine.setLoopRange(start, end);
+    primeBrain.setLoop(true, start, end);
     setTransport(prev => ({ ...prev, loopStart: start, loopEnd: end }));
   }, [studioEngine]);
   
@@ -138,20 +146,14 @@ export const ProjectProvider: React.FC<{ children: React.ReactNode }> = ({ child
     audioEngine.setMasterGain(volume);
   }, [audioEngine]);
   
-  // Update current time during playback using StudioEngine events
+  // Update current time during playback using Prime Brain clock
   useEffect(() => {
-    const handleTimeUpdate = () => {
-      const currentTime = studioEngine.getCurrentTime();
-      setTransport(prev => ({ ...prev, currentTime }));
-    };
+    const unsubscribe = primeBrain.subscribe((time) => {
+      setTransport(prev => ({ ...prev, currentTime: time }));
+    });
     
-    // Listen to StudioEngine time updates for smooth 60fps synchronization
-    studioEngine.addEventListener('timeUpdate', handleTimeUpdate);
-    
-    return () => {
-      studioEngine.removeEventListener('timeUpdate', handleTimeUpdate);
-    };
-  }, [studioEngine]);
+    return unsubscribe;
+  }, []);
   
   // Initialize audio engine settings
   useEffect(() => {

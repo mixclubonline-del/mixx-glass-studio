@@ -1,6 +1,7 @@
 /**
  * Prime Brain Stem (PBS)
  * Central AI router that merges telemetry from knobs, sliders, and scene changes
+ * Now also serves as the Master Clock for timing synchronization
  */
 
 import { telemetry } from '@/lib/telemetry';
@@ -29,10 +30,23 @@ export interface AudioMetrics {
   tempo: number;
 }
 
+export type ClockListener = (time: number, deltaTime: number) => void;
+
 class PrimeBrainStem {
   private controlHistory: ControlEvent[] = [];
   private audioBuffer: AudioMetrics[] = [];
   private isActive = true;
+
+  // Master Clock functionality
+  private isRunning = false;
+  private currentTime = 0;
+  private lastFrameTime = 0;
+  private rafId: number | null = null;
+  private playbackRate = 1.0;
+  private loopEnabled = false;
+  private loopStart = 0;
+  private loopEnd = 0;
+  private listeners: Set<ClockListener> = new Set();
 
   constructor() {
     telemetry.log({
@@ -193,8 +207,186 @@ class PrimeBrainStem {
       audioBuffer: this.audioBuffer.length,
       ambientState: ambientEngine.getState(),
       predictions: predictionEngine.getUpcomingEvents(),
-      artistProfile: artistDNA.getProfile()
+      artistProfile: artistDNA.getProfile(),
+      timing: {
+        isRunning: this.isRunning,
+        currentTime: this.currentTime,
+        loopEnabled: this.loopEnabled
+      }
     };
+  }
+
+  // ============= MASTER CLOCK FUNCTIONALITY =============
+
+  /**
+   * Start playback from a specific time
+   */
+  start(fromTime?: number) {
+    if (fromTime !== undefined) {
+      this.currentTime = fromTime;
+    }
+    this.isRunning = true;
+    this.lastFrameTime = performance.now();
+    
+    telemetry.log({
+      source: 'PBS',
+      category: 'transport',
+      action: 'Play started',
+      data: { time: this.currentTime.toFixed(2) }
+    });
+
+    this.tick();
+  }
+
+  /**
+   * Pause playback
+   */
+  pause() {
+    this.isRunning = false;
+    if (this.rafId !== null) {
+      cancelAnimationFrame(this.rafId);
+      this.rafId = null;
+    }
+
+    telemetry.log({
+      source: 'PBS',
+      category: 'transport',
+      action: 'Paused',
+      data: { time: this.currentTime.toFixed(2) }
+    });
+  }
+
+  /**
+   * Stop playback and reset to zero
+   */
+  stop() {
+    this.pause();
+    this.currentTime = 0;
+
+    telemetry.log({
+      source: 'PBS',
+      category: 'transport',
+      action: 'Stopped'
+    });
+
+    // Notify listeners of reset
+    this.listeners.forEach(listener => listener(0, 0));
+  }
+
+  /**
+   * Seek to a specific time
+   */
+  seek(time: number) {
+    this.currentTime = time;
+
+    telemetry.log({
+      source: 'PBS',
+      category: 'transport',
+      action: 'Seek',
+      data: { time: time.toFixed(2) }
+    });
+
+    // Notify listeners immediately
+    this.listeners.forEach(listener => listener(time, 0));
+  }
+
+  /**
+   * Set loop range
+   */
+  setLoop(enabled: boolean, start: number = 0, end: number = 0) {
+    this.loopEnabled = enabled;
+    this.loopStart = start;
+    this.loopEnd = end;
+
+    telemetry.log({
+      source: 'PBS',
+      category: 'transport',
+      action: enabled ? 'Loop enabled' : 'Loop disabled',
+      data: { start: start.toFixed(2), end: end.toFixed(2) }
+    });
+  }
+
+  /**
+   * Subscribe to time updates
+   */
+  subscribe(listener: ClockListener): () => void {
+    this.listeners.add(listener);
+    return () => this.listeners.delete(listener);
+  }
+
+  /**
+   * Get current playback time
+   */
+  getCurrentTime(): number {
+    return this.currentTime;
+  }
+
+  /**
+   * Check if clock is running
+   */
+  getIsRunning(): boolean {
+    return this.isRunning;
+  }
+
+  /**
+   * Main tick loop - runs at 60fps
+   */
+  private tick = () => {
+    if (!this.isRunning) return;
+
+    const now = performance.now();
+    const deltaTime = (now - this.lastFrameTime) / 1000; // Convert to seconds
+    this.lastFrameTime = now;
+
+    // Update time with playback rate
+    this.currentTime += deltaTime * this.playbackRate;
+
+    // Handle looping
+    if (this.loopEnabled && this.loopEnd > this.loopStart) {
+      if (this.currentTime >= this.loopEnd) {
+        this.currentTime = this.loopStart;
+        
+        telemetry.log({
+          source: 'PBS',
+          category: 'transport',
+          action: 'Loop restart',
+          data: { time: this.currentTime.toFixed(2) }
+        });
+      }
+    }
+
+    // Process audio metrics if available (this happens automatically during playback)
+    if (this.audioBuffer.length > 0) {
+      const latestMetrics = this.audioBuffer[this.audioBuffer.length - 1];
+      // Audio metrics already processed in processAudioMetrics, just log context
+      const avgEnergy = this.audioBuffer.reduce((sum, m) => sum + m.rms, 0) / this.audioBuffer.length;
+      
+      // Could use this for intelligent playback adjustments in the future
+      if (avgEnergy > 0.8 && Math.random() > 0.99) {
+        telemetry.log({
+          source: 'PBS',
+          category: 'audio',
+          action: 'High energy detected',
+          data: { energy: avgEnergy.toFixed(2) }
+        });
+      }
+    }
+
+    // Notify all subscribers with current time and delta
+    this.listeners.forEach(listener => listener(this.currentTime, deltaTime));
+
+    // Schedule next frame
+    this.rafId = requestAnimationFrame(this.tick);
+  };
+
+  /**
+   * Dispose and cleanup
+   */
+  dispose() {
+    this.pause();
+    this.listeners.clear();
+    this.controlHistory = [];
+    this.audioBuffer = [];
   }
 }
 

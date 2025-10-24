@@ -1,6 +1,7 @@
 /**
  * Studio Core Module
  * Exports all core engine functionality
+ * Note: Master Clock functionality now lives in Prime Brain
  */
 
 export {
@@ -12,5 +13,3 @@ export {
   type PlaybackEventType,
   type PlaybackEventListener,
 } from './audioEngine';
-
-export { MasterClock, masterClock } from './MasterClock';
