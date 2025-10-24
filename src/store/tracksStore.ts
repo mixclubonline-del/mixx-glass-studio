@@ -4,12 +4,14 @@
 
 import { create } from 'zustand';
 import { TimelineTrack, Region } from '@/types/timeline';
+import { primeBrain } from '@/ai/primeBrain';
 
 interface TracksState {
   tracks: TimelineTrack[];
   regions: Region[];
   selectedTrackId: string | null;
   addTrackDialogOpen: boolean;
+  trackCounter: number; // Sequential track numbering
   
   // Actions
   addTrack: (track: TimelineTrack) => void;
@@ -29,18 +31,37 @@ export const useTracksStore = create<TracksState>((set, get) => ({
   regions: [],
   selectedTrackId: null,
   addTrackDialogOpen: false,
+  trackCounter: 0,
   
-  addTrack: (track) => set((state) => ({
-    tracks: [...state.tracks, {
+  addTrack: (track) => {
+    const state = get();
+    const newCounter = state.trackCounter + 1;
+    
+    // Generate sequential ID and name if not provided
+    const trackWithDefaults = {
       ...track,
+      id: track.id || `track-${newCounter}`,
+      name: track.name || `Track ${newCounter}`,
       inserts: track.inserts || Array(8).fill(null).map((_, i) => ({
         slotNumber: i + 1,
         pluginId: null,
         instanceId: null,
         bypass: false
       }))
-    }]
-  })),
+    };
+    
+    // Notify Prime Brain of track creation
+    primeBrain.processSceneChange({
+      sceneId: trackWithDefaults.id,
+      sceneName: `TRACK_ADDED: ${trackWithDefaults.name}`,
+      timestamp: Date.now()
+    });
+    
+    set((state) => ({
+      tracks: [...state.tracks, trackWithDefaults],
+      trackCounter: newCounter
+    }));
+  },
   
   removeTrack: (id) => set((state) => ({
     tracks: state.tracks.filter(t => t.id !== id),

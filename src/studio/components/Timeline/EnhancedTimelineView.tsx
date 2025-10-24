@@ -39,7 +39,7 @@ export const EnhancedTimelineView: React.FC<EnhancedTimelineViewProps> = ({
     setDuration,
   } = useTimelineStore();
 
-  const { tracks, regions, addTrack, addRegion } = useTracksStore();
+  const { tracks, regions, addTrack, addRegion, trackCounter } = useTracksStore();
 
   const trackHeight = 72; // Fixed track height
   const rulerHeight = 32;
@@ -93,12 +93,13 @@ export const EnhancedTimelineView: React.FC<EnhancedTimelineViewProps> = ({
     for (const file of Array.from(files)) {
       try {
         const audioData: AudioFileData = await waveformGen.loadAudioFile(file);
-        const trackId = `track-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`;
+        const nextTrackNum = trackCounter + 1;
+        const trackId = `track-${nextTrackNum}`;
         const regionId = `region-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`;
         const baseName = file.name.replace(/\.[^/.]+$/, '');
         const color = getTrackColor(tracks.length);
 
-        // Add track
+        // Add track (counter increments inside addTrack)
         addTrack({
           id: trackId,
           name: baseName,
@@ -159,7 +160,7 @@ export const EnhancedTimelineView: React.FC<EnhancedTimelineViewProps> = ({
     }
 
     waveformGen.dispose();
-  }, [tracks, duration, addTrack, addRegion, setDuration, toast]);
+  }, [tracks, trackCounter, duration, addTrack, addRegion, setDuration, toast]);
 
   // Handle zoom (ctrl+wheel)
   useEffect(() => {

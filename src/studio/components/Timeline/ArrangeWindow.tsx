@@ -49,7 +49,8 @@ export function ArrangeWindow({
 
     trackNames.forEach((name, i) => {
       addTrack({
-        id: `track-${i + 1}`,
+        // Let addTrack generate sequential IDs automatically
+        id: undefined as any, // Will be generated as track-1, track-2, etc.
         name,
         type: i === 7 ? 'aux' : 'audio',
         color: colors[i],
