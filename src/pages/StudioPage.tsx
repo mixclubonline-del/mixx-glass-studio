@@ -10,6 +10,7 @@ import ALSControlPanelEnhanced from '../studio/components/ALS/ALSControlPanelEnh
 import AIMixingAssistant from '../studio/components/AI/AIMixingAssistant';
 import BloomMenu from '../studio/components/Bloom/BloomMenu';
 import ProfessionalMixer from '../studio/components/Mixer/ProfessionalMixer';
+import Enhanced3DVisualizer from '../studio/components/3D/Enhanced3DVisualizer';
 import NativeVelvetCurveBridge from '../components/NativeVelvetCurveBridge';
 import HushInputBridge from '../components/HushInputBridge';
 import HarmonicLatticeBridge from '../components/HarmonicLatticeBridge';
@@ -52,7 +53,7 @@ interface MusicalKey {
 const StudioPageInner: React.FC = () => {
   const { isElectron } = useElectron();
   const [bpm, setBpm] = useState(120);
-  const [activePanel, setActivePanel] = useState<'timeline' | 'tracks' | 'als' | 'ai' | 'bloom' | 'mixer'>('timeline');
+  const [activePanel, setActivePanel] = useState<'timeline' | 'tracks' | 'als' | 'ai' | 'bloom' | 'mixer' | '3d'>('timeline');
   const [isPlaying, setIsPlaying] = useState(false);
   const [currentTime, setCurrentTime] = useState(0);
   const [duration] = useState(180); // 3 minutes
@@ -62,6 +63,8 @@ const StudioPageInner: React.FC = () => {
   
   // Enhanced audio processing states
   const [realtimeAudioData, setRealtimeAudioData] = useState<Float32Array>(new Float32Array(512));
+  const [analysisData, setAnalysisData] = useState<any>(null); // CompleteAnalysis type
+  const [visualizationMode, setVisualizationMode] = useState<'spectrum' | 'waveform' | 'harmonic' | 'meters' | 'combined'>('combined');
   
   // Sample audio data for 3D visualization
   const [audioData, setAudioData] = useState<number[]>([]);
@@ -244,7 +247,8 @@ const StudioPageInner: React.FC = () => {
               {[
                 { id: 'als', label: 'ALS', icon: '📊', color: 'from-blue-500 to-cyan-500' },
                 { id: 'ai', label: 'AI', icon: '🧠', color: 'from-purple-500 to-pink-500' },
-                { id: 'bloom', label: 'Bloom', icon: '✨', color: 'from-yellow-500 to-orange-500' }
+                { id: 'bloom', label: 'Bloom', icon: '✨', color: 'from-yellow-500 to-orange-500' },
+                { id: '3d', label: '3D', icon: '🎆', color: 'from-indigo-500 to-purple-500' }
               ].map((tab) => (
                 <button
                   key={tab.id}
@@ -291,6 +295,31 @@ const StudioPageInner: React.FC = () => {
               {activePanel === 'ai' && <AIMixingAssistant />}
               {activePanel === 'bloom' && <BloomMenu />}
               {activePanel === 'mixer' && <ProfessionalMixer />}
+              {activePanel === '3d' && (
+                <div className="space-y-4">
+                  <div className="bg-gray-800 p-3 rounded space-y-2">
+                    <div className="text-sm font-semibold text-gray-300">Visualization Mode</div>
+                    <select
+                      value={visualizationMode}
+                      onChange={(e) => setVisualizationMode(e.target.value as any)}
+                      title="Select 3D visualization mode"
+                      className="w-full bg-gray-700 text-white text-sm px-2 py-1 rounded border border-gray-600"
+                    >
+                      <option value="spectrum">Spectrum Analyzer</option>
+                      <option value="waveform">Waveform</option>
+                      <option value="harmonic">Harmonics</option>
+                      <option value="meters">Meters</option>
+                      <option value="combined">Combined View</option>
+                    </select>
+                  </div>
+                  <Enhanced3DVisualizer 
+                    analysisData={analysisData}
+                    isActive={isPlaying}
+                    mode={visualizationMode}
+                    interactiveMode={true}
+                  />
+                </div>
+              )}
             </div>
           </div>
         </div>
