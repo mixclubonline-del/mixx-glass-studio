@@ -13,7 +13,9 @@ import { TimelineToolbar } from './TimelineToolbar';
 import { AddTrackDialog, TrackConfig } from './AddTrackDialog';
 import { CrossfadeRenderer } from './CrossfadeRenderer';
 import { ArrangeBrowserPanel } from './ArrangeBrowserPanel';
-import { ZoomIn, ZoomOut, Grid3x3, Maximize2, Plus } from 'lucide-react';
+import { Grid3x3, Plus } from 'lucide-react';
+import { useTimelineKeyboardShortcuts } from '@/studio/hooks/useTimelineKeyboardShortcuts';
+import { DebugOverlay } from './DebugOverlay';
 import { Button } from '@/components/ui/button';
 import mixxclubLogo from '@/assets/mixxclub-logo.png';
 
@@ -92,6 +94,9 @@ export const AdvancedTimelineView: React.FC<AdvancedTimelineViewProps> = ({
   } = useTracksStore();
   
   const [addTrackDialogOpen, setAddTrackDialogOpen] = useState(false);
+  
+  // Enable timeline keyboard shortcuts
+  useTimelineKeyboardShortcuts(true);
   
   // Handler for creating new tracks
   const handleCreateTrack = (config: TrackConfig) => {
@@ -335,6 +340,9 @@ export const AdvancedTimelineView: React.FC<AdvancedTimelineViewProps> = ({
         onOpenChange={setAddTrackDialogOpen}
         onCreateTrack={handleCreateTrack}
       />
+
+      {/* Debug Overlay */}
+      <DebugOverlay bpm={120} timeSignature={{ numerator: 4, denominator: 4 }} />
     </div>
   );
 };
