@@ -1,9 +1,12 @@
 /**
  * Mixx Club Studio - AI Mixing Assistant
  * Prime Brain Stem (PBS) - Central AI router for intelligent mixing
+ * Powered by AdvancedAIMixingEngine for professional-grade recommendations
  */
 
 import React, { useState } from 'react';
+import AdvancedAIMixingEngine from '../../../utils/AdvancedAIMixingEngine';
+import './AIMixingAssistant.css';
 
 interface AIAnalysis {
   issues: Array<{
@@ -32,65 +35,159 @@ const AIMixingAssistant: React.FC = () => {
   const [culturalContext, setCulturalContext] = useState<'artist' | 'engineer' | 'producer'>('artist');
   const [genre, setGenre] = useState<string>('hip-hop');
   const [vocalStyle, setVocalStyle] = useState<string>('rap');
+  const [aiEngine] = useState(() => new AdvancedAIMixingEngine());
 
-  // Simulate AI analysis
+  // Simulate AI analysis using AdvancedAIMixingEngine
   const analyzeMix = async () => {
     setIsAnalyzing(true);
     try {
+      // Set cultural context for AI engine
+      aiEngine.setCulturalContext(culturalContext);
+
       // Desktop-native AI processing - no cloud dependencies
       console.log('🎵 Desktop AI processing for mix analysis');
 
-      // Simulate AI analysis based on cultural context
-      const mockAnalysis: AIAnalysis = {
-        issues: [
-          {
-            id: 'ai-issue-1',
-            type: 'eq',
-            priority: 'medium',
-            title: 'Frequency Clash',
-            description: 'Kick and bass competing in 80-120Hz range',
-            action: 'Apply high-pass filter to kick at 80Hz, boost bass at 100Hz'
+      // Create mock tracks for analysis (in production, these would be real track data)
+      const mockTracks = [
+        {
+          name: 'Kick Drum',
+          level: -6,
+          peak: -3,
+          lufs: -8,
+          frequency: {
+            spectralCentroid: 80,
+            spectralRolloff: 150,
+            spectralFlatness: 0.4,
+            spectralSpread: 50,
+            zeroCrossingRate: 0.1,
+            energyByBand: {
+              subBass: 15,
+              bass: 25,
+              lowMids: 12,
+              mids: 10,
+              highMids: 8,
+              presence: 15,
+              brilliance: 0
+            }
           },
-          {
-            id: 'ai-issue-2',
-            type: 'compression',
-            priority: 'high',
-            title: 'Dynamic Range Issues',
-            description: 'Vocals lack consistency in level',
-            action: 'Apply 2:1 compression with 3dB gain reduction'
-          }
-        ],
-        suggestions: [
-          {
-            id: 'ai-suggestion-1',
-            type: 'stereo',
-            priority: 'medium',
-            title: 'Stereo Width Enhancement',
-            description: 'Add stereo width to hi-hats for more space',
-            action: 'Apply stereo widener with 20% width increase'
+          dynamics: { rms: -18, crestFactor: 12, transientDensity: 0.8 },
+          quality: 'excellent' as const
+        },
+        {
+          name: 'Vocal',
+          level: -8,
+          peak: -5,
+          lufs: -10,
+          frequency: {
+            spectralCentroid: 2000,
+            spectralRolloff: 8000,
+            spectralFlatness: 0.5,
+            spectralSpread: 3000,
+            zeroCrossingRate: 0.15,
+            energyByBand: {
+              subBass: 5,
+              bass: 8,
+              lowMids: 15,
+              mids: 20,
+              highMids: 22,
+              presence: 20,
+              brilliance: 10
+            }
           },
-          {
-            id: 'ai-suggestion-2',
-            type: 'reverb',
-            priority: 'low',
-            title: 'Ambience Addition',
-            description: 'Add subtle reverb to vocals for depth',
-            action: 'Apply plate reverb with 15% wet signal'
-          }
-        ],
-        overallScore: 85,
-        confidence: 0.9
+          dynamics: { rms: -20, crestFactor: 8, transientDensity: 0.6 },
+          quality: 'good' as const
+        },
+        {
+          name: 'Bass',
+          level: -10,
+          peak: -7,
+          lufs: -12,
+          frequency: {
+            spectralCentroid: 120,
+            spectralRolloff: 300,
+            spectralFlatness: 0.3,
+            spectralSpread: 80,
+            zeroCrossingRate: 0.05,
+            energyByBand: {
+              subBass: 40,
+              bass: 30,
+              lowMids: 15,
+              mids: 8,
+              highMids: 5,
+              presence: 2,
+              brilliance: 0
+            }
+          },
+          dynamics: { rms: -22, crestFactor: 10, transientDensity: 0.5 },
+          quality: 'excellent' as const
+        }
+      ];
+
+      // Analyze mix using AI engine
+      const masterplan = aiEngine.analyzeMix(mockTracks);
+
+      // Convert masterplan recommendations to AIAnalysis format
+      const issues: AIAnalysis['issues'] = [];
+      const suggestions: AIAnalysis['suggestions'] = [];
+
+      // Process gain staging recommendations
+      masterplan.recommendations.gainStagingRecommendations.forEach((rec, idx) => {
+        const item: AIAnalysis['issues'][0] = {
+          id: `gain-${idx}`,
+          type: 'dynamics',
+          priority: rec.priority === 'critical' ? 'critical' : rec.priority,
+          title: `Gain: ${rec.trackName}`,
+          description: `Recommended gain: ${rec.recommendedGain}dB`,
+          action: rec.reasoning
+        };
+
+        if (rec.priority === 'critical') {
+          issues.push(item);
+        } else {
+          suggestions.push(item);
+        }
+      });
+
+      // Process EQ recommendations
+      masterplan.recommendations.eqRecommendations.forEach((rec, idx) => {
+        const item: AIAnalysis['suggestions'][0] = {
+          id: `eq-${idx}`,
+          type: 'eq',
+          priority: 'medium',
+          title: `EQ: ${rec.trackName}`,
+          description: rec.issue,
+          action: rec.bands.map(b => `${b.type} @ ${b.frequency}Hz: ${b.gain > 0 ? '+' : ''}${b.gain}dB (Q: ${b.Q})`).join(', ')
+        };
+        suggestions.push(item);
+      });
+
+      // Process compression recommendations
+      masterplan.recommendations.compressionRecommendations.forEach((rec, idx) => {
+        const item: AIAnalysis['suggestions'][0] = {
+          id: `comp-${idx}`,
+          type: 'compression',
+          priority: 'medium',
+          title: `Compression: ${rec.trackName}`,
+          description: `Threshold: ${rec.settings.threshold}dB, Ratio: ${rec.settings.ratio}:1, Attack: ${rec.settings.attack}ms`,
+          action: rec.reasoning
+        };
+        suggestions.push(item);
+      });
+
+      // Create final analysis with masterplan data
+      const finalAnalysis: AIAnalysis = {
+        issues: issues.slice(0, 3), // Limit to top 3 issues
+        suggestions: suggestions.slice(0, 4), // Limit to top 4 suggestions
+        overallScore: Math.round(masterplan.balanceScore * 100),
+        confidence: 0.92
       };
 
-      setAnalysis(mockAnalysis);
+      setAnalysis(finalAnalysis);
 
       // Show summary toast
-      const issueCount = mockAnalysis.issues.length;
-      if (issueCount === 0) {
-        console.log('✅ Desktop AI analysis complete - No issues detected!');
-      } else {
-        console.log(`⚠️ Desktop AI analysis complete - ${issueCount} issue${issueCount > 1 ? 's' : ''} found`);
-      }
+      const issueCount = finalAnalysis.issues.length;
+      console.log(`⚠️ Desktop AI analysis complete - ${issueCount} issue${issueCount !== 1 ? 's' : ''} found`);
+      console.log(`📊 Mix Health: ${masterplan.recommendations.overallMixHealth} | Integrated LUFS: ${masterplan.globalLUFS} | Headroom: ${masterplan.headroom}dB`);
     } catch (error) {
       console.error('Mix analysis error:', error);
     } finally {
@@ -144,6 +241,7 @@ const AIMixingAssistant: React.FC = () => {
         <div>
           <label className="block text-sm font-medium text-gray-300 mb-2">Cultural Context</label>
           <select
+            title="Select cultural context for AI recommendations"
             value={culturalContext}
             onChange={(e) => setCulturalContext(e.target.value as 'artist' | 'engineer' | 'producer')}
             className="w-full bg-gray-800 text-white px-3 py-2 rounded border border-gray-600"
@@ -157,6 +255,7 @@ const AIMixingAssistant: React.FC = () => {
         <div>
           <label className="block text-sm font-medium text-gray-300 mb-2">Genre</label>
           <select
+            title="Select music genre for specialized recommendations"
             value={genre}
             onChange={(e) => setGenre(e.target.value)}
             className="w-full bg-gray-800 text-white px-3 py-2 rounded border border-gray-600"
@@ -172,6 +271,7 @@ const AIMixingAssistant: React.FC = () => {
         <div>
           <label className="block text-sm font-medium text-gray-300 mb-2">Vocal Style</label>
           <select
+            title="Select vocal style for context-aware analysis"
             value={vocalStyle}
             onChange={(e) => setVocalStyle(e.target.value)}
             className="w-full bg-gray-800 text-white px-3 py-2 rounded border border-gray-600"
@@ -193,10 +293,10 @@ const AIMixingAssistant: React.FC = () => {
               <h4 className="text-lg font-semibold text-white">Overall Score</h4>
               <span className="text-2xl font-bold text-white">{analysis.overallScore}/100</span>
             </div>
-            <div className="w-full bg-gray-700 rounded-full h-2">
+            <div className="score-bar">
               <div
-                className="bg-gradient-to-r from-red-500 via-yellow-500 to-green-500 h-2 rounded-full"
-                style={{ width: `${analysis.overallScore}%` }}
+                className="score-bar-fill"
+                data-score={Math.min(analysis.overallScore, 100)}
               />
             </div>
             <div className="text-sm text-gray-300 mt-2">
