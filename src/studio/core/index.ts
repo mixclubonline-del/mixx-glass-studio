@@ -12,3 +12,5 @@ export {
   type PlaybackEventType,
   type PlaybackEventListener,
 } from './audioEngine';
+
+export { MasterClock, masterClock } from './MasterClock';

@@ -1,9 +1,10 @@
 /**
- * Transport Engine - Handles playback, recording, and transport state
+ * Transport Engine - Syncs to Master Clock
  */
 
 import { useEffect, useRef } from 'react';
 import { useTimelineStore } from '@/store/timelineStore';
+import { masterClock } from '@/studio/core/MasterClock';
 
 interface TransportEngineProps {
   onTick?: (deltaTime: number) => void;
@@ -25,63 +26,39 @@ export const TransportEngine: React.FC<TransportEngineProps> = ({
     loopEnd,
   } = useTimelineStore();
 
-  const rafRef = useRef<number | null>(null);
-  const lastTimeRef = useRef<number>(0);
   const lastBeatRef = useRef<number>(-1);
 
+  // Sync master clock with timeline store
+  useEffect(() => {
+    masterClock.setLoop(loopEnabled, loopStart, loopEnd);
+  }, [loopEnabled, loopStart, loopEnd]);
+
+  // Subscribe to master clock updates
   useEffect(() => {
     if (!isPlaying) {
-      if (rafRef.current) {
-        cancelAnimationFrame(rafRef.current);
-        rafRef.current = null;
-      }
-      lastTimeRef.current = 0;
+      masterClock.pause();
       return;
     }
 
-    const tick = (time: number) => {
-      if (!lastTimeRef.current) {
-        lastTimeRef.current = time;
-      }
+    masterClock.start(currentTime);
 
-      const deltaMs = time - lastTimeRef.current;
-      lastTimeRef.current = time;
-      const deltaSec = deltaMs / 1000;
-
-      // Calculate new time
-      let newTime = currentTime + deltaSec;
-
-      // Handle loop
-      if (loopEnabled && loopEnd > loopStart) {
-        if (newTime >= loopEnd) {
-          newTime = loopStart + (newTime - loopEnd);
-        }
-      }
-
-      // Update time
-      setCurrentTime(newTime);
-      onTick?.(deltaSec);
+    const unsubscribe = masterClock.subscribe((time, deltaTime) => {
+      setCurrentTime(time);
+      onTick?.(deltaTime);
 
       // Beat tick
       const beatsPerSecond = bpm / 60;
-      const currentBeat = Math.floor(newTime * beatsPerSecond);
+      const currentBeat = Math.floor(time * beatsPerSecond);
       if (currentBeat !== lastBeatRef.current) {
         lastBeatRef.current = currentBeat;
         onBeatTick?.(currentBeat);
       }
-
-      rafRef.current = requestAnimationFrame(tick);
-    };
-
-    rafRef.current = requestAnimationFrame(tick);
+    });
 
     return () => {
-      if (rafRef.current) {
-        cancelAnimationFrame(rafRef.current);
-        rafRef.current = null;
-      }
+      unsubscribe();
     };
-  }, [isPlaying, currentTime, loopEnabled, loopStart, loopEnd, bpm, setCurrentTime, onTick, onBeatTick]);
+  }, [isPlaying, currentTime, bpm, setCurrentTime, onTick, onBeatTick]);
 
   return null; // No visual output, just logic
 };
