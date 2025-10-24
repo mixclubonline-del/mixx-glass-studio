@@ -11,33 +11,36 @@ type AppView = 'index' | 'studio' | 'flow-canvas' | 'bloom-demo';
 const App = () => {
   const { isElectron, setupMenuHandlers, cleanup } = useElectron();
   
-  // Aggressive detection: Tauri, Electron, or any non-web environment
-  const isTauri = typeof window !== 'undefined' && !!(window as any).__TAURI__;
-  const hasElectronAPI = typeof window !== 'undefined' && !!window.electronAPI;
-  const isWebBrowser = typeof window !== 'undefined' && window.location && !isTauri && !isElectron && !hasElectronAPI;
-  
-  // DEFAULT TO STUDIO MODE (only show index in actual web browsers)
-  const [currentView, setCurrentView] = useState<AppView>(isWebBrowser ? 'index' : 'studio');
+  // State to track which view to show
+  const [currentView, setCurrentView] = useState<AppView>('studio');
 
+  // On component mount, determine if we should show index or studio
   useEffect(() => {
-    // FORCE studio mode if running in any desktop environment
+    const isTauri = !!(window as any).__TAURI__;
+    const hasElectronAPI = !!window.electronAPI;
+    const isWebBrowser = !isTauri && !isElectron && !hasElectronAPI && window.location.hostname !== 'localhost';
+    
+    console.log('🎛️ APP MOUNT:', {
+      isTauri,
+      hasElectronAPI,
+      isElectron,
+      isWebBrowser,
+      hostname: window.location.hostname
+    });
+
+    // Always show studio in desktop environments
     if (!isWebBrowser) {
       setCurrentView('studio');
       console.log('🎛️ DESKTOP APP DETECTED - Loading StudioPage');
+    } else {
+      setCurrentView('index');
+      console.log('🎛️ WEB BROWSER DETECTED - Loading Index');
     }
-  }, [isWebBrowser]);
+  }, [isElectron]);
 
   useEffect(() => {
-    console.log('🎛️ APP INIT:', {
-      isElectron,
-      isTauri,
-      hasElectronAPI,
-      isWebBrowser,
-      currentView,
-      userAgent: navigator.userAgent.substring(0, 50),
-      platform: typeof window !== 'undefined' && window.electronAPI?.platform
-    });
-  }, [isElectron, isTauri, hasElectronAPI, isWebBrowser, currentView]);
+    console.log('🎛️ CURRENT VIEW:', currentView);
+  }, [currentView]);
 
   // Set up desktop menu handlers
   useEffect(() => {
