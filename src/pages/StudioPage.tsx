@@ -1,6 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { useElectron } from '../hooks/useElectron';
 import { ProjectProvider } from '../contexts/ProjectContext';
+import { PrimeBrainProvider, usePrimeBrain } from '../contexts/PrimeBrainContext';
 import TopMenuBar from '../studio/components/Navigation/TopMenuBar';
 import Timeline from '../studio/components/Timeline';
 import TrackList from '../studio/components/TrackManagement/TrackList';
@@ -14,15 +15,51 @@ import PrimeBrainCore from '../studio/components/3D/PrimeBrainCore';
 import ALSVisualizer from '../studio/components/3D/ALSVisualizer';
 import Waveform3D from '../studio/components/3D/Waveform3D';
 
-const StudioPage: React.FC = () => {
+interface AudioMetrics {
+  inputLevel: number;
+  outputLevel: number;
+  latency: number;
+  cpuUsage: number;
+  dropouts: number;
+}
+
+interface HarmonicData {
+  fundamentalFreq: number;
+  harmonics: Array<{
+    frequency: number;
+    amplitude: number;
+    phase: number;
+    harmonic: number;
+  }>;
+  tonality: 'major' | 'minor' | 'dominant' | 'diminished' | 'augmented' | 'unknown';
+  key: string;
+  consonance: number;
+  dissonance: number;
+  spectralCentroid: number;
+  spectralRolloff: number;
+  spectralFlatness: number;
+}
+
+interface MusicalKey {
+  note: string;
+  mode: 'major' | 'minor';
+  confidence: number;
+}
+
+// Enhanced Studio Component with Prime Brain Integration
+const StudioPageInner: React.FC = () => {
   const { isElectron } = useElectron();
   const [bpm, setBpm] = useState(120);
   const [activePanel, setActivePanel] = useState<'timeline' | 'tracks' | 'als' | 'ai' | 'bloom'>('timeline');
-  const [primeBrainActive, setPrimeBrainActive] = useState(false);
-  const [primeBrainIntensity] = useState(0.7);
   const [isPlaying, setIsPlaying] = useState(false);
   const [currentTime, setCurrentTime] = useState(0);
   const [duration] = useState(180); // 3 minutes
+  
+  // 🧠 PRIME BRAIN INTEGRATION
+  const primeBrain = usePrimeBrain();
+  
+  // Enhanced audio processing states
+  const [realtimeAudioData, setRealtimeAudioData] = useState<Float32Array>(new Float32Array(512));
   
   // Sample audio data for 3D visualization
   const [audioData, setAudioData] = useState<number[]>([]);
@@ -49,6 +86,20 @@ const StudioPage: React.FC = () => {
     }
   }, [isPlaying, duration]);
 
+  // Handle real-time audio data from Velvet Curve engine
+  const handleAudioData = (data: Float32Array) => {
+    setRealtimeAudioData(data);
+    // Convert to array for visualization components that expect number[]
+    setAudioData(Array.from(data.slice(0, 512)));
+  };
+
+  // Get current metrics and status from Prime Brain
+  const audioEngineActive = primeBrain.state.systemStatus.audioEngine.active;
+  const currentMetrics = primeBrain.state.audioMetrics;
+  const currentKey = primeBrain.getCurrentKey();
+  const systemHealth = primeBrain.getSystemHealth();
+  const recommendations = primeBrain.getRecommendations().slice(0, 3); // Show top 3
+
   return (
     <ProjectProvider>
       <div className="min-h-screen text-white flex flex-col relative overflow-hidden">
@@ -56,18 +107,55 @@ const StudioPage: React.FC = () => {
         <div className="absolute inset-0 bg-gradient-to-br from-purple-900/20 via-blue-900/20 to-indigo-900/20" />
         <div className="absolute inset-0 bg-gradient-to-t from-black/40 via-transparent to-purple-500/10" />
         
-        {/* Native Audio Engine Bridges */}
-        <NativeVelvetCurveBridge />
-        <HushInputBridge />
+        {/* Enhanced Audio Processing Bridges */}
+        <NativeVelvetCurveBridge 
+          onAudioData={handleAudioData}
+          config={{ lowLatency: true, sampleRate: 48000 }}
+        />
+        <HushInputBridge onStateChange={(isActive: boolean) => {
+          console.log('🔇 Hush Input Bridge:', isActive ? 'Active' : 'Inactive');
+        }} />
         <HarmonicLatticeBridge 
-          onStateChange={(isActive) => {
-            console.log('🎵 Harmonic Lattice System:', isActive ? 'ACTIVE' : 'INACTIVE');
-          }}
+          audioData={realtimeAudioData}
+          sampleRate={48000}
         />
 
         {/* Top Menu Bar */}
         <div className="glass-surface m-4 mb-2">
           <TopMenuBar />
+        </div>
+
+        {/* Audio Engine Status Bar */}
+        <div className="mx-4 mb-2 glass-surface p-3">
+          <div className="flex items-center justify-between text-sm">
+            <div className="flex items-center space-x-6">
+              <div className={`flex items-center space-x-2 ${audioEngineActive ? 'text-green-400' : 'text-red-400'}`}>
+                <div className={`w-2 h-2 rounded-full ${audioEngineActive ? 'bg-green-400 animate-pulse' : 'bg-red-400'}`}></div>
+                <span className="font-medium">Audio Engine {audioEngineActive ? 'Online' : 'Offline'}</span>
+              </div>
+              {audioEngineActive && (
+                <>
+                  <div className="text-purple-400 font-medium">
+                    🎼 {currentKey || 'Analyzing...'}
+                  </div>
+                  <div className="text-blue-400">
+                    🔊 {currentMetrics?.latency.toFixed(1) || '0.0'}ms latency
+                  </div>
+                  <div className="text-yellow-400">
+                    💻 {Math.round((currentMetrics?.cpuUsage || 0) * 100)}% CPU
+                  </div>
+                  {primeBrain.state.harmonicData && (
+                    <div className="text-orange-400">
+                      🎵 {Math.round(primeBrain.state.harmonicData.fundamentalFreq)}Hz fundamental
+                    </div>
+                  )}
+                </>
+              )}
+            </div>
+            <div className="text-gray-400 text-xs">
+              Mixx Glass Studio {audioEngineActive ? 'Professional' : 'Standard'} Edition • BPM: {bpm}
+            </div>
+          </div>
         </div>
 
         {/* Main Studio Interface */}
@@ -101,9 +189,15 @@ const StudioPage: React.FC = () => {
               {/* PRIME BRAIN Core */}
               <div className="h-1/2">
                 <PrimeBrainCore
-                  isActive={primeBrainActive}
-                  intensity={primeBrainIntensity}
-                  onStateChange={setPrimeBrainActive}
+                  isActive={primeBrain.state.isActive}
+                  intensity={primeBrain.state.intensity}
+                  onStateChange={(active) => {
+                    if (active) {
+                      primeBrain.activatePrimeBrain();
+                    } else {
+                      primeBrain.deactivatePrimeBrain();
+                    }
+                  }}
                 />
               </div>
               
@@ -229,6 +323,17 @@ const StudioPage: React.FC = () => {
         </div>
       </div>
     </ProjectProvider>
+  );
+};
+
+// Main StudioPage with Prime Brain Provider
+const StudioPage: React.FC = () => {
+  return (
+    <PrimeBrainProvider>
+      <ProjectProvider>
+        <StudioPageInner />
+      </ProjectProvider>
+    </PrimeBrainProvider>
   );
 };
 
