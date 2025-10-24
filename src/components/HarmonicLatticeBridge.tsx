@@ -190,7 +190,7 @@ class HarmonicAnalysisEngine {
     });
     
     // Test against major and minor keys
-    let bestKey = { note: 'C', mode: 'major' as const, confidence: 0 };
+    let bestKey: MusicalKey = { note: 'C', mode: 'major' as const, confidence: 0 };
     
     for (let tonic = 0; tonic < 12; tonic++) {
       // Test major

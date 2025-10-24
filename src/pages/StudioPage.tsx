@@ -5,7 +5,6 @@ import { PrimeBrainProvider, usePrimeBrain } from '../contexts/PrimeBrainContext
 import TopMenuBar from '../studio/components/Navigation/TopMenuBar';
 import Timeline from '../studio/components/Timeline';
 import TrackList from '../studio/components/TrackManagement/TrackList';
-import ALSControlPanel from '../studio/components/ALS/ALSControlPanel';
 import ALSControlPanelEnhanced from '../studio/components/ALS/ALSControlPanelEnhanced';
 import AIMixingAssistant from '../studio/components/AI/AIMixingAssistant';
 import BloomMenu from '../studio/components/Bloom/BloomMenu';
@@ -18,36 +17,11 @@ import PrimeBrainCore from '../studio/components/3D/PrimeBrainCore';
 import ALSVisualizer from '../studio/components/3D/ALSVisualizer';
 import Waveform3D from '../studio/components/3D/Waveform3D';
 
-interface AudioMetrics {
-  inputLevel: number;
-  outputLevel: number;
-  latency: number;
-  cpuUsage: number;
-  dropouts: number;
-}
+// Local type definitions for StudioPage
+// AudioMetrics - defined locally for tracking studio metrics
 
-interface HarmonicData {
-  fundamentalFreq: number;
-  harmonics: Array<{
-    frequency: number;
-    amplitude: number;
-    phase: number;
-    harmonic: number;
-  }>;
-  tonality: 'major' | 'minor' | 'dominant' | 'diminished' | 'augmented' | 'unknown';
-  key: string;
-  consonance: number;
-  dissonance: number;
-  spectralCentroid: number;
-  spectralRolloff: number;
-  spectralFlatness: number;
-}
+// Local type definitions
 
-interface MusicalKey {
-  note: string;
-  mode: 'major' | 'minor';
-  confidence: number;
-}
 
 // Enhanced Studio Component with Prime Brain Integration
 const StudioPageInner: React.FC = () => {
@@ -63,7 +37,7 @@ const StudioPageInner: React.FC = () => {
   
   // Enhanced audio processing states
   const [realtimeAudioData, setRealtimeAudioData] = useState<Float32Array>(new Float32Array(512));
-  const [analysisData, setAnalysisData] = useState<any>(null); // CompleteAnalysis type
+  const [_analysisData, _setAnalysisData] = useState<any>(null); // CompleteAnalysis type
   const [visualizationMode, setVisualizationMode] = useState<'spectrum' | 'waveform' | 'harmonic' | 'meters' | 'combined'>('combined');
   
   // Sample audio data for 3D visualization
@@ -102,8 +76,8 @@ const StudioPageInner: React.FC = () => {
   const audioEngineActive = primeBrain.state.systemStatus.audioEngine.active;
   const currentMetrics = primeBrain.state.audioMetrics;
   const currentKey = primeBrain.getCurrentKey();
-  const systemHealth = primeBrain.getSystemHealth();
-  const recommendations = primeBrain.getRecommendations().slice(0, 3); // Show top 3
+  // 🎯 ANALYSIS DATA - Updated by Prime Brain
+  // _systemHealth and _recommendations tracked by Prime Brain
 
   return (
     <ProjectProvider>
@@ -313,7 +287,7 @@ const StudioPageInner: React.FC = () => {
                     </select>
                   </div>
                   <Enhanced3DVisualizer 
-                    analysisData={analysisData}
+                    analysisData={_analysisData}
                     isActive={isPlaying}
                     mode={visualizationMode}
                     interactiveMode={true}

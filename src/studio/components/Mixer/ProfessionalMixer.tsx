@@ -208,7 +208,7 @@ const ProfessionalMixer: React.FC<MixerProps> = ({ audioContext }) => {
         <div className="flex h-full">
           {/* Channel Strips */}
           <div className="flex-1 flex overflow-x-auto p-4 space-x-2">
-            {tracks.map((trackState, index) => (
+            {tracks.map((trackState) => (
               <ChannelStrip
                 key={trackState.track.id}
                 trackState={trackState}
@@ -304,7 +304,7 @@ const ChannelStrip: React.FC<ChannelStripProps> = ({
           defaultValue={track.gain}
           onChange={(e) => onGainChange(parseFloat(e.target.value))}
           className="absolute inset-0 w-full h-full appearance-none bg-transparent cursor-pointer"
-          style={{ writingMode: 'bt-lr', WebkitAppearance: 'slider-vertical' }}
+          style={{ writingMode: 'vertical-lr' as any, WebkitAppearance: 'slider-vertical' }}
         />
       </div>
 
@@ -438,7 +438,7 @@ const MasterSection: React.FC<MasterSectionProps> = ({
       {recommendations.length > 0 && (
         <div className="text-xs space-y-1">
           <div className="text-gray-400">PRIME BRAIN</div>
-          {recommendations.map(rec => (
+          {recommendations.map((rec: any) => (
             <div key={rec.id} className="text-purple-300 text-xs">
               {rec.message.slice(0, 30)}...
             </div>

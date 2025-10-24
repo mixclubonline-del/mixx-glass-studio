@@ -326,7 +326,7 @@ class AudioRoutingEngine {
     this.updateTrackRouting(track.id);
   }
 
-  addSendToTrack(trackId: string, busId: string, level: number = 0.2, preFader: boolean = false): void {
+  addSendToTrack(trackId: string, busId: string, level: number = 0.2): void {
     const track = this.routingMatrix.nodes.find(n => n.id === trackId);
     if (!track) return;
 
