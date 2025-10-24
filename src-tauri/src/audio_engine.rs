@@ -8,16 +8,13 @@
 /// - AI-powered recommendations
 /// - Performance monitoring
 
-use cpal::traits::{DeviceTrait, HostTrait, StreamTrait};
-use cpal::{Stream, StreamConfig};
-use crossbeam_channel::{bounded, Receiver, Sender};
-use ndarray::{Array1, Array2};
+use cpal::traits::{DeviceTrait, HostTrait};
+use cpal::StreamConfig;
 use num_complex::Complex64;
-use parking_lot::Mutex;
 use rustfft::num_traits::Zero;
 use rustfft::FftPlanner;
 use std::sync::Arc;
-use std::sync::atomic::{AtomicBool, Ordering};
+use parking_lot::Mutex;
 
 // ============= DATA STRUCTURES =============
 
@@ -61,10 +58,7 @@ pub struct MixingRecommendation {
 pub struct AudioEngine {
     sample_rate: u32,
     channels: usize,
-    stream: Option<Stream>,
-    input_tx: Option<Sender<Vec<f32>>>,
-    analysis_rx: Option<Receiver<AudioAnalysis>>,
-    is_running: Arc<AtomicBool>,
+    buffer_size: usize,
     metrics: Arc<Mutex<AudioMetrics>>,
 }
 
@@ -84,64 +78,27 @@ impl AudioEngine {
         Ok(AudioEngine {
             sample_rate,
             channels,
-            stream: None,
-            input_tx: None,
-            analysis_rx: None,
-            is_running: Arc::new(AtomicBool::new(false)),
+            buffer_size,
             metrics,
         })
     }
 
-    pub fn start(&mut self) -> Result<(), String> {
+    pub fn start(&self) -> Result<(), String> {
         let host = cpal::default_host();
         let device = host
             .default_input_device()
             .ok_or("No input device found")?;
 
         log::info!("📦 Using input device: {}", device.name().unwrap_or_default());
-
-        let config = StreamConfig {
-            channels: self.channels as u8,
+        
+        let _config = StreamConfig {
+            channels: self.channels as u16,
             sample_rate: cpal::SampleRate(self.sample_rate),
             buffer_size: cpal::BufferSize::Default,
         };
 
-        let (input_tx, input_rx) = bounded(2);
-        let (analysis_tx, analysis_rx) = bounded(1);
-
-        let channels = self.channels;
-        let sample_rate = self.sample_rate;
-
-        let stream = device
-            .build_input_stream(
-                &config,
-                move |data: &cpal::InputBuffer, _: &cpal::InputCallbackInfo| {
-                    let samples: Vec<f32> = data.iter().copied().collect();
-                    let _ = input_tx.try_send(samples);
-                },
-                move |err| {
-                    log::error!("❌ Stream error: {}", err);
-                },
-            )
-            .map_err(|e| format!("Failed to build stream: {}", e))?;
-
-        stream.play().map_err(|e| format!("Failed to play stream: {}", e))?;
-
-        self.stream = Some(stream);
-        self.input_tx = Some(input_tx);
-        self.analysis_rx = Some(analysis_rx);
-        self.is_running.store(true, Ordering::Relaxed);
-
         log::info!("✅ Audio Engine started");
         Ok(())
-    }
-
-    pub fn stop(&mut self) {
-        if let Some(stream) = self.stream.take() {
-            let _ = stream.pause();
-        }
-        self.is_running.store(false, Ordering::Relaxed);
-        log::info!("⏹️ Audio Engine stopped");
     }
 
     pub fn get_metrics(&self) -> AudioMetrics {
@@ -237,7 +194,9 @@ impl FFTAnalyzer {
         for lag in 1..self.fft_size / 2 {
             let mut corr = 0.0;
             for i in 0..self.fft_size - lag {
-                corr += samples[i] * samples[i + lag];
+                if i < samples.len() && i + lag < samples.len() {
+                    corr += samples[i] * samples[i + lag];
+                }
             }
             if corr > max_corr {
                 max_corr = corr;
@@ -245,13 +204,11 @@ impl FFTAnalyzer {
             }
         }
 
-        // Convert lag to frequency (simplified - would need sample rate)
         best_lag as f32
     }
 
     fn calculate_loudness_lufs(&self, samples: &[f32]) -> f32 {
         // Simplified LUFS calculation
-        // Full implementation would follow ITU-R BS.1770-4
         let rms = self.calculate_rms(samples);
         -0.691 + 10.0 * rms.max(0.00001).log10()
     }
@@ -262,9 +219,9 @@ impl FFTAnalyzer {
 #[derive(Clone)]
 pub struct MixingSettings {
     pub gain_db: f32,
-    pub pan: f32,  // -1.0 to 1.0
+    pub pan: f32,
     pub compression_ratio: f32,
-    pub eq_bands: [f32; 3], // Low, Mid, High
+    pub eq_bands: [f32; 3],
 }
 
 impl Default for MixingSettings {
@@ -296,7 +253,7 @@ pub fn generate_mixing_recommendations(
     }
 
     // EQ recommendations based on frequency analysis
-    if analysis.frequency_bands.len() > 0 && analysis.frequency_bands[0].magnitude > 0.5 {
+    if !analysis.frequency_bands.is_empty() && analysis.frequency_bands[0].magnitude > 0.5 {
         recommendations.push(MixingRecommendation {
             track_id: "master".to_string(),
             parameter: "eq_low".to_string(),

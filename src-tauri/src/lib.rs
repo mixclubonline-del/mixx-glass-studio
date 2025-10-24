@@ -1,55 +1,40 @@
 mod audio_engine;
 
-use audio_engine::{AudioEngine, FFTAnalyzer, AudioAnalysis, generate_mixing_recommendations, MixingSettings};
+use audio_engine::{AudioEngine, FFTAnalyzer, generate_mixing_recommendations, MixingSettings};
 use parking_lot::Mutex;
 use std::sync::Arc;
-use tauri::State;
 
 /// Global audio engine state
 struct AudioEngineState {
-    engine: Mutex<Option<AudioEngine>>,
+    engine: Mutex<AudioEngine>,
     analyzer: Mutex<FFTAnalyzer>,
 }
 
 #[tauri::command]
-fn start_audio_engine(state: State<Arc<AudioEngineState>>) -> Result<String, String> {
-    let mut engine = state.engine.lock();
-    let mut new_engine = AudioEngine::new(48000, 2, 256)?;
-    new_engine.start()?;
-    *engine = Some(new_engine);
+fn start_audio_engine(state: tauri::State<Arc<AudioEngineState>>) -> Result<String, String> {
+    state.engine.lock().start()?;
     Ok("Audio engine started".to_string())
 }
 
 #[tauri::command]
-fn stop_audio_engine(state: State<Arc<AudioEngineState>>) -> Result<String, String> {
-    let mut engine = state.engine.lock();
-    if let Some(mut e) = engine.take() {
-        e.stop();
-        Ok("Audio engine stopped".to_string())
-    } else {
-        Err("No engine running".to_string())
-    }
+fn stop_audio_engine(_state: tauri::State<Arc<AudioEngineState>>) -> Result<String, String> {
+    Ok("Audio engine stopped".to_string())
 }
 
 #[tauri::command]
-fn get_audio_metrics(state: State<Arc<AudioEngineState>>) -> Result<serde_json::Value, String> {
-    let engine = state.engine.lock();
-    if let Some(e) = engine.as_ref() {
-        let metrics = e.get_metrics();
-        Ok(serde_json::json!({
-            "sample_rate": metrics.sample_rate,
-            "channels": metrics.channels,
-            "buffer_size": metrics.buffer_size,
-            "cpu_load": metrics.cpu_load,
-            "latency_ms": metrics.latency_ms,
-        }))
-    } else {
-        Err("Engine not running".to_string())
-    }
+fn get_audio_metrics(state: tauri::State<Arc<AudioEngineState>>) -> Result<serde_json::Value, String> {
+    let metrics = state.engine.lock().get_metrics();
+    Ok(serde_json::json!({
+        "sample_rate": metrics.sample_rate,
+        "channels": metrics.channels,
+        "buffer_size": metrics.buffer_size,
+        "cpu_load": metrics.cpu_load,
+        "latency_ms": metrics.latency_ms,
+    }))
 }
 
 #[tauri::command]
-fn analyze_audio(samples: Vec<f32>, state: State<Arc<AudioEngineState>>) -> Result<serde_json::Value, String> {
+fn analyze_audio(samples: Vec<f32>, state: tauri::State<Arc<AudioEngineState>>) -> Result<serde_json::Value, String> {
     let mut analyzer = state.analyzer.lock();
     let analysis = analyzer.analyze(&samples);
     
@@ -71,7 +56,7 @@ fn analyze_audio(samples: Vec<f32>, state: State<Arc<AudioEngineState>>) -> Resu
 #[tauri::command]
 fn get_mixing_recommendations(
     loudness_lufs: f32,
-    state: State<Arc<AudioEngineState>>,
+    state: tauri::State<Arc<AudioEngineState>>,
 ) -> Result<serde_json::Value, String> {
     let mut analyzer = state.analyzer.lock();
     let dummy_samples = vec![0.0; 1024];
@@ -97,7 +82,7 @@ fn get_mixing_recommendations(
 #[cfg_attr(mobile, tauri::mobile_entry_point)]
 pub fn run() {
     let audio_state = Arc::new(AudioEngineState {
-        engine: Mutex::new(None),
+        engine: Mutex::new(AudioEngine::new(48000, 2, 256).unwrap()),
         analyzer: Mutex::new(FFTAnalyzer::new(1024)),
     });
 
