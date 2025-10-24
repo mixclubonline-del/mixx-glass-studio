@@ -1,7 +1,7 @@
 import { useEffect, useState } from "react";
 import { useElectron } from "./hooks/useElectron";
 import Index from "./pages/Index";
-import StudioPage from "./pages/StudioPage";
+import StudioPageV2 from "./pages/StudioPageV2";
 import FlowCanvasDemo from "./pages/FlowCanvasDemo";
 import BloomDemo from "./pages/BloomDemo";
 
@@ -59,7 +59,7 @@ const App = () => {
     <div className="min-h-screen bg-gray-900">
       {/* Desktop-native navigation - no web routing */}
       {currentView === 'index' && <Index onNavigate={(view) => setCurrentView(view as AppView)} />}
-      {currentView === 'studio' && <StudioPage />}
+      {currentView === 'studio' && <StudioPageV2 />}
       {currentView === 'flow-canvas' && <FlowCanvasDemo />}
       {currentView === 'bloom-demo' && <BloomDemo />}
     </div>
