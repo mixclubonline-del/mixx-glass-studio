@@ -8,6 +8,7 @@ import React, { createContext, useContext, useState, useCallback, useRef, useEff
 import { AudioEngine } from '@/audio/AudioEngine';
 import { StudioEngine, createStudioEngine } from '@/studio/core';
 import { primeBrain } from '@/ai/primeBrain';
+import { regionPlaybackEngine } from '@/audio/RegionPlaybackEngine';
 
 interface TransportState {
   isPlaying: boolean;
@@ -84,7 +85,7 @@ export const ProjectProvider: React.FC<{ children: React.ReactNode }> = ({ child
     studioEngine.setBPM(newBpm);
   }, [studioEngine]);
   
-  // Transport controls - Route through Prime Brain first, then to StudioEngine
+  // Transport controls - Route through Prime Brain (drives RegionPlaybackEngine via subscription)
   const play = useCallback((fromTime?: number) => {
     primeBrain.start(fromTime);
     studioEngine.play(fromTime);
@@ -93,18 +94,21 @@ export const ProjectProvider: React.FC<{ children: React.ReactNode }> = ({ child
   
   const pause = useCallback(() => {
     primeBrain.pause();
+    regionPlaybackEngine.stopAll();
     studioEngine.pause();
     setTransport(prev => ({ ...prev, isPlaying: false }));
   }, [studioEngine]);
   
   const stop = useCallback(() => {
     primeBrain.stop();
+    regionPlaybackEngine.stopAll();
     studioEngine.stop();
     setTransport(prev => ({ ...prev, isPlaying: false, currentTime: 0 }));
   }, [studioEngine]);
   
   const seek = useCallback((time: number) => {
     primeBrain.seek(time);
+    regionPlaybackEngine.seek(time);
     studioEngine.seek(time);
     setTransport(prev => ({ ...prev, currentTime: time }));
   }, [studioEngine]);
@@ -144,6 +148,7 @@ export const ProjectProvider: React.FC<{ children: React.ReactNode }> = ({ child
   const setMasterVolume = useCallback((volume: number) => {
     setMasterVolumeState(volume);
     audioEngine.setMasterGain(volume);
+    regionPlaybackEngine.setMasterVolume(volume);
   }, [audioEngine]);
   
   // Update current time during playback using Prime Brain clock
@@ -155,11 +160,20 @@ export const ProjectProvider: React.FC<{ children: React.ReactNode }> = ({ child
     return unsubscribe;
   }, []);
   
-  // Initialize audio engine settings
+  // Initialize audio engine settings and region playback
   useEffect(() => {
     audioEngine.bpm = bpm;
     audioEngine.timeSignature = timeSignature;
     audioEngine.setMasterGain(masterVolume);
+    
+    // Initialize region playback engine to listen to Prime Brain
+    regionPlaybackEngine.initialize();
+    regionPlaybackEngine.setMasterVolume(masterVolume);
+    
+    return () => {
+      // Cleanup on unmount
+      regionPlaybackEngine.stopAll();
+    };
   }, [audioEngine, bpm, timeSignature, masterVolume]);
   
   const value: ProjectContextValue = {
