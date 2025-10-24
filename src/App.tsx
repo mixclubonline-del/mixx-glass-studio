@@ -10,19 +10,22 @@ type AppView = 'index' | 'studio' | 'flow-canvas' | 'bloom-demo';
 
 const App = () => {
   const { isElectron, setupMenuHandlers, cleanup } = useElectron();
-  // FORCE: Always start in Studio mode for Electron (check both isElectron AND window.electronAPI)
-  const forceElectronMode = isElectron || (typeof window !== 'undefined' && !!window.electronAPI);
-  const [currentView, setCurrentView] = useState<AppView>(forceElectronMode ? 'studio' : 'index');
+  
+  // Detect if running in Tauri or Electron
+  const isTauri = typeof window !== 'undefined' && !!(window as any).__TAURI__;
+  const forceDesktopMode = isElectron || (typeof window !== 'undefined' && !!window.electronAPI) || isTauri;
+  const [currentView, setCurrentView] = useState<AppView>(forceDesktopMode ? 'studio' : 'index');
 
   useEffect(() => {
     console.log('🎛️ APP INIT:', {
       isElectron,
+      isTauri: typeof window !== 'undefined' && !!(window as any).__TAURI__,
       hasElectronAPI: typeof window !== 'undefined' && !!window.electronAPI,
-      forceElectronMode,
+      forceDesktopMode,
       currentView,
       platform: typeof window !== 'undefined' && window.electronAPI?.platform
     });
-  }, [isElectron, forceElectronMode, currentView]);
+  }, [isElectron, forceDesktopMode, currentView]);
 
   // Set up desktop menu handlers
   useEffect(() => {
