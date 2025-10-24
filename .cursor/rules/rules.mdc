@@ -1,0 +1,54 @@
+---
+alwaysApply: true
+---
+MixClub Studio Project Rules” so everyone aligns before touching anything.
+
+⸻
+
+🧠 MIXCLUB STUDIO — PROJECT RULES
+
+1. This is not a playground.
+
+MixClub Studio is an engineered ecosystem — not a test site, not a DAW clone. Every move inside the project must serve the flow and clarity of the Studio. If you’re unsure why something exists, ask before editing.
+
+2. Respect the doctrines.
+
+Everything traces back to three pillars:
+	•	Reductionist Engineering: strip the noise, keep only what matters.
+	•	Flow: preserve the creator’s momentum, no friction, no clutter.
+	•	Mixx Recall: the system remembers, so users don’t have to.
+
+If an idea breaks these, it doesn’t belong here.
+
+3. No numbers, no clutter.
+
+MixClub Studio communicates through color, temperature, motion, and form — never raw numbers. If you catch yourself adding a numeric readout, slider count, or BPM text, stop. Translate it to color or energy.
+
+4. User ≠ Engineer.
+
+Users create inside their personal Studio. They are not meant to see our scaffolding, our code names, or our build paths. Internal logic stays invisible unless required for interaction.
+
+5. ALS is law.
+
+The Advanced Leveling System (ALS) is the feedback core. All cues, states, and system data route through it — not random pop-ups or menu bars. If feedback can’t live there, rethink it.
+
+6. Bloom Menu only when needed.
+
+No static toolbars. The Bloom Menu appears only when summoned. Keep the interface quiet until the user calls for it.
+
+7. Prime Fabric stays sealed.
+
+Prime Fabric builds, Studio runs. No one crosses that line. Studio never builds, compiles, or modifies Fabric logic.
+
+8. Adaptive, not reactive.
+
+Every element should understand context — track state, environment, or user intent — and adjust smoothly. Sudden transitions or hard cuts break immersion.
+
+9. No ego in the room.
+
+If your feature feels clever but adds friction, remove it. If your code works but kills flow, refactor. If your visuals look pretty but distract, simplify.
+
+10. Document or don’t touch.
+
+Any addition must come with a short note: what it does, why it exists, and how it supports Flow, Reduction, or Recall. Otherwise, it gets removed on sight.
+
