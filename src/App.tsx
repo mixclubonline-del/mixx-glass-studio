@@ -11,28 +11,33 @@ type AppView = 'index' | 'studio' | 'flow-canvas' | 'bloom-demo';
 const App = () => {
   const { isElectron, setupMenuHandlers, cleanup } = useElectron();
   
-  // Detect if running in Tauri or Electron
+  // Aggressive detection: Tauri, Electron, or any non-web environment
   const isTauri = typeof window !== 'undefined' && !!(window as any).__TAURI__;
-  const isDesktopApp = isElectron || (typeof window !== 'undefined' && !!window.electronAPI) || isTauri;
-  const [currentView, setCurrentView] = useState<AppView>('index');
+  const hasElectronAPI = typeof window !== 'undefined' && !!window.electronAPI;
+  const isWebBrowser = typeof window !== 'undefined' && window.location && !isTauri && !isElectron && !hasElectronAPI;
+  
+  // DEFAULT TO STUDIO MODE (only show index in actual web browsers)
+  const [currentView, setCurrentView] = useState<AppView>(isWebBrowser ? 'index' : 'studio');
 
-  // Force studio mode in desktop apps
   useEffect(() => {
-    if (isDesktopApp) {
+    // FORCE studio mode if running in any desktop environment
+    if (!isWebBrowser) {
       setCurrentView('studio');
+      console.log('🎛️ DESKTOP APP DETECTED - Loading StudioPage');
     }
-  }, [isDesktopApp]);
+  }, [isWebBrowser]);
 
   useEffect(() => {
     console.log('🎛️ APP INIT:', {
       isElectron,
       isTauri,
-      hasElectronAPI: typeof window !== 'undefined' && !!window.electronAPI,
-      isDesktopApp,
+      hasElectronAPI,
+      isWebBrowser,
       currentView,
+      userAgent: navigator.userAgent.substring(0, 50),
       platform: typeof window !== 'undefined' && window.electronAPI?.platform
     });
-  }, [isElectron, isDesktopApp, currentView, isTauri]);
+  }, [isElectron, isTauri, hasElectronAPI, isWebBrowser, currentView]);
 
   // Set up desktop menu handlers
   useEffect(() => {
