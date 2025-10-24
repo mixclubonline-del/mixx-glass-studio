@@ -226,27 +226,6 @@ export const AdvancedTimelineView: React.FC<AdvancedTimelineViewProps> = ({
           </div>
           
           <div className="flex items-center gap-2">
-            <button 
-              onClick={() => setZoom(zoom * 0.8)}
-              className="p-1.5 rounded hover:bg-muted/50 transition-colors"
-              title="Zoom Out"
-            >
-              <ZoomOut size={16} />
-            </button>
-            
-            <button 
-              onClick={() => setZoom(zoom * 1.2)}
-              className="p-1.5 rounded hover:bg-muted/50 transition-colors"
-              title="Zoom In"
-            >
-              <ZoomIn size={16} />
-            </button>
-            
-            <div className="text-xs text-muted-foreground px-2">
-              {zoom.toFixed(0)}px/s
-            </div>
-            
-            <div className="w-px h-4 bg-border/50 mx-2" />
             
             <button 
               onClick={() => setSnapMode(snapMode === 'off' ? 'grid' : 'off')}

@@ -142,8 +142,8 @@ export function ArrangeWindow({
             <span className="text-sm font-bold tracking-wider text-muted-foreground">TRACKS</span>
           </div>
 
-          {/* Track controls - NO AUTO SCROLL */}
-          <div className="flex-1 overflow-hidden">
+          {/* Track controls */}
+          <div className="flex-1 overflow-y-auto overflow-x-hidden">
             {tracks.map((track) => (
               <div
                 key={track.id}
@@ -218,8 +218,8 @@ export function ArrangeWindow({
           {/* Overlay glass effect */}
           <div className="absolute inset-0 bg-background/60 backdrop-blur-sm" />
           
-          {/* Track lanes content - NO AUTO SCROLL */}
-          <div className="relative h-full overflow-hidden">
+          {/* Track lanes content */}
+          <div className="relative h-full overflow-y-auto overflow-x-hidden">
             <div className="absolute inset-0">
               {tracks.map((track, index) => (
                 <div

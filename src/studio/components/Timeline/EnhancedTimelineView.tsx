@@ -231,20 +231,6 @@ export const EnhancedTimelineView: React.FC<EnhancedTimelineViewProps> = ({
         </div>
       </div>
 
-      {/* Bottom controls */}
-      <div className="absolute bottom-4 right-4 flex gap-2 items-center glass px-4 py-2 rounded-lg border border-border/50">
-        <span className="text-xs text-muted-foreground">Zoom:</span>
-        <input
-          type="range"
-          min="10"
-          max="500"
-          step="5"
-          value={zoom}
-          onChange={(e) => setZoom(Number(e.target.value))}
-          className="w-32"
-        />
-        <span className="text-xs font-mono">{Math.round(zoom)}px/s</span>
-      </div>
 
       {/* Hidden file input */}
       <input

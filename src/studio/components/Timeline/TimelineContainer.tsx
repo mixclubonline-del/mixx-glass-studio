@@ -167,19 +167,6 @@ export function TimelineContainer({
         </div>
       </div>
       
-      {/* Bottom controls */}
-      <div className="absolute bottom-2 right-2 flex gap-2 items-center glass px-3 py-1 rounded text-xs">
-        <span className="text-muted-foreground">Zoom:</span>
-        <input
-          type="range"
-          min="10"
-          max="500"
-          value={zoom}
-          onChange={(e) => setZoom(Number(e.target.value))}
-          className="w-24 h-1 bg-secondary rounded-lg appearance-none cursor-pointer"
-        />
-        <span className="text-foreground font-mono">{Math.round(zoom)}px/s</span>
-      </div>
     </div>
   );
 }
