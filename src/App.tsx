@@ -18,23 +18,25 @@ const App = () => {
   useEffect(() => {
     const isTauri = !!(window as any).__TAURI__;
     const hasElectronAPI = !!window.electronAPI;
-    const isWebBrowser = !isTauri && !isElectron && !hasElectronAPI && window.location.hostname !== 'localhost';
+    // Key fix: Tauri RUNS ON LOCALHOST, so don't exclude it!
+    const isWebBrowser = !isTauri && !isElectron && !hasElectronAPI && window.location.protocol === 'https:';
     
     console.log('🎛️ APP MOUNT:', {
       isTauri,
       hasElectronAPI,
       isElectron,
       isWebBrowser,
+      protocol: window.location.protocol,
       hostname: window.location.hostname
     });
 
     // Always show studio in desktop environments
     if (!isWebBrowser) {
       setCurrentView('studio');
-      console.log('🎛️ DESKTOP APP DETECTED - Loading StudioPage');
+      console.log('✅ DESKTOP APP DETECTED - Loading StudioPage');
     } else {
       setCurrentView('index');
-      console.log('🎛️ WEB BROWSER DETECTED - Loading Index');
+      console.log('� WEB BROWSER DETECTED - Loading Index');
     }
   }, [isElectron]);
 
