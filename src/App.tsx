@@ -13,19 +13,26 @@ const App = () => {
   
   // Detect if running in Tauri or Electron
   const isTauri = typeof window !== 'undefined' && !!(window as any).__TAURI__;
-  const forceDesktopMode = isElectron || (typeof window !== 'undefined' && !!window.electronAPI) || isTauri;
-  const [currentView, setCurrentView] = useState<AppView>(forceDesktopMode ? 'studio' : 'index');
+  const isDesktopApp = isElectron || (typeof window !== 'undefined' && !!window.electronAPI) || isTauri;
+  const [currentView, setCurrentView] = useState<AppView>('index');
+
+  // Force studio mode in desktop apps
+  useEffect(() => {
+    if (isDesktopApp) {
+      setCurrentView('studio');
+    }
+  }, [isDesktopApp]);
 
   useEffect(() => {
     console.log('🎛️ APP INIT:', {
       isElectron,
-      isTauri: typeof window !== 'undefined' && !!(window as any).__TAURI__,
+      isTauri,
       hasElectronAPI: typeof window !== 'undefined' && !!window.electronAPI,
-      forceDesktopMode,
+      isDesktopApp,
       currentView,
       platform: typeof window !== 'undefined' && window.electronAPI?.platform
     });
-  }, [isElectron, forceDesktopMode, currentView]);
+  }, [isElectron, isDesktopApp, currentView, isTauri]);
 
   // Set up desktop menu handlers
   useEffect(() => {
