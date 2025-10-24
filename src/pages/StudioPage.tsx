@@ -6,6 +6,7 @@ import TopMenuBar from '../studio/components/Navigation/TopMenuBar';
 import Timeline from '../studio/components/Timeline';
 import TrackList from '../studio/components/TrackManagement/TrackList';
 import ALSControlPanel from '../studio/components/ALS/ALSControlPanel';
+import ALSControlPanelEnhanced from '../studio/components/ALS/ALSControlPanelEnhanced';
 import AIMixingAssistant from '../studio/components/AI/AIMixingAssistant';
 import BloomMenu from '../studio/components/Bloom/BloomMenu';
 import ProfessionalMixer from '../studio/components/Mixer/ProfessionalMixer';
@@ -281,10 +282,10 @@ const StudioPageInner: React.FC = () => {
                       frequency: Array.from({ length: 32 }, () => Math.random() * 0.8),
                       harmonics: Array.from({ length: 16 }, () => Math.random() * 0.6)
                     }}
-                    isActive={primeBrainActive}
+                    isActive={true}
                     mode="master"
                   />
-                  <ALSControlPanel />
+                  <ALSControlPanelEnhanced />
                 </div>
               )}
               {activePanel === 'ai' && <AIMixingAssistant />}

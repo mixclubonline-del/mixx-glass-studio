@@ -1,6 +1,6 @@
 /**
  * Mixx Club Studio - Advanced Leveling System (ALS)
- * Comprehensive feedback core with visual feedback
+ * Professional real-time audio analysis with spectrum visualization
  */
 
 import React, { useState, useEffect } from 'react';
