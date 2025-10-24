@@ -8,6 +8,7 @@ import TrackList from '../studio/components/TrackManagement/TrackList';
 import ALSControlPanel from '../studio/components/ALS/ALSControlPanel';
 import AIMixingAssistant from '../studio/components/AI/AIMixingAssistant';
 import BloomMenu from '../studio/components/Bloom/BloomMenu';
+import ProfessionalMixer from '../studio/components/Mixer/ProfessionalMixer';
 import NativeVelvetCurveBridge from '../components/NativeVelvetCurveBridge';
 import HushInputBridge from '../components/HushInputBridge';
 import HarmonicLatticeBridge from '../components/HarmonicLatticeBridge';
@@ -50,7 +51,7 @@ interface MusicalKey {
 const StudioPageInner: React.FC = () => {
   const { isElectron } = useElectron();
   const [bpm, setBpm] = useState(120);
-  const [activePanel, setActivePanel] = useState<'timeline' | 'tracks' | 'als' | 'ai' | 'bloom'>('timeline');
+  const [activePanel, setActivePanel] = useState<'timeline' | 'tracks' | 'als' | 'ai' | 'bloom' | 'mixer'>('timeline');
   const [isPlaying, setIsPlaying] = useState(false);
   const [currentTime, setCurrentTime] = useState(0);
   const [duration] = useState(180); // 3 minutes
@@ -288,6 +289,7 @@ const StudioPageInner: React.FC = () => {
               )}
               {activePanel === 'ai' && <AIMixingAssistant />}
               {activePanel === 'bloom' && <BloomMenu />}
+              {activePanel === 'mixer' && <ProfessionalMixer />}
             </div>
           </div>
         </div>
