@@ -15,11 +15,12 @@ interface ActiveSource {
 }
 
 export class RegionPlaybackEngine {
-  private audioContext: AudioContext;
+  audioContext: AudioContext;
   private masterGain: GainNode;
   private activeSources: Map<string, ActiveSource> = new Map();
+  private scheduledRegions: Set<string> = new Set();
+  private scheduleAheadTime = 0.1; // 100ms look-ahead
   private lastTime: number = 0;
-  private isInitialized: boolean = false;
 
   constructor() {
     this.audioContext = new AudioContext();
@@ -29,66 +30,56 @@ export class RegionPlaybackEngine {
   }
 
   /**
-   * Initialize and start listening to Prime Brain
+   * Update playback state - called by ProjectContext with sample-accurate time
    */
-  initialize() {
-    if (this.isInitialized) return;
-    
-    primeBrain.subscribe((time, deltaTime) => {
-      this.update(time);
-    });
-    
-    this.isInitialized = true;
-  }
-
-  /**
-   * Update playback state based on current time
-   */
-  private update(currentTime: number) {
+  update(currentTimeSamples: number) {
     if (!primeBrain.getIsRunning()) {
       this.stopAll();
       return;
     }
 
+    const sr = this.audioContext.sampleRate;
+    const currentTimeSeconds = currentTimeSamples / sr;
+    const scheduleUntil = currentTimeSeconds + this.scheduleAheadTime;
+
     const { regions, tracks } = useTracksStore.getState();
 
-    // Check each region
     regions.forEach(region => {
       if (!region.audioBuffer || region.muted) return;
-
+      
       const track = tracks.find(t => t.id === region.trackId);
       if (!track || track.muted) return;
 
-      const regionStart = region.startTime;
-      const regionEnd = region.startTime + region.duration;
+      const regionStartSec = region.startTime;
+      const regionEndSec = regionStartSec + region.duration;
 
-      const shouldBePlaying = currentTime >= regionStart && currentTime < regionEnd;
-      const isPlaying = this.activeSources.has(region.id);
-
-      // Start region if we crossed its start point
-      if (shouldBePlaying && !isPlaying && (currentTime > this.lastTime || Math.abs(currentTime - regionStart) < 0.05)) {
-        this.startRegion(region, track, currentTime);
+      // Schedule if region starts in look-ahead window
+      const inWindow = regionStartSec >= currentTimeSeconds && regionStartSec < scheduleUntil;
+      const notScheduled = !this.scheduledRegions.has(region.id);
+      
+      if (inWindow && notScheduled) {
+        this.scheduleRegion(region, track, currentTimeSamples);
+        this.scheduledRegions.add(region.id);
       }
 
-      // Stop region if we passed its end
-      if (!shouldBePlaying && isPlaying) {
+      // Clean up if region ended
+      if (currentTimeSeconds >= regionEndSec && this.activeSources.has(region.id)) {
         this.stopRegion(region.id);
+        this.scheduledRegions.delete(region.id);
       }
     });
 
-    this.lastTime = currentTime;
+    this.lastTime = currentTimeSeconds;
   }
 
   /**
-   * Start playing a region
+   * Schedule a region to play in the future (sample-accurate)
    */
-  private startRegion(region: Region, track: any, currentTime: number) {
+  private scheduleRegion(region: Region, track: any, nowSamples: number) {
     try {
-      // Resume audio context if suspended
-      if (this.audioContext.state === 'suspended') {
-        this.audioContext.resume();
-      }
-
+      const sr = this.audioContext.sampleRate;
+      const nowSeconds = nowSamples / sr;
+      
       const source = this.audioContext.createBufferSource();
       source.buffer = region.audioBuffer;
 
@@ -98,60 +89,45 @@ export class RegionPlaybackEngine {
       const regionGain = region.gain ?? 1;
       gainNode.gain.value = regionGain * trackVolume;
 
-      // Apply fade-in
-      if (region.fadeIn > 0) {
-        const fadeInDuration = Math.min(region.fadeIn, region.duration);
-        gainNode.gain.setValueAtTime(0, this.audioContext.currentTime);
-        gainNode.gain.linearRampToValueAtTime(
-          regionGain * trackVolume,
-          this.audioContext.currentTime + fadeInDuration
-        );
-      }
-
-      // Apply fade-out
-      if (region.fadeOut > 0) {
-        const fadeOutStart = this.audioContext.currentTime + (region.duration - (currentTime - region.startTime)) - region.fadeOut;
-        if (fadeOutStart > this.audioContext.currentTime) {
-          gainNode.gain.setValueAtTime(regionGain * trackVolume, fadeOutStart);
-          gainNode.gain.linearRampToValueAtTime(0, fadeOutStart + region.fadeOut);
-        }
-      }
-
       // Connect: source -> gain -> master
       source.connect(gainNode);
       gainNode.connect(this.masterGain);
 
-      // Calculate offset into buffer
-      const offsetIntoRegion = Math.max(0, currentTime - region.startTime);
-      const bufferStartTime = (region.bufferOffset ?? 0) + offsetIntoRegion;
-      const duration = Math.min(region.duration - offsetIntoRegion, region.audioBuffer.duration - bufferStartTime);
+      // Calculate EXACT start time
+      const regionStartSeconds = region.startTime;
+      const deltaSeconds = regionStartSeconds - nowSeconds;
+      const whenToStart = this.audioContext.currentTime + deltaSeconds;
+
+      // Buffer offset
+      const bufferOffset = region.bufferOffset ?? 0;
+      const duration = Math.min(region.duration, region.audioBuffer.duration - bufferOffset);
 
       // Validate timing
-      if (bufferStartTime >= region.audioBuffer.duration || duration <= 0) {
-        console.warn('Invalid region timing:', { bufferStartTime, duration, regionId: region.id });
+      if (bufferOffset >= region.audioBuffer.duration || duration <= 0) {
+        console.warn('Invalid region timing:', { bufferOffset, duration, regionId: region.id });
         return;
       }
 
-      // Start playback
-      const when = this.audioContext.currentTime;
-      source.start(when, bufferStartTime, duration);
+      // START IN THE FUTURE (sample-accurate)
+      source.start(whenToStart, bufferOffset, duration);
 
       // Store active source
       this.activeSources.set(region.id, {
         source,
         gain: gainNode,
         regionId: region.id,
-        startedAt: currentTime
+        startedAt: regionStartSeconds
       });
 
       // Clean up when done
       source.onended = () => {
         this.stopRegion(region.id);
+        this.scheduledRegions.delete(region.id);
       };
 
-      console.log(`🎵 Started region: ${region.name} at ${currentTime.toFixed(2)}s (offset: ${bufferStartTime.toFixed(2)}s, duration: ${duration.toFixed(2)}s)`);
+      console.log(`🎵 Scheduled: ${region.name} at +${(deltaSeconds * 1000).toFixed(1)}ms`);
     } catch (error) {
-      console.error('Failed to start region:', region.id, error);
+      console.error('Schedule failed:', region.id, error);
     }
   }
 
@@ -179,6 +155,7 @@ export class RegionPlaybackEngine {
     this.activeSources.forEach((source, id) => {
       this.stopRegion(id);
     });
+    this.scheduledRegions.clear();
   }
 
   /**
@@ -186,6 +163,7 @@ export class RegionPlaybackEngine {
    */
   seek(time: number) {
     this.stopAll();
+    this.scheduledRegions.clear();
     this.lastTime = time;
   }
 

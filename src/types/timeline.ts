@@ -10,6 +10,8 @@ export interface Region {
   // Positioning
   startTime: number; // seconds in timeline
   duration: number;
+  startTimeSamples?: number; // sample-accurate position
+  lengthSamples?: number; // sample-accurate length
   
   // Audio data
   bufferOffset: number; // start position in source buffer

@@ -43,7 +43,7 @@ export const TransportEngine: React.FC<TransportEngineProps> = ({
     primeBrain.start(currentTime);
 
     const unsubscribe = primeBrain.subscribe((time, deltaTime) => {
-      setCurrentTime(time);
+      // Display-only: don't write to store (ProjectContext handles that)
       onTick?.(deltaTime);
 
       // Beat tick

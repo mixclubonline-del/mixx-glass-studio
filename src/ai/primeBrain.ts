@@ -40,6 +40,8 @@ class PrimeBrainStem {
   // Master Clock functionality
   private isRunning = false;
   private currentTime = 0;
+  private currentTimeSamples = 0;
+  private sampleRate = 48000;
   private lastFrameTime = 0;
   private rafId: number | null = null;
   private playbackRate = 1.0;
@@ -224,6 +226,7 @@ class PrimeBrainStem {
   start(fromTime?: number) {
     if (fromTime !== undefined) {
       this.currentTime = fromTime;
+      this.currentTimeSamples = Math.round(fromTime * this.sampleRate);
     }
     this.isRunning = true;
     this.lastFrameTime = performance.now();
@@ -278,6 +281,7 @@ class PrimeBrainStem {
    */
   seek(time: number) {
     this.currentTime = time;
+    this.currentTimeSamples = Math.round(time * this.sampleRate);
 
     telemetry.log({
       source: 'PBS',
@@ -338,13 +342,16 @@ class PrimeBrainStem {
     const deltaTime = (now - this.lastFrameTime) / 1000; // Convert to seconds
     this.lastFrameTime = now;
 
-    // Update time with playback rate
-    this.currentTime += deltaTime * this.playbackRate;
+    // Update time with playback rate (sample-accurate)
+    const deltaSamples = Math.round(deltaTime * this.sampleRate * this.playbackRate);
+    this.currentTimeSamples += deltaSamples;
+    this.currentTime = this.currentTimeSamples / this.sampleRate;
 
     // Handle looping
     if (this.loopEnabled && this.loopEnd > this.loopStart) {
       if (this.currentTime >= this.loopEnd) {
         this.currentTime = this.loopStart;
+        this.currentTimeSamples = Math.round(this.loopStart * this.sampleRate);
         
         telemetry.log({
           source: 'PBS',

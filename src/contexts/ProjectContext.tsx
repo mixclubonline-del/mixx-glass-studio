@@ -86,7 +86,12 @@ export const ProjectProvider: React.FC<{ children: React.ReactNode }> = ({ child
   }, [studioEngine]);
   
   // Transport controls - Route through Prime Brain (drives RegionPlaybackEngine via subscription)
-  const play = useCallback((fromTime?: number) => {
+  const play = useCallback(async (fromTime?: number) => {
+    // Resume AudioContext ONCE at transport start
+    if (regionPlaybackEngine.audioContext.state === 'suspended') {
+      await regionPlaybackEngine.audioContext.resume();
+    }
+    
     primeBrain.start(fromTime);
     studioEngine.play(fromTime);
     setTransport(prev => ({ ...prev, isPlaying: true }));
@@ -151,23 +156,29 @@ export const ProjectProvider: React.FC<{ children: React.ReactNode }> = ({ child
     regionPlaybackEngine.setMasterVolume(volume);
   }, [audioEngine]);
   
-  // Update current time during playback using Prime Brain clock
+  // Update current time during playback using Prime Brain clock (SINGLE SOURCE OF TRUTH)
   useEffect(() => {
     const unsubscribe = primeBrain.subscribe((time) => {
+      // Update transport state
       setTransport(prev => ({ ...prev, currentTime: time }));
+      
+      // Sync timeline store for UI display
+      const { setCurrentTime } = require('@/store/timelineStore').useTimelineStore.getState();
+      setCurrentTime(time);
+      
+      // Drive region playback with sample-accurate time
+      const samples = Math.round(time * regionPlaybackEngine.audioContext.sampleRate);
+      regionPlaybackEngine.update(samples);
     });
     
     return unsubscribe;
   }, []);
   
-  // Initialize audio engine settings and region playback
+  // Initialize audio engine settings
   useEffect(() => {
     audioEngine.bpm = bpm;
     audioEngine.timeSignature = timeSignature;
     audioEngine.setMasterGain(masterVolume);
-    
-    // Initialize region playback engine to listen to Prime Brain
-    regionPlaybackEngine.initialize();
     regionPlaybackEngine.setMasterVolume(masterVolume);
     
     return () => {

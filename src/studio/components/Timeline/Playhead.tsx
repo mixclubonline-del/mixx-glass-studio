@@ -13,28 +13,16 @@ interface PlayheadProps {
 }
 
 export function Playhead({ containerWidth, containerHeight }: PlayheadProps) {
-  const { duration, zoom, scrollX } = useTimelineStore();
-  const [currentTime, setCurrentTime] = useState(0);
+  const { duration, zoom, scrollX, currentTime } = useTimelineStore();
   const [isPlaying, setIsPlaying] = useState(false);
   
-  // Subscribe directly to Prime Brain for time updates
+  // Read time from timeline store (written by ProjectContext)
   useEffect(() => {
-    const unsubscribe = primeBrain.subscribe((time) => {
-      setCurrentTime(time);
-    });
-    
-    // Sync playing state
-    const syncPlayingState = () => {
+    const interval = setInterval(() => {
       setIsPlaying(primeBrain.getIsRunning());
-    };
+    }, 100);
     
-    syncPlayingState();
-    const interval = setInterval(syncPlayingState, 100);
-    
-    return () => {
-      unsubscribe();
-      clearInterval(interval);
-    };
+    return () => clearInterval(interval);
   }, []);
   
   if (duration === 0) return null;
