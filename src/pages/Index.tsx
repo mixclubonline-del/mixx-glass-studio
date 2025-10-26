@@ -161,7 +161,7 @@ function TrackHeader({
           </div>
           <div className="flex items-center gap-1 pt-1">
             <Button
-              size="xs"
+              size="sm"
               variant={muted ? "default" : "outline"}
               onClick={(e) => {
                 e.stopPropagation();
@@ -171,7 +171,7 @@ function TrackHeader({
               M
             </Button>
             <Button
-              size="xs"
+              size="sm"
               variant={solo ? "default" : "outline"}
               onClick={(e) => {
                 e.stopPropagation();
@@ -181,7 +181,7 @@ function TrackHeader({
               S
             </Button>
             <Button
-              size="xs"
+              size="sm"
               variant={recordArmed ? "default" : "outline"}
               onClick={(e) => {
                 e.stopPropagation();
@@ -191,7 +191,7 @@ function TrackHeader({
               R
             </Button>
             <Button
-              size="xs"
+              size="sm"
               variant="outline"
               onClick={(e) => {
                 e.stopPropagation();
@@ -503,10 +503,7 @@ export default function Index() {
         }
 
         // Create region on that track (start at 0); attach precise meta
-        const sr =
-          (audioEngine.getSampleRate && audioEngine.getSampleRate()) ||
-          (audioEngine.audioContext && audioEngine.audioContext.sampleRate) ||
-          48000;
+        const sr = (audioEngine as any).context?.sampleRate || 48000;
 
         const duration = loadedTrack.buffer.duration;
         const regionId = `region-${trackId}-${Date.now()}`;
