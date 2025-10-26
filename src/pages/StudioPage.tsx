@@ -18,6 +18,7 @@ import { CollapsibleMeteringPanel } from "../studio/components/Metering/Collapsi
 import { AudioPlaybackCoordinator } from "@/audio/AudioPlaybackCoordinator";
 import { useAudioRecording } from "@/hooks/useAudioRecording";
 import { useTracksStore } from "@/store/tracksStore";
+import { ArrangeBrowserPanel } from "@/studio/components/Timeline/ArrangeBrowserPanel";
 
 // Inner component that uses ProjectContext
 function StudioPageContent() {
@@ -110,40 +111,51 @@ function StudioPageContent() {
 
   return (
     <div className="h-screen flex flex-col bg-background">
-      {/* Unified Transport Bar - Always visible */}
-      <div className="px-3 pt-3">
+      {/* Top Bar: Transport Controls */}
+      <div className="flex-none border-b border-border/30">
         <UnifiedTransportBar />
       </div>
       
-      {/* View Switcher */}
-      <div className="px-3 py-2 border-b border-border/30">
-        <ViewSwitcher />
+      {/* Main Content Area: Sidebar + Content */}
+      <div className="flex-1 flex overflow-hidden">
+        {/* Left Sidebar - Context-aware browser/tools */}
+        <div className="w-80 flex-none border-r border-border/30 bg-card/50 backdrop-blur-sm overflow-y-auto">
+          {currentView === 'producer-lab' ? (
+            <ProducerLab />
+          ) : currentView === 'ai-studio' ? (
+            <MixxAIStudio />
+          ) : (
+            <ArrangeBrowserPanel />
+          )}
+        </div>
+
+        {/* Main Content Area */}
+        <ViewContainer className="flex-1 flex flex-col overflow-hidden">
+          {/* View Switcher - Now integrated into main area */}
+          <div className="flex-none px-3 py-2 border-b border-border/30 bg-background/80 backdrop-blur-sm">
+            <ViewSwitcher />
+          </div>
+          
+          {/* Main Timeline/Arrange View */}
+          <div className="flex-1 overflow-hidden">
+            <ArrangeWindow
+              bpm={bpm}
+              onBpmChange={setBpm}
+              isPlaying={transport.isPlaying}
+              onPlay={play}
+              onPause={pause}
+              onStop={stop}
+              onRecord={handleRecord}
+              currentTime={transport.currentTime}
+              masterVolume={masterVolume}
+              onMasterVolumeChange={setMasterVolume}
+            />
+          </div>
+        </ViewContainer>
+
+        {/* Right Panel - Metering (collapsible) */}
+        <CollapsibleMeteringPanel />
       </div>
-
-      {/* View Content */}
-      <ViewContainer className="flex-1 overflow-hidden">
-        {currentView === 'ai-studio' ? (
-          <MixxAIStudio />
-        ) : currentView === 'producer-lab' ? (
-          <ProducerLab />
-        ) : (
-          <ArrangeWindow
-            bpm={bpm}
-            onBpmChange={setBpm}
-            isPlaying={transport.isPlaying}
-            onPlay={play}
-            onPause={pause}
-            onStop={stop}
-            onRecord={handleRecord}
-            currentTime={transport.currentTime}
-            masterVolume={masterVolume}
-            onMasterVolumeChange={setMasterVolume}
-          />
-        )}
-      </ViewContainer>
-
-      {/* Global Collapsible Metering Panel - accessible from View menu */}
-      <CollapsibleMeteringPanel />
     </div>
   );
 }
