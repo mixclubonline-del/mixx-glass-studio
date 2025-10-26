@@ -2,35 +2,20 @@
  * TrackHeader - Enhanced track header with all professional controls
  */
 
-import { useState } from 'react';
-import { 
-  Circle, 
-  Lock, 
-  Unlock, 
-  ChevronDown,
-  Edit3,
-  Trash2,
-  Copy,
-  StickyNote
-} from 'lucide-react';
-import { Button } from '@/components/ui/button';
-import { Input } from '@/components/ui/input';
+import { useState } from "react";
+import { Circle, Lock, Unlock, ChevronDown, Edit3, Trash2, Copy, StickyNote } from "lucide-react";
+import { Button } from "@/components/ui/button";
+import { Input } from "@/components/ui/input";
 import {
   DropdownMenu,
   DropdownMenuContent,
   DropdownMenuItem,
   DropdownMenuTrigger,
-} from '@/components/ui/dropdown-menu';
-import { MenubarSeparator } from '@/components/ui/menubar';
-import {
-  Select,
-  SelectContent,
-  SelectItem,
-  SelectTrigger,
-  SelectValue,
-} from '@/components/ui/select';
-import { cn } from '@/lib/utils';
-import { ProfessionalPeakMeter } from '../Metering/ProfessionalPeakMeter';
+} from "@/components/ui/dropdown-menu";
+import { MenubarSeparator } from "@/components/ui/menubar";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import { cn } from "@/lib/utils";
+import { ProfessionalPeakMeter } from "../Metering/ProfessionalPeakMeter";
 
 interface TrackHeaderProps {
   id: string;
@@ -41,7 +26,7 @@ interface TrackHeaderProps {
   solo: boolean;
   recordArmed: boolean;
   locked: boolean;
-  automationMode: 'off' | 'read' | 'touch' | 'latch' | 'write';
+  automationMode: "off" | "read" | "touch" | "latch" | "write";
   peakLevel: { left: number; right: number };
   pluginCount: number;
   isSelected: boolean;
@@ -95,17 +80,13 @@ export function TrackHeader({
     <div
       className={cn(
         "flex items-center gap-2 px-2 border-b border-border/50 hover:bg-secondary/20 transition-colors",
-        isSelected && "bg-secondary/40 ring-1 ring-primary/30"
+        isSelected && "bg-secondary/40 ring-1 ring-primary/30",
       )}
       style={{ height: `${height}px` }}
       onClick={() => onSelect(id)}
     >
       {/* Color indicator */}
-      <Circle
-        className="w-3 h-3 shrink-0 cursor-pointer"
-        fill={color}
-        stroke={color}
-      />
+      <Circle className="w-3 h-3 shrink-0 cursor-pointer" fill={color} stroke={color} />
 
       {/* Track name */}
       <div className="flex-1 min-w-0">
@@ -115,8 +96,8 @@ export function TrackHeader({
             onChange={(e) => setEditName(e.target.value)}
             onBlur={handleNameSubmit}
             onKeyDown={(e) => {
-              if (e.key === 'Enter') handleNameSubmit();
-              if (e.key === 'Escape') {
+              if (e.key === "Enter") handleNameSubmit();
+              if (e.key === "Escape") {
                 setEditName(name);
                 setIsEditing(false);
               }
@@ -126,7 +107,7 @@ export function TrackHeader({
             onClick={(e) => e.stopPropagation()}
           />
         ) : (
-          <span 
+          <span
             className="text-sm truncate block cursor-text"
             onDoubleClick={(e) => {
               e.stopPropagation();
@@ -139,13 +120,8 @@ export function TrackHeader({
       </div>
 
       {/* Inline peak meter */}
-      <div className="shrink-0" style={{ width: '16px', height: '60px' }}>
-        <ProfessionalPeakMeter
-          level={peakLevel}
-          width={16}
-          height={60}
-          stereo={true}
-        />
+      <div className="shrink-0" style={{ width: "16px", height: "60px" }}>
+        <ProfessionalPeakMeter level={peakLevel} width={16} height={60} stereo={true} />
       </div>
 
       {/* Record arm */}
@@ -154,7 +130,7 @@ export function TrackHeader({
         size="icon"
         className={cn(
           "w-7 h-7 shrink-0 rounded-full",
-          recordArmed && "bg-destructive/20 text-destructive ring-2 ring-destructive animate-pulse"
+          recordArmed && "bg-destructive/20 text-destructive ring-2 ring-destructive animate-pulse",
         )}
         onClick={(e) => {
           e.stopPropagation();
@@ -168,10 +144,7 @@ export function TrackHeader({
       <Button
         variant="ghost"
         size="icon"
-        className={cn(
-          "w-7 h-7 shrink-0 text-xs font-bold",
-          muted && "bg-muted text-muted-foreground"
-        )}
+        className={cn("w-7 h-7 shrink-0 text-xs font-bold", muted && "bg-muted text-muted-foreground")}
         onClick={(e) => {
           e.stopPropagation();
           onMuteToggle(id);
@@ -184,10 +157,7 @@ export function TrackHeader({
       <Button
         variant="ghost"
         size="icon"
-        className={cn(
-          "w-7 h-7 shrink-0 text-xs font-bold",
-          solo && "bg-[hsl(var(--fire-red))] text-white"
-        )}
+        className={cn("w-7 h-7 shrink-0 text-xs font-bold", solo && "bg-[hsl(var(--fire-red))] text-white")}
         onClick={(e) => {
           e.stopPropagation();
           onSoloToggle(id);
@@ -197,14 +167,8 @@ export function TrackHeader({
       </Button>
 
       {/* Automation mode */}
-      <Select
-        value={automationMode}
-        onValueChange={(value) => onAutomationModeChange(id, value)}
-      >
-        <SelectTrigger 
-          className="w-16 h-7 text-xs shrink-0"
-          onClick={(e) => e.stopPropagation()}
-        >
+      <Select value={automationMode} onValueChange={(value) => onAutomationModeChange(id, value)}>
+        <SelectTrigger className="w-16 h-7 text-xs shrink-0" onClick={(e) => e.stopPropagation()}>
           <SelectValue />
         </SelectTrigger>
         <SelectContent>
@@ -227,10 +191,7 @@ export function TrackHeader({
       <Button
         variant="ghost"
         size="icon"
-        className={cn(
-          "w-7 h-7 shrink-0",
-          locked && "text-primary"
-        )}
+        className={cn("w-7 h-7 shrink-0", locked && "text-primary")}
         onClick={(e) => {
           e.stopPropagation();
           onLockToggle(id);
@@ -260,10 +221,7 @@ export function TrackHeader({
             Add Note
           </DropdownMenuItem>
           <MenubarSeparator />
-          <DropdownMenuItem 
-            onClick={() => onDelete(id)}
-            className="text-destructive focus:text-destructive"
-          >
+          <DropdownMenuItem onClick={() => onDelete(id)} className="text-destructive focus:text-destructive">
             <Trash2 className="w-4 h-4 mr-2" />
             Delete Track
           </DropdownMenuItem>
