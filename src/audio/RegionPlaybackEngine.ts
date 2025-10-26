@@ -108,6 +108,18 @@ export class RegionPlaybackEngine {
         return;
       }
 
+      // Debug logging
+      console.log(`🎵 Scheduling: ${region.name}`, {
+        regionStart: regionStartSeconds.toFixed(3),
+        now: nowSeconds.toFixed(3),
+        delta: deltaSeconds.toFixed(3),
+        whenToStart: whenToStart.toFixed(3),
+        hasBuffer: !!region.audioBuffer,
+        bufferDuration: region.audioBuffer.duration.toFixed(3),
+        contextState: this.audioContext.state,
+        contextTime: this.audioContext.currentTime.toFixed(3),
+      });
+
       // START IN THE FUTURE (sample-accurate)
       source.start(whenToStart, bufferOffset, duration);
 

@@ -12,6 +12,8 @@ import { CollapsibleTimelineToolbar } from './CollapsibleTimelineToolbar';
 import { Button } from '@/components/ui/button';
 import { Upload, Plus } from 'lucide-react';
 import { useToast } from '@/hooks/use-toast';
+import { regionPlaybackEngine } from '@/audio/RegionPlaybackEngine';
+import { primeBrain } from '@/ai/primeBrain';
 
 interface EnhancedTimelineViewProps {
   bpm: number;
@@ -88,7 +90,8 @@ export const EnhancedTimelineView: React.FC<EnhancedTimelineViewProps> = ({
   const handleFileUpload = useCallback(async (files: FileList | null) => {
     if (!files || files.length === 0) return;
 
-    const waveformGen = new WaveformGenerator();
+    // Use shared AudioContext from playback engine
+    const waveformGen = new WaveformGenerator(regionPlaybackEngine.audioContext);
     
     for (const file of Array.from(files)) {
       try {
@@ -120,13 +123,20 @@ export const EnhancedTimelineView: React.FC<EnhancedTimelineViewProps> = ({
           sends: [],
         });
 
+        // Calculate sample-accurate region placement
+        const sampleRate = regionPlaybackEngine.audioContext.sampleRate;
+        const startTimeSamples = 0; // Place at beginning
+        const lengthSamples = Math.round(audioData.duration * sampleRate);
+
         // Add region
         addRegion({
           id: regionId,
           trackId,
           name: baseName,
           startTime: 0,
+          startTimeSamples, // Sample-accurate position
           duration: audioData.duration,
+          lengthSamples, // Sample-accurate length
           bufferOffset: 0,
           bufferDuration: audioData.duration,
           fadeIn: 0,
@@ -140,10 +150,35 @@ export const EnhancedTimelineView: React.FC<EnhancedTimelineViewProps> = ({
           bins: audioData.bins,
         });
 
+        // Notify Prime Brain of audio import
+        primeBrain.processSceneChange({
+          sceneId: regionId,
+          sceneName: `AUDIO_IMPORTED: ${baseName}`,
+          timestamp: Date.now(),
+        });
+
         // Update duration if needed
         if (audioData.duration > duration) {
           setDuration(audioData.duration);
         }
+
+        // Auto-scroll and zoom to show imported region
+        setScrollX(0);
+        setZoom(Math.max(50, dimensions.width / (audioData.duration + 5)));
+
+        // Debug logging
+        console.log('✅ Region added:', {
+          id: regionId,
+          trackId,
+          startTime: 0,
+          startTimeSamples,
+          duration: audioData.duration,
+          lengthSamples,
+          hasAudioBuffer: !!audioData.buffer,
+          hasPeaks: !!audioData.peaks,
+          peaksLength: audioData.peaks?.length || 0,
+          contextState: regionPlaybackEngine.audioContext.state,
+        });
 
         toast({
           title: 'Audio loaded',
@@ -159,8 +194,9 @@ export const EnhancedTimelineView: React.FC<EnhancedTimelineViewProps> = ({
       }
     }
 
+    // Dispose AFTER all files processed
     waveformGen.dispose();
-  }, [tracks, trackCounter, duration, addTrack, addRegion, setDuration, toast]);
+  }, [tracks, trackCounter, duration, dimensions.width, addTrack, addRegion, setDuration, setScrollX, setZoom, toast]);
 
   // Handle zoom (ctrl+wheel)
   useEffect(() => {
