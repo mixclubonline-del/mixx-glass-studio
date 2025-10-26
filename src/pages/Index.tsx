@@ -1,187 +1,182 @@
-import { useState, useEffect, useRef } from "react";
-import {
-  EnhancedTopMenuBar,
-  ViewContainer,
-  ViewSwitcher,
-  TransportControls,
-  ProfessionalMixerView,
-  EnhancedTimelineView,
-} from "@/studio/components";
-import { ProfessionalBrowserPanel } from "@/studio/components/Browser";
-import { StartPageDialog } from "@/studio/components/Dialogs";
-import { PluginBrowser } from "@/studio/components/Plugins/PluginBrowser";
-import { PluginWindowManager } from "@/studio/components/Plugins/PluginWindowManager";
+import { useState, useEffect, useRef, useCallback } from "react";
+import { Upload } from "lucide-react";
+import { Button } from "@/components/ui/button";
+import { useToast } from "@/hooks/use-toast";
+
+import { MixxAmbientOverlay } from "@/components/MixxAmbientOverlay";
+import { TransportControls } from "@/studio/components";
+import { EnhancedTimelineView } from "@/studio/components";
 import { useKeyboardShortcuts } from "@/hooks/useKeyboardShortcuts";
-import { useViewStore } from "@/store/viewStore";
+
+import { useProject, useTransport, useAudioEngine } from "@/contexts/ProjectContext";
 import { useTimelineStore } from "@/store/timelineStore";
 import { useTracksStore } from "@/store/tracksStore";
 import { useMixerStore } from "@/store/mixerStore";
-import { Upload } from "lucide-react";
-import { TimelineTrack, Region } from "@/types/timeline";
-import { Button } from "@/components/ui/button";
-import { useToast } from "@/hooks/use-toast";
+
 import { AudioAnalyzer } from "@/audio/analysis/AudioAnalyzer";
-import { MixxAmbientOverlay } from "@/components/MixxAmbientOverlay";
-import { useProject, useTransport, useAudioEngine } from "@/contexts/ProjectContext";
+import type { TimelineTrack, Region } from "@/types/timeline";
+
+// ---------- Minimal Bloom (Quick Actions) ----------
+function QuickBloom({
+  open,
+  onClose,
+  actions,
+}: {
+  open: boolean;
+  onClose: () => void;
+  actions: { label: string; onClick: () => void; hotkey?: string }[];
+}) {
+  if (!open) return null;
+  return (
+    <div className="fixed inset-0 z-50 flex items-center justify-center">
+      <div className="absolute inset-0 bg-black/40 backdrop-blur-sm" onClick={onClose} />
+      <div className="relative glass border border-border/30 rounded-2xl p-4 w-[520px] max-w-[92vw]">
+        <div className="text-sm text-muted-foreground mb-2">Bloom Menu</div>
+        <div className="grid grid-cols-2 gap-2">
+          {actions.map((a, i) => (
+            <Button
+              key={i}
+              variant="outline"
+              className="justify-between"
+              onClick={() => {
+                a.onClick();
+                onClose();
+              }}
+            >
+              <span>{a.label}</span>
+              {a.hotkey && <span className="opacity-60 text-xs font-mono">{a.hotkey}</span>}
+            </Button>
+          ))}
+        </div>
+        <div className="mt-3 text-xs text-muted-foreground">
+          Press <span className="font-mono">B</span> to toggle • <span className="font-mono">Esc</span> to close
+        </div>
+      </div>
+    </div>
+  );
+}
 
 const Index = () => {
+  // ---------- Refs / UI state ----------
   const fileInputRef = useRef<HTMLInputElement>(null);
-  const [audioBuffers, setAudioBuffers] = useState<Map<string, AudioBuffer>>(new Map());
   const [isExporting, setIsExporting] = useState(false);
-  const [pluginBrowserOpen, setPluginBrowserOpen] = useState(false);
-  const [selectedTrackForPlugin, setSelectedTrackForPlugin] = useState<string | null>(null);
-  const [selectedSlotForPlugin, setSelectedSlotForPlugin] = useState<number>(1);
-  const [openPluginWindows, setOpenPluginWindows] = useState<Map<string, { trackId: string; slotNumber: number; pluginId: string }>>(new Map());
-  const [selectedTrackId, setSelectedTrackId] = useState<string | null>(null);
-  const [transportFloating, setTransportFloating] = useState(false);
-  const [transportCollapsed, setTransportCollapsed] = useState(false);
-  const [transportCovered, setTransportCovered] = useState(false);
+  const [focusMode, setFocusMode] = useState(true); // Focus by default
+  const [bloomOpen, setBloomOpen] = useState(false);
   const [detectedBPM, setDetectedBPM] = useState<number | null>(null);
   const [detectedKey, setDetectedKey] = useState<string | null>(null);
-  const [showStartPage, setShowStartPage] = useState(false);
-  const [showBrowser, setShowBrowser] = useState(true);
   const { toast } = useToast();
-  
-  // Project context - centralized audio engine and transport
+
+  // ---------- Core contexts ----------
   const { bpm, setBpm, masterVolume, setMasterVolume } = useProject();
   const audioEngine = useAudioEngine();
-  const { transport, play, pause, stop, seek: seekTransport, toggleLoop, prevBar, nextBar, getBarPosition } = useTransport();
-  
-  // Global stores
-  const { currentView, isPanelOpen, togglePanel } = useViewStore();
-  const { setCurrentTime, setDuration } = useTimelineStore();
-  const { tracks, regions, addTrack, addRegion } = useTracksStore();
+  const { transport, play, pause, stop, seek: seekTransport, toggleLoop, prevBar, nextBar } = useTransport();
 
-  // Mixer store
+  // ---------- Stores ----------
+  const { setCurrentTime, setDuration } = useTimelineStore();
+  const { addTrack, addRegion } = useTracksStore();
+
   const mixerStore = useMixerStore();
-  const { 
-    channels, 
-    masterPeakLevel,
-    buses,
-    addChannel,
-    updatePeakLevel,
-    addBus,
-    updateBus
-  } = mixerStore;
+  const { channels, addChannel, updatePeakLevel } = mixerStore;
   const setMixerMasterPeak = mixerStore.setMasterPeakLevel;
 
-  // Update playback time from transport
+  // ---------- Playback time driver ----------
   useEffect(() => {
     if (!transport.isPlaying) return;
-    
-    const interval = setInterval(() => {
-      const time = transport.currentTime;
-      setCurrentTime(time);
-    }, 50);
-    
-    return () => clearInterval(interval);
-  }, [transport.isPlaying, transport.currentTime, setCurrentTime, bpm]);
+    const id = setInterval(() => setCurrentTime(transport.currentTime), 50);
+    return () => clearInterval(id);
+  }, [transport.isPlaying, transport.currentTime, setCurrentTime]);
 
-  // Update peak meters at 30Hz (33ms) for smooth animation
+  // ---------- Peak meters @30Hz ----------
   useEffect(() => {
-    const interval = setInterval(() => {
+    const id = setInterval(() => {
       const master = audioEngine.getMasterPeakLevel();
       setMixerMasterPeak(master);
-      
       channels.forEach((_, id) => {
-        const level = audioEngine.getTrackPeakLevel(id);
-        updatePeakLevel(id, level);
+        updatePeakLevel(id, audioEngine.getTrackPeakLevel(id));
       });
-    }, 33); // 30Hz update rate
-    
-    return () => clearInterval(interval);
+    }, 33);
+    return () => clearInterval(id);
   }, [channels, setMixerMasterPeak, updatePeakLevel, audioEngine]);
 
-  const handleImport = () => {
-    fileInputRef.current?.click();
-  };
+  // ---------- Import ----------
+  const handleImport = () => fileInputRef.current?.click();
 
   const handleFileSelect = (e: React.ChangeEvent<HTMLInputElement>) => {
     const files = e.target.files;
-    if (files) {
-      Array.from(files).forEach(file => handleLoadTrack(file));
-      toast({
-        title: "Audio files imported",
-        description: `${files.length} file(s) loaded successfully`,
-      });
+    if (files && files.length) {
+      (async () => {
+        for (const file of Array.from(files)) {
+          await handleLoadTrack(file);
+        }
+        toast({ title: "Audio files imported", description: `${files.length} file(s) loaded` });
+      })();
     }
-    if (fileInputRef.current) {
-      fileInputRef.current.value = '';
-    }
+    if (fileInputRef.current) fileInputRef.current.value = "";
   };
 
-  const handleLoadTrack = async (file: File) => {
-    if (!audioEngine) return;
-    
-    try {
-      const id = `track-${Date.now()}`;
-      await audioEngine.loadTrack(id, file.name, file);
-      
-      const audioTracks = audioEngine.getTracks();
-      const loadedTrack = audioTracks.find(t => t.id === id);
-      
-      if (loadedTrack && loadedTrack.buffer) {
-        // Generate color
+  const handleLoadTrack = useCallback(
+    async (file: File) => {
+      if (!audioEngine) return;
+      try {
+        // 1) Load into engine (shared AudioContext inside audioEngine)
+        const id = `track-${Date.now()}-${Math.floor(Math.random() * 1000)}`;
+        await audioEngine.loadTrack(id, file.name, file);
+
+        const engineTracks = audioEngine.getTracks();
+        const loadedTrack = engineTracks.find((t) => t.id === id);
+
+        if (!loadedTrack || !loadedTrack.buffer) {
+          toast({ title: "Load failed", description: `No buffer for ${file.name}`, variant: "destructive" });
+          return;
+        }
+
+        // 2) Timeline + Region (sample-accurate fields via meta to avoid type breaks)
         const hue = Math.floor(Math.random() * 360);
         const color = `hsl(${hue}, 70%, 50%)`;
-        
-        // Add to timeline store
+
         const timelineTrack: TimelineTrack = {
           id,
           name: file.name,
           color,
-          height: 100,
+          height: 96,
           regions: [],
           muted: false,
           solo: false,
-          recordArmed: false
+          recordArmed: false,
         };
         addTrack(timelineTrack);
-        
-        // Create region - start at time 0
+
+        const sr =
+          (audioEngine.getSampleRate && audioEngine.getSampleRate()) ||
+          (audioEngine.audioContext && audioEngine.audioContext.sampleRate) ||
+          48000;
+
+        const duration = loadedTrack.buffer.duration;
+        const regionId = `region-${id}`;
         const region: Region = {
-          id: `region-${id}`,
+          id: regionId,
           trackId: id,
           name: file.name,
-          startTime: 0, // Start at beginning of timeline
-          duration: loadedTrack.buffer.duration,
+          startTime: 0,
+          duration,
           bufferOffset: 0,
-          bufferDuration: loadedTrack.buffer.duration,
+          bufferDuration: duration,
           color,
           fadeIn: 0,
           fadeOut: 0,
           gain: 1,
           locked: false,
-          muted: false
+          muted: false,
+          // @ts-expect-error: stash internal precise fields in meta to avoid breaking types
+          meta: {
+            startTimeSamples: 0,
+            lengthSamples: Math.round(duration * sr),
+            sampleRate: sr,
+          },
         };
         addRegion(region);
-        
-        // Store audio buffer
-        setAudioBuffers(prev => new Map(prev).set(region.id, loadedTrack.buffer!));
-        
-        // Auto-detect BPM, key, and time signature (client-side, non-blocking)
-        setTimeout(() => {
-          try {
-            const bpm = AudioAnalyzer.detectBPM(loadedTrack.buffer!);
-            const { key, scale } = AudioAnalyzer.detectKey(loadedTrack.buffer!);
-            const timeSignature = AudioAnalyzer.inferTimeSignature(bpm, loadedTrack.buffer!);
-            
-            setDetectedBPM(bpm);
-            setDetectedKey(`${key} ${scale}`);
-            
-            setBpm(bpm);
-            audioEngine.timeSignature = timeSignature;
-            
-            toast({
-              title: "Audio Analysis Complete",
-              description: `BPM: ${bpm} | Key: ${key} ${scale} | Time: ${timeSignature.numerator}/${timeSignature.denominator}`,
-            });
-          } catch (error) {
-            console.error("Audio analysis failed:", error);
-          }
-        }, 100);
-        
-        // Add to mixer - sync state
+
+        // 3) Mixer channel (sync volume/pan to engine)
         addChannel({
           id,
           name: file.name,
@@ -190,361 +185,108 @@ const Index = () => {
           muted: false,
           solo: false,
           color,
-          peakLevel: { left: -60, right: -60 }
+          peakLevel: { left: -60, right: -60 },
         });
-        
-        // Sync initial volume to audio engine
         audioEngine.setTrackVolume(id, 0.75);
-        
-        // Update duration
-        const totalDuration = Math.max(region.startTime + region.duration, transport.currentTime);
-        setDuration(totalDuration);
-        
-        toast({
-          title: "Track loaded",
-          description: `${file.name} added to timeline and mixer`,
-        });
-      }
-    } catch (error) {
-      console.error("Failed to load track:", error);
-      toast({
-        title: "Error",
-        description: "Failed to load audio file",
-        variant: "destructive"
-      });
-    }
-  };
 
-  const handleRemoveTrack = (id: string) => {
-    audioEngine.removeTrack(id);
-    // Stores will handle removal through their own methods
-  };
+        // 4) Update timeline duration + make visible (basic zoom/scroll handled by timeline impl)
+        setDuration(Math.max(duration, transport.currentTime));
 
-  const handleVolumeChange = (id: string, volume: number) => {
-    audioEngine.setTrackVolume(id, volume);
-    // Sync to mixer store
-    const channel = channels.get(id);
-    if (channel) {
-      useMixerStore.getState().updateChannel(id, { volume });
-    }
-  };
-  
-  const handlePanChange = (id: string, pan: number) => {
-    audioEngine.setTrackPan(id, pan);
-  };
-  
-  const handleSoloToggle = (id: string) => {
-    const channel = channels.get(id);
-    if (channel) {
-      audioEngine.setTrackSolo(id, !channel.solo);
-      useMixerStore.getState().updateChannel(id, { solo: !channel.solo });
-    }
-  };
-  
-  // Plugin management
-  const handleLoadPlugin = (trackId: string, slotNumber: number, pluginId: string) => {
-    const instanceId = audioEngine.loadPluginToTrack(trackId, pluginId, slotNumber);
-      
-      if (instanceId) {
-        // Update tracks store with plugin info
-        const { tracks: tracksArray, updateTrack } = useTracksStore.getState();
-        const track = tracksArray.find(t => t.id === trackId);
-        
-        if (track && track.inserts) {
-          const updatedInserts = [...track.inserts];
-          const insertIndex = updatedInserts.findIndex(i => i.slotNumber === slotNumber);
-          if (insertIndex !== -1) {
-            updatedInserts[insertIndex] = {
-              slotNumber,
-              pluginId,
-              instanceId,
-              bypass: false
-            };
-            updateTrack(trackId, { inserts: updatedInserts });
+        // 5) Lightweight client-side analysis (non-blocking)
+        setTimeout(() => {
+          try {
+            const nbpm = AudioAnalyzer.detectBPM(loadedTrack.buffer!);
+            const { key, scale } = AudioAnalyzer.detectKey(loadedTrack.buffer!);
+            const ts = AudioAnalyzer.inferTimeSignature(nbpm, loadedTrack.buffer!);
+            setDetectedBPM(nbpm);
+            setDetectedKey(`${key} ${scale}`);
+            setBpm(nbpm);
+            (audioEngine as any).timeSignature = ts; // keep for compatibility
+            toast({
+              title: "Analysis complete",
+              description: `BPM ${nbpm} • Key ${key} ${scale} • ${ts.numerator}/${ts.denominator}`,
+            });
+          } catch (err) {
+            console.warn("Analysis failed:", err);
           }
-        }
-        
-        toast({
-          title: "Plugin Loaded",
-          description: `${pluginId} loaded to slot ${slotNumber}`,
-        });
-    }
-  };
-  
-  const handleUnloadPlugin = (trackId: string, slotNumber: number) => {
-    audioEngine.unloadPluginFromTrack(trackId, slotNumber);
-      
-      // Update tracks store
-      const { tracks: tracksArray, updateTrack } = useTracksStore.getState();
-      const track = tracksArray.find(t => t.id === trackId);
-      
-      if (track && track.inserts) {
-        const updatedInserts = [...track.inserts];
-        const insertIndex = updatedInserts.findIndex(i => i.slotNumber === slotNumber);
-        if (insertIndex !== -1) {
-          updatedInserts[insertIndex] = {
-            slotNumber,
-            pluginId: null,
-            instanceId: null,
-            bypass: false
-          };
-          updateTrack(trackId, { inserts: updatedInserts });
-        }
+        }, 60);
+
+        toast({ title: "Track loaded", description: `${file.name} to arrange + mixer` });
+      } catch (err) {
+        console.error("Failed to load track:", err);
+        toast({ title: "Error", description: "Failed to load audio file", variant: "destructive" });
       }
-      
-      toast({
-        title: "Plugin Removed",
-        description: `Removed plugin from slot ${slotNumber}`,
-      });
-  };
-  
-  const handleBypassPlugin = (trackId: string, slotNumber: number, bypass: boolean) => {
-    audioEngine.bypassPluginOnTrack(trackId, slotNumber, bypass);
-    
-    // Update tracks store
-    const { tracks: tracksArray, updateTrack } = useTracksStore.getState();
-    const track = tracksArray.find(t => t.id === trackId);
-    
-    if (track && track.inserts) {
-      const updatedInserts = [...track.inserts];
-      const insertIndex = updatedInserts.findIndex(i => i.slotNumber === slotNumber);
-      if (insertIndex !== -1) {
-        updatedInserts[insertIndex].bypass = bypass;
-        updateTrack(trackId, { inserts: updatedInserts });
-      }
-    }
-  };
-  
-  // Send management
-  const handleSendChange = (trackId: string, busId: string, amount: number) => {
-    const track = audioEngine.getTracks().find(t => t.id === trackId);
-      if (track) {
-        track.channelStrip.setSendAmount(busId, amount);
-        
-        // Update mixer store
-        const channel = channels.get(trackId);
-        if (channel) {
-          const sends = channel.sends || new Map();
-          sends.set(busId, amount);
-          useMixerStore.getState().updateChannel(trackId, { sends });
-        }
-    }
-  };
-  
-  const handlePluginSelect = (pluginId: string) => {
-    // Use selectedTrackForPlugin if set (from mixer), otherwise use selectedTrackId (from timeline)
-    const targetTrack = selectedTrackForPlugin || selectedTrackId;
-    
-    if (targetTrack) {
-      handleLoadPlugin(targetTrack, selectedSlotForPlugin, pluginId);
-      toast({
-        title: "Plugin Loaded",
-        description: `${pluginId} loaded to track`,
-      });
-    } else {
-      toast({
-        title: "No Track Selected",
-        description: "Please select a track first",
-        variant: "destructive"
-      });
-    }
-    setPluginBrowserOpen(false);
-    setSelectedTrackForPlugin(null); // Reset after use
-  };
-  
-  const handleOpenPluginBrowser = (trackId: string, slotNumber: number) => {
-    setSelectedTrackForPlugin(trackId);
-    setSelectedSlotForPlugin(slotNumber);
-    setPluginBrowserOpen(true);
-  };
-  
-  const handleOpenPluginWindow = (trackId: string, slotNumber: number, pluginId: string) => {
-    const windowId = `${trackId}_${slotNumber}`;
-    setOpenPluginWindows(prev => {
-      const newMap = new Map(prev);
-      newMap.set(windowId, { trackId, slotNumber, pluginId });
-      return newMap;
-    });
-  };
-  
-  const handleClosePluginWindow = (windowId: string) => {
-    setOpenPluginWindows(prev => {
-      const newMap = new Map(prev);
-      newMap.delete(windowId);
-      return newMap;
-    });
-  };
-  
-  const handlePluginParameterChange = (trackId: string, slotNumber: number, paramName: string, value: number) => {
-    const pluginInstance = audioEngine.getPluginInstance(trackId, slotNumber);
-    if (pluginInstance && 'setParams' in pluginInstance) {
-      // Call setParams if the plugin has this method
-      (pluginInstance as any).setParams({ [paramName]: value });
-    }
-  };
-  
-  // Bus management  
-  const handleCreateBus = (name: string, color: string, type: 'aux' | 'group') => {
-    const busId = `bus-${Date.now()}`;
-    
-    if (type === 'aux') {
-      audioEngine.createAuxBus(busId, name);
-    } else {
-      audioEngine.createGroupBus(busId, name);
-    }
-      
-      addBus({
-        id: busId,
-        name,
-        type,
-        color,
-        volume: 0.75,
-        sends: []
-      });
-      
-      toast({
-        title: "Bus Created",
-        description: `${type === 'aux' ? 'Aux' : 'Group'} bus "${name}" created`,
-      });
-  };
-  
-  // Loop & recording
-  const handleRecord = () => {
-    toast({
-      title: "Recording",
-      description: "Recording functionality coming soon",
-    });
-  };
+    },
+    [addTrack, addRegion, addChannel, audioEngine, setBpm, setDuration, toast, transport.currentTime],
+  );
 
-  const handleMuteToggle = (id: string) => {
-    const channel = channels.get(id);
-    if (channel) {
-      const newMuted = !channel.muted;
-      audioEngine.setTrackMute(id, newMuted);
-      // Sync to stores
-      useMixerStore.getState().updateChannel(id, { muted: newMuted });
-      useTracksStore.getState().updateTrack(id, { muted: newMuted });
-    }
-  };
-
-  const handleSeek = (time: number) => {
-    seekTransport(time);
-  };
-
+  // ---------- Transport helpers ----------
   const handleExport = async () => {
-    
     setIsExporting(true);
-    
     try {
       const blob = await audioEngine.exportMix();
       const url = URL.createObjectURL(blob);
-      const a = document.createElement('a');
+      const a = document.createElement("a");
       a.href = url;
-      a.download = `mixx-club-export-${Date.now()}.wav`;
+      a.download = `mixx-export-${Date.now()}.wav`;
       a.click();
       URL.revokeObjectURL(url);
-    } catch (error) {
-      console.error("Failed to export:", error);
     } finally {
       setIsExporting(false);
     }
   };
 
-  // Keyboard shortcuts
+  const handleSeek = (time: number) => seekTransport(time);
+
+  // ---------- Keyboard: keep only essentials + Focus/Bloom ----------
   useKeyboardShortcuts({
     onPlay: play,
     onPause: pause,
     onStop: stop,
     onExport: handleExport,
-    onDuplicate: () => {
-      const { selectedRegions } = useTimelineStore.getState();
-      if (selectedRegions.size > 0) {
-        console.log('Duplicate regions:', Array.from(selectedRegions));
-        toast({
-          title: "Duplicate",
-          description: `${selectedRegions.size} region(s) duplicated`,
-        });
-      }
-    },
-    onSplit: () => {
-      const { selectedRegions } = useTimelineStore.getState();
-      if (selectedRegions.size > 0) {
-        console.log('Split regions:', Array.from(selectedRegions));
-        toast({
-          title: "Split",
-          description: `${selectedRegions.size} region(s) split`,
-        });
-      }
-    },
     onLoop: toggleLoop,
     onPrevBar: prevBar,
     onNextBar: nextBar,
   });
 
+  useEffect(() => {
+    const onKey = (e: KeyboardEvent) => {
+      // Toggle Bloom
+      if ((e.key === "b" || e.key === "B") && !e.metaKey && !e.ctrlKey && !e.altKey) {
+        setBloomOpen((v) => !v);
+      }
+      // Toggle Focus
+      if ((e.key === "f" || e.key === "F") && !e.metaKey && !e.ctrlKey && !e.altKey) {
+        setFocusMode((v) => !v);
+      }
+      // Spacebar play/pause (only if not focused on input)
+      if (e.code === "Space" && (e.target as HTMLElement).tagName !== "INPUT") {
+        e.preventDefault();
+        transport.isPlaying ? pause() : play();
+      }
+    };
+    window.addEventListener("keydown", onKey);
+    return () => window.removeEventListener("keydown", onKey);
+  }, [pause, play, transport.isPlaying]);
+
+  // ---------- Minimal UI (Focus-first) ----------
   return (
     <div className="min-h-screen bg-background relative overflow-hidden flex flex-col">
       {/* Hidden file input */}
-      <input
-        ref={fileInputRef}
-        type="file"
-        accept="audio/*"
-        multiple
-        className="hidden"
-        onChange={handleFileSelect}
-      />
-      
-      {/* Mixx Ambient Lighting Overlay */}
-      <MixxAmbientOverlay />
-      
-      {/* Animated background */}
-      <div className="fixed inset-0 gradient-animate opacity-10 pointer-events-none" />
-      
-      {/* Grid overlay */}
-      <div 
-        className="fixed inset-0 pointer-events-none opacity-[0.02]"
-        style={{
-          backgroundImage: 'linear-gradient(hsl(var(--prime-500)) 1px, transparent 1px), linear-gradient(90deg, hsl(var(--prime-500)) 1px, transparent 1px)',
-          backgroundSize: '50px 50px'
-        }}
-      />
+      <input ref={fileInputRef} type="file" accept="audio/*" multiple className="hidden" onChange={handleFileSelect} />
 
-      <div className="flex flex-col h-screen">
-        <EnhancedTopMenuBar
-          onExport={handleExport}
-          onSave={() => toast({ title: "Save", description: "Project saved locally" })}
-          onLoad={() => toast({ title: "Load", description: "Not yet implemented" })}
-          onImport={handleImport}
-          onNewProject={() => setShowStartPage(true)}
-        />
-        
-        <StartPageDialog
-          open={showStartPage}
-          onOpenChange={setShowStartPage}
-          onNewProject={(templateId, name) => {
-            console.log('New project:', templateId, name);
-            toast({ title: "New Project", description: `Creating ${name}...` });
-          }}
-        />
-        
-        {/* View switcher & quick actions */}
+      {/* ALS / Ambient */}
+      <MixxAmbientOverlay />
+      {/* Subtle background gradient (kept, but very light) */}
+      <div className="fixed inset-0 gradient-animate opacity-10 pointer-events-none" />
+
+      {/* Top strip (only when NOT in focus mode) */}
+      {!focusMode && (
         <div className="flex items-center justify-between px-4 py-3 glass border-b border-border/30">
           <div className="flex items-center gap-2">
-            <Button
-              variant="outline"
-              size="sm"
-              onClick={handleImport}
-              className="gap-2"
-            >
+            <Button variant="outline" size="sm" onClick={handleImport} className="gap-2">
               <Upload className="w-4 h-4" />
               Import Audio
-            </Button>
-            <Button
-              variant="outline"
-              size="sm"
-              onClick={() => togglePanel('browser')}
-              className="gap-2 neon-glow-prime"
-            >
-              🎛️ Plugin Suite
             </Button>
             {(detectedBPM || detectedKey) && (
               <div className="flex items-center gap-3 text-xs text-muted-foreground">
@@ -553,126 +295,89 @@ const Index = () => {
               </div>
             )}
           </div>
-          <ViewSwitcher />
-        </div>
-        
-        <ViewContainer>
-          <div className="flex h-full">
-            {showBrowser && (
-              <div className="w-80 border-r border-border">
-                <ProfessionalBrowserPanel />
-              </div>
-            )}
-            
-            {/* Main view */}
-            <div className="flex-1 flex flex-col">
-              {currentView === 'arrange' && (
-                <EnhancedTimelineView 
-                  bpm={bpm} 
-                  onBPMChange={setBpm}
-                />
-              )}
-              
-              {currentView === 'mix' && (
-                <ProfessionalMixerView
-                  onVolumeChange={handleVolumeChange}
-                  onPanChange={handlePanChange}
-                  onMuteToggle={handleMuteToggle}
-                  onSoloToggle={handleSoloToggle}
-                  onExport={handleExport}
-                  isExporting={isExporting}
-                  onLoadPlugin={handleLoadPlugin}
-                  onUnloadPlugin={handleUnloadPlugin}
-                  onBypassPlugin={handleBypassPlugin}
-                  onSendChange={handleSendChange}
-                  onCreateBus={handleCreateBus}
-                  onOpenPluginWindow={handleOpenPluginWindow}
-                  onOpenPluginBrowser={handleOpenPluginBrowser}
-                />
-              )}
-              
-              {currentView === 'edit' && (
-                <div className="flex-1 flex items-center justify-center">
-                  <div className="text-center space-y-4">
-                    <h2 className="text-2xl font-semibold text-muted-foreground">Edit View</h2>
-                    <p className="text-sm text-muted-foreground">Clean workspace ready for editor build</p>
-                  </div>
-                </div>
-              )}
-            </div>
+          <div className="flex items-center gap-2">
+            <Button variant="outline" size="sm" onClick={() => setBloomOpen(true)}>
+              Bloom
+            </Button>
+            <Button variant="outline" size="sm" onClick={() => setFocusMode(true)}>
+              Enter Focus
+            </Button>
           </div>
-        </ViewContainer>
-        
-        {/* Transport Controls - Collapsible and Floatable */}
-        {!transportCollapsed && (
-          <div className={`${transportFloating ? "fixed bottom-4 right-4 z-50" : ""} ${transportCovered ? "opacity-30 hover:opacity-100 transition-opacity" : ""}`}>
-            <TransportControls
-              isPlaying={transport.isPlaying}
-              onPlay={play}
-              onPause={pause}
-              onStop={stop}
-              onExport={handleExport}
-              isExporting={isExporting}
-              bpm={bpm}
-              timeSignature={{ numerator: 4, denominator: 4 }}
-              onBpmChange={setBpm}
-              onTimeSignatureChange={() => {}}
-              isRecording={transport.isRecording}
-              isLooping={transport.loopEnabled}
-              onRecord={handleRecord}
-              onLoopToggle={toggleLoop}
-              onPrevBar={prevBar}
-              onNextBar={nextBar}
-              currentTime={transport.currentTime}
-              masterVolume={masterVolume}
-              onMasterVolumeChange={(volume) => {
-                setMasterVolume(volume);
-              }}
-            />
+        </div>
+      )}
+
+      {/* Arrange view only (no extra panels, no view switcher) */}
+      <div className="flex-1 flex flex-col">
+        {/* In Focus mode we float a tiny import pill so you can still add audio */}
+        {focusMode && (
+          <div className="absolute top-4 left-4 z-40">
+            <Button variant="outline" size="sm" onClick={handleImport} className="gap-2 neon-glow-prime">
+              <Upload className="w-4 h-4" />
+              Import
+            </Button>
           </div>
         )}
-        
-        {/* Transport Toggle Buttons */}
-        <div className="fixed bottom-4 left-4 flex gap-2 z-40">
-          <Button
-            variant="outline"
-            size="sm"
-            onClick={() => setTransportCollapsed(!transportCollapsed)}
-            title={transportCollapsed ? "Show Transport" : "Hide Transport"}
-          >
-            {transportCollapsed ? "Show Transport" : "Hide Transport"}
-          </Button>
-          {!transportCollapsed && (
-            <Button
-              variant="outline"
-              size="sm"
-              onClick={() => setTransportFloating(!transportFloating)}
-              title={transportFloating ? "Dock Transport" : "Float Transport"}
-            >
-              {transportFloating ? "Dock" : "Float"}
-            </Button>
-          )}
+
+        <div className="flex-1">
+          <EnhancedTimelineView bpm={bpm} onBPMChange={setBpm} />
         </div>
       </div>
-      
-      {/* Plugin Browser */}
-      <PluginBrowser
-        isOpen={isPanelOpen.browser}
-        onClose={() => togglePanel('browser')}
-        onPluginSelect={(pluginId) => {
-          togglePanel('browser');
-          toast({
-            title: "Plugin Loaded",
-            description: `${pluginId} added to track`,
-          });
-        }}
-      />
-      
-      {/* Plugin Window Manager */}
-      <PluginWindowManager
-        openWindows={openPluginWindows}
-        onCloseWindow={handleClosePluginWindow}
-        onParameterChange={handlePluginParameterChange}
+
+      {/* Transport (always visible) */}
+      <div className="fixed bottom-4 left-1/2 -translate-x-1/2 z-40">
+        <TransportControls
+          isPlaying={transport.isPlaying}
+          onPlay={play}
+          onPause={pause}
+          onStop={stop}
+          onExport={handleExport}
+          isExporting={isExporting}
+          bpm={bpm}
+          timeSignature={{ numerator: 4, denominator: 4 }}
+          onBpmChange={setBpm}
+          onTimeSignatureChange={() => {}}
+          isRecording={transport.isRecording}
+          isLooping={transport.loopEnabled}
+          onRecord={() => {
+            // minimal placeholder
+          }}
+          onLoopToggle={toggleLoop}
+          onPrevBar={prevBar}
+          onNextBar={nextBar}
+          currentTime={transport.currentTime}
+          masterVolume={masterVolume}
+          onMasterVolumeChange={setMasterVolume}
+        />
+      </div>
+
+      {/* Focus toggle + Bloom pill (bottom-left) */}
+      <div className="fixed bottom-4 left-4 flex gap-2 z-40">
+        <Button variant="outline" size="sm" onClick={() => setFocusMode((v) => !v)}>
+          {focusMode ? "Exit Focus" : "Enter Focus"}
+        </Button>
+        <Button variant="outline" size="sm" onClick={() => setBloomOpen((v) => !v)}>
+          {bloomOpen ? "Hide Bloom" : "Bloom"}
+        </Button>
+      </div>
+
+      {/* Bloom overlay */}
+      <QuickBloom
+        open={bloomOpen}
+        onClose={() => setBloomOpen(false)}
+        actions={[
+          { label: "Import Audio", onClick: handleImport, hotkey: "I" },
+          {
+            label: transport.isPlaying ? "Pause" : "Play",
+            onClick: () => (transport.isPlaying ? pause() : play()),
+            hotkey: "Space",
+          },
+          { label: "Stop", onClick: stop },
+          { label: "Export Mix", onClick: handleExport },
+          { label: transport.loopEnabled ? "Loop: On" : "Loop: Off", onClick: toggleLoop },
+          { label: "Prev Bar", onClick: prevBar },
+          { label: "Next Bar", onClick: nextBar },
+          { label: focusMode ? "Exit Focus" : "Enter Focus", onClick: () => setFocusMode((v) => !v), hotkey: "F" },
+        ]}
       />
     </div>
   );
