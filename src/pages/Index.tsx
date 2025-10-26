@@ -1,5 +1,5 @@
-// REPLACE ENTIRE FILE WITH THIS CONTENT
-import { useState, useEffect, useRef, useCallback } from "react";
+// REPLACE ENTIRE PAGE WITH THIS
+import { useState, useEffect, useRef, useCallback, useMemo } from "react";
 import { Button } from "@/components/ui/button";
 import { Upload } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
@@ -16,38 +16,124 @@ import { useMixerStore } from "@/store/mixerStore";
 import { AudioAnalyzer } from "@/audio/analysis/AudioAnalyzer";
 import type { TimelineTrack, Region } from "@/types/timeline";
 
+/* ------------------------------
+   Small UI helpers (DAW style)
+-------------------------------*/
+function dbToLinear(db: number) {
+  // -60..0 dB -> 0..1
+  const clamped = Math.max(-60, Math.min(0, db));
+  return Math.pow(10, clamped / 20);
+}
+
+function Knob({
+  value,
+  min = -1,
+  max = 1,
+  step = 0.01,
+  onChange,
+  label,
+}: {
+  value: number;
+  min?: number;
+  max?: number;
+  step?: number;
+  onChange: (v: number) => void;
+  label?: string;
+}) {
+  return (
+    <div className="flex flex-col items-center gap-1">
+      <input
+        type="range"
+        min={min}
+        max={max}
+        step={step}
+        value={value}
+        onChange={(e) => onChange(parseFloat(e.target.value))}
+        className="w-14 h-5 accent-[hsl(var(--prime-500))]"
+      />
+      {label && <span className="text-[10px] text-muted-foreground">{label}</span>}
+    </div>
+  );
+}
+
+function MiniFader({ value, onChange, label }: { value: number; onChange: (v: number) => void; label?: string }) {
+  return (
+    <div className="flex flex-col items-center">
+      <input
+        type="range"
+        min={0}
+        max={1}
+        step={0.01}
+        value={value}
+        onChange={(e) => onChange(parseFloat(e.target.value))}
+        className="h-24 w-4 accent-[hsl(var(--prime-500))] rotate-[-90deg]"
+        style={{ transformOrigin: "center" }}
+        aria-label={label || "Volume"}
+      />
+      {label && <span className="mt-1 text-[10px] text-muted-foreground">{label}</span>}
+    </div>
+  );
+}
+
 /* -------------------------------------------
-   INLINE: TrackHeader (left lane menu / gutter)
+   INLINE: DAW TrackHeader (left track bar)
 -------------------------------------------- */
 function TrackHeader({
+  index,
   id,
   name,
   color,
   height,
   selected,
-  onSelect,
-  onDropFiles,
   muted,
   solo,
   recordArmed,
+  peakL = -60,
+  peakR = -60,
+  volume = 0.75,
+  pan = 0,
+  inputId,
+  outputId,
+  onSelect,
+  onDropFiles,
   onToggleMute,
   onToggleSolo,
   onToggleRecord,
+  onSetVolume,
+  onSetPan,
+  onSetInput,
+  onSetOutput,
+  onToggleMonitor,
 }: {
+  index: number;
   id: string;
   name: string;
   color: string;
   height: number;
   selected: boolean;
-  onSelect: (id: string) => void;
-  onDropFiles: (files: FileList, targetTrackId: string) => void;
   muted?: boolean;
   solo?: boolean;
   recordArmed?: boolean;
-  onToggleMute?: (id: string) => void;
-  onToggleSolo?: (id: string) => void;
-  onToggleRecord?: (id: string) => void;
+  peakL?: number;
+  peakR?: number;
+  volume?: number;
+  pan?: number;
+  inputId?: string;
+  outputId?: string;
+  onSelect: (id: string) => void;
+  onDropFiles: (files: FileList, targetTrackId: string) => void;
+  onToggleMute: (id: string) => void;
+  onToggleSolo: (id: string) => void;
+  onToggleRecord: (id: string) => void;
+  onSetVolume: (id: string, v: number) => void;
+  onSetPan: (id: string, v: number) => void;
+  onSetInput: (id: string, inputId: string) => void;
+  onSetOutput: (id: string, outputId: string) => void;
+  onToggleMonitor: (id: string) => void;
 }) {
+  const linL = dbToLinear(peakL ?? -60);
+  const linR = dbToLinear(peakR ?? -60);
+
   return (
     <div
       role="button"
@@ -55,50 +141,110 @@ function TrackHeader({
       onDragOver={(e) => e.preventDefault()}
       onDrop={(e) => {
         e.preventDefault();
-        if (e.dataTransfer?.files?.length) {
-          onDropFiles(e.dataTransfer.files, id);
-        }
+        if (e.dataTransfer?.files?.length) onDropFiles(e.dataTransfer.files, id);
       }}
       className={[
-        "relative rounded-xl mb-2 glass border border-border/30",
+        "relative mb-2 glass border border-border/30 rounded-xl overflow-hidden",
         selected ? "ring-2 ring-[hsl(var(--prime-500))]" : "",
       ].join(" ")}
       style={{ height }}
     >
-      <div className="absolute left-0 top-0 h-full w-1.5 rounded-l-xl" style={{ background: color }} />
-      <div className="flex h-full flex-col justify-between px-3 py-2">
-        <div className="text-xs font-semibold truncate">{name}</div>
-        <div className="flex items-center gap-2">
-          <Button
-            size="xs"
-            variant={muted ? "default" : "outline"}
-            onClick={(e) => {
-              e.stopPropagation();
-              onToggleMute?.(id);
-            }}
-          >
-            M
-          </Button>
-          <Button
-            size="xs"
-            variant={solo ? "default" : "outline"}
-            onClick={(e) => {
-              e.stopPropagation();
-              onToggleSolo?.(id);
-            }}
-          >
-            S
-          </Button>
-          <Button
-            size="xs"
-            variant={recordArmed ? "default" : "outline"}
-            onClick={(e) => {
-              e.stopPropagation();
-              onToggleRecord?.(id);
-            }}
-          >
-            R
-          </Button>
+      {/* color spine */}
+      <div className="absolute left-0 top-0 h-full w-1.5" style={{ background: color }} />
+
+      <div className="h-full pl-2 pr-2 py-2 flex gap-2">
+        {/* 1) index + name + quick M/S/R/Mon */}
+        <div className="flex-1 min-w-0 flex flex-col justify-between">
+          <div className="flex items-center gap-2">
+            <div className="text-[10px] px-1.5 py-0.5 rounded bg-foreground/10">{index}</div>
+            <div className="truncate text-xs font-semibold">{name}</div>
+          </div>
+          <div className="flex items-center gap-1 pt-1">
+            <Button
+              size="xs"
+              variant={muted ? "default" : "outline"}
+              onClick={(e) => {
+                e.stopPropagation();
+                onToggleMute(id);
+              }}
+            >
+              M
+            </Button>
+            <Button
+              size="xs"
+              variant={solo ? "default" : "outline"}
+              onClick={(e) => {
+                e.stopPropagation();
+                onToggleSolo(id);
+              }}
+            >
+              S
+            </Button>
+            <Button
+              size="xs"
+              variant={recordArmed ? "default" : "outline"}
+              onClick={(e) => {
+                e.stopPropagation();
+                onToggleRecord(id);
+              }}
+            >
+              R
+            </Button>
+            <Button
+              size="xs"
+              variant="outline"
+              onClick={(e) => {
+                e.stopPropagation();
+                onToggleMonitor(id);
+              }}
+            >
+              👂
+            </Button>
+          </div>
+
+          {/* I/O row (typical DAW) */}
+          <div className="mt-1 grid grid-cols-2 gap-1">
+            <select
+              className="bg-background/60 border border-border/30 rounded px-1 py-0.5 text-[11px] truncate"
+              value={inputId || ""}
+              onChange={(e) => onSetInput(id, e.target.value)}
+              title="Input"
+            >
+              <option value="">Input</option>
+              {/* Options are populated from parent (we call setters only) */}
+              {/* The actual list is handled in parent using audioEngine */}
+            </select>
+            <select
+              className="bg-background/60 border border-border/30 rounded px-1 py-0.5 text-[11px] truncate"
+              value={outputId || ""}
+              onChange={(e) => onSetOutput(id, e.target.value)}
+              title="Output"
+            >
+              <option value="">Output</option>
+            </select>
+          </div>
+        </div>
+
+        {/* 2) meter */}
+        <div className="w-3 flex flex-col justify-end items-center gap-1">
+          <div className="relative h-16 w-1.5 rounded bg-foreground/10 overflow-hidden">
+            <div
+              className="absolute bottom-0 left-0 right-0 bg-[hsl(var(--prime-500))]/80"
+              style={{ height: `${linL * 100}%` }}
+            />
+          </div>
+          <div className="relative h-16 w-1.5 rounded bg-foreground/10 overflow-hidden">
+            <div
+              className="absolute bottom-0 left-0 right-0 bg-[hsl(var(--prime-500))]/60"
+              style={{ height: `${linR * 100}%` }}
+            />
+          </div>
+        </div>
+
+        {/* 3) pan + mini fader */}
+        <div className="flex flex-col items-center justify-between">
+          <Knob value={pan ?? 0} min={-1} max={1} step={0.01} onChange={(v) => onSetPan(id, v)} label="Pan" />
+          <MiniFader value={volume ?? 0.75} onChange={(v) => onSetVolume(id, v)} label="Vol" />
         </div>
       </div>
     </div>
@@ -106,7 +252,7 @@ function TrackHeader({
 }
 
 /* ----------------------------------------------------
-   INLINE: TrackLanesLayout (headers + sync-scrolling)
+   INLINE: TrackLanesLayout (headers + sync scroll)
 ----------------------------------------------------- */
 function TrackLanesLayout({
   selectedTrackId,
@@ -122,14 +268,18 @@ function TrackLanesLayout({
   onBPMChange: (v: number) => void;
 }) {
   const { tracks } = useTracksStore();
+  const { channels } = useMixerStore();
   const headerRef = useRef<HTMLDivElement>(null);
   const lanesRef = useRef<HTMLDivElement>(null);
   const [scrollTop, setScrollTop] = useState(0);
 
-  const TRACK_HEADER_W = 240;
+  const TRACK_HEADER_W = 260;
   const LANE_GAP = 8;
 
-  const totalHeight = tracks.reduce((sum, t) => sum + (t.height ?? 96) + LANE_GAP, 0);
+  const totalHeight = useMemo(() => tracks.reduce((sum, t) => sum + (t.height ?? 96) + LANE_GAP, 0), [tracks]);
+
+  // Build a quick map: channel peak/vol/pan by id
+  const chan = useMixerStore.getState().channels;
 
   // sync vertical scroll
   useEffect(() => {
@@ -154,7 +304,7 @@ function TrackLanesLayout({
 
   return (
     <div className="flex-1 flex overflow-hidden">
-      {/* Left gutter: track headers */}
+      {/* Left: track headers */}
       <div
         className="shrink-0 border-r border-border/30 bg-background/60 backdrop-blur-sm"
         style={{ width: TRACK_HEADER_W }}
@@ -163,21 +313,43 @@ function TrackLanesLayout({
           <div style={{ height: totalHeight, position: "relative" }}>
             {
               tracks.reduce<{ top: number; nodes: JSX.Element[] }>(
-                (acc, t) => {
+                (acc, t, i) => {
                   const h = t.height ?? 96;
+                  const ch = chan.get(t.id);
                   acc.nodes.push(
                     <div key={t.id} style={{ position: "absolute", left: 0, right: 0, top: acc.top }}>
                       <TrackHeader
+                        index={i + 1}
                         id={t.id}
                         name={t.name}
                         color={t.color}
                         height={h}
                         selected={selectedTrackId === t.id}
-                        onSelect={onSelectTrack}
-                        onDropFiles={onDropFilesOnTrack}
                         muted={t.muted}
                         solo={t.solo}
                         recordArmed={t.recordArmed}
+                        peakL={ch?.peakLevel?.left ?? -60}
+                        peakR={ch?.peakLevel?.right ?? -60}
+                        volume={ch?.volume ?? 0.75}
+                        pan={ch?.pan ?? 0}
+                        onSelect={onSelectTrack}
+                        onDropFiles={onDropFilesOnTrack}
+                        onToggleMute={(id) => useTracksStore.getState().updateTrack(id, { muted: !t.muted })}
+                        onToggleSolo={(id) => useTracksStore.getState().updateTrack(id, { solo: !t.solo })}
+                        onToggleRecord={(id) =>
+                          useTracksStore.getState().updateTrack(id, { recordArmed: !t.recordArmed })
+                        }
+                        onSetVolume={(id, v) => useMixerStore.getState().updateChannel(id, { volume: v })}
+                        onSetPan={(id, v) => useMixerStore.getState().updateChannel(id, { pan: v })}
+                        onSetInput={(id, input) => {
+                          /* wired in parent via audioEngine if needed */
+                        }}
+                        onSetOutput={(id, output) => {
+                          /* wired in parent via audioEngine if needed */
+                        }}
+                        onToggleMonitor={(id) => {
+                          /* optionally: audioEngine.setTrackMonitor?.(id, true/false) */
+                        }}
                       />
                     </div>,
                   );
@@ -191,11 +363,11 @@ function TrackLanesLayout({
         </div>
       </div>
 
-      {/* Right: timeline surface */}
+      {/* Right: timeline (arrange) */}
       <div className="grow relative">
         <div ref={lanesRef} className="absolute inset-0 overflow-auto">
-          {/* Lanes background */}
           <div className="relative" style={{ height: totalHeight, minWidth: 1200 }}>
+            {/* lane backgrounds */}
             {
               tracks.reduce<{ top: number; nodes: JSX.Element[] }>(
                 (acc, t) => {
@@ -214,14 +386,13 @@ function TrackLanesLayout({
               ).nodes
             }
 
-            {/* Timeline renderer - can accept scrollTop/lane metrics when ready */}
+            {/* timeline renderer */}
             <div className="absolute inset-0">
               <EnhancedTimelineView
                 bpm={bpm}
                 onBPMChange={onBPMChange}
-                // @ts-expect-error: optional extension hooks for your renderer
+                // @ts-expect-error optional hooks if your renderer supports them
                 scrollTop={scrollTop}
-                // @ts-expect-error header width can be used to offset region drawing
                 laneMetrics={{ headerWidth: TRACK_HEADER_W, laneGap: LANE_GAP }}
               />
             </div>
@@ -233,7 +404,7 @@ function TrackLanesLayout({
 }
 
 /* -------------------------------------------
-   PAGE: Clean arrange view + targeted import
+   PAGE: Arrange + DAW left track bar
 -------------------------------------------- */
 export default function Index() {
   const fileInputRef = useRef<HTMLInputElement>(null);
@@ -285,7 +456,7 @@ export default function Index() {
     if (fileInputRef.current) fileInputRef.current.value = "";
   };
 
-  // Allow explicit target track id (selected lane or drop)
+  // Import → to selected lane OR new lane; drag-drop handled in headers via callback
   const handleLoadTrack = useCallback(
     async (file: File, targetTrackId?: string) => {
       if (!audioEngine) return;
@@ -293,7 +464,6 @@ export default function Index() {
         const newCandidateId = `track-${Date.now()}-${Math.floor(Math.random() * 1000)}`;
         const trackId = targetTrackId || newCandidateId;
 
-        // Load into engine channel identified by trackId (shared AudioContext inside engine)
         await audioEngine.loadTrack(trackId, file.name, file);
         const engineTracks = audioEngine.getTracks();
         const loadedTrack = engineTracks.find((t) => t.id === trackId);
@@ -302,7 +472,6 @@ export default function Index() {
           return;
         }
 
-        // Create track if it didn't exist
         const existing = useTracksStore.getState().tracks.find((t) => t.id === trackId);
         if (!existing) {
           const hue = Math.floor(Math.random() * 360);
@@ -319,7 +488,7 @@ export default function Index() {
           };
           addTrack(timelineTrack);
 
-          // Mixer channel (sync)
+          // Mixer channel
           addChannel({
             id: trackId,
             name: file.name,
@@ -355,7 +524,7 @@ export default function Index() {
           gain: 1,
           locked: false,
           muted: false,
-          // @ts-expect-error: stash precise fields in meta without breaking Region type
+          // @ts-expect-error keep precise fields in meta to avoid type breakage
           meta: {
             audioBuffer: loadedTrack.buffer,
             startTimeSamples: 0,
@@ -369,14 +538,12 @@ export default function Index() {
         setDuration(Math.max(duration, transport.currentTime));
         toast({ title: existing ? "Track updated" : "Track created", description: `${file.name} → ${trackId}` });
 
-        // Optional: lightweight analysis (non-blocking)
+        // Optional: quick analysis (non-blocking)
         setTimeout(() => {
           try {
             const nbpm = AudioAnalyzer.detectBPM(loadedTrack.buffer!);
             const { key, scale } = AudioAnalyzer.detectKey(loadedTrack.buffer!);
             const ts = AudioAnalyzer.inferTimeSignature(nbpm, loadedTrack.buffer!);
-            // setBpm here only if you want global tempo to follow import:
-            // setBpm(nbpm);
             (audioEngine as any).timeSignature = ts;
           } catch {}
         }, 50);
@@ -390,9 +557,7 @@ export default function Index() {
 
   const handleDropFilesOnTrack = (files: FileList, targetTrackId: string) => {
     (async () => {
-      for (const file of Array.from(files)) {
-        await handleLoadTrack(file, targetTrackId);
-      }
+      for (const file of Array.from(files)) await handleLoadTrack(file, targetTrackId);
     })();
   };
 
@@ -413,7 +578,7 @@ export default function Index() {
 
   const handleSeek = (time: number) => seekTransport(time);
 
-  // Keep only essential shortcuts
+  // Essentials only
   useKeyboardShortcuts({
     onPlay: play,
     onPause: pause,
@@ -432,7 +597,7 @@ export default function Index() {
       {/* ALS / Ambient */}
       <MixxAmbientOverlay />
 
-      {/* Minimal top-left import pill */}
+      {/* Import pill */}
       <div className="absolute top-4 left-4 z-40">
         <Button
           variant="outline"
@@ -445,7 +610,7 @@ export default function Index() {
         </Button>
       </div>
 
-      {/* Arrange-only: headers + timeline lanes */}
+      {/* Arrange-only: DAW left bar + lanes */}
       <div className="flex-1 flex flex-col">
         <TrackLanesLayout
           selectedTrackId={selectedTrackId}
