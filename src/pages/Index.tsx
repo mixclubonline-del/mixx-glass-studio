@@ -54,6 +54,19 @@ const Index = () => {
   const [detectedKey, setDetectedKey] = useState<string | null>(null);
   const { toast } = useToast();
   
+  // Helper utilities
+  const genId = (prefix: string) =>
+    `${prefix}-${Date.now().toString(36)}-${Math.random().toString(36).slice(2, 7)}`;
+
+  const DEFAULT_TRACK_HEIGHT = 100;
+  const ensureInserts = (slots = 8) =>
+    Array.from({ length: slots }).map((_, i) => ({
+      slotNumber: i + 1,
+      pluginId: null as string | null,
+      instanceId: null as string | null,
+      bypass: false,
+    }));
+  
   // Global stores
   const { currentView, isPanelOpen, togglePanel } = useViewStore();
   const { currentTime, isPlaying, setCurrentTime, setIsPlaying, setDuration } = useTimelineStore();
@@ -145,133 +158,122 @@ const Index = () => {
     fileInputRef.current?.click();
   };
 
-  const handleFileSelect = (e: React.ChangeEvent<HTMLInputElement>) => {
-    const files = e.target.files;
-    if (files) {
-      Array.from(files).forEach(file => handleLoadTrack(file));
+  const handleFileSelect = (e: React.ChangeEvent<HTMLInputElement> | { target: { files: File[] } }) => {
+    const files = (e as any).target.files as FileList | File[];
+    if (files && (files as any).length) {
+      Array.from(files as any).forEach((file: File) => handleLoadTrack(file));
       toast({
         title: "Audio files imported",
-        description: `${files.length} file(s) loaded successfully`,
+        description: `${(files as any).length} file(s) loaded successfully`,
       });
     }
-    if (fileInputRef.current) {
-      fileInputRef.current.value = '';
-    }
+    if (fileInputRef.current) fileInputRef.current.value = '';
   };
 
   const handleLoadTrack = async (file: File) => {
     if (!engineRef.current) return;
-    
+
     try {
-      const id = `track-${Date.now()}`;
-      await engineRef.current.loadTrack(id, file.name, file);
-      
-      const audioTracks = engineRef.current.getTracks();
-      const loadedTrack = audioTracks.find(t => t.id === id);
-      
-      if (loadedTrack && loadedTrack.buffer) {
-        // Generate color
-        const hue = Math.floor(Math.random() * 360);
-        const color = `hsl(${hue}, 70%, 50%)`;
-        
-        // Add to timeline store
-        const timelineTrack: TimelineTrack = {
-          id,
-          name: file.name,
-          color,
-          height: 100,
-          regions: [],
-          muted: false,
-          solo: false,
-          recordArmed: false,
-          volume: 0.75 // Default volume at 75%
-        };
-        addTrack(timelineTrack);
-        
-        // Create region - start at time 0
-        const region: Region = {
-          id: `region-${id}`,
-          trackId: id,
-          name: file.name,
-          startTime: 0, // Start at beginning of timeline
-          duration: loadedTrack.buffer.duration,
-          bufferOffset: 0,
-          bufferDuration: loadedTrack.buffer.duration,
-          color,
-          fadeIn: 0,
-          fadeOut: 0,
-          gain: 1,
-          locked: false,
-          muted: false
-        };
-        addRegion(region);
-        
-        // Store audio buffer
-        setAudioBuffers(prev => new Map(prev).set(region.id, loadedTrack.buffer!));
-        
-        // Auto-detect BPM, key, and time signature (client-side, non-blocking)
-        setTimeout(() => {
-          try {
-            const bpm = AudioAnalyzer.detectBPM(loadedTrack.buffer!);
-            const { key, scale } = AudioAnalyzer.detectKey(loadedTrack.buffer!);
-            const timeSignature = AudioAnalyzer.inferTimeSignature(bpm, loadedTrack.buffer!);
-            
-            setDetectedBPM(bpm);
-            setDetectedKey(`${key} ${scale}`);
-            
-            if (engineRef.current) {
-              engineRef.current.bpm = bpm;
-              engineRef.current.timeSignature = timeSignature;
-            }
-            
-            toast({
-              title: "Audio Analysis Complete",
-              description: `BPM: ${bpm} | Key: ${key} ${scale} | Time: ${timeSignature.numerator}/${timeSignature.denominator}`,
-            });
-          } catch (error) {
-            console.error("Audio analysis failed:", error);
+      // Unique IDs (prevents collisions on fast multi-imports)
+      const trackId = genId("track");
+
+      // Load into engine first so buffer/duration is real
+      await engineRef.current.loadTrack(trackId, file.name, file);
+      const loaded = engineRef.current.getTracks().find(t => t.id === trackId);
+      const buffer = loaded?.buffer;
+      if (!buffer) throw new Error("No audio buffer after load");
+
+      // Stable per-track color
+      const hue = Math.floor(Math.random() * 360);
+      const color = `hsl(${hue}, 70%, 50%)`;
+
+      // 1) Add the new track lane
+      const timelineTrack: TimelineTrack = {
+        id: trackId,
+        name: file.name,
+        color,
+        height: DEFAULT_TRACK_HEIGHT,
+        regions: [],
+        muted: false,
+        solo: false,
+        recordArmed: false,
+        volume: 0.75,
+        inserts: ensureInserts(8),
+      };
+      addTrack(timelineTrack);
+
+      // 2) Add the region at the beginning (snap to 0)
+      const regionId = `region-${trackId}`;
+      addRegion({
+        id: regionId,
+        trackId,
+        name: file.name,
+        startTime: 0,                   // <-- lock to 0
+        duration: buffer.duration,
+        bufferOffset: 0,
+        bufferDuration: buffer.duration,
+        color,
+        fadeIn: 0,
+        fadeOut: 0,
+        gain: 1,
+        locked: false,
+        muted: false,
+      });
+
+      // 3) Keep a handle to the buffer for the timeline renderer
+      setAudioBuffers(prev => new Map(prev).set(regionId, buffer));
+
+      // 4) Mixer sync (channel per track)
+      addChannel({
+        id: trackId,
+        name: file.name,
+        volume: 0.75,
+        pan: 0,
+        muted: false,
+        solo: false,
+        color,
+        peakLevel: { left: -60, right: -60 },
+      });
+      engineRef.current.setTrackVolume(trackId, 0.75);
+
+      // 5) Update song duration conservatively
+      const newEnd = 0 + buffer.duration;
+      setDuration(Math.max(newEnd, useTimelineStore.getState().duration || 0));
+
+      // 6) Optional analysis (non-blocking; no UI changes)
+      setTimeout(() => {
+        try {
+          const bpm = AudioAnalyzer.detectBPM(buffer);
+          const { key, scale } = AudioAnalyzer.detectKey(buffer);
+          const ts = AudioAnalyzer.inferTimeSignature(bpm, buffer);
+          setDetectedBPM(bpm);
+          setDetectedKey(`${key} ${scale}`);
+          if (engineRef.current) {
+            engineRef.current.bpm = bpm;
+            engineRef.current.timeSignature = ts;
           }
-        }, 100);
-        
-        // Add to mixer - sync state
-        addChannel({
-          id,
-          name: file.name,
-          volume: 0.75,
-          pan: 0,
-          muted: false,
-          solo: false,
-          color,
-          peakLevel: { left: -60, right: -60 }
-        });
-        
-        // Sync initial volume to audio engine
-        engineRef.current.setTrackVolume(id, 0.75);
-        
-        // Update duration
-        const totalDuration = Math.max(region.startTime + region.duration, currentTime);
-        setDuration(totalDuration);
-        
-        toast({
-          title: "Track loaded",
-          description: `${file.name} added to timeline and mixer`,
-        });
-      }
+        } catch {}
+      }, 120);
+
+      // 7) UX: select the new track (no visual change if your UI already highlights)
+      setSelectedTrackId(trackId);
+
+      toast({ title: "Track loaded", description: `${file.name} added to timeline & mixer` });
     } catch (error) {
       console.error("Failed to load track:", error);
       toast({
         title: "Error",
         description: "Failed to load audio file",
-        variant: "destructive"
+        variant: "destructive",
       });
     }
   };
 
   const handleRemoveTrack = (id: string) => {
-    if (engineRef.current) {
-      engineRef.current.removeTrack(id);
-      // Stores will handle removal through their own methods
-    }
+    engineRef.current?.removeTrack(id);
+    useTracksStore.getState().removeTrack?.(id);
+    useMixerStore.getState().removeChannel?.(id);
+    if (selectedTrackId === id) setSelectedTrackId(null);
   };
 
   const handleVolumeChange = (id: string, volume: number) => {
