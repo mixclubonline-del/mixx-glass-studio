@@ -178,3 +178,22 @@ export class AudioAnalyzer {
     return { numerator: 4, denominator: 4 };
   }
 }
+import { useMixerStore } from '@/store/mixerStore';
+import { useMeteringStore } from '@/store/meteringStore';
+
+// example inside your processor callback
+const { setMasterPeaks, setMasterRMS } = useMixerStore.getState();
+const {
+  setTruePeak, setCrestFactor, setStereoWidth, setPhaseCorrelation, setLUFS, bumpClipCount,
+} = useMeteringStore.getState();
+
+// compute values...
+setMasterPeaks(peakL, peakR);
+setMasterRMS(rmsL, rmsR);
+setTruePeak(dbtp);
+setCrestFactor(peakAvg - rmsAvg);
+setStereoWidth(width01);
+setPhaseCorrelation(phi);
+setLUFS({ momentary: m, shortTerm: s, integrated: i, range: lra });
+
+if (clippedL || clippedR) bumpClipCount('master', clippedL && clippedR ? 'LR' : clippedL ? 'L' : 'R');
