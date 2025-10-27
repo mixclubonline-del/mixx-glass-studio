@@ -183,7 +183,8 @@ const Index = () => {
           regions: [],
           muted: false,
           solo: false,
-          recordArmed: false
+          recordArmed: false,
+          volume: 0.75 // Default volume at 75%
         };
         addTrack(timelineTrack);
         

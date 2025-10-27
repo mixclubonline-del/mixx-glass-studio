@@ -298,4 +298,10 @@
   .border-glow-hype {
     animation: border-glow 2s ease-in-out infinite;
   }
+  
+  /* Vertical text for collapsed sidebar */
+  .writing-mode-vertical {
+    writing-mode: vertical-rl;
+    text-orientation: mixed;
+  }
 }

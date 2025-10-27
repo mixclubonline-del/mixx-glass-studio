@@ -13,8 +13,9 @@ import { TimelineToolbar } from './TimelineToolbar';
 import { AddTrackDialog, TrackConfig } from './AddTrackDialog';
 import { CrossfadeRenderer } from './CrossfadeRenderer';
 import { ArrangeBrowserPanel } from './ArrangeBrowserPanel';
-import { ZoomIn, ZoomOut, Grid3x3, Maximize2, Plus } from 'lucide-react';
+import { ZoomIn, ZoomOut, Grid3x3, Maximize2, Plus, ChevronLeft, ChevronRight } from 'lucide-react';
 import { Button } from '@/components/ui/button';
+import { cn } from '@/lib/utils';
 import mixxclubLogo from '@/assets/mixxclub-logo.png';
 
 // Dynamic hip-hop encouragement messages based on session time
@@ -51,6 +52,11 @@ export const AdvancedTimelineView: React.FC<AdvancedTimelineViewProps> = ({
   const [browserCollapsed, setBrowserCollapsed] = useState(() => {
     const saved = localStorage.getItem('browserCollapsed');
     return saved === 'true';
+  });
+  
+  const [trackListCollapsed, setTrackListCollapsed] = useState(() => {
+    const saved = localStorage.getItem('trackListCollapsed');
+    return saved === 'false'; // Default to expanded
   });
   
   // Track session time for dynamic encouragement
@@ -185,6 +191,11 @@ export const AdvancedTimelineView: React.FC<AdvancedTimelineViewProps> = ({
     localStorage.setItem('browserCollapsed', browserCollapsed.toString());
   }, [browserCollapsed]);
   
+  // Save track list collapsed state to localStorage
+  useEffect(() => {
+    localStorage.setItem('trackListCollapsed', trackListCollapsed.toString());
+  }, [trackListCollapsed]);
+  
   // Auto-scroll follow playhead when enabled
   const { autoScrollEnabled } = useTimelineStore();
   useEffect(() => {
@@ -203,8 +214,142 @@ export const AdvancedTimelineView: React.FC<AdvancedTimelineViewProps> = ({
   
   return (
     <div className="flex h-full bg-background">
+      {/* Left Track List Sidebar */}
+      {!trackListCollapsed && (
+        <div className="w-64 flex-shrink-0 glass border-r border-border/50 flex flex-col">
+          {/* Sidebar Header */}
+          <div className="h-[88px] flex items-center justify-between px-4 border-b-2 border-[#a855f7]/50 bg-gradient-to-r from-[#a855f7]/5 to-[#ec4899]/5">
+            <div className="flex flex-col">
+              <h3 className="text-sm font-bold gradient-flow uppercase">Tracks</h3>
+              <p className="text-xs text-muted-foreground">{tracks.length} track{tracks.length !== 1 ? 's' : ''}</p>
+            </div>
+            <Button
+              size="sm"
+              variant="ghost"
+              onClick={() => setTrackListCollapsed(true)}
+              className="h-8 w-8 p-0"
+            >
+              <ChevronLeft size={16} />
+            </Button>
+          </div>
+          
+          {/* Track List */}
+          <div className="flex-1 overflow-y-auto">
+            {tracks.length === 0 ? (
+              <div className="flex items-center justify-center h-full text-center text-muted-foreground p-4">
+                <p className="text-xs">No tracks yet</p>
+              </div>
+            ) : (
+              tracks.map((track) => (
+                <div
+                  key={track.id}
+                  onClick={() => handleSelectTrack(track.id)}
+                  className={cn(
+                    "h-[100px] border-b border-border/30 cursor-pointer transition-colors",
+                    "hover:bg-muted/50",
+                    selectedTrackId === track.id && "bg-primary/10 border-l-4 border-l-primary"
+                  )}
+                >
+                  <div className="h-full px-3 py-2 flex flex-col justify-between">
+                    {/* Track Name and Color */}
+                    <div className="flex items-center gap-2">
+                      <div 
+                        className="w-2 h-2 rounded-full flex-shrink-0"
+                        style={{ backgroundColor: track.color }}
+                      />
+                      <span className="text-sm font-medium truncate flex-1">
+                        {track.name}
+                      </span>
+                    </div>
+                    
+                    {/* Track Controls */}
+                    <div className="flex items-center gap-1">
+                      <button
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          // Toggle mute - will be implemented
+                        }}
+                        className={cn(
+                          "px-2 py-1 rounded text-xs font-bold transition-colors",
+                          track.muted 
+                            ? "bg-orange-500/20 text-orange-500" 
+                            : "bg-muted/50 text-muted-foreground hover:text-foreground"
+                        )}
+                        title="Mute"
+                      >
+                        M
+                      </button>
+                      <button
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          // Toggle solo - will be implemented
+                        }}
+                        className={cn(
+                          "px-2 py-1 rounded text-xs font-bold transition-colors",
+                          track.solo 
+                            ? "bg-yellow-500/20 text-yellow-500" 
+                            : "bg-muted/50 text-muted-foreground hover:text-foreground"
+                        )}
+                        title="Solo"
+                      >
+                        S
+                      </button>
+                      <button
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          // Toggle record arm - will be implemented
+                        }}
+                        className={cn(
+                          "px-2 py-1 rounded text-xs font-bold transition-colors",
+                          track.recordArmed 
+                            ? "bg-red-500/20 text-red-500" 
+                            : "bg-muted/50 text-muted-foreground hover:text-foreground"
+                        )}
+                        title="Record Arm"
+                      >
+                        R
+                      </button>
+                    </div>
+                    
+                    {/* Volume Indicator */}
+                    <div className="flex items-center gap-2">
+                      <div className="flex-1 h-1 bg-muted/30 rounded-full overflow-hidden">
+                        <div 
+                          className="h-full bg-gradient-to-r from-green-500 to-yellow-500 transition-all"
+                          style={{ width: `${track.volume * 100}%` }}
+                        />
+                      </div>
+                      <span className="text-xs text-muted-foreground font-mono w-8 text-right">
+                        {Math.round(track.volume * 100)}
+                      </span>
+                    </div>
+                  </div>
+                </div>
+              ))
+            )}
+          </div>
+        </div>
+      )}
+      
+      {/* Collapsed Track List Toggle Button */}
+      {trackListCollapsed && (
+        <div className="w-12 flex-shrink-0 glass border-r border-border/50 flex flex-col items-center py-4 gap-2">
+          <Button
+            size="sm"
+            variant="ghost"
+            onClick={() => setTrackListCollapsed(false)}
+            className="h-8 w-8 p-0"
+          >
+            <ChevronRight size={16} />
+          </Button>
+          <div className="writing-mode-vertical text-xs text-muted-foreground font-bold uppercase tracking-wider">
+            Tracks
+          </div>
+        </div>
+      )}
+      
       {/* Main Timeline Area */}
-      <div className="flex-1 flex flex-col">
+      <div className="flex-1 flex flex-col min-w-0">
         {/* Timeline toolbar with tools */}
         <div className="flex items-center justify-between gap-3 px-6 py-4 glass border-b-2 border-[#a855f7]/50 border-glow-hype bg-gradient-to-r from-[#a855f7]/5 via-[#ec4899]/5 to-[#3b82f6]/5">
           <div className="flex items-center gap-6">

@@ -46,6 +46,7 @@ export interface TimelineTrack {
   muted: boolean;
   solo: boolean;
   recordArmed: boolean;
+  volume: number; // 0-1 range
   inserts?: import('@/audio/Track').PluginInsert[];
 }
 
