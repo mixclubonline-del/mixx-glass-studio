@@ -1,146 +1,169 @@
-/**
- * Metering Store - Professional audio metering state
- * ITU-R BS.1770-5 / EBU R128 compliant
- */
-
 import { create } from 'zustand';
 
-export interface MeteringState {
-  // Peak metering
-  truePeakEnabled: boolean;
-  peakHoldTime: number; // milliseconds
-  clipCount: Map<string, number>; // channelId -> count
-  
-  // LUFS metering (ITU-R BS.1770-5)
-  lufsIntegrated: number; // Overall program loudness
-  lufsShortTerm: number; // 3-second rolling window
-  lufsMomentary: number; // 400ms window
-  loudnessRange: number; // LRA in LU
-  truePeak: number; // Inter-sample peak
-  
-  // Phase & stereo
-  phaseCorrelation: number; // -1 to +1
-  stereoWidth: number; // 0 to 1
-  
-  // Dynamic range
-  dynamicRange: number; // DR score (EBU Tech 3342)
-  crestFactor: number; // Peak-to-RMS ratio
-  
-  // Analysis settings
-  meteringStandard: 'ITU-R-BS.1770-5' | 'EBU-R128';
-  targetLoudness: -23 | -16 | -14 | -8; // LUFS
-  rmsWindow: 100 | 300 | 400; // milliseconds
-  
-  // Spectrum analyzer
-  spectrumBands: number; // FFT band count
-  spectrumData: Float32Array;
-  
-  // Export readiness
-  exportReady: boolean; // True if mix meets target standards
-  
-  // Actions
-  setTruePeakEnabled: (enabled: boolean) => void;
-  setPeakHoldTime: (time: number) => void;
-  incrementClipCount: (channelId: string) => void;
-  resetClipCount: (channelId: string) => void;
-  updateLUFS: (integrated: number, shortTerm: number, momentary: number) => void;
-  updateLoudnessRange: (lra: number) => void;
-  updateTruePeak: (peak: number) => void;
-  updatePhaseCorrelation: (correlation: number) => void;
-  updateStereoWidth: (width: number) => void;
-  updateDynamicRange: (dr: number, crest: number) => void;
-  setMeteringStandard: (standard: 'ITU-R-BS.1770-5' | 'EBU-R128') => void;
-  setTargetLoudness: (loudness: -23 | -16 | -14 | -8) => void;
-  updateSpectrum: (data: Float32Array) => void;
-  checkExportReadiness: () => void;
+type ClipCounts = Record<string, { L: number; R: number; total: number }>;
+
+export interface LufsState {
+  /** EBU R128 Momentary (400 ms) */
+  momentary: number;
+  /** EBU R128 Short-Term (3 s) */
+  shortTerm: number;
+  /** Integrated program loudness */
+  integrated: number;
+  /** Loudness range (LRA) */
+  range: number;
 }
 
-export const useMeteringStore = create<MeteringState>((set, get) => ({
-  // Initial state
-  truePeakEnabled: true,
-  peakHoldTime: 3000,
-  clipCount: new Map(),
-  
-  lufsIntegrated: -23,
-  lufsShortTerm: -23,
-  lufsMomentary: -23,
-  loudnessRange: 0,
-  truePeak: -60,
-  
-  phaseCorrelation: 1.0,
+interface MeteringState {
+  /** Sample-accurate / oversampled true-peak (dBTP) */
+  truePeak: number;
+  /** Album-style DR value (integer-ish) */
+  dynamicRange: number;
+  /** Peak - RMS (dB) */
+  crestFactor: number;
+  /** 0..1 = mono..wide */
+  stereoWidth: number;
+  /** -1..+1 phase correlation */
+  phaseCorrelation: number;
+
+  /** LUFS bucket (R128-style) */
+  lufs: LufsState;
+
+  /** Optional spectrum data (copy as plain array for immutability) */
+  spectrum: number[];
+
+  /** Clip counters keyed by bus name (e.g., 'master', 'track-3') */
+  clipCounts: ClipCounts;
+
+  // --- Actions (all return NEW objects to trigger renders) ---
+  setTruePeak: (v: number) => void;
+  setDynamicRange: (v: number) => void;
+  setCrestFactor: (v: number) => void;
+  setStereoWidth: (v: number) => void;
+  setPhaseCorrelation: (v: number) => void;
+
+  setLUFS: (partial: Partial<LufsState>) => void;
+  setSpectrum: (bins: ArrayLike<number>) => void;
+
+  bumpClipCount: (bus: string, channel?: 'L' | 'R' | 'LR') => void;
+  resetClipCount: (bus: string) => void;
+
+  /** Convenience: batch master metering update */
+  updateMasterStats: (stats: {
+    truePeak?: number;
+    dynamicRange?: number;
+    crestFactor?: number;
+    stereoWidth?: number;
+    phaseCorrelation?: number;
+    lufs?: Partial<LufsState>;
+  }) => void;
+}
+
+const clamp = (v: number, min: number, max: number) =>
+  Number.isFinite(v) ? Math.min(max, Math.max(min, v)) : min;
+
+// sensible defaults (nothing “hot” on boot)
+const initialLUFS: LufsState = {
+  momentary: -24,
+  shortTerm: -22,
+  integrated: -18,
+  range: 5,
+};
+
+export const useMeteringStore = create<MeteringState>((set) => ({
+  truePeak: -40,
+  dynamicRange: 12,
+  crestFactor: 8,
   stereoWidth: 0.5,
-  
-  dynamicRange: 14,
-  crestFactor: 10,
-  
-  meteringStandard: 'ITU-R-BS.1770-5',
-  targetLoudness: -14, // Streaming default
-  rmsWindow: 300,
-  
-  spectrumBands: 32,
-  spectrumData: new Float32Array(32),
-  
-  exportReady: false,
-  
-  // Actions
-  setTruePeakEnabled: (enabled) => set({ truePeakEnabled: enabled }),
-  
-  setPeakHoldTime: (time) => set({ peakHoldTime: time }),
-  
-  incrementClipCount: (channelId) => set((state) => {
-    const newCount = new Map(state.clipCount);
-    newCount.set(channelId, (newCount.get(channelId) || 0) + 1);
-    return { clipCount: newCount };
-  }),
-  
-  resetClipCount: (channelId) => set((state) => {
-    const newCount = new Map(state.clipCount);
-    newCount.set(channelId, 0);
-    return { clipCount: newCount };
-  }),
-  
-  updateLUFS: (integrated, shortTerm, momentary) => {
-    set({
-      lufsIntegrated: integrated,
-      lufsShortTerm: shortTerm,
-      lufsMomentary: momentary
-    });
-    get().checkExportReadiness();
-  },
-  
-  updateLoudnessRange: (lra) => set({ loudnessRange: lra }),
-  
-  updateTruePeak: (peak) => set({ truePeak: peak }),
-  
-  updatePhaseCorrelation: (correlation) => set({ phaseCorrelation: correlation }),
-  
-  updateStereoWidth: (width) => set({ stereoWidth: width }),
-  
-  updateDynamicRange: (dr, crest) => set({ 
-    dynamicRange: dr, 
-    crestFactor: crest 
-  }),
-  
-  setMeteringStandard: (standard) => set({ meteringStandard: standard }),
-  
-  setTargetLoudness: (loudness) => {
-    set({ targetLoudness: loudness });
-    get().checkExportReadiness();
-  },
-  
-  updateSpectrum: (data) => set({ spectrumData: data }),
-  
-  checkExportReadiness: () => {
-    const { lufsIntegrated, targetLoudness, truePeak, phaseCorrelation } = get();
-    
-    // Check if mix meets standards:
-    // 1. LUFS within ±2 LU of target
-    // 2. True peak below -1 dBTP
-    // 3. Phase correlation above -0.3 (mono compatibility)
-    const lufsOk = Math.abs(lufsIntegrated - targetLoudness) <= 2;
-    const peakOk = truePeak < -1;
-    const phaseOk = phaseCorrelation > -0.3;
-    
-    set({ exportReady: lufsOk && peakOk && phaseOk });
-  }
+  phaseCorrelation: 0.9,
+
+  lufs: initialLUFS,
+  spectrum: [],
+  clipCounts: {},
+
+  setTruePeak: (v) =>
+    set(() => ({ truePeak: Number.isFinite(v) ? v : -40 })),
+
+  setDynamicRange: (v) =>
+    set(() => ({ dynamicRange: Number.isFinite(v) ? Math.round(v) : 12 })),
+
+  setCrestFactor: (v) =>
+    set(() => ({ crestFactor: Number.isFinite(v) ? v : 8 })),
+
+  setStereoWidth: (v) =>
+    set(() => ({ stereoWidth: clamp(v, 0, 1) })),
+
+  setPhaseCorrelation: (v) =>
+    set(() => ({ phaseCorrelation: clamp(v, -1, 1) })),
+
+  setLUFS: (partial) =>
+    set((state) => ({
+      lufs: {
+        ...state.lufs,
+        ...Object.fromEntries(
+          Object.entries(partial).map(([k, val]) => [
+            k,
+            Number.isFinite(val as number) ? (val as number) : (state.lufs as any)[k],
+          ])
+        ),
+      },
+    })),
+
+  setSpectrum: (bins) =>
+    set(() => ({
+      // create a NEW array; don’t hold references to shared Float32Array
+      spectrum: Array.from(bins as number[] | ArrayLike<number>),
+    })),
+
+  bumpClipCount: (bus, channel = 'LR') =>
+    set((state) => {
+      const prev = state.clipCounts[bus] ?? { L: 0, R: 0, total: 0 };
+      let L = prev.L;
+      let R = prev.R;
+      if (channel === 'L') L += 1;
+      else if (channel === 'R') R += 1;
+      else {
+        L += 1;
+        R += 1;
+      }
+      const total = L + R;
+      return {
+        clipCounts: {
+          ...state.clipCounts,
+          [bus]: { L, R, total },
+        },
+      };
+    }),
+
+  resetClipCount: (bus) =>
+    set((state) => ({
+      clipCounts: {
+        ...state.clipCounts,
+        [bus]: { L: 0, R: 0, total: 0 },
+      },
+    })),
+
+  updateMasterStats: (stats) =>
+    set((state) => ({
+      truePeak:
+        stats.truePeak !== undefined
+          ? stats.truePeak
+          : state.truePeak,
+      dynamicRange:
+        stats.dynamicRange !== undefined
+          ? Math.round(stats.dynamicRange)
+          : state.dynamicRange,
+      crestFactor:
+        stats.crestFactor !== undefined
+          ? stats.crestFactor
+          : state.crestFactor,
+      stereoWidth:
+        stats.stereoWidth !== undefined
+          ? clamp(stats.stereoWidth, 0, 1)
+          : state.stereoWidth,
+      phaseCorrelation:
+        stats.phaseCorrelation !== undefined
+          ? clamp(stats.phaseCorrelation, -1, 1)
+          : state.phaseCorrelation,
+      lufs: stats.lufs ? { ...state.lufs, ...stats.lufs } : state.lufs,
+    })),
 }));
