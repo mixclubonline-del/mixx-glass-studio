@@ -4,7 +4,6 @@
 
 // Timeline
 export { AdvancedTimelineView } from './Timeline/AdvancedTimelineView';
-export { EnhancedTimelineView } from './Timeline/EnhancedTimelineView';
 export { TimelineRuler } from './Timeline/TimelineRuler';
 export { Playhead } from './Timeline/Playhead';
 export { GridOverlay } from './Timeline/GridOverlay';
@@ -17,7 +16,6 @@ export * from './Timeline/CursorTools';
 
 // Mixer
 export { NextGenMixerView } from './Mixer/NextGenMixerView';
-export { ProfessionalMixerView } from './Mixer/ProfessionalMixerView';
 export { GlassChannelStrip } from './Mixer/GlassChannelStrip';
 export { MasterChannelStrip } from './Mixer/MasterChannelStrip';
 export { PeakMeter } from './Mixer/PeakMeter';
@@ -42,7 +40,6 @@ export * from './Editing';
 // Navigation
 export { ViewSwitcher } from './Navigation/ViewSwitcher';
 export { TopMenuBar } from './Navigation/TopMenuBar';
-export { EnhancedTopMenuBar } from './Navigation/EnhancedTopMenuBar';
 export { ViewContainer } from './Navigation/ViewContainer';
 
 // AI
@@ -53,6 +50,9 @@ export { AISuggestionsPanel } from './AI/AISuggestionsPanel';
 
 // Producer
 export { ProducerLab } from './Producer/ProducerLab';
+export { DrumMachine } from './Producer/DrumMachine';
+export { SynthRack } from './Producer/SynthRack';
+export { Sampler } from './Producer/Sampler';
 
 // Transport
 export { TransportControls } from './TransportControls';

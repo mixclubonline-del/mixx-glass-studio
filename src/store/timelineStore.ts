@@ -33,9 +33,7 @@ interface TimelineState {
   currentTool: 'select' | 'range' | 'split' | 'trim' | 'fade' | 'pencil' | 'zoom' | 'multi';
   gridMode: 'bars' | 'beats' | 'seconds' | 'samples' | 'adaptive';
   snapMode: 'grid' | 'relative' | 'transient' | 'marker' | 'region' | 'off';
-  quantizeStrength: number; // 0-1, where 1 = hard snap, 0 = free
   rippleEdit: boolean;
-  returnOnStop: boolean; // Return to start position on stop
   
   // Auto-scroll modes
   scrollMode: 'continuous' | 'page' | 'none';
@@ -62,9 +60,7 @@ interface TimelineState {
   setCurrentTool: (tool: 'select' | 'range' | 'split' | 'trim' | 'fade' | 'pencil' | 'zoom' | 'multi') => void;
   setGridMode: (mode: 'bars' | 'beats' | 'seconds' | 'samples' | 'adaptive') => void;
   setSnapMode: (mode: 'grid' | 'relative' | 'transient' | 'marker' | 'region' | 'off') => void;
-  setQuantizeStrength: (strength: number) => void;
   toggleRippleEdit: () => void;
-  setReturnOnStop: (enabled: boolean) => void;
   setScrollMode: (mode: 'continuous' | 'page' | 'none') => void;
   setAutoScrollEnabled: (enabled: boolean) => void;
   setCenterPlayhead: (center: boolean) => void;
@@ -94,13 +90,11 @@ export const useTimelineStore = create<TimelineState>((set) => ({
   currentTool: 'select',
   gridMode: 'adaptive',
   snapMode: 'grid',
-  quantizeStrength: 1.0, // 100% snap by default
   rippleEdit: false,
-  returnOnStop: true, // Return to start on stop (Pro Tools behavior)
   
-  scrollMode: 'none',
-  autoScrollEnabled: false,
-  centerPlayhead: false,
+  scrollMode: 'continuous',
+  autoScrollEnabled: true,
+  centerPlayhead: true,
   
   // Actions
   setCurrentTime: (time) => set({ currentTime: time }),
@@ -133,9 +127,7 @@ export const useTimelineStore = create<TimelineState>((set) => ({
   setCurrentTool: (tool) => set({ currentTool: tool }),
   setGridMode: (mode) => set({ gridMode: mode }),
   setSnapMode: (mode) => set({ snapMode: mode }),
-  setQuantizeStrength: (strength) => set({ quantizeStrength: Math.max(0, Math.min(1, strength)) }),
   toggleRippleEdit: () => set((state) => ({ rippleEdit: !state.rippleEdit })),
-  setReturnOnStop: (enabled) => set({ returnOnStop: enabled }),
   setScrollMode: (mode) => set({ scrollMode: mode }),
   setAutoScrollEnabled: (enabled) => set({ autoScrollEnabled: enabled }),
   setCenterPlayhead: (center) => set({ centerPlayhead: center }),

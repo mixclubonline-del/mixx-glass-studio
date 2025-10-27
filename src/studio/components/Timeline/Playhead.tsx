@@ -1,11 +1,8 @@
 /**
  * Playhead component - vertical line following playback
- * Synced directly to Prime Brain Master Clock
  */
 
-import { useEffect, useState } from 'react';
 import { useTimelineStore } from '@/store/timelineStore';
-import { primeBrain } from '@/ai/primeBrain';
 
 interface PlayheadProps {
   containerWidth: number;
@@ -13,17 +10,7 @@ interface PlayheadProps {
 }
 
 export function Playhead({ containerWidth, containerHeight }: PlayheadProps) {
-  const { duration, zoom, scrollX, currentTime } = useTimelineStore();
-  const [isPlaying, setIsPlaying] = useState(false);
-  
-  // Read time from timeline store (written by ProjectContext)
-  useEffect(() => {
-    const interval = setInterval(() => {
-      setIsPlaying(primeBrain.getIsRunning());
-    }, 100);
-    
-    return () => clearInterval(interval);
-  }, []);
+  const { currentTime, duration, zoom, scrollX, isPlaying } = useTimelineStore();
   
   if (duration === 0) return null;
   

@@ -13,9 +13,7 @@ import { TimelineToolbar } from './TimelineToolbar';
 import { AddTrackDialog, TrackConfig } from './AddTrackDialog';
 import { CrossfadeRenderer } from './CrossfadeRenderer';
 import { ArrangeBrowserPanel } from './ArrangeBrowserPanel';
-import { Grid3x3, Plus } from 'lucide-react';
-import { useTimelineKeyboardShortcuts } from '@/studio/hooks/useTimelineKeyboardShortcuts';
-import { DebugOverlay } from './DebugOverlay';
+import { ZoomIn, ZoomOut, Grid3x3, Maximize2, Plus } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import mixxclubLogo from '@/assets/mixxclub-logo.png';
 
@@ -94,9 +92,6 @@ export const AdvancedTimelineView: React.FC<AdvancedTimelineViewProps> = ({
   } = useTracksStore();
   
   const [addTrackDialogOpen, setAddTrackDialogOpen] = useState(false);
-  
-  // Enable timeline keyboard shortcuts
-  useTimelineKeyboardShortcuts(true);
   
   // Handler for creating new tracks
   const handleCreateTrack = (config: TrackConfig) => {
@@ -231,6 +226,27 @@ export const AdvancedTimelineView: React.FC<AdvancedTimelineViewProps> = ({
           </div>
           
           <div className="flex items-center gap-2">
+            <button 
+              onClick={() => setZoom(zoom * 0.8)}
+              className="p-1.5 rounded hover:bg-muted/50 transition-colors"
+              title="Zoom Out"
+            >
+              <ZoomOut size={16} />
+            </button>
+            
+            <button 
+              onClick={() => setZoom(zoom * 1.2)}
+              className="p-1.5 rounded hover:bg-muted/50 transition-colors"
+              title="Zoom In"
+            >
+              <ZoomIn size={16} />
+            </button>
+            
+            <div className="text-xs text-muted-foreground px-2">
+              {zoom.toFixed(0)}px/s
+            </div>
+            
+            <div className="w-px h-4 bg-border/50 mx-2" />
             
             <button 
               onClick={() => setSnapMode(snapMode === 'off' ? 'grid' : 'off')}
@@ -340,9 +356,6 @@ export const AdvancedTimelineView: React.FC<AdvancedTimelineViewProps> = ({
         onOpenChange={setAddTrackDialogOpen}
         onCreateTrack={handleCreateTrack}
       />
-
-      {/* Debug Overlay */}
-      <DebugOverlay bpm={120} timeSignature={{ numerator: 4, denominator: 4 }} />
     </div>
   );
 };

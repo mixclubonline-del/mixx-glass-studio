@@ -1,14 +1,10 @@
 /**
  * Project Context - Global state synchronization for entire studio
  * Single source of truth for BPM, Key, Transport, and AudioEngine
- * Routes transport control through Prime Brain (Master Clock)
  */
 
 import React, { createContext, useContext, useState, useCallback, useRef, useEffect } from 'react';
 import { AudioEngine } from '@/audio/AudioEngine';
-import { StudioEngine, createStudioEngine } from '@/studio/core';
-import { primeBrain } from '@/ai/primeBrain';
-import { regionPlaybackEngine } from '@/audio/RegionPlaybackEngine';
 
 interface TransportState {
   isPlaying: boolean;
@@ -22,7 +18,6 @@ interface TransportState {
 interface ProjectContextValue {
   // Audio Engine
   audioEngine: AudioEngine;
-  studioEngine: StudioEngine;
   
   // Project Settings
   bpm: number;
@@ -59,10 +54,6 @@ export const ProjectProvider: React.FC<{ children: React.ReactNode }> = ({ child
   const audioEngineRef = useRef<AudioEngine>(new AudioEngine());
   const audioEngine = audioEngineRef.current;
   
-  // Studio Engine wraps AudioEngine with enhanced features
-  const studioEngineRef = useRef<StudioEngine>(createStudioEngine(audioEngine));
-  const studioEngine = studioEngineRef.current;
-  
   // Project Settings
   const [bpm, setBpmState] = useState(120);
   const [key, setKey] = useState('C Major');
@@ -82,53 +73,40 @@ export const ProjectProvider: React.FC<{ children: React.ReactNode }> = ({ child
   // Update audio engine when BPM changes
   const setBpm = useCallback((newBpm: number) => {
     setBpmState(newBpm);
-    studioEngine.setBPM(newBpm);
-  }, [studioEngine]);
+    audioEngine.bpm = newBpm;
+  }, [audioEngine]);
   
-  // Transport controls - Route through Prime Brain (drives RegionPlaybackEngine via subscription)
-  const play = useCallback(async (fromTime?: number) => {
-    // Resume AudioContext ONCE at transport start
-    if (regionPlaybackEngine.audioContext.state === 'suspended') {
-      await regionPlaybackEngine.audioContext.resume();
-    }
-    
-    primeBrain.start(fromTime);
-    studioEngine.play(fromTime);
+  // Transport controls
+  const play = useCallback((fromTime?: number) => {
+    audioEngine.play(fromTime);
     setTransport(prev => ({ ...prev, isPlaying: true }));
-  }, [studioEngine]);
+  }, [audioEngine]);
   
   const pause = useCallback(() => {
-    primeBrain.pause();
-    regionPlaybackEngine.stopAll();
-    studioEngine.pause();
+    audioEngine.pause();
     setTransport(prev => ({ ...prev, isPlaying: false }));
-  }, [studioEngine]);
+  }, [audioEngine]);
   
   const stop = useCallback(() => {
-    primeBrain.stop();
-    regionPlaybackEngine.stopAll();
-    studioEngine.stop();
+    audioEngine.stop();
     setTransport(prev => ({ ...prev, isPlaying: false, currentTime: 0 }));
-  }, [studioEngine]);
+  }, [audioEngine]);
   
   const seek = useCallback((time: number) => {
-    primeBrain.seek(time);
-    regionPlaybackEngine.seek(time);
-    studioEngine.seek(time);
+    audioEngine.seek(time);
     setTransport(prev => ({ ...prev, currentTime: time }));
-  }, [studioEngine]);
+  }, [audioEngine]);
   
   const toggleLoop = useCallback(() => {
-    studioEngine.toggleLoop();
-    primeBrain.setLoop(audioEngine.loopEnabled, audioEngine.loopStart, audioEngine.loopEnd);
+    audioEngine.loopEnabled = !audioEngine.loopEnabled;
     setTransport(prev => ({ ...prev, loopEnabled: audioEngine.loopEnabled }));
-  }, [studioEngine, audioEngine]);
+  }, [audioEngine]);
   
   const setLoopRange = useCallback((start: number, end: number) => {
-    studioEngine.setLoopRange(start, end);
-    primeBrain.setLoop(true, start, end);
+    audioEngine.loopStart = start;
+    audioEngine.loopEnd = end;
     setTransport(prev => ({ ...prev, loopStart: start, loopEnd: end }));
-  }, [studioEngine]);
+  }, [audioEngine]);
   
   const toggleRecord = useCallback(() => {
     setTransport(prev => ({ ...prev, isRecording: !prev.isRecording }));
@@ -153,43 +131,29 @@ export const ProjectProvider: React.FC<{ children: React.ReactNode }> = ({ child
   const setMasterVolume = useCallback((volume: number) => {
     setMasterVolumeState(volume);
     audioEngine.setMasterGain(volume);
-    regionPlaybackEngine.setMasterVolume(volume);
   }, [audioEngine]);
   
-  // Update current time during playback using Prime Brain clock (SINGLE SOURCE OF TRUTH)
+  // Update current time during playback
   useEffect(() => {
-    const unsubscribe = primeBrain.subscribe((time) => {
-      // Update transport state
-      setTransport(prev => ({ ...prev, currentTime: time }));
-      
-      // Sync timeline store for UI display
-      const { setCurrentTime } = require('@/store/timelineStore').useTimelineStore.getState();
-      setCurrentTime(time);
-      
-      // Drive region playback with sample-accurate time
-      const samples = Math.round(time * regionPlaybackEngine.audioContext.sampleRate);
-      regionPlaybackEngine.update(samples);
-    });
+    if (!transport.isPlaying) return;
     
-    return unsubscribe;
-  }, []);
+    const intervalId = setInterval(() => {
+      const currentTime = audioEngine.getCurrentTime();
+      setTransport(prev => ({ ...prev, currentTime }));
+    }, 50); // Update every 50ms
+    
+    return () => clearInterval(intervalId);
+  }, [transport.isPlaying, audioEngine]);
   
   // Initialize audio engine settings
   useEffect(() => {
     audioEngine.bpm = bpm;
     audioEngine.timeSignature = timeSignature;
     audioEngine.setMasterGain(masterVolume);
-    regionPlaybackEngine.setMasterVolume(masterVolume);
-    
-    return () => {
-      // Cleanup on unmount
-      regionPlaybackEngine.stopAll();
-    };
   }, [audioEngine, bpm, timeSignature, masterVolume]);
   
   const value: ProjectContextValue = {
     audioEngine,
-    studioEngine,
     bpm,
     setBpm,
     key,
@@ -243,10 +207,4 @@ export const useAudioEngine = () => {
   const context = useContext(ProjectContext);
   if (!context) throw new Error('useAudioEngine must be used within ProjectProvider');
   return context.audioEngine;
-};
-
-export const useStudioEngine = () => {
-  const context = useContext(ProjectContext);
-  if (!context) throw new Error('useStudioEngine must be used within ProjectProvider');
-  return context.studioEngine;
 };
