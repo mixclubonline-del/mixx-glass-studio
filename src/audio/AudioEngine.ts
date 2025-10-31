@@ -9,6 +9,7 @@ import { Reverb } from './effects/Reverb';
 import { Delay } from './effects/Delay';
 import { EQParams, CompressorParams, PeakLevel } from '@/types/audio';
 import { PluginFactory } from './plugins/PluginFactory';
+import { getVelvetFloorEngine, VelvetFloorEngine } from './engines/VelvetFloorEngine';
 
 export interface EffectParams {
   reverbMix: number;
@@ -26,6 +27,7 @@ export class AudioEngine {
   private soloedTracks: Set<string>;
   private preSoloMuteStates: Map<string, boolean>;
   private masterGainNode: GainNode;
+  private velvetFloor: VelvetFloorEngine;
   
   // Playback state
   private isPlaying: boolean;
@@ -78,10 +80,19 @@ export class AudioEngine {
     this.limiter.attack.value = 0.003;
     this.limiter.release.value = 0.05;
     
-    // Connect master → masterGain → limiter → output
-    this.masterBus.channelStrip.output.connect(this.masterGainNode);
+    // Initialize VelvetFloor Engine (Five Pillars Doctrine)
+    this.velvetFloor = getVelvetFloorEngine();
+    this.velvetFloor.initialize(this.context).then(() => {
+      console.log('🎵 VelvetFloor Engine initialized');
+    });
+    
+    // Master chain: masterBus -> VelvetFloor -> masterGain -> limiter -> output
+    this.masterBus.channelStrip.output.connect(this.velvetFloor.input);
+    this.velvetFloor.output.connect(this.masterGainNode);
     this.masterGainNode.connect(this.limiter);
     this.limiter.connect(this.context.destination);
+    
+    console.log('🎵 Audio routing: Master Bus → VelvetFloor → Master Gain → Limiter → Output');
     
     // Create default reverb and delay buses
     this.createBus('reverb', 'Reverb', 'aux');
@@ -115,6 +126,9 @@ export class AudioEngine {
     });
     
     this.tracks.set(id, track);
+    
+    // Analyze sub-harmonic content for VelvetFloor
+    this.analyzeSubHarmonics(id, audioBuffer);
   }
   
   getTracks(): Track[] {
@@ -515,11 +529,92 @@ export class AudioEngine {
     }
   }
   
-  // Get plugin effect instance for parameter updates
-  getPluginInstance(trackId: string, slotNumber: number) {
+  getPluginInstance(trackId: string, slotNumber: number): any | null {
     const track = this.tracks.get(trackId);
-    if (!track) return null;
+    if (track) {
+      return track.channelStrip.getInsert(slotNumber);
+    }
+    return null;
+  }
+
+  /**
+   * Analyze sub-harmonic content and register with VelvetFloor
+   */
+  private analyzeSubHarmonics(trackId: string, buffer: AudioBuffer): void {
+    const channelData = buffer.getChannelData(0);
+    const sampleRate = buffer.sampleRate;
     
-    return track.channelStrip.getInsert(slotNumber);
+    // Simple frequency detection for sub-bass (20-120Hz)
+    const fftSize = 2048;
+    const frequencies = [30, 45, 60, 80, 100]; // Key sub frequencies
+    
+    frequencies.forEach((freq, index) => {
+      // Calculate approximate energy at this frequency
+      const energy = this.estimateFrequencyEnergy(channelData, freq, sampleRate, fftSize);
+      
+      if (energy > 0.1) {
+        this.velvetFloor.addSubSource({
+          id: `${trackId}-sub-${freq}Hz`,
+          frequency: freq,
+          amplitude: energy,
+          phase: 0,
+          harmonicContent: [1, 0.5, 0.3, 0.2, 0.1],
+          sourceType: freq < 40 ? 'sub' : freq < 70 ? '808' : 'bass'
+        });
+        console.log(`🎵 VelvetFloor: Added ${freq}Hz sub source from ${trackId}, energy: ${energy.toFixed(2)}`);
+      }
+    });
+  }
+
+  /**
+   * Estimate energy at a specific frequency
+   */
+  private estimateFrequencyEnergy(
+    channelData: Float32Array, 
+    targetFreq: number, 
+    sampleRate: number, 
+    fftSize: number
+  ): number {
+    let maxEnergy = 0;
+    const step = Math.floor(sampleRate * 0.1); // Sample every 0.1 seconds
+    
+    for (let i = 0; i < channelData.length - fftSize; i += step) {
+      let real = 0;
+      let imag = 0;
+      
+      // Simple DFT at target frequency
+      const omega = (2 * Math.PI * targetFreq) / sampleRate;
+      for (let n = 0; n < fftSize; n++) {
+        const sample = channelData[i + n] || 0;
+        real += sample * Math.cos(omega * n);
+        imag += sample * Math.sin(omega * n);
+      }
+      
+      const energy = Math.sqrt(real * real + imag * imag) / fftSize;
+      maxEnergy = Math.max(maxEnergy, energy);
+    }
+    
+    return Math.min(1, maxEnergy * 2);
+  }
+
+  /**
+   * Get VelvetFloor Engine instance
+   */
+  getVelvetFloorEngine(): VelvetFloorEngine {
+    return this.velvetFloor;
+  }
+
+  /**
+   * Set beat-locked clock for VelvetFloor
+   */
+  setBeatClock(getBeatPhase: () => number): void {
+    this.velvetFloor.setClock(getBeatPhase);
+  }
+  
+  dispose() {
+    this.stop();
+    this.tracks.forEach(track => track.dispose());
+    this.buses.forEach(bus => bus.dispose());
+    this.velvetFloor.dispose();
   }
 }

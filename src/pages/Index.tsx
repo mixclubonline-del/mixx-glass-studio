@@ -26,6 +26,7 @@ import { TimelineTrack, Region } from "@/types/timeline";
 import type { MusicalContext } from "@/types/mixxtune";
 import { Button } from "@/components/ui/button";
 import { useToast } from "@/hooks/use-toast";
+import { MasterMeteringPanel, VelvetFloorPanel } from '@/studio/components/Metering';
 import { AudioAnalyzer } from "@/audio/analysis/AudioAnalyzer";
 import { MixxAmbientOverlay } from "@/components/MixxAmbientOverlay";
 import { BeastModeAmbient } from "@/components/BeastModeAmbient";
@@ -257,6 +258,15 @@ const Index = () => {
 
       // 7) UX: select the new track (no visual change if your UI already highlights)
       setSelectedTrackId(trackId);
+
+      // 8) Debug logging for waveform rendering
+      console.log('🎵 Track loaded:', {
+        trackId,
+        regionId,
+        bufferDuration: buffer.duration,
+        audioBuffersSize: audioBuffers.size + 1,
+        hasBuffer: !!buffer
+      });
 
       toast({ title: "Track loaded", description: `${file.name} added to timeline & mixer` });
     } catch (error) {
@@ -797,11 +807,23 @@ const Index = () => {
               
               {/* Metering dashboard - only in mix view */}
               {currentView === 'mix' && (
-                <MeteringDashboard
-                  masterPeakLevel={masterPeakLevel}
-                  analyserNode={engineRef.current?.getMasterAnalyser()}
-                  engineRef={engineRef}
-                />
+                <>
+                  <MeteringDashboard
+                    masterPeakLevel={masterPeakLevel}
+                    analyserNode={engineRef.current?.getMasterAnalyser()}
+                    engineRef={engineRef}
+                  />
+                  
+                  {/* VelvetFloor Panel - Sub-harmonic monitoring */}
+                  {engineRef.current && (
+                    <VelvetFloorPanel
+                      getVelvetFloorState={() => engineRef.current!.getVelvetFloorEngine().getVelvetFloorState()}
+                      getHarmonicLattice={() => engineRef.current!.getVelvetFloorEngine().getHarmonicLattice()}
+                      getALSColor={() => engineRef.current!.getVelvetFloorEngine().getALSColor()}
+                      isPlaying={isPlaying}
+                    />
+                  )}
+                </>
               )}
             </div>
           </div>
