@@ -1,16 +1,15 @@
 import { useState, useEffect, useRef } from "react";
 import { AudioEngine } from "@/audio/AudioEngine";
 import {
-  TopMenuBar,
   ViewContainer,
   AdvancedTimelineView,
   NextGenMixerView,
   MeteringDashboard,
   WaveformEditor,
-  ViewSwitcher,
   TransportControls,
   AIAssistantPanel
 } from "@/studio/components";
+import { CentralCommandHub } from "@/studio/components/Navigation/CentralCommandHub";
 import { PluginBrowser } from "@/studio/components/Plugins/PluginBrowser";
 import { PluginWindowManager } from "@/studio/components/Plugins/PluginWindowManager";
 import { useKeyboardShortcuts } from "@/hooks/useKeyboardShortcuts";
@@ -18,7 +17,6 @@ import { useViewStore } from "@/store/viewStore";
 import { useTimelineStore } from "@/store/timelineStore";
 import { useTracksStore } from "@/store/tracksStore";
 import { useMixerStore } from "@/store/mixerStore";
-import { Bot, Upload } from "lucide-react";
 import { Track } from "@/audio/Track";
 import { Bus } from "@/audio/Bus";
 import { EQParams, CompressorParams, PeakLevel } from "@/types/audio";
@@ -672,52 +670,12 @@ const Index = () => {
       />
 
       <div className="flex flex-col h-screen">
-        
-        {/* View switcher & quick actions - ALIGNED */}
-        <div 
-          className="flex items-center justify-between px-4 glass border-b border-border/30"
-          style={{ 
-            paddingTop: `${SPACING.md}px`,
-            paddingBottom: `${SPACING.md}px`,
-            gap: `${SPACING.sm}px`
-          }}
-        >
-          <div className="flex items-center gap-2">
-            <Button
-              variant="outline"
-              size="sm"
-              onClick={handleImport}
-              className="gap-2"
-            >
-              <Upload className="w-4 h-4" />
-              Import Audio
-            </Button>
-            <Button
-              variant="outline"
-              size="sm"
-              onClick={() => togglePanel('browser')}
-              className="gap-2 neon-glow-prime"
-            >
-              🎛️ Plugin Suite
-            </Button>
-            <Button
-              variant="outline"
-              size="sm"
-              onClick={() => setShowAIAssistant(!showAIAssistant)}
-              className="gap-2"
-            >
-              <Bot className="w-4 h-4" />
-              AI Assistant
-            </Button>
-            {(detectedBPM || detectedKey) && (
-              <div className="flex items-center gap-3 text-xs text-muted-foreground">
-                {detectedBPM && <span className="font-mono">BPM: {detectedBPM}</span>}
-                {detectedKey && <span className="font-mono">Key: {detectedKey}</span>}
-              </div>
-            )}
-          </div>
-          <ViewSwitcher />
-        </div>
+        {/* Central Command Hub - The new heart of the DAW */}
+        <CentralCommandHub
+          onImport={handleImport}
+          onTogglePluginBrowser={() => togglePanel('browser')}
+          onToggleAIAssistant={() => setShowAIAssistant(!showAIAssistant)}
+        />
         
         <ViewContainer>
           <div className="flex h-full">
@@ -901,14 +859,6 @@ const Index = () => {
         onCloseWindow={handleClosePluginWindow}
         onParameterChange={handlePluginParameterChange}
       />
-      
-      {/* AI Assistant Toggle FAB */}
-      <button
-        onClick={() => setShowAIAssistant(!showAIAssistant)}
-        className="fixed right-4 bottom-24 w-14 h-14 rounded-full bg-primary text-primary-foreground shadow-lg hover:shadow-xl transition-all hover:scale-110 flex items-center justify-center z-40 neon-glow-prime"
-      >
-        <Bot className="w-6 h-6" />
-      </button>
     </div>
   );
 };
