@@ -1,11 +1,13 @@
 /**
  * Timeline Track Row - Single track with regions
+ * ALIGNED: Using standard track height
  */
 
 import React from 'react';
 import { TimelineTrack, Region } from '@/types/timeline';
 import { TimelineRegion } from './TimelineRegion';
 import { Mic, Volume2, Lock, Eye, EyeOff } from 'lucide-react';
+import { TRACK_HEIGHT } from '@/lib/layout-constants';
 
 interface TimelineTrackRowProps {
   track: TimelineTrack;
@@ -37,7 +39,7 @@ export const TimelineTrackRow: React.FC<TimelineTrackRowProps> = ({
       className={`relative border-b border-border/30 transition-colors ${
         isSelected ? 'bg-primary/5' : 'hover:bg-muted/5'
       }`}
-      style={{ height: `${track.height}px` }}
+      style={{ height: `${TRACK_HEIGHT}px` }}
       onClick={() => onSelectTrack(track.id)}
     >
       {/* Regions - now aligned to left edge */}

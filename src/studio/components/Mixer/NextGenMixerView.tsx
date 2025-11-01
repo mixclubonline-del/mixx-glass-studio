@@ -1,5 +1,6 @@
 /**
  * Next-Gen Mixer View - Revolutionary spatial mixing environment
+ * ALIGNED: Using standard header height and panel widths
  */
 
 import React from 'react';
@@ -12,6 +13,7 @@ import { MixerSidePanels } from './MixerSidePanels';
 import { Button } from '@/components/ui/button';
 import { Plus, ChevronLeft, ChevronRight } from 'lucide-react';
 import mixxclubLogo from '@/assets/mixxclub-logo.png';
+import { HEADER_HEIGHT, SPACING, MASTER_CHANNEL_WIDTH } from '@/lib/layout-constants';
 
 interface NextGenMixerViewProps {
   onVolumeChange: (id: string, volume: number) => void;
@@ -101,20 +103,23 @@ export const NextGenMixerView: React.FC<NextGenMixerViewProps> = ({
   
   return (
     <div className="h-full flex flex-col bg-background">
-      {/* Header */}
-      <div className="px-3 py-2 glass border-b border-border/30 flex items-center justify-between">
-        <div className="flex items-center gap-3">
+      {/* Header - STANDARDIZED to 72px */}
+      <div 
+        className="px-4 glass border-b border-border/30 flex items-center justify-between"
+        style={{ height: `${HEADER_HEIGHT}px` }}
+      >
+        <div className="flex items-center gap-4">
           <img 
             src={mixxclubLogo} 
             alt="MixxClub Studio" 
-            className="h-7 w-auto logo-glow" 
+            className="h-10 w-auto logo-glow" 
           />
-          <div className="border-l border-border/30 h-6"></div>
+          <div className="border-l border-border/30 h-10"></div>
           <div>
-            <h2 className="text-sm font-bold gradient-flow">
+            <h2 className="text-lg font-bold gradient-flow">
               Mix View
             </h2>
-            <p className="text-[0.65rem] text-muted-foreground">
+            <p className="text-xs text-muted-foreground">
               {channelArray.length} channels • Pro Metering
             </p>
           </div>
@@ -157,8 +162,14 @@ export const NextGenMixerView: React.FC<NextGenMixerViewProps> = ({
           </div>
         ) : (
           <div className="h-full flex">
-            {/* Master channel - Fixed on left */}
-            <div className="flex-shrink-0 p-2 border-r border-border/30">
+            {/* Master channel - Fixed on left with STANDARD WIDTH */}
+            <div 
+              className="flex-shrink-0 border-r border-border/30"
+              style={{ 
+                width: `${MASTER_CHANNEL_WIDTH}px`,
+                padding: `${SPACING.sm}px`
+              }}
+            >
               <MasterChannelStrip
                 volume={masterVolume}
                 peakLevel={masterPeakLevel}
@@ -168,10 +179,14 @@ export const NextGenMixerView: React.FC<NextGenMixerViewProps> = ({
               />
             </div>
             
-            {/* Scrollable channels area */}
+            {/* Scrollable channels area with STANDARD SPACING */}
             <div 
               ref={scrollRef}
-              className="flex-1 overflow-x-auto overflow-y-hidden p-2 flex gap-1 scroll-smooth"
+              className="flex-1 overflow-x-auto overflow-y-hidden flex scroll-smooth"
+              style={{ 
+                padding: `${SPACING.sm}px`,
+                gap: `${SPACING.xs}px`
+              }}
               onWheel={(e) => {
                 if (e.shiftKey) {
                   e.preventDefault();
@@ -209,9 +224,12 @@ export const NextGenMixerView: React.FC<NextGenMixerViewProps> = ({
               })}
             </div>
             
-            {/* Scroll Indicators */}
+            {/* Scroll Indicators - ADJUSTED for new master width */}
             {showLeftScroll && (
-              <div className="absolute left-[110px] top-0 bottom-0 w-12 bg-gradient-to-r from-background/80 to-transparent pointer-events-none flex items-center justify-start pl-2">
+              <div 
+                className="absolute top-0 bottom-0 w-12 bg-gradient-to-r from-background/80 to-transparent pointer-events-none flex items-center justify-start pl-2"
+                style={{ left: `${MASTER_CHANNEL_WIDTH}px` }}
+              >
                 <ChevronLeft className="text-primary animate-pulse" size={24} />
               </div>
             )}

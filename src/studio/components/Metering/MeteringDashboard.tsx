@@ -1,11 +1,13 @@
 /**
  * Metering Dashboard - Comprehensive analysis panel
+ * ALIGNED: Using standard panel width
  */
 
 import React from 'react';
 import { SpectrumAnalyzer } from './SpectrumAnalyzer';
 import { PeakMeter } from '../Mixer/PeakMeter';
 import { Activity, Radio, Gauge } from 'lucide-react';
+import { PANEL_WIDTH_SM, SPACING } from '@/lib/layout-constants';
 
 interface MeteringDashboardProps {
   masterPeakLevel: { left: number; right: number };
@@ -59,7 +61,13 @@ export const MeteringDashboard: React.FC<MeteringDashboardProps> = ({
     return () => clearInterval(interval);
   }, [engineRef]);
   return (
-    <div className="flex flex-col h-full w-80 glass border-l border-border/30 p-4 overflow-y-auto">
+    <div 
+      className="flex flex-col h-full glass border-l border-border/30 overflow-y-auto"
+      style={{ 
+        width: `${PANEL_WIDTH_SM}px`,
+        padding: `${SPACING.lg}px`
+      }}
+    >
       {/* Header */}
       <div className="flex items-center gap-2 mb-4">
         <Activity className="text-primary" size={18} />
@@ -88,7 +96,7 @@ export const MeteringDashboard: React.FC<MeteringDashboardProps> = ({
           Frequency Spectrum
         </div>
         <SpectrumAnalyzer
-          width={280}
+          width={PANEL_WIDTH_SM - (SPACING.lg * 2)}
           height={120}
           peakLevel={masterPeakLevel}
           analyserNode={analyserNode}

@@ -1,5 +1,6 @@
 /**
  * Advanced Timeline View - Revolutionary 2027 timeline with intelligent features
+ * ALIGNED: Using standard header height and panel widths
  */
 
 import React, { useRef, useEffect, useState } from 'react';
@@ -17,6 +18,7 @@ import { ZoomIn, ZoomOut, Grid3x3, Maximize2, Plus, ChevronLeft, ChevronRight } 
 import { Button } from '@/components/ui/button';
 import { cn } from '@/lib/utils';
 import mixxclubLogo from '@/assets/mixxclub-logo.png';
+import { HEADER_HEIGHT, RULER_HEIGHT, TRACK_HEIGHT, TRACK_LIST_WIDTH, TRACK_LIST_COLLAPSED, SPACING } from '@/lib/layout-constants';
 
 // Dynamic hip-hop encouragement messages based on session time
 const getHipHopEncouragement = (minutes: number): string => {
@@ -214,11 +216,17 @@ export const AdvancedTimelineView: React.FC<AdvancedTimelineViewProps> = ({
   
   return (
     <div className="flex h-full bg-background">
-      {/* Left Track List Sidebar */}
+      {/* Left Track List Sidebar - STANDARD WIDTH */}
       {!trackListCollapsed && (
-        <div className="w-64 flex-shrink-0 glass border-r border-border/50 flex flex-col">
-          {/* Sidebar Header */}
-          <div className="h-[88px] flex items-center justify-between px-4 border-b-2 border-[#a855f7]/50 bg-gradient-to-r from-[#a855f7]/5 to-[#ec4899]/5">
+        <div 
+          className="flex-shrink-0 glass border-r border-border/50 flex flex-col"
+          style={{ width: `${TRACK_LIST_WIDTH}px` }}
+        >
+          {/* Sidebar Header - STANDARDIZED to 72px */}
+          <div 
+            className="flex items-center justify-between px-4 border-b-2 border-[#a855f7]/50 bg-gradient-to-r from-[#a855f7]/5 to-[#ec4899]/5"
+            style={{ height: `${HEADER_HEIGHT}px` }}
+          >
             <div className="flex flex-col">
               <h3 className="text-sm font-bold gradient-flow uppercase">Tracks</h3>
               <p className="text-xs text-muted-foreground">{tracks.length} track{tracks.length !== 1 ? 's' : ''}</p>
@@ -245,10 +253,10 @@ export const AdvancedTimelineView: React.FC<AdvancedTimelineViewProps> = ({
                   key={track.id}
                   onClick={() => handleSelectTrack(track.id)}
                   className={cn(
-                    "h-[100px] border-b border-border/30 cursor-pointer transition-colors",
-                    "hover:bg-muted/50",
+                    "border-b border-border/30 cursor-pointer transition-colors hover:bg-muted/50",
                     selectedTrackId === track.id && "bg-primary/10 border-l-4 border-l-primary"
                   )}
+                  style={{ height: `${TRACK_HEIGHT}px` }}
                 >
                   <div className="h-full px-3 py-2 flex flex-col justify-between">
                     {/* Track Name and Color */}
@@ -331,9 +339,12 @@ export const AdvancedTimelineView: React.FC<AdvancedTimelineViewProps> = ({
         </div>
       )}
       
-      {/* Collapsed Track List Toggle Button */}
+      {/* Collapsed Track List Toggle Button - STANDARD COLLAPSED WIDTH */}
       {trackListCollapsed && (
-        <div className="w-12 flex-shrink-0 glass border-r border-border/50 flex flex-col items-center py-4 gap-2">
+        <div 
+          className="flex-shrink-0 glass border-r border-border/50 flex flex-col items-center py-4 gap-2"
+          style={{ width: `${TRACK_LIST_COLLAPSED}px` }}
+        >
           <Button
             size="sm"
             variant="ghost"
@@ -350,23 +361,29 @@ export const AdvancedTimelineView: React.FC<AdvancedTimelineViewProps> = ({
       
       {/* Main Timeline Area */}
       <div className="flex-1 flex flex-col min-w-0">
-        {/* Timeline toolbar with tools */}
-        <div className="flex items-center justify-between gap-3 px-6 py-4 glass border-b-2 border-[#a855f7]/50 border-glow-hype bg-gradient-to-r from-[#a855f7]/5 via-[#ec4899]/5 to-[#3b82f6]/5">
-          <div className="flex items-center gap-6">
+        {/* Timeline toolbar with tools - STANDARDIZED to 72px */}
+        <div 
+          className="flex items-center justify-between px-6 glass border-b-2 border-[#a855f7]/50 border-glow-hype bg-gradient-to-r from-[#a855f7]/5 via-[#ec4899]/5 to-[#3b82f6]/5"
+          style={{ 
+            height: `${HEADER_HEIGHT}px`,
+            gap: `${SPACING.md}px`
+          }}
+        >
+          <div className="flex items-center" style={{ gap: `${SPACING.lg}px` }}>
             <img 
               src={mixxclubLogo} 
               alt="MixxClub Studio" 
-              className="h-16 w-auto logo-pulse logo-glow" 
+              className="h-10 w-auto logo-pulse logo-glow" 
             />
             <div className="flex flex-col">
-              <h3 className="text-2xl font-black gradient-flow uppercase tracking-wide">
+              <h3 className="text-lg font-bold gradient-flow uppercase tracking-wide">
                 Arrange View
               </h3>
               <p className="text-xs text-[#ec4899] font-bold text-glow-hype uppercase tracking-wider">
                 {getHipHopEncouragement(sessionMinutes)}
               </p>
             </div>
-            <div className="border-l-2 border-[#a855f7]/50 h-12 mx-2"></div>
+            <div className="border-l-2 border-[#a855f7]/50 h-10"></div>
             <TimelineToolbar />
           </div>
           
@@ -415,11 +432,11 @@ export const AdvancedTimelineView: React.FC<AdvancedTimelineViewProps> = ({
           </div>
         </div>
         
-        {/* Timeline ruler */}
-        <div className="relative h-10">
+        {/* Timeline ruler - STANDARD HEIGHT */}
+        <div className="relative" style={{ height: `${RULER_HEIGHT}px` }}>
           <TimelineRuler
             width={containerRef.current?.clientWidth || 800}
-            height={40}
+            height={RULER_HEIGHT}
             bpm={120}
             onSeek={onSeek}
           />
@@ -440,14 +457,14 @@ export const AdvancedTimelineView: React.FC<AdvancedTimelineViewProps> = ({
             {/* Grid overlay */}
             <GridOverlay
               width={totalWidth}
-              height={tracks.length * 100}
+              height={tracks.length * TRACK_HEIGHT}
               bpm={120}
             />
             
             {/* Playhead */}
             <Playhead
               containerWidth={containerRef.current?.clientWidth || 800}
-              containerHeight={tracks.length * 100}
+              containerHeight={tracks.length * TRACK_HEIGHT}
             />
 
             {/* Crossfade Renderer */}

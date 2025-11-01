@@ -1,5 +1,6 @@
 /**
  * Glass Channel Strip - Next-gen mixer channel with glass morphism
+ * ALIGNED: Using standard channel width
  */
 
 import React, { useState } from 'react';
@@ -12,6 +13,7 @@ import { InsertRack } from './InsertRack';
 import { SendKnobSimple } from './SendKnobSimple';
 import { dbToNormalized, normalizedToDb } from '@/studio/utils/TemperatureGradient';
 import { PluginInsert } from '@/audio/Track';
+import { CHANNEL_WIDTH_DEFAULT } from '@/lib/layout-constants';
 
 interface GlassChannelStripProps {
   channel: ChannelState;
@@ -53,15 +55,16 @@ export const GlassChannelStrip: React.FC<GlassChannelStripProps> = ({
   
   return (
     <div 
-      className={`relative flex flex-col h-full glass border border-border/30 w-[90px] ${
+      className={`relative flex flex-col h-full glass border border-border/30 ${
         isSelected 
           ? 'ring-2 ring-primary shadow-[0_0_30px_hsl(var(--primary)/0.4)]' 
           : 'hover:ring-1 hover:ring-primary/30'
       }`}
-      onClick={() => onSelect(channel.id)}
       style={{
+        width: `${CHANNEL_WIDTH_DEFAULT}px`,
         borderLeft: `3px solid ${channel.color}`,
       }}
+      onClick={() => onSelect(channel.id)}
     >
       {/* Channel name */}
       <div className="text-[10px] font-medium text-foreground mb-1 truncate text-center px-1">

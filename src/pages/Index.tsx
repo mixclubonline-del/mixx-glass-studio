@@ -36,6 +36,7 @@ import { beastModeEngine } from "@/services/BeastModeEngine";
 import { useBeastModeStore } from "@/store/beastModeStore";
 import { BeastModePanel } from "@/studio/components/AI/BeastModePanel";
 import { AISuggestionsPanel } from "@/studio/components/AI/AISuggestionsPanel";
+import { SPACING } from "@/lib/layout-constants";
 
 const Index = () => {
   const engineRef = useRef<AudioEngine | null>(null);
@@ -726,8 +727,15 @@ const Index = () => {
           onToggleTransportCover={() => setTransportCovered(!transportCovered)}
         />
         
-        {/* View switcher & quick actions */}
-        <div className="flex items-center justify-between px-4 py-3 glass border-b border-border/30">
+        {/* View switcher & quick actions - ALIGNED */}
+        <div 
+          className="flex items-center justify-between px-4 glass border-b border-border/30"
+          style={{ 
+            paddingTop: `${SPACING.md}px`,
+            paddingBottom: `${SPACING.md}px`,
+            gap: `${SPACING.sm}px`
+          }}
+        >
           <div className="flex items-center gap-2">
             <Button
               variant="outline"
@@ -814,8 +822,11 @@ const Index = () => {
               )}
             </div>
             
-            {/* Right side panels */}
-            <div className="flex flex-col gap-2">
+            {/* Right side panels - ALIGNED with consistent spacing */}
+            <div 
+              className="flex flex-col overflow-y-auto"
+              style={{ gap: `${SPACING.sm}px` }}
+            >
               {/* Beast Mode Panel */}
               <BeastModePanel />
               
