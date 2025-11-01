@@ -358,7 +358,7 @@ export const AdvancedTimelineView: React.FC<AdvancedTimelineViewProps> = ({
       )}
       
       {/* Main Timeline Area */}
-      <div className="flex-1 flex flex-col min-w-0">
+      <div className="flex-1 flex flex-col overflow-hidden">
         {/* Timeline toolbar with tools - STANDARDIZED to 72px */}
         <div 
           className="flex items-center justify-between px-6 glass-ultra border-b border-gradient"
@@ -463,7 +463,8 @@ export const AdvancedTimelineView: React.FC<AdvancedTimelineViewProps> = ({
           onScroll={handleScroll}
           style={{
             background: 'linear-gradient(180deg, hsl(240 15% 4% / 0.8) 0%, hsl(240 10% 2% / 0.6) 100%)',
-            backdropFilter: 'blur(20px)'
+            backdropFilter: 'blur(20px)',
+            minHeight: 0
           }}
         >
           <div 

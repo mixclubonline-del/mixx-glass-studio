@@ -29,36 +29,47 @@ export const ArrangeBrowserPanel: React.FC<ArrangeBrowserPanelProps> = ({
 
   if (isCollapsed) {
     return (
-      <div className="h-full w-12 glass border-l border-border/30 flex flex-col items-center py-4 gap-4">
+      <div 
+        className="h-full flex-shrink-0 glass-light border-l border-gradient flex flex-col items-center justify-center"
+        style={{ 
+          width: '48px',
+          backdropFilter: 'blur(60px) saturate(200%)'
+        }}
+      >
         <button
           onClick={onToggleCollapse}
-          className="p-2 hover:bg-primary/10 rounded transition-colors"
+          className="p-2 hover:bg-primary/10 rounded transition-colors micro-interact chromatic-hover"
           title="Expand Browser"
         >
           <ChevronLeft size={18} className="text-muted-foreground" />
         </button>
-        <div className="flex flex-col gap-3">
-          <Files size={18} className="text-muted-foreground" />
-          <Grid3x3 size={18} className="text-muted-foreground" />
-          <Info size={18} className="text-muted-foreground" />
-        </div>
       </div>
     );
   }
 
   return (
-    <div className="h-full w-[160px] glass-medium border-l border-gradient flex flex-col"
+    <div 
+      className="h-full flex-shrink-0 border-l border-gradient flex flex-col"
       style={{
-        background: `var(--gradient-mesh), hsl(var(--glass-medium))`,
-        backdropFilter: 'blur(60px) saturate(200%)'
+        width: '280px',
+        background: `
+          radial-gradient(circle at 80% 50%, hsl(275 100% 65% / 0.03) 0%, transparent 50%),
+          var(--gradient-mesh),
+          linear-gradient(135deg, hsl(var(--glass-medium)), hsl(var(--glass-ultra)))
+        `,
+        backdropFilter: 'blur(80px) saturate(220%)',
+        boxShadow: 'inset -1px 0 0 rgba(255, 255, 255, 0.1)'
       }}
     >
-      {/* Header */}
-      <div className="flex items-center justify-between px-3 py-2 border-b border-border/30">
-        <h3 className="text-sm font-semibold text-foreground">Browser</h3>
+      {/* Header - Match other headers at 72px */}
+      <div 
+        className="flex items-center justify-between px-4 glass-ultra border-b border-gradient"
+        style={{ height: '72px' }}
+      >
+        <h3 className="text-sm font-bold text-gradient-subtle uppercase">Browser</h3>
         <button
           onClick={onToggleCollapse}
-          className="p-1 hover:bg-primary/10 rounded transition-colors"
+          className="p-2 hover:bg-primary/10 rounded transition-colors micro-interact chromatic-hover"
           title="Collapse Browser"
         >
           <ChevronRight size={16} className="text-muted-foreground" />
