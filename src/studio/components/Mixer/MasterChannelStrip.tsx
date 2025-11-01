@@ -5,7 +5,7 @@
 import React from 'react';
 import { IceFireFader } from '../Controls/IceFireFader';
 import { SlimPeakMeter } from '../Metering/SlimPeakMeter';
-import { SpectrumAnalyzer } from '../Metering/SpectrumAnalyzer';
+
 import { LUFSMeter } from '../Metering/LUFSMeter';
 import { Download } from 'lucide-react';
 import { Button } from '@/components/ui/button';
@@ -51,15 +51,6 @@ export const MasterChannelStrip: React.FC<MasterChannelStripProps> = ({
           </span>
         )}
       </Button>
-      
-      {/* Spectrum analyzer */}
-      <div className="mb-3 h-16 flex justify-center">
-        <SpectrumAnalyzer
-          width={80}
-          height={60}
-          analyser={analysers?.left}
-        />
-      </div>
       
       {/* Peak meters */}
       <div className="mb-2 flex justify-center">

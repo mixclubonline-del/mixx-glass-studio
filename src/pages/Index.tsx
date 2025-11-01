@@ -672,27 +672,6 @@ const Index = () => {
       />
 
       <div className="flex flex-col h-screen">
-        <TopMenuBar
-          onExport={handleExport}
-          onSave={() => toast({ title: "Save", description: "Project saved locally" })}
-          onLoad={() => toast({ title: "Load", description: "Not yet implemented" })}
-          onImport={handleImport}
-          onAIMix={() => setShowAIAssistant(true)}
-          onStemSeparation={() => toast({ 
-            title: "Stem Separation", 
-            description: "Feature ready - upload audio to begin separation" 
-          })}
-          onAutoMaster={() => toast({ 
-            title: "Auto-Master", 
-            description: "Analyzing mix for optimal mastering settings..." 
-          })}
-          transportHidden={transportCollapsed}
-          transportFloating={transportFloating}
-          transportCovered={transportCovered}
-          onToggleTransportHide={() => setTransportCollapsed(!transportCollapsed)}
-          onToggleTransportFloat={() => setTransportFloating(!transportFloating)}
-          onToggleTransportCover={() => setTransportCovered(!transportCovered)}
-        />
         
         {/* View switcher & quick actions - ALIGNED */}
         <div 

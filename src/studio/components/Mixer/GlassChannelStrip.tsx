@@ -73,23 +73,19 @@ export const GlassChannelStrip: React.FC<GlassChannelStripProps> = ({
         {channel.name}
       </div>
       
-      {/* Peak meter */}
-      <div className="mb-1 flex justify-center">
+      {/* Peak meter and Pan in compact row */}
+      <div className="mb-1 flex items-center justify-center gap-1">
         <SlimPeakMeter
           analysers={analysers}
-          height={100}
+          height={120}
           barWidth={3}
           gap={1}
         />
-      </div>
-      
-      {/* Pan knob */}
-      <div className="mb-1 flex justify-center">
         <IceFireKnob
           value={(channel.pan + 1) / 2}
           onChange={(value) => onPanChange(channel.id, (value * 2) - 1)}
-          size={28}
-          label="PAN"
+          size={32}
+          label="P"
           valueLabel={channel.pan === 0 ? 'C' : channel.pan < 0 ? `L${Math.abs(channel.pan * 100).toFixed(0)}` : `R${(channel.pan * 100).toFixed(0)}`}
           min={-100}
           max={100}
