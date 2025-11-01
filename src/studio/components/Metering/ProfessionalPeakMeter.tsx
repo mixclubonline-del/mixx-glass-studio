@@ -1,39 +1,199 @@
 /**
- * Professional Peak Meter - Slim, long, industry-standard meter
- * True Peak + RMS with color-coded zones
+ * Professional Peak Meter - Real-time audio-driven metering
+ * Reads directly from AnalyserNode with internal animation loop
  */
 
-import React, { useMemo } from 'react';
+import React, { useEffect, useRef, useState } from 'react';
+import { cn } from '@/lib/utils';
 
 interface ProfessionalPeakMeterProps {
-  level: { left: number; right: number }; // dB values
+  analysers?: { left: AnalyserNode; right: AnalyserNode } | null;
   height?: number;
   width?: number;
   stereo?: boolean;
   showRMS?: boolean;
-  rmsLevel?: { left: number; right: number };
   clipIndicator?: boolean;
   onResetClip?: () => void;
 }
 
 export const ProfessionalPeakMeter: React.FC<ProfessionalPeakMeterProps> = ({
-  level,
-  height = 300,
-  width = 16,
+  analysers,
+  height = 200,
+  width = 6,
   stereo = true,
-  showRMS = true,
-  rmsLevel,
+  showRMS = false,
   clipIndicator = true,
   onResetClip
 }) => {
-  const [leftClip, setLeftClip] = React.useState(false);
-  const [rightClip, setRightClip] = React.useState(false);
+  const leftCanvasRef = useRef<HTMLCanvasElement>(null);
+  const rightCanvasRef = useRef<HTMLCanvasElement>(null);
+  const [leftClip, setLeftClip] = useState(false);
+  const [rightClip, setRightClip] = useState(false);
   
-  // Check for clipping
-  React.useEffect(() => {
-    if (level.left >= 0) setLeftClip(true);
-    if (level.right >= 0) setRightClip(true);
-  }, [level]);
+  // Convert dB to percentage (0-100) for rendering
+  const dbToPercent = (db: number): number => {
+    const clamped = Math.max(-60, Math.min(6, db));
+    return ((clamped + 60) / 66) * 100;
+  };
+  
+  // Get color for dB level
+  const getSegmentColor = (db: number): string => {
+    if (db > 0) return '#ff0000'; // Red (clipping)
+    if (db > -3) return '#ff4444'; // Red zone
+    if (db > -12) return '#ffaa00'; // Yellow zone
+    return '#44ff44'; // Green zone (safe)
+  };
+  
+  useEffect(() => {
+    if (!analysers) return;
+    
+    const leftCanvas = leftCanvasRef.current;
+    const rightCanvas = rightCanvasRef.current;
+    if (!leftCanvas || (stereo && !rightCanvas)) return;
+    
+    const leftCtx = leftCanvas.getContext('2d');
+    const rightCtx = stereo ? rightCanvas?.getContext('2d') : null;
+    if (!leftCtx || (stereo && !rightCtx)) return;
+    
+    // Initialize data arrays
+    const leftData = new Float32Array(analysers.left.frequencyBinCount);
+    const rightData = stereo ? new Float32Array(analysers.right.frequencyBinCount) : null;
+    
+    // Peak hold state
+    let leftPeak = -60, rightPeak = -60;
+    let leftPeakHold = -60, rightPeakHold = -60;
+    let leftHoldFrames = 0, rightHoldFrames = 0;
+    
+    let animationFrameId: number;
+    
+    const drawMeter = (
+      ctx: CanvasRenderingContext2D,
+      canvas: HTMLCanvasElement,
+      db: number,
+      peakHold: number,
+      showClip: boolean
+    ) => {
+      const w = canvas.width;
+      const h = canvas.height;
+      
+      // Clear
+      ctx.fillStyle = 'hsl(var(--background))';
+      ctx.fillRect(0, 0, w, h);
+      
+      // Draw background grid
+      ctx.fillStyle = 'rgba(255, 255, 255, 0.05)';
+      const markers = [0, -3, -6, -12, -18, -24, -36, -48, -60];
+      markers.forEach(markerDb => {
+        const y = h - (dbToPercent(markerDb) / 100) * h;
+        ctx.fillRect(0, y, w / 2, 1);
+      });
+      
+      // Draw meter bar with gradient
+      const percent = dbToPercent(db);
+      const meterHeight = (percent / 100) * h;
+      
+      const gradient = ctx.createLinearGradient(0, h, 0, 0);
+      gradient.addColorStop(0, '#44ff44'); // Green
+      gradient.addColorStop(0.7, '#ffaa00'); // Yellow
+      gradient.addColorStop(0.9, '#ff4444'); // Red
+      gradient.addColorStop(1, '#ff0000'); // Clip red
+      
+      ctx.fillStyle = gradient;
+      ctx.fillRect(0, h - meterHeight, w, meterHeight);
+      
+      // Draw peak hold line
+      if (peakHold > -60) {
+        const peakY = h - (dbToPercent(peakHold) / 100) * h;
+        ctx.fillStyle = getSegmentColor(peakHold);
+        ctx.fillRect(0, peakY - 2, w, 2);
+      }
+      
+      // Draw 0dB marker
+      const zeroY = h - (dbToPercent(0) / 100) * h;
+      ctx.fillStyle = 'rgba(255, 0, 0, 0.3)';
+      ctx.fillRect(0, zeroY - 1, w, 2);
+      
+      // Draw clip indicator at top
+      if (showClip && clipIndicator) {
+        ctx.fillStyle = '#ff0000';
+        ctx.fillRect(0, 0, w, 3);
+      }
+    };
+    
+    const animate = () => {
+      // Read from analysers
+      analysers.left.getFloatTimeDomainData(leftData);
+      if (rightData && stereo) {
+        analysers.right.getFloatTimeDomainData(rightData);
+      }
+      
+      // Calculate peak levels
+      let leftMax = 0;
+      for (let i = 0; i < leftData.length; i++) {
+        leftMax = Math.max(leftMax, Math.abs(leftData[i]));
+      }
+      const leftDb = leftMax > 0.0001 ? 20 * Math.log10(leftMax) : -60;
+      
+      let rightDb = leftDb; // Default to same as left for mono
+      if (rightData && stereo) {
+        let rightMax = 0;
+        for (let i = 0; i < rightData.length; i++) {
+          rightMax = Math.max(rightMax, Math.abs(rightData[i]));
+        }
+        rightDb = rightMax > 0.0001 ? 20 * Math.log10(rightMax) : -60;
+      }
+      
+      // Update peak hold (left)
+      if (leftDb > leftPeak) {
+        leftPeak = leftDb;
+        leftPeakHold = leftDb;
+        leftHoldFrames = 60; // Hold for 1 second at 60fps
+      } else {
+        leftPeak = Math.max(leftDb, leftPeak - 1.0);
+        leftHoldFrames = Math.max(0, leftHoldFrames - 1);
+        if (leftHoldFrames === 0) {
+          leftPeakHold = Math.max(-60, leftPeakHold - 0.5);
+        }
+      }
+      
+      // Update peak hold (right)
+      if (rightDb > rightPeak) {
+        rightPeak = rightDb;
+        rightPeakHold = rightDb;
+        rightHoldFrames = 60;
+      } else {
+        rightPeak = Math.max(rightDb, rightPeak - 1.0);
+        rightHoldFrames = Math.max(0, rightHoldFrames - 1);
+        if (rightHoldFrames === 0) {
+          rightPeakHold = Math.max(-60, rightPeakHold - 0.5);
+        }
+      }
+      
+      // Clip detection
+      if (leftDb > 0 && !leftClip) {
+        setLeftClip(true);
+      }
+      if (rightDb > 0 && !rightClip) {
+        setRightClip(true);
+      }
+      
+      // Draw meters
+      drawMeter(leftCtx, leftCanvas, leftDb, leftPeakHold, leftClip);
+      if (rightCtx && rightCanvas && stereo) {
+        drawMeter(rightCtx, rightCanvas, rightDb, rightPeakHold, rightClip);
+      }
+      
+      animationFrameId = requestAnimationFrame(animate);
+    };
+    
+    animationFrameId = requestAnimationFrame(animate);
+    
+    return () => {
+      if (animationFrameId) {
+        cancelAnimationFrame(animationFrameId);
+      }
+    };
+  }, [analysers, stereo, clipIndicator, leftClip, rightClip]);
   
   const handleResetClip = () => {
     setLeftClip(false);
@@ -41,122 +201,36 @@ export const ProfessionalPeakMeter: React.FC<ProfessionalPeakMeterProps> = ({
     onResetClip?.();
   };
   
-  const MeterBar = ({ db, rmsDb, channel }: { db: number; rmsDb?: number; channel: 'left' | 'right' }) => {
-    // Convert dB to percentage (-60dB = 0%, 0dB = 100%, +12dB = 120%)
-    const dbToPercent = (value: number) => {
-      const minDb = -60;
-      const maxDb = 12;
-      return Math.max(0, Math.min(120, ((value - minDb) / (maxDb - minDb)) * 100));
-    };
-    
-    const percent = dbToPercent(db);
-    const rmsPercent = rmsDb ? dbToPercent(rmsDb) : 0;
-    
-    // Color zones based on dB level
-    const getSegmentColor = (segmentPercent: number) => {
-      const segmentDb = -60 + (segmentPercent / 100) * 72; // -60 to +12
-      
-      if (segmentDb < -18) return 'hsl(130 100% 50%)'; // Green - safe
-      if (segmentDb < -6) return 'hsl(45 100% 55%)'; // Yellow - caution
-      if (segmentDb < -3) return 'hsl(25 100% 60%)'; // Orange - warning
-      return 'hsl(0 100% 60%)'; // Red - danger
-    };
-    
-    // Generate gradient stops
-    const gradientStops = useMemo(() => {
-      const stops: string[] = [];
-      for (let i = 0; i <= 100; i += 5) {
-        stops.push(`${getSegmentColor(i)} ${i}%`);
-      }
-      return stops.join(', ');
-    }, []);
-    
-    const isClipping = channel === 'left' ? leftClip : rightClip;
-    
-    return (
-      <div className="relative" style={{ width: `${width}px`, height: `${height}px` }}>
-        {/* Background */}
-        <div
-          className="absolute inset-0 rounded-sm"
-          style={{
-            background: 'rgba(10, 10, 15, 0.6)',
-            border: '1px solid rgba(255, 255, 255, 0.1)'
-          }}
-        />
-        
-        {/* RMS level (background bar) */}
-        {showRMS && rmsDb !== undefined && (
-          <div
-            className="absolute bottom-0 left-0 right-0 transition-all duration-100"
-            style={{
-              height: `${rmsPercent}%`,
-              background: `linear-gradient(to top, ${gradientStops})`,
-              opacity: 0.4
-            }}
-          />
-        )}
-        
-        {/* Peak level (foreground bar) */}
-        <div
-          className="absolute bottom-0 left-0 right-0 transition-all duration-75"
-          style={{
-            height: `${percent}%`,
-            background: `linear-gradient(to top, ${gradientStops})`,
-            boxShadow: percent > 85 ? `0 0 8px ${getSegmentColor(percent)}` : 'none'
-          }}
-        />
-        
-        {/* 0dB marker line */}
-        <div
-          className="absolute left-0 right-0 h-0.5 bg-primary shadow-[0_0_6px_hsl(var(--primary))]"
-          style={{
-            bottom: `${dbToPercent(0)}%`,
-            transform: 'translateY(50%)'
-          }}
-        />
-        
-        {/* Clip indicator */}
-        {clipIndicator && isClipping && (
-          <div
-            className="absolute top-0 left-0 right-0 h-2 bg-destructive rounded-t-sm cursor-pointer animate-pulse"
-            onClick={handleResetClip}
-            title="Click to reset clip indicator"
-          />
-        )}
-      </div>
-    );
-  };
-  
   return (
-    <div className="flex items-center gap-1">
-      {stereo ? (
-        <>
-          <MeterBar 
-            db={level.left} 
-            rmsDb={rmsLevel?.left} 
-            channel="left" 
-          />
-          <MeterBar 
-            db={level.right} 
-            rmsDb={rmsLevel?.right} 
-            channel="right" 
-          />
-        </>
-      ) : (
-        <MeterBar 
-          db={level.left} 
-          rmsDb={rmsLevel?.left} 
-          channel="left" 
+    <div className="flex flex-col items-center gap-1">
+      <div className={cn("flex gap-1", stereo ? "w-auto" : "w-auto")}>
+        <canvas
+          ref={leftCanvasRef}
+          width={width}
+          height={height}
+          className="rounded-sm border border-border/50 cursor-pointer"
+          onClick={handleResetClip}
+          title="Click to reset clip indicators"
         />
-      )}
-      
-      {/* Peak value display */}
-      <div className="ml-1 text-[9px] font-mono text-muted-foreground">
-        <div>{level.left > 0 ? `+${level.left.toFixed(1)}` : level.left.toFixed(1)}</div>
         {stereo && (
-          <div>{level.right > 0 ? `+${level.right.toFixed(1)}` : level.right.toFixed(1)}</div>
+          <canvas
+            ref={rightCanvasRef}
+            width={width}
+            height={height}
+            className="rounded-sm border border-border/50 cursor-pointer"
+            onClick={handleResetClip}
+            title="Click to reset clip indicators"
+          />
         )}
       </div>
+      {clipIndicator && (leftClip || rightClip) && (
+        <div 
+          className="text-[8px] text-destructive font-bold cursor-pointer"
+          onClick={handleResetClip}
+        >
+          CLIP
+        </div>
+      )}
     </div>
   );
 };

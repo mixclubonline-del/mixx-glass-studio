@@ -141,7 +141,7 @@ export function TrackHeader({
       {/* Inline peak meter */}
       <div className="shrink-0" style={{ width: '16px', height: '60px' }}>
         <ProfessionalPeakMeter
-          level={peakLevel}
+          analysers={undefined}
           width={16}
           height={60}
           stereo={true}

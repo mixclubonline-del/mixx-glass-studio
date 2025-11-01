@@ -355,17 +355,18 @@ export class AudioEngine {
     return maxDuration;
   }
   
-  // Metering
-  getTrackPeakLevel(id: string): PeakLevel {
+  // Metering - Direct analyser access for real-time rendering
+  getTrackAnalysers(id: string): { left: AnalyserNode; right: AnalyserNode } | null {
     const track = this.tracks.get(id);
-    return track ? track.channelStrip.getPeakLevel() : { left: -60, right: -60 };
+    return track ? track.channelStrip.getAnalysers() : null;
   }
   
-  getMasterPeakLevel(): PeakLevel {
-    return this.masterBus.channelStrip.getPeakLevel();
+  getMasterAnalysers(): { left: AnalyserNode; right: AnalyserNode } {
+    return this.masterBus.channelStrip.getAnalysers();
   }
   
-  getMasterAnalyser(): AnalyserNode | undefined {
+  // Legacy compatibility - return left analyser
+  getMasterAnalyser(): AnalyserNode {
     return this.masterBus.channelStrip.getAnalyser();
   }
   

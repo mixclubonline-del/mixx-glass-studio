@@ -12,7 +12,7 @@ import { Button } from '@/components/ui/button';
 
 interface MasterChannelStripProps {
   volume: number;
-  peakLevel: { left: number; right: number };
+  analysers?: { left: AnalyserNode; right: AnalyserNode } | null;
   onVolumeChange: (volume: number) => void;
   onExport: () => void;
   isExporting: boolean;
@@ -20,7 +20,7 @@ interface MasterChannelStripProps {
 
 export const MasterChannelStrip: React.FC<MasterChannelStripProps> = ({
   volume,
-  peakLevel,
+  analysers,
   onVolumeChange,
   onExport,
   isExporting
@@ -37,14 +37,14 @@ export const MasterChannelStrip: React.FC<MasterChannelStripProps> = ({
         <SpectrumAnalyzer
           width={80}
           height={80}
-          peakLevel={peakLevel}
+          analyser={analysers?.left}
         />
       </div>
       
       {/* Peak meters */}
       <div className="mb-3 flex justify-center">
         <ProfessionalPeakMeter
-          level={peakLevel}
+          analysers={analysers}
           height={220}
           width={6}
           stereo={true}

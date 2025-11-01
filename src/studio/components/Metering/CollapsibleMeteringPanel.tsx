@@ -64,12 +64,11 @@ export const CollapsibleMeteringPanel: React.FC = () => {
           <h3 className="text-xs font-semibold text-foreground mb-3">Peak Meters</h3>
           <div className="flex justify-center">
             <ProfessionalPeakMeter
-              level={masterPeakLevel}
+              analysers={undefined}
               height={isExpanded ? 400 : 300}
               width={6}
               stereo={true}
               showRMS={true}
-              rmsLevel={{ left: masterPeakLevel.left - 6, right: masterPeakLevel.right - 6 }}
               clipIndicator={true}
               onResetClip={() => resetClipCount('master')}
             />

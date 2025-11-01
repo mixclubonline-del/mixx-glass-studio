@@ -39,12 +39,11 @@ export const MasterMeteringPanel: React.FC = () => {
         <h3 className="text-xs font-semibold text-foreground mb-3">Peak Meters</h3>
         <div className="flex justify-center">
           <ProfessionalPeakMeter
-            level={{ left, right }}
+            analysers={undefined}
             height={300}
             width={6}
             stereo
             showRMS
-            rmsLevel={rmsLevel}
             clipIndicator
             onResetClip={() => resetClipCount('master')}
           />

@@ -139,40 +139,7 @@ const Index = () => {
     return () => clearInterval(interval);
   }, [isPlaying, setCurrentTime]);
 
-  // Update peak meters at 60Hz (16ms) for smooth animation - runs continuously
-  useEffect(() => {
-    let animationFrameId: number;
-    let lastUpdateTime = 0;
-    const updateInterval = 16; // ~60fps
-    
-    const updateMeters = (currentTime: number) => {
-      if (currentTime - lastUpdateTime >= updateInterval) {
-        if (engineRef.current) {
-          // Update master meter
-          const master = engineRef.current.getMasterPeakLevel();
-          setMasterPeakLevel(master);
-          
-          // Update all track meters - get fresh channels from store
-          const currentChannels = useMixerStore.getState().channels;
-          currentChannels.forEach((_, id) => {
-            const level = engineRef.current!.getTrackPeakLevel(id);
-            updatePeakLevel(id, level);
-          });
-        }
-        lastUpdateTime = currentTime;
-      }
-      
-      animationFrameId = requestAnimationFrame(updateMeters);
-    };
-    
-    animationFrameId = requestAnimationFrame(updateMeters);
-    
-    return () => {
-      if (animationFrameId) {
-        cancelAnimationFrame(animationFrameId);
-      }
-    };
-  }, [setMasterPeakLevel, updatePeakLevel]); // Only stable functions as deps
+  // No metering loop needed - meters read directly from AnalyserNodes with their own RAF loops
 
   const handleImport = () => {
     fileInputRef.current?.click();
@@ -801,6 +768,7 @@ const Index = () => {
               
               {currentView === 'mix' && (
                 <NextGenMixerView
+                  engineRef={engineRef}
                   onExport={handleExport}
                   isExporting={isExporting}
                   onVolumeChange={handleVolumeChange}
@@ -848,7 +816,7 @@ const Index = () => {
                 <>
                   <MeteringDashboard
                     masterPeakLevel={masterPeakLevel}
-                    analyserNode={engineRef.current?.getMasterAnalyser()}
+                    analyser={engineRef.current?.getMasterAnalyser()}
                     engineRef={engineRef}
                   />
                   

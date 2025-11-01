@@ -26,8 +26,10 @@ export class ChannelStrip {
   // Send nodes (pre/post fader)
   public sends: Map<string, { node: GainNode; preFader: boolean }>;
   
-  // Metering
-  private analyser: AnalyserNode;
+  // Metering - True stereo with splitter
+  private splitter: ChannelSplitterNode;
+  private analyserLeft: AnalyserNode;
+  private analyserRight: AnalyserNode;
   private analyserDataArray: Float32Array<ArrayBuffer>;
   
   // Professional metering
@@ -57,17 +59,18 @@ export class ChannelStrip {
     this.panNode = context.createStereoPanner();
     this.fader = context.createGain();
     
-    // Metering
-    this.analyser = context.createAnalyser();
-    this.analyser.fftSize = 256;
-    this.analyser.smoothingTimeConstant = 0.8;
-    this.analyserDataArray = new Float32Array(this.analyser.frequencyBinCount);
+    // Metering - True stereo metering with channel splitter
+    this.splitter = context.createChannelSplitter(2);
+    this.analyserLeft = context.createAnalyser();
+    this.analyserRight = context.createAnalyser();
+    this.analyserLeft.fftSize = 256;
+    this.analyserRight.fftSize = 256;
+    this.analyserLeft.smoothingTimeConstant = 0.8;
+    this.analyserRight.smoothingTimeConstant = 0.8;
+    this.analyserDataArray = new Float32Array(this.analyserLeft.frequencyBinCount);
     
     // Build initial audio graph
     this.rebuildAudioGraph();
-    
-    // Connect to analyser for metering (after fader)
-    this.fader.connect(this.analyser);
     
     // Initialize professional metering
     this.truePeakDetector = new TruePeakDetector(context);
@@ -295,8 +298,10 @@ export class ChannelStrip {
     this.panNode.connect(this.fader);
     this.fader.connect(this.output);
     
-    // Reconnect analyser
-    this.fader.connect(this.analyser);
+    // Connect to stereo analysers BEFORE panning for true stereo metering
+    currentNode.connect(this.splitter);
+    this.splitter.connect(this.analyserLeft, 0);
+    this.splitter.connect(this.analyserRight, 1);
   }
   
   // Send management
@@ -340,43 +345,20 @@ export class ChannelStrip {
     }
   }
   
-  // Peak metering (optimized for smooth animation)
-  getPeakLevel(): PeakLevel {
-    this.analyser.getFloatTimeDomainData(this.analyserDataArray);
-    
-    let peakLeft = 0;
-    let peakRight = 0;
-    
-    // Simulate stereo by splitting the buffer
-    const halfLength = Math.floor(this.analyserDataArray.length / 2);
-    
-    for (let i = 0; i < halfLength; i++) {
-      peakLeft = Math.max(peakLeft, Math.abs(this.analyserDataArray[i]));
-    }
-    
-    for (let i = halfLength; i < this.analyserDataArray.length; i++) {
-      peakRight = Math.max(peakRight, Math.abs(this.analyserDataArray[i]));
-    }
-    
-    // Convert to dB (-60 to +6 range) with smooth floor
-    const leftDb = peakLeft > 0.0001 ? 20 * Math.log10(peakLeft) : -60;
-    const rightDb = peakRight > 0.0001 ? 20 * Math.log10(peakRight) : -60;
-    
-    return { 
-      left: Math.max(-60, Math.min(6, leftDb)), 
-      right: Math.max(-60, Math.min(6, rightDb)) 
-    };
+  // Get stereo analysers for direct metering
+  getAnalysers(): { left: AnalyserNode; right: AnalyserNode } {
+    return { left: this.analyserLeft, right: this.analyserRight };
   }
   
   // True Peak metering (ITU-R BS.1770-5)
   getTruePeak(): number {
-    this.analyser.getFloatTimeDomainData(this.analyserDataArray);
+    this.analyserLeft.getFloatTimeDomainData(this.analyserDataArray);
     return this.truePeakDetector.detectTruePeak(this.analyserDataArray);
   }
   
   // LUFS calculations
   getLUFS(): { integrated: number; shortTerm: number; momentary: number; range: number } {
-    this.analyser.getFloatTimeDomainData(this.analyserDataArray);
+    this.analyserLeft.getFloatTimeDomainData(this.analyserDataArray);
     
     return {
       integrated: this.lufsCalculator.calculateIntegrated(this.analyserDataArray),
@@ -388,14 +370,16 @@ export class ChannelStrip {
   
   // Phase correlation
   getPhaseCorrelation(): number {
-    this.analyser.getFloatTimeDomainData(this.analyserDataArray);
-    // For now, use same data for L/R (mono)
-    return this.phaseAnalyzer.calculateCorrelation(this.analyserDataArray, this.analyserDataArray);
+    const leftData = new Float32Array(this.analyserLeft.frequencyBinCount);
+    const rightData = new Float32Array(this.analyserRight.frequencyBinCount);
+    this.analyserLeft.getFloatTimeDomainData(leftData);
+    this.analyserRight.getFloatTimeDomainData(rightData);
+    return this.phaseAnalyzer.calculateCorrelation(leftData, rightData);
   }
   
   // Dynamic range
   getDynamicRange(): { dr: number; crest: number } {
-    this.analyser.getFloatTimeDomainData(this.analyserDataArray);
+    this.analyserLeft.getFloatTimeDomainData(this.analyserDataArray);
     
     return {
       dr: this.drCalculator.calculateDRScore(this.analyserDataArray),
@@ -403,8 +387,9 @@ export class ChannelStrip {
     };
   }
   
+  // Legacy compatibility - return left analyser
   getAnalyser(): AnalyserNode {
-    return this.analyser;
+    return this.analyserLeft;
   }
   
   dispose() {
@@ -420,7 +405,9 @@ export class ChannelStrip {
     this.compressor.dispose();
     this.panNode.disconnect();
     this.fader.disconnect();
-    this.analyser.disconnect();
+    this.splitter.disconnect();
+    this.analyserLeft.disconnect();
+    this.analyserRight.disconnect();
     this.output.disconnect();
     
     this.sends.forEach(send => send.node.disconnect());

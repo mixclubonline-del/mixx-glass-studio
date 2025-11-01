@@ -11,13 +11,13 @@ import { PANEL_WIDTH_SM, SPACING } from '@/lib/layout-constants';
 
 interface MeteringDashboardProps {
   masterPeakLevel: { left: number; right: number };
-  analyserNode?: AnalyserNode;
+  analyser?: AnalyserNode;
   engineRef?: React.RefObject<any>; // AudioEngine reference for advanced metrics
 }
 
 export const MeteringDashboard: React.FC<MeteringDashboardProps> = ({
   masterPeakLevel,
-  analyserNode,
+  analyser,
   engineRef
 }) => {
   const [lufs, setLufs] = React.useState({ integrated: -14.2, shortTerm: -12.8, momentary: -11.5, range: 8.4 });
@@ -98,8 +98,7 @@ export const MeteringDashboard: React.FC<MeteringDashboardProps> = ({
         <SpectrumAnalyzer
           width={PANEL_WIDTH_SM - (SPACING.lg * 2)}
           height={120}
-          peakLevel={masterPeakLevel}
-          analyserNode={analyserNode}
+          analyser={analyser}
         />
       </div>
       

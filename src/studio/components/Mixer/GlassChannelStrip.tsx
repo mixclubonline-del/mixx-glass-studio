@@ -18,6 +18,7 @@ import { CHANNEL_WIDTH_DEFAULT } from '@/lib/layout-constants';
 interface GlassChannelStripProps {
   channel: ChannelState;
   isSelected: boolean;
+  analysers?: { left: AnalyserNode; right: AnalyserNode } | null;
   inserts?: PluginInsert[];
   buses?: BusState[];
   onSelect: (id: string) => void;
@@ -36,6 +37,7 @@ interface GlassChannelStripProps {
 export const GlassChannelStrip: React.FC<GlassChannelStripProps> = ({
   channel,
   isSelected,
+  analysers,
   inserts,
   buses,
   onSelect,
@@ -74,7 +76,7 @@ export const GlassChannelStrip: React.FC<GlassChannelStripProps> = ({
       {/* Peak meter */}
       <div className="mb-1 flex justify-center">
         <ProfessionalPeakMeter
-          level={channel.peakLevel}
+          analysers={analysers}
           height={160}
           width={3}
           stereo={true}

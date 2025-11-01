@@ -7,16 +7,14 @@ import React, { useEffect, useRef } from 'react';
 interface SpectrumAnalyzerProps {
   width: number;
   height: number;
-  peakLevel?: { left: number; right: number };
-  analyserNode?: AnalyserNode; // Real FFT connection
+  analyser?: AnalyserNode; // Direct FFT connection
   mode?: 'spectrum' | 'phase' | 'waveform';
 }
 
 export const SpectrumAnalyzer: React.FC<SpectrumAnalyzerProps> = ({ 
   width, 
   height, 
-  peakLevel,
-  analyserNode,
+  analyser,
   mode = 'spectrum'
 }) => {
   const canvasRef = useRef<HTMLCanvasElement>(null);
@@ -47,19 +45,17 @@ export const SpectrumAnalyzer: React.FC<SpectrumAnalyzerProps> = ({
     const mutedHsl = `hsl(${mutedForeground})`;
     
     // Initialize frequency data array if we have analyser
-    if (analyserNode && !frequencyDataRef.current) {
-      frequencyDataRef.current = new Uint8Array(analyserNode.frequencyBinCount);
+    let dataArray: Uint8Array | null = null;
+    if (analyser) {
+      dataArray = new Uint8Array(analyser.frequencyBinCount);
     }
     
     const draw = () => {
       ctx.clearRect(0, 0, width, height);
       
       // Get real FFT data if available
-      let fftData: Uint8Array | null = null;
-      if (analyserNode && frequencyDataRef.current) {
-        fftData = frequencyDataRef.current;
-        // @ts-ignore - TypeScript strict check, but works at runtime
-        analyserNode.getByteFrequencyData(fftData);
+      if (analyser && dataArray) {
+        analyser.getByteFrequencyData(dataArray as any);
       }
       
       // Draw frequency bars
@@ -74,12 +70,12 @@ export const SpectrumAnalyzer: React.FC<SpectrumAnalyzerProps> = ({
         let value: number;
         
         // Use real FFT data if available
-        if (fftData) {
-          const binIndex = Math.floor(i * fftData.length / barCount);
-          value = fftData[binIndex] / 255; // Normalize to 0-1
+        if (dataArray && analyser) {
+          const binIndex = Math.floor(i * dataArray.length / barCount);
+          value = dataArray[binIndex] / 255; // Normalize to 0-1
         } else {
-          // Fallback to mock data
-          value = Math.random() * 0.3 + 0.1 + (peakLevel ? (peakLevel.left + 60) / 60 * 0.4 : 0);
+          // Fallback to minimal idle animation
+          value = Math.random() * 0.1;
         }
         
         const barHeight = value * height;
@@ -120,7 +116,7 @@ export const SpectrumAnalyzer: React.FC<SpectrumAnalyzerProps> = ({
         cancelAnimationFrame(animationRef.current);
       }
     };
-  }, [width, height, peakLevel, analyserNode]);
+  }, [width, height, analyser]);
   
   return (
     <canvas

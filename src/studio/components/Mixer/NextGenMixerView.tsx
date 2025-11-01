@@ -16,6 +16,7 @@ import mixxclubLogo from '@/assets/mixxclub-logo.png';
 import { HEADER_HEIGHT, SPACING, MASTER_CHANNEL_WIDTH } from '@/lib/layout-constants';
 
 interface NextGenMixerViewProps {
+  engineRef?: React.RefObject<any>;
   onVolumeChange: (id: string, volume: number) => void;
   onPanChange: (id: string, pan: number) => void;
   onMuteToggle: (id: string) => void;
@@ -32,6 +33,7 @@ interface NextGenMixerViewProps {
 }
 
 export const NextGenMixerView: React.FC<NextGenMixerViewProps> = ({
+  engineRef,
   onVolumeChange,
   onPanChange,
   onMuteToggle,
@@ -172,7 +174,7 @@ export const NextGenMixerView: React.FC<NextGenMixerViewProps> = ({
             >
               <MasterChannelStrip
                 volume={masterVolume}
-                peakLevel={masterPeakLevel}
+                analysers={engineRef?.current?.getMasterAnalysers()}
                 onVolumeChange={setMasterVolume}
                 onExport={onExport}
                 isExporting={isExporting}
@@ -205,6 +207,7 @@ export const NextGenMixerView: React.FC<NextGenMixerViewProps> = ({
                   <GlassChannelStrip
                     key={channel.id}
                     channel={channel}
+                    analysers={engineRef?.current?.getTrackAnalysers(channel.id)}
                     isSelected={selectedChannelId === channel.id}
                     inserts={track?.inserts}
                     onSelect={selectChannel}
