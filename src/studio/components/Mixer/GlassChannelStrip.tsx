@@ -6,7 +6,7 @@
 import React, { useState } from 'react';
 import { ChannelState, BusState } from '@/store/mixerStore';
 import { Volume2, Mic, ChevronDown, ChevronUp } from 'lucide-react';
-import { ProfessionalPeakMeter } from '../Metering/ProfessionalPeakMeter';
+import { SlimPeakMeter } from '../Metering/SlimPeakMeter';
 import { IceFireFader } from '../Controls/IceFireFader';
 import { IceFireKnob } from '../Controls/IceFireKnob';
 import { InsertRack } from './InsertRack';
@@ -75,13 +75,11 @@ export const GlassChannelStrip: React.FC<GlassChannelStripProps> = ({
       
       {/* Peak meter */}
       <div className="mb-1 flex justify-center">
-        <ProfessionalPeakMeter
+        <SlimPeakMeter
           analysers={analysers}
           height={100}
-          width={3}
-          stereo={true}
-          showRMS={false}
-          clipIndicator={true}
+          barWidth={3}
+          gap={1}
         />
       </div>
       
@@ -175,7 +173,7 @@ export const GlassChannelStrip: React.FC<GlassChannelStripProps> = ({
       )}
       
       {/* Fader */}
-      <div className="flex-1 flex items-center justify-center mb-1 min-h-0">
+      <div className="flex-1 flex items-end justify-center mb-1 min-h-0">
         <IceFireFader
           value={channel.volume}
           onChange={(value) => onVolumeChange(channel.id, value)}

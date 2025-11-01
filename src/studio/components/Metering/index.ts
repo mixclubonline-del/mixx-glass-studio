@@ -5,3 +5,4 @@ export { MasterMeteringPanel } from './MasterMeteringPanel';
 export { MeteringDashboard } from './MeteringDashboard';
 export { SpectrumAnalyzer } from './SpectrumAnalyzer';
 export { VelvetFloorPanel } from './VelvetFloorPanel';
+export { SlimPeakMeter } from './SlimPeakMeter';

@@ -20,7 +20,7 @@ export const TRACK_LIST_COLLAPSED = 48; // Collapsed track list
 export const CHANNEL_WIDTH_MIN = 80; // Minimum channel width
 export const CHANNEL_WIDTH_DEFAULT = 90; // Default channel width
 export const CHANNEL_WIDTH_MAX = 120; // Maximum channel width
-export const MASTER_CHANNEL_WIDTH = 128; // Master channel fixed width
+export const MASTER_CHANNEL_WIDTH = 176; // Master channel fixed width
 
 // Track Heights
 export const TRACK_HEIGHT = 100; // Standard track height in timeline
