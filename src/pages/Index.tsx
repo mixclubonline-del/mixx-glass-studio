@@ -560,6 +560,15 @@ const Index = () => {
       // Resume from current timeline position
       engineRef.current.play(currentTime);
       setIsPlaying(true);
+      
+      // Verify AudioContext unlocked
+      const masterAnalyser = engineRef.current.getMasterAnalyser();
+      if (masterAnalyser?.context) {
+        console.info('🎵 AudioContext state:', masterAnalyser.context.state);
+        if (masterAnalyser.context.state === 'running') {
+          console.info('✅ Audio unlocked and ready');
+        }
+      }
     }
   };
   

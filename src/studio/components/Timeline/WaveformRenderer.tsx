@@ -43,9 +43,18 @@ export const WaveformRenderer: React.FC<WaveformRendererProps> = ({
     // Clear canvas
     ctx.clearRect(0, 0, width, height);
     
-    // Draw waveform
+    // Draw waveform - respect startTime and duration
     const channelData = audioBuffer.getChannelData(0);
-    const samplesPerPixel = Math.floor(channelData.length / width);
+    const sampleRate = audioBuffer.sampleRate;
+    
+    // Calculate sample range based on startTime and duration
+    const startSample = startTime ? Math.floor(startTime * sampleRate) : 0;
+    const endSample = duration 
+      ? Math.min(Math.floor((startTime + duration) * sampleRate), channelData.length)
+      : channelData.length;
+    const totalSamples = endSample - startSample;
+    
+    const samplesPerPixel = Math.max(1, Math.floor(totalSamples / width));
     const centerY = height / 2;
     
     ctx.beginPath();
@@ -53,8 +62,8 @@ export const WaveformRenderer: React.FC<WaveformRendererProps> = ({
     ctx.lineWidth = 1;
     
     for (let x = 0; x < width; x++) {
-      const start = Math.floor(x * samplesPerPixel);
-      const end = Math.floor(start + samplesPerPixel);
+      const start = startSample + Math.floor(x * samplesPerPixel);
+      const end = Math.min(startSample + Math.floor((x + 1) * samplesPerPixel), endSample);
       
       let min = 1;
       let max = -1;
@@ -77,8 +86,8 @@ export const WaveformRenderer: React.FC<WaveformRendererProps> = ({
     
     // Mirror for bottom half
     for (let x = width - 1; x >= 0; x--) {
-      const start = Math.floor(x * samplesPerPixel);
-      const end = Math.floor(start + samplesPerPixel);
+      const start = startSample + Math.floor(x * samplesPerPixel);
+      const end = Math.min(startSample + Math.floor((x + 1) * samplesPerPixel), endSample);
       
       let min = 1;
       
@@ -92,7 +101,13 @@ export const WaveformRenderer: React.FC<WaveformRendererProps> = ({
     }
     
     ctx.closePath();
-    ctx.fillStyle = color + '40'; // Add transparency
+    
+    // Fix fill color for hsl strings
+    let fillColor = color + '40';
+    if (color.startsWith('hsl(')) {
+      fillColor = color.replace('hsl(', 'hsla(').replace(')', ', 0.25)');
+    }
+    ctx.fillStyle = fillColor;
     ctx.fill();
     ctx.stroke();
     

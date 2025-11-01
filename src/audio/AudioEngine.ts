@@ -232,6 +232,13 @@ export class AudioEngine {
   play(fromTime: number = 0) {
     if (this.isPlaying) return;
     
+    // Unlock AudioContext on play (browser security requirement)
+    if (this.context.state !== 'running') {
+      this.context.resume().catch(err => {
+        console.error('Failed to resume AudioContext:', err);
+      });
+    }
+    
     // If resuming from pause, use pauseTime, otherwise use fromTime
     const offset = this.pauseTime > 0 ? this.pauseTime : fromTime;
     this.startTime = this.context.currentTime - offset;
