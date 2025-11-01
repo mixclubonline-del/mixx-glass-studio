@@ -6,7 +6,6 @@ import { useViewStore } from "@/store/viewStore";
 import { ProjectProvider, useProject, useTransport } from "@/contexts/ProjectContext";
 import { useGlobalKeyboardShortcuts } from "@/hooks/useGlobalKeyboardShortcuts";
 import { EffectsRack } from "../studio/components/EffectsRack";
-import { Timeline } from "../studio/components/Timeline";
 import { TransportControls } from "../studio/components/TransportControls";
 import { MixxAIStudio } from "../studio/components/AI/MixxAIStudio";
 import { ProducerLab } from "../studio/components/Producer/ProducerLab";
@@ -78,19 +77,9 @@ function StudioPageContent() {
           <ProducerLab />
         ) : (
           <div style={{ padding: 12 }}>
-            {/* Top timeline/arranger */}
-            <div style={{ marginBottom: 12 }}>
-              <Timeline 
-                currentTime={transport.currentTime}
-                duration={duration}
-                isPlaying={transport.isPlaying}
-                onSeek={handleSeek}
-              />
-            </div>
-
             {/* Main rack (your plugins live here) */}
             <div style={{ marginBottom: 12 }}>
-              <EffectsRack 
+              <EffectsRack
                 reverbMix={reverbMix}
                 delayTime={delayTime}
                 delayFeedback={delayFeedback}
