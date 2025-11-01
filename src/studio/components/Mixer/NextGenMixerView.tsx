@@ -152,7 +152,7 @@ export const NextGenMixerView: React.FC<NextGenMixerViewProps> = ({
       </div>
       
       {/* Mixer Content with horizontal scroll */}
-      <div className="flex-1 overflow-hidden relative">
+      <div className="flex-1 overflow-hidden relative min-h-0">
         {channelArray.length === 0 ? (
           <div className="h-full flex items-center justify-center text-center">
             <div className="glass-glow rounded-lg p-8">
@@ -163,7 +163,7 @@ export const NextGenMixerView: React.FC<NextGenMixerViewProps> = ({
             </div>
           </div>
         ) : (
-          <div className="h-full flex">
+          <div className="h-full flex min-h-0">
             {/* Master channel - Fixed on left with STANDARD WIDTH */}
             <div 
               className="flex-shrink-0 border-r border-border/30"

@@ -26,26 +26,26 @@ export const MasterChannelStrip: React.FC<MasterChannelStripProps> = ({
   isExporting
 }) => {
   return (
-    <div className="relative flex flex-col h-full w-28 glass-glow rounded-lg p-3 border-l-4 border-primary">
+    <div className="relative flex flex-col h-full w-28 glass-glow rounded-lg p-2 border-l-4 border-primary overflow-hidden">
       {/* Master label */}
-      <div className="text-sm font-bold text-primary mb-4 text-center neon-text">
+      <div className="text-sm font-bold text-primary mb-2 text-center neon-text">
         MASTER
       </div>
       
       {/* Spectrum analyzer */}
-      <div className="mb-4 h-20 flex justify-center">
+      <div className="mb-3 h-16 flex justify-center">
         <SpectrumAnalyzer
           width={80}
-          height={80}
+          height={60}
           analyser={analysers?.left}
         />
       </div>
       
       {/* Peak meters */}
-      <div className="mb-3 flex justify-center">
+      <div className="mb-2 flex justify-center">
         <ProfessionalPeakMeter
           analysers={analysers}
-          height={220}
+          height={140}
           width={6}
           stereo={true}
           showRMS={true}
@@ -54,11 +54,11 @@ export const MasterChannelStrip: React.FC<MasterChannelStripProps> = ({
       </div>
       
       {/* Master fader */}
-      <div className="flex-1 flex items-center justify-center mb-3">
+      <div className="flex-1 flex items-center justify-center mb-2 min-h-0">
         <IceFireFader
           value={volume}
           onChange={onVolumeChange}
-          height={280}
+          height={200}
           width={14}
           showScale={true}
         />

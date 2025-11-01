@@ -57,7 +57,7 @@ export const GlassChannelStrip: React.FC<GlassChannelStripProps> = ({
   
   return (
     <div 
-      className={`relative flex flex-col h-full glass border border-border/30 ${
+      className={`relative flex flex-col h-full glass border border-border/30 overflow-hidden ${
         isSelected 
           ? 'ring-2 ring-primary shadow-[0_0_30px_hsl(var(--primary)/0.4)]' 
           : 'hover:ring-1 hover:ring-primary/30'
@@ -77,7 +77,7 @@ export const GlassChannelStrip: React.FC<GlassChannelStripProps> = ({
       <div className="mb-1 flex justify-center">
         <ProfessionalPeakMeter
           analysers={analysers}
-          height={160}
+          height={100}
           width={3}
           stereo={true}
           showRMS={false}
@@ -175,11 +175,11 @@ export const GlassChannelStrip: React.FC<GlassChannelStripProps> = ({
       )}
       
       {/* Fader */}
-      <div className="flex-1 flex items-center justify-center mb-1 min-h-[200px]">
+      <div className="flex-1 flex items-center justify-center mb-1 min-h-0">
         <IceFireFader
           value={channel.volume}
           onChange={(value) => onVolumeChange(channel.id, value)}
-          height={280}
+          height={180}
           width={12}
           showScale={false}
         />
