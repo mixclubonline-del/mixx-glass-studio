@@ -54,11 +54,11 @@ export const MasterChannelStrip: React.FC<MasterChannelStripProps> = ({
       </div>
       
       {/* Master fader */}
-      <div className="flex-1 flex items-center justify-center mb-2 min-h-0">
+      <div className="flex-1 flex items-center justify-center mb-2 min-h-0 py-2">
         <IceFireFader
           value={volume}
           onChange={onVolumeChange}
-          height={200}
+          height={180}
           width={14}
           showScale={true}
         />
