@@ -38,7 +38,6 @@ import { AISuggestionsPanel } from "@/studio/components/AI/AISuggestionsPanel";
 import { SPACING } from "@/lib/layout-constants";
 import { ContextualBloomWrapper } from "@/components/Bloom/ContextualBloomWrapper";
 import { EdgeBloomTrigger } from "@/components/Bloom/EdgeBloomTrigger";
-import { SmartTopBar } from "@/components/Bloom/SmartTopBar";
 import { useBloomDetection } from "@/hooks/useBloomDetection";
 import { useBloomStore } from "@/store/bloomStore";
 
@@ -737,17 +736,6 @@ const IndexContent = () => {
       <EdgeBloomTrigger edge="right" thickness={20} />
 
       <div className="flex flex-col h-screen">
-        {/* Smart Top Bar - Blooms on top edge hover */}
-        <ContextualBloomWrapper
-          config={{
-            triggerZone: 'top',
-            className: 'fixed top-4 left-1/2 -translate-x-1/2 z-50',
-            preferenceKey: 'topBar'
-          }}
-        >
-          <SmartTopBar />
-        </ContextualBloomWrapper>
-        
         <ViewContainer>
           <div className="flex h-full">
             {/* Main view */}
