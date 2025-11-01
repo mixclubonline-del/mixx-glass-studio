@@ -57,7 +57,7 @@ export const CollapsibleTimelineToolbar: React.FC = () => {
   
   if (isCollapsed) {
     return (
-      <div className="absolute top-2 left-2 z-10 glass rounded-lg p-1 flex items-center gap-1">
+      <div className="absolute top-2 left-2 z-10 glass-light rounded-lg p-1 flex items-center gap-1 micro-interact">
         <TooltipProvider>
           <Tooltip>
             <TooltipTrigger asChild>
@@ -83,7 +83,7 @@ export const CollapsibleTimelineToolbar: React.FC = () => {
   }
   
   return (
-    <div className="glass rounded-lg p-2 flex items-center gap-1 border border-border/30">
+    <div className="glass-light border-gradient rounded-lg p-2 flex items-center gap-1 shadow-[var(--shadow-float)]">
       <TooltipProvider>
         {tools.map((tool) => (
           <Tooltip key={tool.id}>
@@ -92,7 +92,7 @@ export const CollapsibleTimelineToolbar: React.FC = () => {
                 variant={currentTool === tool.id ? "default" : "ghost"}
                 size="sm"
                 onClick={() => setCurrentTool(tool.id)}
-                className="h-8 w-8 p-0"
+                className={`h-8 w-8 p-0 ${currentTool === tool.id ? 'shadow-[var(--glow-medium)]' : 'micro-interact'}`}
               >
                 <tool.icon size={16} />
               </Button>

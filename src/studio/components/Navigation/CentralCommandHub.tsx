@@ -47,15 +47,15 @@ export const CentralCommandHub = ({
   ];
   
   return (
-    <div className="glass border-b border-border/30 px-4 py-2">
-      <div className="flex items-center justify-between gap-4">
+    <div className="glass-ultra border-gradient px-6 py-3 rounded-lg shadow-[var(--shadow-float)]">
+      <div className="flex items-center justify-between gap-6">
         {/* LEFT: Utilities */}
         <div className="flex items-center gap-2">
           <Button
             variant="outline"
             size="sm"
             onClick={onImport}
-            className="gap-2 h-9"
+            className="gap-2 h-9 micro-interact"
             title="Import Audio Files"
           >
             <Upload className="w-4 h-4" />
@@ -66,7 +66,7 @@ export const CentralCommandHub = ({
             variant="outline"
             size="sm"
             onClick={onTogglePluginBrowser}
-            className="gap-2 h-9 neon-glow-prime"
+            className="gap-2 h-9 micro-interact"
             title="Open Plugin Suite"
           >
             <Grid3x3 className="w-4 h-4" />
@@ -102,8 +102,8 @@ export const CentralCommandHub = ({
             size="icon"
             onClick={transport.isPlaying ? pause : () => play()}
             className={transport.isPlaying 
-              ? 'bg-[hsl(var(--prime-500))] hover:bg-[hsl(var(--prime-500))]/90 shadow-[0_0_30px_hsl(var(--prime-500)/0.6)] h-14 w-14 scale-110' 
-              : 'hover:bg-muted h-14 w-14 scale-110'
+              ? 'bg-[hsl(var(--prime-500))] hover:bg-[hsl(var(--prime-500))]/90 shadow-[var(--glow-intense)] h-14 w-14 scale-110 chromatic-hover' 
+              : 'hover:bg-muted h-14 w-14 scale-110 micro-interact'
             }
             title="Play/Pause (Space)"
           >
@@ -146,14 +146,14 @@ export const CentralCommandHub = ({
         {/* RIGHT: Navigation & AI */}
         <div className="flex items-center gap-2">
           {/* View Switcher */}
-          <div className="flex gap-1 glass rounded-lg p-1">
+          <div className="flex gap-1 glass-light rounded-lg p-1">
             {views.map((view) => (
               <button
                 key={view.id}
                 onClick={() => setView(view.id)}
-                className={`flex items-center gap-1.5 px-3 py-1.5 rounded transition-all text-sm ${
+                className={`flex items-center gap-1.5 px-3 py-1.5 rounded transition-all text-sm micro-interact ${
                   currentView === view.id
-                    ? 'bg-primary text-primary-foreground shadow-[0_0_15px_hsl(var(--primary)/0.4)]'
+                    ? 'bg-primary text-primary-foreground shadow-[var(--glow-medium)]'
                     : 'text-muted-foreground hover:text-foreground hover:bg-muted/50'
                 }`}
                 title={`${view.label} View`}
@@ -171,7 +171,7 @@ export const CentralCommandHub = ({
             variant="outline"
             size="sm"
             onClick={onToggleAIAssistant}
-            className="gap-2 h-9 neon-glow-accent"
+            className="gap-2 h-9 micro-interact chromatic-hover"
             title="AI Assistant"
           >
             <Bot className="w-4 h-4" />

@@ -36,6 +36,11 @@ import { useBeastModeStore } from "@/store/beastModeStore";
 import { BeastModePanel } from "@/studio/components/AI/BeastModePanel";
 import { AISuggestionsPanel } from "@/studio/components/AI/AISuggestionsPanel";
 import { SPACING } from "@/lib/layout-constants";
+import { ContextualBloomWrapper } from "@/components/Bloom/ContextualBloomWrapper";
+import { EdgeBloomTrigger } from "@/components/Bloom/EdgeBloomTrigger";
+import { SmartTopBar } from "@/components/Bloom/SmartTopBar";
+import { useBloomDetection } from "@/hooks/useBloomDetection";
+import { useBloomStore } from "@/store/bloomStore";
 
 const IndexContent = () => {
   const engineRef = useRef<AudioEngine | null>(null);
@@ -85,6 +90,10 @@ const IndexContent = () => {
   
   // Beast Mode integration
   const { isActive: beastModeActive } = useBeastModeStore();
+  
+  // Bloom System
+  useBloomDetection({ idleTimeout: 3000 });
+  const { toggleUltraMinimal, toggleDebugMode } = useBloomStore();
   
   useEffect(() => {
     if (beastModeActive) {
@@ -641,6 +650,36 @@ const IndexContent = () => {
     onPrevBar: handlePrevBar,
     onNextBar: handleNextBar,
   });
+  
+  // Bloom keyboard shortcuts
+  useEffect(() => {
+    const handleKeyDown = (e: KeyboardEvent) => {
+      // Tab - Toggle all panels
+      if (e.key === 'Tab' && !e.shiftKey && !e.metaKey && !e.ctrlKey) {
+        const activeElement = document.activeElement;
+        // Only prevent default if not in an input field
+        if (activeElement?.tagName !== 'INPUT' && activeElement?.tagName !== 'TEXTAREA') {
+          e.preventDefault();
+          toggleUltraMinimal();
+        }
+      }
+      
+      // Cmd+Shift+H - Ultra minimal mode
+      if ((e.metaKey || e.ctrlKey) && e.shiftKey && e.key === 'h') {
+        e.preventDefault();
+        toggleUltraMinimal();
+      }
+      
+      // Cmd+/ - Debug mode (show bloom zones)
+      if ((e.metaKey || e.ctrlKey) && e.key === '/') {
+        e.preventDefault();
+        toggleDebugMode();
+      }
+    };
+    
+    window.addEventListener('keydown', handleKeyDown);
+    return () => window.removeEventListener('keydown', handleKeyDown);
+  }, [toggleUltraMinimal, toggleDebugMode]);
 
   return (
     <div className="min-h-screen bg-background relative overflow-hidden flex flex-col">
@@ -658,19 +697,57 @@ const IndexContent = () => {
       <MixxAmbientOverlay />
       <BeastModeAmbient />
       
-      {/* Animated background */}
-      <div className="fixed inset-0 gradient-animate opacity-10 pointer-events-none" />
-      
-      {/* Grid overlay */}
+      {/* 2030 Gradient Mesh Background */}
       <div 
-        className="fixed inset-0 pointer-events-none opacity-[0.02]"
+        className="fixed inset-0 -z-10"
         style={{
-          backgroundImage: 'linear-gradient(hsl(var(--prime-500)) 1px, transparent 1px), linear-gradient(90deg, hsl(var(--prime-500)) 1px, transparent 1px)',
-          backgroundSize: '50px 50px'
+          background: `
+            radial-gradient(ellipse at 20% 30%, hsl(275 100% 65% / 0.08) 0%, transparent 50%),
+            radial-gradient(ellipse at 80% 70%, hsl(191 100% 50% / 0.06) 0%, transparent 50%),
+            radial-gradient(ellipse at 50% 50%, hsl(314 100% 65% / 0.04) 0%, transparent 70%),
+            linear-gradient(180deg, hsl(240 10% 2%) 0%, hsl(240 15% 4%) 100%)
+          `
         }}
       />
+      
+      {/* Animated gradient orbs */}
+      <div className="fixed inset-0 -z-10 overflow-hidden pointer-events-none">
+        <div 
+          className="absolute top-1/4 left-1/4 w-96 h-96 rounded-full"
+          style={{
+            background: 'radial-gradient(circle, hsl(275 100% 65% / 0.15) 0%, transparent 70%)',
+            filter: 'blur(100px)',
+            animation: 'float 20s ease-in-out infinite'
+          }}
+        />
+        <div 
+          className="absolute bottom-1/4 right-1/4 w-96 h-96 rounded-full"
+          style={{
+            background: 'radial-gradient(circle, hsl(191 100% 50% / 0.12) 0%, transparent 70%)',
+            filter: 'blur(120px)',
+            animation: 'float 25s ease-in-out infinite reverse'
+          }}
+        />
+      </div>
+      
+      {/* Edge Bloom Triggers for Debug Mode */}
+      <EdgeBloomTrigger edge="top" thickness={40} />
+      <EdgeBloomTrigger edge="bottom" thickness={60} />
+      <EdgeBloomTrigger edge="left" thickness={20} />
+      <EdgeBloomTrigger edge="right" thickness={20} />
 
       <div className="flex flex-col h-screen">
+        {/* Smart Top Bar - Blooms on top edge hover */}
+        <ContextualBloomWrapper
+          config={{
+            triggerZone: 'top',
+            className: 'fixed top-4 left-1/2 -translate-x-1/2 z-50',
+            preferenceKey: 'topBar'
+          }}
+        >
+          <SmartTopBar />
+        </ContextualBloomWrapper>
+        
         <ViewContainer>
           <div className="flex h-full">
             {/* Main view */}
@@ -766,15 +843,25 @@ const IndexContent = () => {
           </div>
         </ViewContainer>
         
-        {/* Central Command Hub - Bottom Transport with Floating Support */}
+        {/* Central Command Hub - Bottom Transport with Bloom */}
         {!transportCollapsed && (
-          <div className={`${transportFloating ? "fixed bottom-4 left-1/2 -translate-x-1/2 z-50 min-w-[900px]" : "w-full"} ${transportCovered ? "opacity-30 hover:opacity-100 transition-opacity" : ""}`}>
-            <CentralCommandHub
-              onImport={handleImport}
-              onTogglePluginBrowser={() => togglePanel('browser')}
-              onToggleAIAssistant={() => setShowAIAssistant(!showAIAssistant)}
-            />
-          </div>
+          <ContextualBloomWrapper
+            config={{
+              triggerZone: 'bottom',
+              className: transportFloating 
+                ? "fixed bottom-4 left-1/2 -translate-x-1/2 z-50 min-w-[900px]" 
+                : "w-full",
+              preferenceKey: 'transport'
+            }}
+          >
+            <div className={transportCovered ? "opacity-60 hover:opacity-100 transition-opacity" : ""}>
+              <CentralCommandHub
+                onImport={handleImport}
+                onTogglePluginBrowser={() => togglePanel('browser')}
+                onToggleAIAssistant={() => setShowAIAssistant(!showAIAssistant)}
+              />
+            </div>
+          </ContextualBloomWrapper>
         )}
         
         {/* Transport Toggle Buttons */}
