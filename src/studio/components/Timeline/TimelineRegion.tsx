@@ -175,20 +175,33 @@ export const TimelineRegion: React.FC<TimelineRegionProps> = ({
         ref={regionRef}
         className={`absolute h-full rounded-md overflow-hidden transition-all group ${
           isSelected 
-            ? 'ring-2 ring-primary shadow-[0_0_20px_hsl(var(--primary)/0.5)]' 
-            : 'hover:ring-1 hover:ring-primary/50'
+            ? 'region-selected animate-pulse-slow' 
+            : 'hover:ring-1 hover:ring-white/20'
         }`}
         style={{
           left: `${left}px`,
           width: `${width}px`,
-          backgroundColor: region.color + '20',
-          borderLeft: `2px solid ${region.color}`,
+          background: `linear-gradient(135deg, ${region.color}15, ${region.color}08)`,
+          backdropFilter: 'blur(40px) saturate(180%)',
+          border: '0.5px solid rgba(255, 255, 255, 0.15)',
+          boxShadow: isSelected
+            ? `var(--shadow-float), inset 0 1px 0 rgba(255, 255, 255, 0.2), 0 0 20px ${region.color}40`
+            : `var(--shadow-float), inset 0 1px 0 rgba(255, 255, 255, 0.1)`,
           cursor: getCursor(),
+          position: 'relative',
         }}
         onMouseDown={handleMouseDown}
         onMouseMove={handleRegionMouseMove}
         onMouseLeave={() => setHoverX(null)}
       >
+      {/* Gradient accent border */}
+      <div 
+        className="absolute left-0 top-0 bottom-0 w-[3px] pointer-events-none"
+        style={{
+          background: `linear-gradient(180deg, ${region.color}FF 0%, ${region.color}80 50%, ${region.color}40 100%)`,
+          filter: 'blur(1px)',
+        }}
+      />
       {/* Waveform */}
       {audioBuffer && (
         <WaveformRenderer

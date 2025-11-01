@@ -75,10 +75,7 @@ export function GridOverlay({ width, height, bpm, timeSignature = [4, 4] }: Grid
     const startIndex = Math.floor(startTime / subdivisionInterval);
     const endIndex = Math.ceil(endTime / subdivisionInterval);
     
-    // Draw subdivision lines (lightest)
-    ctx.strokeStyle = 'rgba(255, 255, 255, 0.03)';
-    ctx.lineWidth = 1;
-    
+    // Draw subdivision lines with gradient fade
     for (let i = startIndex; i <= endIndex; i++) {
       const time = i * subdivisionInterval;
       const x = (time * zoom) - scrollX;
@@ -89,6 +86,11 @@ export function GridOverlay({ width, height, bpm, timeSignature = [4, 4] }: Grid
         
         // Skip if it's a beat or bar line (will draw those separately)
         if (!isBar && !isBeat) {
+          const gradient = ctx.createLinearGradient(x, 0, x, height);
+          gradient.addColorStop(0, 'rgba(255, 255, 255, 0.15)');
+          gradient.addColorStop(1, 'rgba(255, 255, 255, 0.03)');
+          ctx.strokeStyle = gradient;
+          ctx.lineWidth = 1;
           ctx.beginPath();
           ctx.moveTo(x, 0);
           ctx.lineTo(x, height);
@@ -97,10 +99,7 @@ export function GridOverlay({ width, height, bpm, timeSignature = [4, 4] }: Grid
       }
     }
     
-    // Draw beat lines (medium)
-    ctx.strokeStyle = 'rgba(255, 255, 255, 0.08)';
-    ctx.lineWidth = 1;
-    
+    // Draw beat lines with pulsing glow
     for (let i = startIndex; i <= endIndex; i++) {
       const time = i * subdivisionInterval;
       const x = (time * zoom) - scrollX;
@@ -110,6 +109,10 @@ export function GridOverlay({ width, height, bpm, timeSignature = [4, 4] }: Grid
         const isBar = Math.abs(time % secondsPerBar) < 0.001;
         
         if (isBeat && !isBar) {
+          ctx.strokeStyle = 'rgba(255, 255, 255, 0.12)';
+          ctx.lineWidth = 1;
+          ctx.shadowBlur = 2;
+          ctx.shadowColor = 'rgba(255, 255, 255, 0.1)';
           ctx.beginPath();
           ctx.moveTo(x, 0);
           ctx.lineTo(x, height);
@@ -118,12 +121,7 @@ export function GridOverlay({ width, height, bpm, timeSignature = [4, 4] }: Grid
       }
     }
     
-    // Draw bar lines (bright with glow)
-    ctx.strokeStyle = 'rgba(255, 255, 255, 0.15)';
-    ctx.lineWidth = 2;
-    ctx.shadowBlur = 4;
-    ctx.shadowColor = 'rgba(255, 255, 255, 0.2)';
-    
+    // Draw bar lines with multi-layer depth and chromatic aberration
     for (let i = startIndex; i <= endIndex; i++) {
       const time = i * subdivisionInterval;
       const x = (time * zoom) - scrollX;
@@ -132,12 +130,26 @@ export function GridOverlay({ width, height, bpm, timeSignature = [4, 4] }: Grid
         const isBar = Math.abs(time % secondsPerBar) < 0.001;
         
         if (isBar) {
+          // Base line (wide, subtle)
+          ctx.strokeStyle = 'rgba(255, 255, 255, 0.05)';
+          ctx.lineWidth = 6;
+          ctx.shadowBlur = 0;
           ctx.beginPath();
           ctx.moveTo(x, 0);
           ctx.lineTo(x, height);
           ctx.stroke();
           
-          // Add primary color accent at top
+          // Main line with depth
+          ctx.strokeStyle = 'rgba(255, 255, 255, 0.2)';
+          ctx.lineWidth = 3;
+          ctx.shadowBlur = 12;
+          ctx.shadowColor = primaryHsl;
+          ctx.beginPath();
+          ctx.moveTo(x, 0);
+          ctx.lineTo(x, height);
+          ctx.stroke();
+          
+          // Primary color accent at top
           ctx.strokeStyle = primaryHsl;
           ctx.lineWidth = 3;
           ctx.shadowBlur = 8;
@@ -146,12 +158,6 @@ export function GridOverlay({ width, height, bpm, timeSignature = [4, 4] }: Grid
           ctx.moveTo(x, 0);
           ctx.lineTo(x, Math.min(30, height));
           ctx.stroke();
-          
-          // Reset for next bar line
-          ctx.strokeStyle = 'rgba(255, 255, 255, 0.15)';
-          ctx.lineWidth = 2;
-          ctx.shadowBlur = 4;
-          ctx.shadowColor = 'rgba(255, 255, 255, 0.2)';
         }
       }
     }

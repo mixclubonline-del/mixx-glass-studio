@@ -340,6 +340,55 @@
     animation: border-glow 2s ease-in-out infinite;
   }
   
+  /* Region selection animation */
+  @keyframes region-select {
+    0% {
+      transform: scale(1);
+    }
+    50% {
+      transform: scale(1.02);
+    }
+    100% {
+      transform: scale(1);
+    }
+  }
+  
+  /* Playhead trail animation */
+  @keyframes playhead-trail {
+    0% {
+      opacity: 0.3;
+    }
+    100% {
+      opacity: 0;
+    }
+  }
+  
+  /* Grid pulse animation */
+  @keyframes grid-pulse {
+    0%, 100% { 
+      opacity: 0.08; 
+    }
+    50% { 
+      opacity: 0.15; 
+    }
+  }
+  
+  .region-selected {
+    animation: region-select 0.3s cubic-bezier(0.34, 1.56, 0.64, 1);
+  }
+  
+  .animate-playhead-trail {
+    animation: playhead-trail 0.5s linear infinite;
+  }
+  
+  .grid-line.beat {
+    animation: grid-pulse 2s ease-in-out infinite;
+  }
+  
+  .animate-pulse-slow {
+    animation: pulse 3s cubic-bezier(0.4, 0, 0.6, 1) infinite;
+  }
+  
   /* Vertical text for collapsed sidebar */
 .writing-mode-vertical {
   writing-mode: vertical-rl;

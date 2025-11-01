@@ -30,9 +30,8 @@ export function TimelineRuler({ width, height, bpm, onSeek }: TimelineRulerProps
     canvas.style.height = `${height}px`;
     ctx.scale(dpr, dpr);
     
-    // Clear
-    ctx.fillStyle = 'hsl(240, 10%, 8%)';
-    ctx.fillRect(0, 0, width, height);
+    // Clear - transparent for glass effect
+    ctx.clearRect(0, 0, width, height);
     
     // Calculate time range visible
     const startTime = scrollX / zoom;
@@ -69,8 +68,11 @@ export function TimelineRuler({ width, height, bpm, onSeek }: TimelineRulerProps
         ctx.lineTo(x, height);
         ctx.stroke();
         
-        // Bar number (start at 1, not 0)
-        ctx.fillStyle = 'hsl(0, 0%, 70%)';
+        // Bar number with gradient (start at 1, not 0)
+        const gradient = ctx.createLinearGradient(x, 0, x + 50, 0);
+        gradient.addColorStop(0, 'hsl(275 100% 70%)');
+        gradient.addColorStop(1, 'hsl(191 100% 60%)');
+        ctx.fillStyle = gradient;
         ctx.fillText(`${bar + 1}`, x + 4, height / 2);
         
         // Beat subdivisions (show beats 2, 3, 4)
@@ -134,7 +136,10 @@ export function TimelineRuler({ width, height, bpm, onSeek }: TimelineRulerProps
     <canvas
       ref={canvasRef}
       onClick={handleClick}
-      className="cursor-pointer border-b border-border"
+      className="cursor-pointer glass-light border-b border-border/30"
+      style={{
+        backdropFilter: 'blur(40px) saturate(180%)',
+      }}
     />
   );
 }

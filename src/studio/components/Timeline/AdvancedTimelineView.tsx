@@ -8,6 +8,7 @@ import { useTimelineStore } from '@/store/timelineStore';
 import { useTracksStore } from '@/store/tracksStore';
 import { TimelineRuler } from './TimelineRuler';
 import { TimelineTrackRow } from './TimelineTrackRow';
+import { ContextualBloomWrapper, EdgeBloomTrigger } from '@/components/Bloom';
 import { Playhead } from './Playhead';
 import { GridOverlay } from './GridOverlay';
 import { TimelineToolbar } from './TimelineToolbar';
@@ -215,27 +216,65 @@ export const AdvancedTimelineView: React.FC<AdvancedTimelineViewProps> = ({
   }, [currentTime, zoom, autoScrollEnabled]);
   
   return (
-    <div className="flex h-full bg-background">
+    <div className="flex h-full relative">
+      {/* Background ambience */}
+      <div className="absolute inset-0 -z-10 overflow-hidden pointer-events-none">
+        <div 
+          className="absolute top-1/3 left-1/4 w-[500px] h-[500px] rounded-full"
+          style={{
+            background: 'radial-gradient(circle, hsl(275 100% 65% / 0.08) 0%, transparent 70%)',
+            filter: 'blur(120px)',
+            animation: 'float 25s ease-in-out infinite'
+          }}
+        />
+        <div 
+          className="absolute bottom-1/3 right-1/3 w-[400px] h-[400px] rounded-full"
+          style={{
+            background: 'radial-gradient(circle, hsl(191 100% 50% / 0.06) 0%, transparent 70%)',
+            filter: 'blur(100px)',
+            animation: 'float 30s ease-in-out infinite reverse'
+          }}
+        />
+      </div>
+      
+      {/* Main background with gradient mesh */}
+      <div 
+        className="absolute inset-0 -z-20"
+        style={{
+          background: `
+            var(--gradient-mesh),
+            linear-gradient(180deg, 
+              hsl(240 15% 4%) 0%, 
+              hsl(240 10% 2%) 100%
+            )
+          `
+        }}
+      />
+      
       {/* Left Track List Sidebar - STANDARD WIDTH */}
       {!trackListCollapsed && (
         <div 
-          className="flex-shrink-0 glass border-r border-border/50 flex flex-col"
-          style={{ width: `${TRACK_LIST_WIDTH}px` }}
+          className="flex-shrink-0 glass-medium border-r border-border/50 flex flex-col"
+          style={{ 
+            width: `${TRACK_LIST_WIDTH}px`,
+            background: `var(--gradient-mesh), hsl(var(--glass-medium))`,
+            backdropFilter: 'blur(60px) saturate(200%)'
+          }}
         >
           {/* Sidebar Header - STANDARDIZED to 72px */}
           <div 
-            className="flex items-center justify-between px-4 border-b-2 border-[#a855f7]/50 bg-gradient-to-r from-[#a855f7]/5 to-[#ec4899]/5"
+            className="flex items-center justify-between px-4 glass-ultra float-card border-b border-gradient"
             style={{ height: `${HEADER_HEIGHT}px` }}
           >
             <div className="flex flex-col">
-              <h3 className="text-sm font-bold gradient-flow uppercase">Tracks</h3>
+              <h3 className="text-sm font-bold text-gradient-subtle uppercase">Tracks</h3>
               <p className="text-xs text-muted-foreground">{tracks.length} track{tracks.length !== 1 ? 's' : ''}</p>
             </div>
             <Button
               size="sm"
               variant="ghost"
               onClick={() => setTrackListCollapsed(true)}
-              className="h-8 w-8 p-0"
+              className="h-8 w-8 p-0 micro-interact chromatic-hover"
             >
               <ChevronLeft size={16} />
             </Button>
@@ -253,8 +292,8 @@ export const AdvancedTimelineView: React.FC<AdvancedTimelineViewProps> = ({
                   key={track.id}
                   onClick={() => handleSelectTrack(track.id)}
                   className={cn(
-                    "border-b border-border/30 cursor-pointer transition-colors hover:bg-muted/50",
-                    selectedTrackId === track.id && "bg-primary/10 border-l-4 border-l-primary"
+                    "border-b border-border/30 cursor-pointer transition-all duration-300 glass-light float-card micro-interact",
+                    selectedTrackId === track.id && "border-gradient animate-pulse-slow"
                   )}
                   style={{ height: `${TRACK_HEIGHT}px` }}
                 >
@@ -384,7 +423,15 @@ export const AdvancedTimelineView: React.FC<AdvancedTimelineViewProps> = ({
               </p>
             </div>
             <div className="border-l-2 border-[#a855f7]/50 h-10"></div>
-            <TimelineToolbar />
+            <ContextualBloomWrapper config={{
+              triggerZone: 'top',
+              idleOpacity: 0.2,
+              activeOpacity: 1,
+              blurAmount: 8,
+              preferenceKey: 'timeline-toolbar'
+            }}>
+              <TimelineToolbar />
+            </ContextualBloomWrapper>
           </div>
           
           <div className="flex items-center gap-2">
@@ -503,14 +550,29 @@ export const AdvancedTimelineView: React.FC<AdvancedTimelineViewProps> = ({
         </div>
       </div>
 
-      {/* Right Browser Panel */}
-      <ArrangeBrowserPanel
-        selectedTrackId={selectedTrackId}
-        onFileSelect={onFileSelect}
-        onPluginSelect={onPluginSelect}
-        isCollapsed={browserCollapsed}
-        onToggleCollapse={() => setBrowserCollapsed(!browserCollapsed)}
+      {/* Right Browser Panel with Bloom */}
+      <EdgeBloomTrigger 
+        edge="right" 
+        thickness={20}
+        offset={0}
       />
+      
+      <ContextualBloomWrapper config={{
+        triggerZone: 'right',
+        idleOpacity: 0,
+        activeOpacity: 1,
+        blurAmount: 12,
+        springConfig: { stiffness: 200, damping: 25 },
+        preferenceKey: 'browser-panel'
+      }}>
+        <ArrangeBrowserPanel
+          selectedTrackId={selectedTrackId}
+          onFileSelect={onFileSelect}
+          onPluginSelect={onPluginSelect}
+          isCollapsed={browserCollapsed}
+          onToggleCollapse={() => setBrowserCollapsed(!browserCollapsed)}
+        />
+      </ContextualBloomWrapper>
 
       {/* Add Track Dialog */}
       <AddTrackDialog

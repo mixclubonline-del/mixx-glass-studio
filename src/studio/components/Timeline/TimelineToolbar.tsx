@@ -75,15 +75,15 @@ export const TimelineToolbar: React.FC = () => {
   }, [currentTool, setCurrentTool]);
   
   return (
-    <div className="flex items-center gap-1 glass rounded-lg p-1.5">
+    <div className="flex items-center gap-1 glass-ultra border-gradient rounded-lg p-1.5">
       {tools.map((tool) => (
         <button
           key={tool.id}
           onClick={() => setCurrentTool(tool.id)}
-          className={`flex items-center gap-1.5 px-3 py-2 rounded-md transition-all group relative ${
+          className={`flex items-center gap-1.5 px-3 py-2 rounded-md transition-all group relative micro-interact ${
             currentTool === tool.id
-              ? 'bg-primary text-primary-foreground shadow-[0_0_12px_hsl(var(--primary)/0.4)]'
-              : 'text-muted-foreground hover:text-foreground hover:bg-muted/50'
+              ? 'glass-light text-gradient-subtle shadow-[0_0_12px_hsl(var(--prime-500)/0.4)]'
+              : 'text-muted-foreground hover:text-foreground chromatic-hover'
           }`}
           title={`${tool.label} (${tool.shortcut})`}
         >

@@ -76,14 +76,22 @@ export const ProfessionalTrackHeader: React.FC<TrackHeaderProps> = ({
   onInputMonitorToggle,
   onSettings,
 }) => {
+  const [isHovered, setIsHovered] = React.useState(false);
+  
   return (
     <div
       className={cn(
-        "flex flex-col gap-1 px-2 py-1.5 border-b border-border/50 transition-colors cursor-pointer select-none",
-        isSelected ? "bg-primary/10 border-l-2 border-l-primary" : "hover:bg-secondary/30"
+        "flex flex-col gap-1 px-2 py-1.5 border-b border-border/50 transition-all duration-400 cursor-pointer select-none",
+        isSelected 
+          ? "glass-light bloom-visible border-l-2 border-gradient" 
+          : isHovered 
+            ? "glass-light bloom-visible" 
+            : "bloom-dimmed"
       )}
       style={{ height: `${height}px` }}
       onClick={() => onSelect(id)}
+      onMouseEnter={() => setIsHovered(true)}
+      onMouseLeave={() => setIsHovered(false)}
     >
       {/* Top row: Track name, expand/collapse */}
       <div className="flex items-center gap-1.5">
@@ -117,8 +125,16 @@ export const ProfessionalTrackHeader: React.FC<TrackHeaderProps> = ({
         {frozen && <Snowflake size={10} className="text-blue-400" />}
       </div>
 
-      {/* Middle row: Main controls */}
-      <div className="flex items-center gap-1">
+      {/* Middle row: Main controls with stagger animation */}
+      <div 
+        className={cn(
+          "flex items-center gap-1 transition-all duration-300",
+          isHovered ? "opacity-100 scale-100" : "opacity-60 scale-95"
+        )}
+        style={{
+          transitionDelay: isHovered ? '50ms' : '0ms'
+        }}
+      >
         {/* Record Arm */}
         <Button
           variant={recordArmed ? "destructive" : "ghost"}

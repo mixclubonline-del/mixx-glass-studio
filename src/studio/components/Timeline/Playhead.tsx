@@ -28,26 +28,41 @@ export function Playhead({ containerWidth, containerHeight }: PlayheadProps) {
         height: `${containerHeight}px`,
       }}
     >
-      {/* Glow effect */}
+      {/* Glow effect with enhanced trail */}
       <div
-        className="absolute top-0 w-[60px] h-full"
+        className="absolute top-0 w-[80px] h-full transition-all"
         style={{
-          left: '-30px',
+          left: '-40px',
           background: isPlaying
-            ? 'radial-gradient(circle at center, hsl(var(--neon-pink) / 0.4) 0%, transparent 70%)'
-            : 'radial-gradient(circle at center, hsl(var(--neon-blue) / 0.4) 0%, transparent 70%)',
+            ? 'radial-gradient(ellipse at center, hsl(var(--neon-pink) / 0.5) 0%, hsl(var(--neon-pink) / 0.2) 30%, transparent 70%)'
+            : 'radial-gradient(ellipse at center, hsl(var(--neon-blue) / 0.4) 0%, transparent 70%)',
         }}
       />
       
-      {/* Playhead line */}
+      {/* Motion blur trail when playing */}
+      {isPlaying && (
+        <div
+          className="absolute top-0 h-full animate-playhead-trail"
+          style={{
+            left: '-40px',
+            right: '100%',
+            background: 'linear-gradient(90deg, transparent 0%, hsl(var(--neon-pink) / 0.3) 100%)',
+            filter: 'blur(8px)',
+          }}
+        />
+      )}
+      
+      {/* Playhead line with glow */}
       <div
-        className="absolute top-0 w-[2px] h-full"
+        className="absolute top-0 w-[3px] h-full"
         style={{
-          left: '-1px',
-          background: isPlaying ? 'hsl(var(--neon-pink))' : 'hsl(var(--neon-blue))',
+          left: '-1.5px',
+          background: isPlaying 
+            ? 'linear-gradient(180deg, hsl(var(--neon-pink)) 0%, hsl(var(--neon-pink) / 0.8) 100%)' 
+            : 'linear-gradient(180deg, hsl(var(--neon-blue)) 0%, hsl(var(--neon-blue) / 0.8) 100%)',
           boxShadow: isPlaying
-            ? '0 0 10px hsl(var(--neon-pink)), 0 0 20px hsl(var(--neon-pink) / 0.5)'
-            : '0 0 10px hsl(var(--neon-blue)), 0 0 20px hsl(var(--neon-blue) / 0.5)',
+            ? '0 0 15px hsl(var(--neon-pink)), 0 0 30px hsl(var(--neon-pink) / 0.5), 0 0 60px hsl(var(--neon-pink) / 0.2)'
+            : '0 0 15px hsl(var(--neon-blue)), 0 0 30px hsl(var(--neon-blue) / 0.5)',
         }}
       />
       

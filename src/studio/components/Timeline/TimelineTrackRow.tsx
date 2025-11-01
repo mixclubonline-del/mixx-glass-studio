@@ -34,13 +34,17 @@ export const TimelineTrackRow: React.FC<TimelineTrackRowProps> = ({
   onSplitRegion,
   selectedRegionIds
 }) => {
+  const [isHovered, setIsHovered] = React.useState(false);
+  
   return (
     <div 
-      className={`relative border-b border-border/30 transition-colors ${
-        isSelected ? 'bg-primary/5' : 'hover:bg-muted/5'
+      className={`relative border-b border-border/30 transition-all duration-400 group ${
+        isSelected ? 'glass-light bloom-visible' : 'bloom-dimmed hover:bloom-visible'
       }`}
       style={{ height: `${TRACK_HEIGHT}px` }}
       onClick={() => onSelectTrack(track.id)}
+      onMouseEnter={() => setIsHovered(true)}
+      onMouseLeave={() => setIsHovered(false)}
     >
       {/* Regions - now aligned to left edge */}
       <div className="absolute left-0 right-0 top-0 bottom-0">

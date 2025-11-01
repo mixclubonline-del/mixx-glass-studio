@@ -47,7 +47,12 @@ export const ArrangeBrowserPanel: React.FC<ArrangeBrowserPanelProps> = ({
   }
 
   return (
-    <div className="h-full w-[160px] glass border-l border-border/30 flex flex-col">
+    <div className="h-full w-[160px] glass-medium border-l border-gradient flex flex-col"
+      style={{
+        background: `var(--gradient-mesh), hsl(var(--glass-medium))`,
+        backdropFilter: 'blur(60px) saturate(200%)'
+      }}
+    >
       {/* Header */}
       <div className="flex items-center justify-between px-3 py-2 border-b border-border/30">
         <h3 className="text-sm font-semibold text-foreground">Browser</h3>

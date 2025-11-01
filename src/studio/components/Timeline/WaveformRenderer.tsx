@@ -57,8 +57,32 @@ export const WaveformRenderer: React.FC<WaveformRendererProps> = ({
     const samplesPerPixel = Math.max(1, Math.floor(totalSamples / width));
     const centerY = height / 2;
     
+    // Calculate max amplitude for gradient selection
+    let maxAmplitude = 0;
+    for (let i = startSample; i < endSample; i += Math.floor(samplesPerPixel / 10)) {
+      const sample = Math.abs(channelData[i] || 0);
+      if (sample > maxAmplitude) maxAmplitude = sample;
+    }
+    
+    // Create amplitude-based ice-to-fire gradient
+    const gradient = ctx.createLinearGradient(0, 0, 0, height);
+    if (maxAmplitude > 0.8) {
+      // Hot zone - fire colors
+      gradient.addColorStop(0, 'hsl(0 100% 70%)');
+      gradient.addColorStop(0.5, 'hsl(30 100% 60%)');
+      gradient.addColorStop(1, 'hsl(45 100% 50%)');
+    } else if (maxAmplitude > 0.5) {
+      // Warm zone
+      gradient.addColorStop(0, 'hsl(275 100% 70%)');
+      gradient.addColorStop(1, 'hsl(314 100% 65%)');
+    } else {
+      // Cool zone - ice colors
+      gradient.addColorStop(0, 'hsl(191 100% 60%)');
+      gradient.addColorStop(1, 'hsl(220 100% 70%)');
+    }
+    
     ctx.beginPath();
-    ctx.strokeStyle = color;
+    ctx.strokeStyle = gradient;
     ctx.lineWidth = 1;
     
     for (let x = 0; x < width; x++) {
@@ -102,12 +126,20 @@ export const WaveformRenderer: React.FC<WaveformRendererProps> = ({
     
     ctx.closePath();
     
-    // Fix fill color for hsl strings
-    let fillColor = color + '40';
-    if (color.startsWith('hsl(')) {
-      fillColor = color.replace('hsl(', 'hsla(').replace(')', ', 0.25)');
+    // Use gradient for fill with transparency
+    const fillGradient = ctx.createLinearGradient(0, 0, 0, height);
+    if (maxAmplitude > 0.8) {
+      fillGradient.addColorStop(0, 'hsl(0 100% 70% / 0.3)');
+      fillGradient.addColorStop(0.5, 'hsl(30 100% 60% / 0.2)');
+      fillGradient.addColorStop(1, 'hsl(45 100% 50% / 0.15)');
+    } else if (maxAmplitude > 0.5) {
+      fillGradient.addColorStop(0, 'hsl(275 100% 70% / 0.3)');
+      fillGradient.addColorStop(1, 'hsl(314 100% 65% / 0.2)');
+    } else {
+      fillGradient.addColorStop(0, 'hsl(191 100% 60% / 0.3)');
+      fillGradient.addColorStop(1, 'hsl(220 100% 70% / 0.2)');
     }
-    ctx.fillStyle = fillColor;
+    ctx.fillStyle = fillGradient;
     ctx.fill();
     ctx.stroke();
     
