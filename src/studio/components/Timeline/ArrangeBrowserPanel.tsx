@@ -61,18 +61,17 @@ export const ArrangeBrowserPanel: React.FC<ArrangeBrowserPanelProps> = ({
         boxShadow: 'inset -1px 0 0 rgba(255, 255, 255, 0.1)'
       }}
     >
-      {/* Header - Match other headers at 72px */}
+      {/* Compact Header */}
       <div 
-        className="flex items-center justify-between px-4 glass-ultra border-b border-gradient"
-        style={{ height: '72px' }}
+        className="flex items-center justify-between px-3 py-2 glass-ultra border-b border-gradient"
       >
-        <h3 className="text-sm font-bold text-gradient-subtle uppercase">Browser</h3>
+        <h3 className="text-xs font-bold text-gradient-subtle uppercase tracking-wide">Browser</h3>
         <button
           onClick={onToggleCollapse}
-          className="p-2 hover:bg-primary/10 rounded transition-colors micro-interact chromatic-hover"
+          className="p-1.5 hover:bg-primary/10 rounded transition-colors micro-interact chromatic-hover"
           title="Collapse Browser"
         >
-          <ChevronRight size={16} className="text-muted-foreground" />
+          <ChevronRight size={14} className="text-muted-foreground" />
         </button>
       </div>
 

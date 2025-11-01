@@ -357,7 +357,7 @@ export const AdvancedTimelineView: React.FC<AdvancedTimelineViewProps> = ({
         </div>
       )}
       
-      {/* Main Timeline Area */}
+      {/* Main Timeline Area with Browser */}
       <div className="flex-1 flex flex-col overflow-hidden">
         {/* Timeline toolbar with tools - STANDARDIZED to 72px */}
         <div 
@@ -440,111 +440,117 @@ export const AdvancedTimelineView: React.FC<AdvancedTimelineViewProps> = ({
           </div>
         </div>
         
-        {/* Timeline ruler - STANDARD HEIGHT */}
-        <div 
-          className="relative glass-light border-b border-gradient"
-          style={{ 
-            height: `${RULER_HEIGHT}px`,
-            backdropFilter: 'blur(40px) saturate(180%)'
-          }}
-        >
-          <TimelineRuler
-            width={containerRef.current?.clientWidth || 800}
-            height={RULER_HEIGHT}
-            bpm={120}
-            onSeek={onSeek}
-          />
-        </div>
-        
-        {/* Scrollable timeline content */}
-        <div 
-          ref={containerRef}
-          className="flex-1 overflow-auto relative"
-          onScroll={handleScroll}
-          style={{
-            background: 'linear-gradient(180deg, hsl(240 15% 4% / 0.8) 0%, hsl(240 10% 2% / 0.6) 100%)',
-            backdropFilter: 'blur(20px)',
-            minHeight: 0
-          }}
-        >
-          <div 
-            ref={contentRef}
-            className="relative"
-            style={{ width: `${totalWidth}px` }}
-            onClick={handleTimelineClick}
-          >
-            {/* Grid overlay */}
-            <GridOverlay
-              width={totalWidth}
-              height={tracks.length * TRACK_HEIGHT}
-              bpm={120}
-            />
-            
-            {/* Playhead */}
-            <Playhead
-              containerWidth={containerRef.current?.clientWidth || 800}
-              containerHeight={tracks.length * TRACK_HEIGHT}
-            />
-
-            {/* Crossfade Renderer */}
-            <CrossfadeRenderer
-              regions={regions}
-              zoom={zoom}
-              trackHeight={100}
-            />
-            
-            {/* Tracks */}
-            {tracks.map((track) => (
-              <TimelineTrackRow
-                key={track.id}
-                track={track}
-                regions={getTrackRegions(track.id)}
-                audioBuffers={audioBuffers}
-                zoom={zoom}
-                isSelected={selectedTrackId === track.id}
-                onSelectTrack={handleSelectTrack}
-                onUpdateRegion={updateRegion}
-                onSelectRegion={() => {}}
-                onSplitRegion={handleSplitRegion}
-                selectedRegionIds={new Set()}
+        {/* Timeline content area with ruler, tracks, and browser */}
+        <div className="flex-1 flex overflow-hidden">
+          {/* Timeline area */}
+          <div className="flex-1 flex flex-col overflow-hidden min-w-0">
+            {/* Timeline ruler - STANDARD HEIGHT */}
+            <div 
+              className="relative glass-light border-b border-gradient"
+              style={{ 
+                height: `${RULER_HEIGHT}px`,
+                backdropFilter: 'blur(40px) saturate(180%)'
+              }}
+            >
+              <TimelineRuler
+                width={containerRef.current?.clientWidth || 800}
+                height={RULER_HEIGHT}
+                bpm={120}
+                onSeek={onSeek}
               />
-            ))}
+            </div>
             
-            {tracks.length === 0 && (
-              <div className="absolute inset-0 flex items-center justify-center">
-                <div className="text-center text-muted-foreground">
-                  <p className="text-lg mb-2">No tracks loaded</p>
-                  <p className="text-sm">Load audio files to get started</p>
-                </div>
+            {/* Scrollable timeline content */}
+            <div 
+              ref={containerRef}
+              className="flex-1 overflow-auto relative"
+              onScroll={handleScroll}
+              style={{
+                background: 'linear-gradient(180deg, hsl(240 15% 4% / 0.8) 0%, hsl(240 10% 2% / 0.6) 100%)',
+                backdropFilter: 'blur(20px)',
+                minHeight: 0
+              }}
+            >
+              <div 
+                ref={contentRef}
+                className="relative"
+                style={{ width: `${totalWidth}px` }}
+                onClick={handleTimelineClick}
+              >
+                {/* Grid overlay */}
+                <GridOverlay
+                  width={totalWidth}
+                  height={tracks.length * TRACK_HEIGHT}
+                  bpm={120}
+                />
+                
+                {/* Playhead */}
+                <Playhead
+                  containerWidth={containerRef.current?.clientWidth || 800}
+                  containerHeight={tracks.length * TRACK_HEIGHT}
+                />
+
+                {/* Crossfade Renderer */}
+                <CrossfadeRenderer
+                  regions={regions}
+                  zoom={zoom}
+                  trackHeight={100}
+                />
+                
+                {/* Tracks */}
+                {tracks.map((track) => (
+                  <TimelineTrackRow
+                    key={track.id}
+                    track={track}
+                    regions={getTrackRegions(track.id)}
+                    audioBuffers={audioBuffers}
+                    zoom={zoom}
+                    isSelected={selectedTrackId === track.id}
+                    onSelectTrack={handleSelectTrack}
+                    onUpdateRegion={updateRegion}
+                    onSelectRegion={() => {}}
+                    onSplitRegion={handleSplitRegion}
+                    selectedRegionIds={new Set()}
+                  />
+                ))}
+                
+                {tracks.length === 0 && (
+                  <div className="absolute inset-0 flex items-center justify-center">
+                    <div className="text-center text-muted-foreground">
+                      <p className="text-lg mb-2">No tracks loaded</p>
+                      <p className="text-sm">Load audio files to get started</p>
+                    </div>
+                  </div>
+                )}
               </div>
-            )}
+            </div>
           </div>
+
+          {/* Right Browser Panel - Aligned with timeline content */}
+          <EdgeBloomTrigger 
+            edge="right" 
+            thickness={20}
+            offset={0}
+          />
+          
+          <ContextualBloomWrapper config={{
+            triggerZone: 'right',
+            idleOpacity: 0,
+            activeOpacity: 1,
+            blurAmount: 12,
+            springConfig: { stiffness: 200, damping: 25 },
+            preferenceKey: 'browser-panel'
+          }}>
+            <ArrangeBrowserPanel
+              selectedTrackId={selectedTrackId}
+              onFileSelect={onFileSelect}
+              onPluginSelect={onPluginSelect}
+              isCollapsed={browserCollapsed}
+              onToggleCollapse={() => setBrowserCollapsed(!browserCollapsed)}
+            />
+          </ContextualBloomWrapper>
         </div>
       </div>
-
-      {/* Right Browser Panel with Bloom */}
-      <EdgeBloomTrigger 
-        edge="right" 
-        thickness={20}
-        offset={0}
-      />
-      
-      <ContextualBloomWrapper config={{
-        triggerZone: 'right',
-        idleOpacity: 0,
-        activeOpacity: 1,
-        blurAmount: 12,
-        springConfig: { stiffness: 200, damping: 25 },
-        preferenceKey: 'browser-panel'
-      }}>
-        <ArrangeBrowserPanel
-          selectedTrackId={selectedTrackId}
-          onFileSelect={onFileSelect}
-          onPluginSelect={onPluginSelect}
-          isCollapsed={browserCollapsed}
-          onToggleCollapse={() => setBrowserCollapsed(!browserCollapsed)}
-        />
-      </ContextualBloomWrapper>
 
       {/* Add Track Dialog */}
       <AddTrackDialog
