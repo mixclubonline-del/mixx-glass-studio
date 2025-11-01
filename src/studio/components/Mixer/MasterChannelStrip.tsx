@@ -26,7 +26,7 @@ export const MasterChannelStrip: React.FC<MasterChannelStripProps> = ({
   isExporting
 }) => {
   return (
-    <div className="relative flex flex-col h-full w-28 glass-glow rounded-lg p-2 border-l-4 border-primary overflow-hidden">
+    <div className="relative flex flex-col h-full w-32 glass-glow rounded-lg p-2 border-l-4 border-primary overflow-hidden">
       {/* Master label */}
       <div className="text-sm font-bold text-primary mb-2 text-center neon-text">
         MASTER
