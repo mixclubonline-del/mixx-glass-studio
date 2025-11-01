@@ -53,10 +53,7 @@ export const AdvancedTimelineView: React.FC<AdvancedTimelineViewProps> = ({
 }) => {
   const containerRef = useRef<HTMLDivElement>(null);
   const contentRef = useRef<HTMLDivElement>(null);
-  const [browserCollapsed, setBrowserCollapsed] = useState(() => {
-    const saved = localStorage.getItem('browserCollapsed');
-    return saved === 'true';
-  });
+  const [browserCollapsed, setBrowserCollapsed] = useState(false); // Default to expanded
   
   const [trackListCollapsed, setTrackListCollapsed] = useState(() => {
     const saved = localStorage.getItem('trackListCollapsed');
