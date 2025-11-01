@@ -671,13 +671,6 @@ const IndexContent = () => {
       />
 
       <div className="flex flex-col h-screen">
-        {/* Central Command Hub - The new heart of the DAW */}
-        <CentralCommandHub
-          onImport={handleImport}
-          onTogglePluginBrowser={() => togglePanel('browser')}
-          onToggleAIAssistant={() => setShowAIAssistant(!showAIAssistant)}
-        />
-        
         <ViewContainer>
           <div className="flex h-full">
             {/* Main view */}
@@ -773,41 +766,13 @@ const IndexContent = () => {
           </div>
         </ViewContainer>
         
-        {/* Transport Controls - Collapsible and Floatable */}
+        {/* Central Command Hub - Bottom Transport with Floating Support */}
         {!transportCollapsed && (
-          <div className={`${transportFloating ? "fixed bottom-4 right-4 z-50" : ""} ${transportCovered ? "opacity-30 hover:opacity-100 transition-opacity" : ""}`}>
-            <TransportControls
-              isPlaying={isPlaying}
-              onPlay={handlePlay}
-              onPause={handlePause}
-              onStop={handleStop}
-              onExport={handleExport}
-              isExporting={isExporting}
-              bpm={120}
-              timeSignature={{ numerator: 4, denominator: 4 }}
-              onBpmChange={() => {}}
-              onTimeSignatureChange={() => {}}
-              isRecording={false}
-              isLooping={useTimelineStore.getState().loopEnabled}
-              onRecord={handleRecord}
-              onLoopToggle={handleLoopToggle}
-              onPrevBar={handlePrevBar}
-              onNextBar={handleNextBar}
-              currentTime={currentTime}
-              masterVolume={engineRef.current?.getMasterGain() || 0.75}
-              onMasterVolumeChange={(volume) => {
-                if (engineRef.current) {
-                  engineRef.current.setMasterGain(volume);
-                  
-                  // Send to Prime Brain
-                  primeBrain.processControlEvent({
-                    type: 'fader',
-                    controlId: 'master_volume',
-                    value: volume,
-                    timestamp: Date.now()
-                  });
-                }
-              }}
+          <div className={`${transportFloating ? "fixed bottom-4 left-1/2 -translate-x-1/2 z-50 min-w-[900px]" : "w-full"} ${transportCovered ? "opacity-30 hover:opacity-100 transition-opacity" : ""}`}>
+            <CentralCommandHub
+              onImport={handleImport}
+              onTogglePluginBrowser={() => togglePanel('browser')}
+              onToggleAIAssistant={() => setShowAIAssistant(!showAIAssistant)}
             />
           </div>
         )}
