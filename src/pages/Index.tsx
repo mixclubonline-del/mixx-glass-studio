@@ -10,6 +10,7 @@ import {
   AIAssistantPanel
 } from "@/studio/components";
 import { CentralCommandHub } from "@/studio/components/Navigation/CentralCommandHub";
+import { ProjectProvider } from "@/contexts/ProjectContext";
 import { PluginBrowser } from "@/studio/components/Plugins/PluginBrowser";
 import { PluginWindowManager } from "@/studio/components/Plugins/PluginWindowManager";
 import { useKeyboardShortcuts } from "@/hooks/useKeyboardShortcuts";
@@ -36,7 +37,7 @@ import { BeastModePanel } from "@/studio/components/AI/BeastModePanel";
 import { AISuggestionsPanel } from "@/studio/components/AI/AISuggestionsPanel";
 import { SPACING } from "@/lib/layout-constants";
 
-const Index = () => {
+const IndexContent = () => {
   const engineRef = useRef<AudioEngine | null>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
   const [audioBuffers, setAudioBuffers] = useState<Map<string, AudioBuffer>>(new Map());
@@ -863,4 +864,11 @@ const Index = () => {
   );
 };
 
-export default Index;
+// Wrap with ProjectProvider
+export default function Index() {
+  return (
+    <ProjectProvider>
+      <IndexContent />
+    </ProjectProvider>
+  );
+}
