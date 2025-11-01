@@ -8,6 +8,7 @@ import { useTimelineStore } from '@/store/timelineStore';
 import { useTracksStore } from '@/store/tracksStore';
 import { TimelineRuler } from './TimelineRuler';
 import { TimelineTrackRow } from './TimelineTrackRow';
+import { ProfessionalTrackHeader } from './ProfessionalTrackHeader';
 import { ContextualBloomWrapper, EdgeBloomTrigger } from '@/components/Bloom';
 import { Playhead } from './Playhead';
 import { GridOverlay } from './GridOverlay';
@@ -94,11 +95,41 @@ export const AdvancedTimelineView: React.FC<AdvancedTimelineViewProps> = ({
     regions, 
     selectedTrackId,
     selectTrack,
+    updateTrack,
     getTrackRegions,
     addRegion,
     removeRegion,
     updateRegion,
   } = useTracksStore();
+  
+  // Track control handlers
+  const handleMuteToggle = (trackId: string) => {
+    const track = tracks.find(t => t.id === trackId);
+    if (track) {
+      updateTrack(trackId, { muted: !track.muted });
+    }
+  };
+  
+  const handleSoloToggle = (trackId: string) => {
+    const track = tracks.find(t => t.id === trackId);
+    if (track) {
+      updateTrack(trackId, { solo: !track.solo });
+    }
+  };
+  
+  const handleRecordArmToggle = (trackId: string) => {
+    const track = tracks.find(t => t.id === trackId);
+    if (track) {
+      updateTrack(trackId, { recordArmed: !track.recordArmed });
+    }
+  };
+  
+  const handleLockToggle = (trackId: string) => {
+    const track = tracks.find(t => t.id === trackId);
+    if (track) {
+      updateTrack(trackId, { locked: !track.locked });
+    }
+  };
   
   const [addTrackDialogOpen, setAddTrackDialogOpen] = useState(false);
   
@@ -254,22 +285,23 @@ export const AdvancedTimelineView: React.FC<AdvancedTimelineViewProps> = ({
       {/* Left Track List Sidebar - STANDARD WIDTH */}
       {!trackListCollapsed && (
         <div 
-          className="flex-shrink-0 glass-medium border-r border-border/50 flex flex-col"
+          className="flex-shrink-0 border-r border-gradient flex flex-col"
           style={{ 
             width: `${TRACK_LIST_WIDTH}px`,
-            background: `var(--gradient-mesh), hsl(var(--glass-medium))`,
-            backdropFilter: 'blur(60px) saturate(200%)'
+            background: `
+              radial-gradient(circle at 20% 50%, hsl(275 100% 65% / 0.03) 0%, transparent 50%),
+              var(--gradient-mesh),
+              linear-gradient(135deg, hsl(var(--glass-medium)), hsl(var(--glass-ultra)))
+            `,
+            backdropFilter: 'blur(80px) saturate(220%)',
+            boxShadow: 'inset 1px 0 0 rgba(255, 255, 255, 0.1)'
           }}
         >
           {/* Sidebar Header - STANDARDIZED to 72px */}
           <div 
-            className="flex items-center justify-between px-4 glass-ultra float-card border-b border-gradient"
+            className="flex items-center justify-end px-4 glass-ultra border-b border-gradient"
             style={{ height: `${HEADER_HEIGHT}px` }}
           >
-            <div className="flex flex-col">
-              <h3 className="text-sm font-bold text-gradient-subtle uppercase">Tracks</h3>
-              <p className="text-xs text-muted-foreground">{tracks.length} track{tracks.length !== 1 ? 's' : ''}</p>
-            </div>
             <Button
               size="sm"
               variant="ghost"
@@ -282,98 +314,25 @@ export const AdvancedTimelineView: React.FC<AdvancedTimelineViewProps> = ({
           
           {/* Track List */}
           <div className="flex-1 overflow-y-auto">
-            {tracks.length === 0 ? (
-              <div className="flex items-center justify-center h-full text-center text-muted-foreground p-4">
-                <p className="text-xs">No tracks yet</p>
-              </div>
-            ) : (
-              tracks.map((track) => (
-                <div
-                  key={track.id}
-                  onClick={() => handleSelectTrack(track.id)}
-                  className={cn(
-                    "border-b border-border/30 cursor-pointer transition-all duration-300 glass-light float-card micro-interact",
-                    selectedTrackId === track.id && "border-gradient animate-pulse-slow"
-                  )}
-                  style={{ height: `${TRACK_HEIGHT}px` }}
-                >
-                  <div className="h-full px-3 py-2 flex flex-col justify-between">
-                    {/* Track Name and Color */}
-                    <div className="flex items-center gap-2">
-                      <div 
-                        className="w-2 h-2 rounded-full flex-shrink-0"
-                        style={{ backgroundColor: track.color }}
-                      />
-                      <span className="text-sm font-medium truncate flex-1">
-                        {track.name}
-                      </span>
-                    </div>
-                    
-                    {/* Track Controls */}
-                    <div className="flex items-center gap-1">
-                      <button
-                        onClick={(e) => {
-                          e.stopPropagation();
-                          // Toggle mute - will be implemented
-                        }}
-                        className={cn(
-                          "px-2 py-1 rounded text-xs font-bold transition-colors",
-                          track.muted 
-                            ? "bg-orange-500/20 text-orange-500" 
-                            : "bg-muted/50 text-muted-foreground hover:text-foreground"
-                        )}
-                        title="Mute"
-                      >
-                        M
-                      </button>
-                      <button
-                        onClick={(e) => {
-                          e.stopPropagation();
-                          // Toggle solo - will be implemented
-                        }}
-                        className={cn(
-                          "px-2 py-1 rounded text-xs font-bold transition-colors",
-                          track.solo 
-                            ? "bg-yellow-500/20 text-yellow-500" 
-                            : "bg-muted/50 text-muted-foreground hover:text-foreground"
-                        )}
-                        title="Solo"
-                      >
-                        S
-                      </button>
-                      <button
-                        onClick={(e) => {
-                          e.stopPropagation();
-                          // Toggle record arm - will be implemented
-                        }}
-                        className={cn(
-                          "px-2 py-1 rounded text-xs font-bold transition-colors",
-                          track.recordArmed 
-                            ? "bg-red-500/20 text-red-500" 
-                            : "bg-muted/50 text-muted-foreground hover:text-foreground"
-                        )}
-                        title="Record Arm"
-                      >
-                        R
-                      </button>
-                    </div>
-                    
-                    {/* Volume Indicator */}
-                    <div className="flex items-center gap-2">
-                      <div className="flex-1 h-1 bg-muted/30 rounded-full overflow-hidden">
-                        <div 
-                          className="h-full bg-gradient-to-r from-green-500 to-yellow-500 transition-all"
-                          style={{ width: `${track.volume * 100}%` }}
-                        />
-                      </div>
-                      <span className="text-xs text-muted-foreground font-mono w-8 text-right">
-                        {Math.round(track.volume * 100)}
-                      </span>
-                    </div>
-                  </div>
-                </div>
-              ))
-            )}
+            {tracks.map((track) => (
+              <ProfessionalTrackHeader
+                key={track.id}
+                id={track.id}
+                name={track.name}
+                color={track.color}
+                muted={track.muted}
+                solo={track.solo}
+                recordArmed={track.recordArmed}
+                locked={track.locked}
+                isSelected={selectedTrackId === track.id}
+                height={TRACK_HEIGHT}
+                onSelect={handleSelectTrack}
+                onMuteToggle={handleMuteToggle}
+                onSoloToggle={handleSoloToggle}
+                onRecordArmToggle={handleRecordArmToggle}
+                onLockToggle={handleLockToggle}
+              />
+            ))}
           </div>
         </div>
       )}
@@ -381,20 +340,20 @@ export const AdvancedTimelineView: React.FC<AdvancedTimelineViewProps> = ({
       {/* Collapsed Track List Toggle Button - STANDARD COLLAPSED WIDTH */}
       {trackListCollapsed && (
         <div 
-          className="flex-shrink-0 glass border-r border-border/50 flex flex-col items-center py-4 gap-2"
-          style={{ width: `${TRACK_LIST_COLLAPSED}px` }}
+          className="flex-shrink-0 glass-light border-r border-gradient flex flex-col items-center justify-center"
+          style={{ 
+            width: `${TRACK_LIST_COLLAPSED}px`,
+            backdropFilter: 'blur(60px) saturate(200%)'
+          }}
         >
           <Button
             size="sm"
             variant="ghost"
             onClick={() => setTrackListCollapsed(false)}
-            className="h-8 w-8 p-0"
+            className="h-8 w-8 p-0 micro-interact chromatic-hover"
           >
             <ChevronRight size={16} />
           </Button>
-          <div className="writing-mode-vertical text-xs text-muted-foreground font-bold uppercase tracking-wider">
-            Tracks
-          </div>
         </div>
       )}
       
@@ -402,10 +361,12 @@ export const AdvancedTimelineView: React.FC<AdvancedTimelineViewProps> = ({
       <div className="flex-1 flex flex-col min-w-0">
         {/* Timeline toolbar with tools - STANDARDIZED to 72px */}
         <div 
-          className="flex items-center justify-between px-6 glass border-b-2 border-[#a855f7]/50 border-glow-hype bg-gradient-to-r from-[#a855f7]/5 via-[#ec4899]/5 to-[#3b82f6]/5"
+          className="flex items-center justify-between px-6 glass-ultra border-b border-gradient"
           style={{ 
             height: `${HEADER_HEIGHT}px`,
-            gap: `${SPACING.md}px`
+            gap: `${SPACING.md}px`,
+            backdropFilter: 'blur(60px) saturate(200%)',
+            background: 'linear-gradient(135deg, hsl(var(--glass-light)), hsl(var(--glass-ultra)))'
           }}
         >
           <div className="flex items-center" style={{ gap: `${SPACING.lg}px` }}>
@@ -480,7 +441,13 @@ export const AdvancedTimelineView: React.FC<AdvancedTimelineViewProps> = ({
         </div>
         
         {/* Timeline ruler - STANDARD HEIGHT */}
-        <div className="relative" style={{ height: `${RULER_HEIGHT}px` }}>
+        <div 
+          className="relative glass-light border-b border-gradient"
+          style={{ 
+            height: `${RULER_HEIGHT}px`,
+            backdropFilter: 'blur(40px) saturate(180%)'
+          }}
+        >
           <TimelineRuler
             width={containerRef.current?.clientWidth || 800}
             height={RULER_HEIGHT}
@@ -494,6 +461,10 @@ export const AdvancedTimelineView: React.FC<AdvancedTimelineViewProps> = ({
           ref={containerRef}
           className="flex-1 overflow-auto relative"
           onScroll={handleScroll}
+          style={{
+            background: 'linear-gradient(180deg, hsl(240 15% 4% / 0.8) 0%, hsl(240 10% 2% / 0.6) 100%)',
+            backdropFilter: 'blur(20px)'
+          }}
         >
           <div 
             ref={contentRef}
