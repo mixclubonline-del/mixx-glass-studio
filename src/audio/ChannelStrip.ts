@@ -340,20 +340,32 @@ export class ChannelStrip {
     }
   }
   
-  // Peak metering (standard)
+  // Peak metering (optimized for smooth animation)
   getPeakLevel(): PeakLevel {
     this.analyser.getFloatTimeDomainData(this.analyserDataArray);
     
-    let peak = 0;
-    for (let i = 0; i < this.analyserDataArray.length; i++) {
-      peak = Math.max(peak, Math.abs(this.analyserDataArray[i]));
+    let peakLeft = 0;
+    let peakRight = 0;
+    
+    // Simulate stereo by splitting the buffer
+    const halfLength = Math.floor(this.analyserDataArray.length / 2);
+    
+    for (let i = 0; i < halfLength; i++) {
+      peakLeft = Math.max(peakLeft, Math.abs(this.analyserDataArray[i]));
     }
     
-    // Convert to dB (-60 to +6 range)
-    const db = peak > 0 ? 20 * Math.log10(peak) : -60;
+    for (let i = halfLength; i < this.analyserDataArray.length; i++) {
+      peakRight = Math.max(peakRight, Math.abs(this.analyserDataArray[i]));
+    }
     
-    // Return same for both channels (mono meter for now)
-    return { left: db, right: db };
+    // Convert to dB (-60 to +6 range) with smooth floor
+    const leftDb = peakLeft > 0.0001 ? 20 * Math.log10(peakLeft) : -60;
+    const rightDb = peakRight > 0.0001 ? 20 * Math.log10(peakRight) : -60;
+    
+    return { 
+      left: Math.max(-60, Math.min(6, leftDb)), 
+      right: Math.max(-60, Math.min(6, rightDb)) 
+    };
   }
   
   // True Peak metering (ITU-R BS.1770-5)

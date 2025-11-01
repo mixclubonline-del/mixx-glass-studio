@@ -138,22 +138,40 @@ const Index = () => {
     return () => clearInterval(interval);
   }, [isPlaying, setCurrentTime]);
 
-  // Update peak meters at 30Hz (33ms) for smooth animation
+  // Update peak meters at 60Hz (16ms) for smooth animation - runs continuously
   useEffect(() => {
-    const interval = setInterval(() => {
-      if (engineRef.current) {
-        const master = engineRef.current.getMasterPeakLevel();
-        setMasterPeakLevel(master);
-        
-        channels.forEach((_, id) => {
-          const level = engineRef.current!.getTrackPeakLevel(id);
-          updatePeakLevel(id, level);
-        });
-      }
-    }, 33); // 30Hz update rate
+    let animationFrameId: number;
+    let lastUpdateTime = 0;
+    const updateInterval = 16; // ~60fps
     
-    return () => clearInterval(interval);
-  }, [channels, setMasterPeakLevel, updatePeakLevel]);
+    const updateMeters = (currentTime: number) => {
+      if (currentTime - lastUpdateTime >= updateInterval) {
+        if (engineRef.current) {
+          // Update master meter
+          const master = engineRef.current.getMasterPeakLevel();
+          setMasterPeakLevel(master);
+          
+          // Update all track meters - get fresh channels from store
+          const currentChannels = useMixerStore.getState().channels;
+          currentChannels.forEach((_, id) => {
+            const level = engineRef.current!.getTrackPeakLevel(id);
+            updatePeakLevel(id, level);
+          });
+        }
+        lastUpdateTime = currentTime;
+      }
+      
+      animationFrameId = requestAnimationFrame(updateMeters);
+    };
+    
+    animationFrameId = requestAnimationFrame(updateMeters);
+    
+    return () => {
+      if (animationFrameId) {
+        cancelAnimationFrame(animationFrameId);
+      }
+    };
+  }, [setMasterPeakLevel, updatePeakLevel]); // Only stable functions as deps
 
   const handleImport = () => {
     fileInputRef.current?.click();

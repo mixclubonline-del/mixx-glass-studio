@@ -1,5 +1,5 @@
 /**
- * Peak Meter Component
+ * Peak Meter Component - Optimized version
  * Real-time stereo peak metering with color zones
  */
 
@@ -20,6 +20,7 @@ export function PeakMeter({ level, height = 200, stereo = true }: PeakMeterProps
   const rightPeakRef = useRef<number>(-60);
   const leftPeakHoldRef = useRef<number>(0);
   const rightPeakHoldRef = useRef<number>(0);
+  const frameCountRef = useRef<number>(0);
   
   // Convert dB to percentage (0-100)
   const dbToPercent = (db: number): number => {
@@ -53,12 +54,12 @@ export function PeakMeter({ level, height = 200, stereo = true }: PeakMeterProps
       ctx.fillStyle = 'hsl(var(--background))';
       ctx.fillRect(0, 0, width, height);
       
-      // Update peak hold
+      // Update peak hold (60fps = 1 frame per call)
       if (db > peakRef.current) {
         peakRef.current = db;
-        peakHoldRef.current = 60; // Hold for 60 frames (~1 second)
+        peakHoldRef.current = 60; // Hold for 60 frames (~1 second at 60fps)
       } else {
-        peakRef.current = Math.max(db, peakRef.current - 0.5); // Decay
+        peakRef.current = Math.max(db, peakRef.current - 1.0); // Faster decay
         peakHoldRef.current = Math.max(0, peakHoldRef.current - 1);
       }
       
@@ -82,10 +83,9 @@ export function PeakMeter({ level, height = 200, stereo = true }: PeakMeterProps
         ctx.fillRect(0, peakY - 1, width, 2);
       }
       
-      // Draw dB markers
-      const markers = [6, 0, -6, -12, -18, -24, -30, -40, -50, -60];
-      ctx.fillStyle = 'hsl(var(--muted-foreground))';
-      ctx.font = '8px monospace';
+      // Draw dB markers every 6dB
+      const markers = [0, -6, -12, -18, -24, -30, -40, -50, -60];
+      ctx.fillStyle = 'rgba(255, 255, 255, 0.1)';
       
       markers.forEach(markerDb => {
         const y = height - (dbToPercent(markerDb) / 100) * height;
@@ -93,17 +93,14 @@ export function PeakMeter({ level, height = 200, stereo = true }: PeakMeterProps
       });
     };
     
-    const animate = () => {
-      drawMeter(leftCanvasRef.current, level.left, leftPeakRef, leftPeakHoldRef);
-      if (stereo) {
-        drawMeter(rightCanvasRef.current, level.right, rightPeakRef, rightPeakHoldRef);
-      }
-      requestAnimationFrame(animate);
-    };
+    // Redraw when level changes
+    drawMeter(leftCanvasRef.current, level.left, leftPeakRef, leftPeakHoldRef);
+    if (stereo) {
+      drawMeter(rightCanvasRef.current, level.right, rightPeakRef, rightPeakHoldRef);
+    }
     
-    const animationId = requestAnimationFrame(animate);
-    return () => cancelAnimationFrame(animationId);
-  }, [level, stereo]);
+    frameCountRef.current++;
+  }, [level, stereo, height]);
   
   return (
     <div className={cn("flex gap-1", stereo ? "w-10" : "w-5")}>
@@ -111,14 +108,14 @@ export function PeakMeter({ level, height = 200, stereo = true }: PeakMeterProps
         ref={leftCanvasRef}
         width={16}
         height={height}
-        className="rounded-sm border border-border"
+        className="rounded-sm border border-border/50"
       />
       {stereo && (
         <canvas
           ref={rightCanvasRef}
           width={16}
           height={height}
-          className="rounded-sm border border-border"
+          className="rounded-sm border border-border/50"
         />
       )}
     </div>
