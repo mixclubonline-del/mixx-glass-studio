@@ -45,6 +45,11 @@ export { TrackGroupManager } from './TrackGroupManager';
 export { TrackTemplateManager } from './TrackTemplateManager';
 export { PerTrackMeter } from './PerTrackMeter';
 
+// User Experience
+export { TimelineTooltip } from './TimelineTooltip';
+export { TimelineOnboarding } from './TimelineOnboarding';
+export { TimelineStatusBar } from './TimelineStatusBar';
+
 // Utilities
 export * from './CursorTools';
 export * from './MultiRegionOperations';
