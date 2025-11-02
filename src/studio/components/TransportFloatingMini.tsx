@@ -41,8 +41,8 @@ export const TransportFloatingMini: React.FC<TransportFloatingMiniProps> = ({
   return (
     <div
       className={cn(
-        "glass border border-border/50 bg-background/80 backdrop-blur rounded-lg p-2 flex items-center gap-2 transition-all",
-        isFloating && "fixed bottom-4 left-1/2 -translate-x-1/2 z-50 shadow-xl"
+        "glass border border-border/30 rounded-lg p-2 flex items-center gap-2 transition-all",
+        isFloating && "fixed top-4 right-4 z-50 shadow-xl"
       )}
     >
       {/* Time display */}

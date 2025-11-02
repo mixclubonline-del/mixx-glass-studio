@@ -4,18 +4,20 @@
  */
 
 // Header Heights (standardized across all views)
-export const COMPACT_HEADER_HEIGHT = 64; // Single unified header combining all global controls
+export const CREATIVE_HEADER_HEIGHT = 48; // Creative breathing controls (BPM/Time/Position)
 export const HEADER_HEIGHT = 72; // Main view headers
-export const TOOLBAR_HEIGHT = 48; // Toolbars and secondary bars (REMOVED from timeline)
-export const RULER_HEIGHT = 32; // Timeline ruler (reduced from 40px)
-export const HEADER_TOTAL_HEIGHT = 64; // Compact header only
+export const TOOLBAR_HEIGHT = 48; // Toolbars and secondary bars
+export const TRANSPORT_HEIGHT = 60; // Transport controls
+export const VIEW_SWITCHER_HEIGHT = 48; // View navigation tabs
+export const RULER_HEIGHT = 40; // Timeline ruler
+export const HEADER_TOTAL_HEIGHT = 168; // Sum of all header sections + spacing
 
 // Panel Widths (standardized sidebar/panel sizes)
 export const PANEL_WIDTH_SM = 280; // Small panels (metering, browser)
 export const PANEL_WIDTH_MD = 320; // Medium panels (AI assistant)
 export const PANEL_WIDTH_LG = 400; // Large panels (extended features)
-export const TRACK_LIST_WIDTH = 180; // Timeline track list (narrower for minimal design)
-export const TRACK_LIST_COLLAPSED = 0; // Fully hidden when collapsed
+export const TRACK_LIST_WIDTH = 280; // Timeline track list
+export const TRACK_LIST_COLLAPSED = 48; // Collapsed track list
 
 // Channel Strip Sizing
 export const CHANNEL_WIDTH_MIN = 80; // Minimum channel width
@@ -24,7 +26,7 @@ export const CHANNEL_WIDTH_MAX = 120; // Maximum channel width
 export const MASTER_CHANNEL_WIDTH = 176; // Master channel fixed width
 
 // Track Heights
-export const TRACK_HEIGHT = 80; // Standard track height in timeline (reduced for minimal design)
+export const TRACK_HEIGHT = 100; // Standard track height in timeline
 export const TRACK_HEIGHT_MIN = 60; // Minimum track height
 export const TRACK_HEIGHT_MAX = 200; // Maximum track height
 

@@ -18,24 +18,24 @@
     --prime-purple: 275 100% 65%; /* Prime purple - optimal */
     --fire-red: 0 100% 60%; /* Fire red - danger */
     
-    /* Base tokens - Pure black for timeline */
-    --background: 0 0% 0%; /* Pure black */
+    /* Base tokens */
+    --background: 240 10% 3.9%;
     --foreground: 0 0% 98%;
     
-    --card: 0 0% 5%; /* Nearly black */
+    --card: 240 10% 5%;
     --card-foreground: 0 0% 98%;
     
-    --popover: 0 0% 5%;
+    --popover: 240 10% 5%;
     --popover-foreground: 0 0% 98%;
     
     --primary: var(--prime-500);
     --primary-foreground: 0 0% 100%;
     
-    --secondary: 0 0% 10%; /* Darker secondary */
+    --secondary: 240 5% 15%;
     --secondary-foreground: 0 0% 98%;
     
-    --muted: 0 0% 10%;
-    --muted-foreground: 0 0% 60%;
+    --muted: 240 5% 15%;
+    --muted-foreground: 240 5% 60%;
     
     --accent: var(--neon-blue);
     --accent-foreground: 0 0% 100%;
@@ -43,16 +43,16 @@
     --destructive: 0 84% 60%;
     --destructive-foreground: 0 0% 98%;
     
-    --border: 0 0% 15%; /* Subtle borders */
-    --input: 0 0% 10%;
+    --border: 240 10% 15%;
+    --input: 240 10% 15%;
     --ring: var(--prime-500);
     
     --radius: 0.5rem;
     
-    /* Glass effects - Reduced for minimal design */
-    --glass-bg: 0 0% 5% / 0.3;
-    --glass-border: 0 0% 100% / 0.05;
-    --glass-glow: var(--prime-500) / 0.1;
+    /* Glass effects */
+    --glass-bg: 240 10% 8% / 0.6;
+    --glass-border: 0 0% 100% / 0.1;
+    --glass-glow: var(--prime-500) / 0.2;
     
     /* Gradients */
     --gradient-prime: linear-gradient(135deg, hsl(var(--prime-500)), hsl(var(--neon-pink)));
@@ -63,13 +63,13 @@
     --shadow-neon: 0 0 20px hsl(var(--neon-blue) / 0.4);
     
     /* Sidebar */
-    --sidebar-background: 0 0% 0%;
+    --sidebar-background: 240 10% 5%;
     --sidebar-foreground: 0 0% 98%;
     --sidebar-primary: var(--prime-500);
     --sidebar-primary-foreground: 0 0% 100%;
-    --sidebar-accent: 0 0% 10%;
+    --sidebar-accent: 240 5% 15%;
     --sidebar-accent-foreground: 0 0% 98%;
-    --sidebar-border: 0 0% 15%;
+    --sidebar-border: 240 10% 15%;
     --sidebar-ring: var(--prime-500);
     
     /* 2030 Glassmorphism System */
