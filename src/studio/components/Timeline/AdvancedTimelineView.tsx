@@ -18,7 +18,9 @@ import { AddTrackDialog, TrackConfig } from './AddTrackDialog';
 import { CrossfadeRenderer } from './CrossfadeRenderer';
 import { ArrangeBrowserPanel } from './ArrangeBrowserPanel';
 import { RippleEditIndicator } from './RippleEditIndicator';
+import { KeyboardShortcutsHelper } from './KeyboardShortcutsHelper';
 import { useRegionClipboard } from '@/hooks/useRegionClipboard';
+import { useTimelineKeyboardShortcuts } from '@/hooks/useTimelineKeyboardShortcuts';
 import { ZoomIn, ZoomOut, Grid3x3, Maximize2, Plus, ChevronLeft, ChevronRight } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { cn } from '@/lib/utils';
@@ -93,6 +95,14 @@ export const AdvancedTimelineView: React.FC<AdvancedTimelineViewProps> = ({
   
   // Clipboard functionality
   const { handleCopy, handlePaste, handleDuplicate, hasClipboard } = useRegionClipboard();
+  
+  // Timeline keyboard shortcuts
+  useTimelineKeyboardShortcuts(
+    onSeek,
+    undefined, // play/pause handled by parent
+    undefined, // stop handled by parent
+    undefined  // record handled by parent
+  );
   
   const { 
     tracks, 
@@ -450,7 +460,9 @@ export const AdvancedTimelineView: React.FC<AdvancedTimelineViewProps> = ({
             
             <div className="w-px h-4 bg-border/50 mx-2" />
             
-            <button 
+            <KeyboardShortcutsHelper />
+            
+            <button
               onClick={() => setSnapMode(snapMode === 'off' ? 'grid' : 'off')}
               className={`p-1.5 rounded transition-colors ${
                 snapMode !== 'off' ? 'bg-primary/20 text-primary' : 'hover:bg-muted/50'

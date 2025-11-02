@@ -36,6 +36,9 @@ export const WaveformRenderer: React.FC<WaveformRendererProps> = ({
     const ctx = canvas.getContext('2d');
     if (!ctx) return;
     
+    // Performance measurement
+    const renderStart = performance.now();
+    
     // High DPI support
     const dpr = window.devicePixelRatio || 1;
     canvas.width = width * dpr;
@@ -174,6 +177,12 @@ export const WaveformRenderer: React.FC<WaveformRendererProps> = ({
     ctx.fillStyle = fillGradient;
     ctx.fill();
     ctx.stroke();
+    
+    // Log performance
+    const renderTime = performance.now() - renderStart;
+    if (renderTime > 16) { // More than one frame at 60fps
+      console.warn(`Waveform render took ${renderTime.toFixed(2)}ms`);
+    }
     
   }, [audioBuffer, width, height, color, displayMode, zoom, startTime, duration]);
   

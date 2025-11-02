@@ -7,6 +7,7 @@ import { Region } from '@/types/timeline';
 import { WaveformRenderer } from './WaveformRenderer';
 import { useTimelineStore } from '@/store/timelineStore';
 import { RegionContextMenu } from './RegionContextMenu';
+import { useTracksStore } from '@/store/tracksStore';
 import { Scissors } from 'lucide-react';
 
 interface TimelineRegionProps {
@@ -38,6 +39,7 @@ export const TimelineRegion: React.FC<TimelineRegionProps> = ({
   const [showTooltip, setShowTooltip] = useState(false);
   const regionRef = useRef<HTMLDivElement>(null);
   const { currentTool, rippleEdit } = useTimelineStore();
+  const { duplicateRegion, deleteRegionWithRipple } = useTracksStore();
   
   const left = region.startTime * zoom;
   const width = region.duration * zoom;
@@ -220,7 +222,9 @@ export const TimelineRegion: React.FC<TimelineRegionProps> = ({
   return (
     <RegionContextMenu
       region={region}
-      onDuplicate={() => console.log('Duplicate region:', region.id)}
+      onDuplicate={() => {
+        duplicateRegion(region.id);
+      }}
       onSplit={() => onSplit(region.id, region.startTime + region.duration / 2)}
       onNormalize={() => console.log('Normalize region:', region.id)}
       onReverse={() => console.log('Reverse region:', region.id)}
