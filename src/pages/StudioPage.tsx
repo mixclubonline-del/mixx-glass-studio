@@ -13,6 +13,7 @@ import { ViewSwitcher } from "../studio/components/Navigation/ViewSwitcher";
 import { ViewContainer } from "../studio/components/Navigation/ViewContainer";
 import { UnifiedTransportBar } from "../studio/components/Navigation/UnifiedTransportBar";
 import { CollapsibleMeteringPanel } from "../studio/components/Metering/CollapsibleMeteringPanel";
+import { AdvancedTimelineView } from "../studio/components/Timeline/AdvancedTimelineView";
 
 // Inner component that uses ProjectContext
 function StudioPageContent() {
@@ -71,10 +72,31 @@ function StudioPageContent() {
 
       {/* View Content */}
       <ViewContainer className="flex-1">
-        {currentView === 'ai-studio' ? (
+        {currentView === 'arrange' ? (
+          <AdvancedTimelineView
+            audioBuffers={new Map()}
+            onSeek={handleSeek}
+          />
+        ) : currentView === 'ai-studio' ? (
           <MixxAIStudio />
         ) : currentView === 'producer-lab' ? (
           <ProducerLab />
+        ) : currentView === 'mix' ? (
+          <div style={{ padding: 12 }}>
+            {/* Mixer view coming soon */}
+            <div className="text-center text-muted-foreground py-12">
+              <h2 className="text-2xl font-bold mb-2">Mixer View</h2>
+              <p>Coming soon...</p>
+            </div>
+          </div>
+        ) : currentView === 'edit' ? (
+          <div style={{ padding: 12 }}>
+            {/* Edit view coming soon */}
+            <div className="text-center text-muted-foreground py-12">
+              <h2 className="text-2xl font-bold mb-2">Edit View</h2>
+              <p>Coming soon...</p>
+            </div>
+          </div>
         ) : (
           <div style={{ padding: 12 }}>
             {/* Main rack (your plugins live here) */}
