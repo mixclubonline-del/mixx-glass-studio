@@ -3,7 +3,7 @@
  * Combines global controls, transport, and view switching in minimal space
  */
 
-import { Play, Pause, Square, Circle, RotateCcw } from 'lucide-react';
+import { Play, Pause, Square, Circle, RotateCcw, MoreVertical, Maximize2, EyeOff } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { IceFireFader } from '@/studio/components/Controls/IceFireFader';
 import { useProject } from '@/contexts/ProjectContext';
@@ -16,13 +16,31 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuTrigger,
+  DropdownMenuSeparator,
+} from "@/components/ui/dropdown-menu";
 
 interface CompactStudioHeaderProps {
   currentView: string;
   onViewChange: (view: string) => void;
+  transportHidden?: boolean;
+  transportFloating?: boolean;
+  onToggleTransportHide?: () => void;
+  onToggleTransportFloat?: () => void;
 }
 
-export const CompactStudioHeader = ({ currentView, onViewChange }: CompactStudioHeaderProps) => {
+export const CompactStudioHeader = ({ 
+  currentView, 
+  onViewChange,
+  transportHidden = false,
+  transportFloating = false,
+  onToggleTransportHide = () => {},
+  onToggleTransportFloat = () => {}
+}: CompactStudioHeaderProps) => {
   const { bpm, setBpm, timeSignature, setTimeSignature } = useProject();
   const { transport, play, pause, stop, seek, toggleRecord } = useTransport();
   
@@ -117,6 +135,30 @@ export const CompactStudioHeader = ({ currentView, onViewChange }: CompactStudio
         >
           <Square size={16} />
         </Button>
+
+        {/* Transport Options Menu */}
+        <DropdownMenu>
+          <DropdownMenuTrigger asChild>
+            <Button
+              variant="ghost"
+              size="icon"
+              className="w-8 h-8 ml-1"
+              title="Transport Options"
+            >
+              <MoreVertical size={16} />
+            </Button>
+          </DropdownMenuTrigger>
+          <DropdownMenuContent align="center" className="bg-background/95 backdrop-blur-sm">
+            <DropdownMenuItem onClick={onToggleTransportHide} className="gap-2">
+              <EyeOff size={14} />
+              <span>{transportHidden ? "Show" : "Hide"} Transport</span>
+            </DropdownMenuItem>
+            <DropdownMenuItem onClick={onToggleTransportFloat} className="gap-2">
+              <Maximize2 size={14} />
+              <span>{transportFloating ? "Dock" : "Float"} Transport</span>
+            </DropdownMenuItem>
+          </DropdownMenuContent>
+        </DropdownMenu>
       </div>
 
       {/* RIGHT: View switcher & master volume */}

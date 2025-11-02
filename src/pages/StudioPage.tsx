@@ -28,6 +28,8 @@ function StudioPageContent() {
   const [delayFeedback, setDelayFeedback] = useState(0.4);
   const [delayMix, setDelayMix] = useState(0.3);
   const [limiterThreshold, setLimiterThreshold] = useState(-1);
+  const [transportHidden, setTransportHidden] = useState(false);
+  const [transportFloating, setTransportFloating] = useState(false);
   
   const handleViewChange = (view: string) => {
     // Map from compact header view names to store view names
@@ -75,10 +77,16 @@ function StudioPageContent() {
   return (
     <div className="h-screen flex flex-col bg-black overflow-hidden">
       {/* Compact Studio Header - Single 64px header */}
-      <CompactStudioHeader 
-        currentView={currentView}
-        onViewChange={handleViewChange}
-      />
+      {!transportHidden && (
+        <CompactStudioHeader 
+          currentView={currentView}
+          onViewChange={handleViewChange}
+          transportHidden={transportHidden}
+          transportFloating={transportFloating}
+          onToggleTransportHide={() => setTransportHidden(!transportHidden)}
+          onToggleTransportFloat={() => setTransportFloating(!transportFloating)}
+        />
+      )}
 
       {/* View Content - Fills remaining space */}
       <ViewContainer className="flex-1 overflow-hidden">
