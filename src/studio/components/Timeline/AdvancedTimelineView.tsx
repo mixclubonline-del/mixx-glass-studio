@@ -12,6 +12,7 @@ import { ProfessionalTrackHeader } from './ProfessionalTrackHeader';
 import { ContextualBloomWrapper, EdgeBloomTrigger } from '@/components/Bloom';
 import { Playhead } from './Playhead';
 import { GridOverlay } from './GridOverlay';
+import { SnapGuide } from './SnapGuide';
 import { TimelineToolbar } from './TimelineToolbar';
 import { AddTrackDialog, TrackConfig } from './AddTrackDialog';
 import { CrossfadeRenderer } from './CrossfadeRenderer';
@@ -65,6 +66,7 @@ export const AdvancedTimelineView: React.FC<AdvancedTimelineViewProps> = ({
   // Track session time for dynamic encouragement
   const [sessionMinutes, setSessionMinutes] = useState(0);
   const [sessionStartTime] = useState(() => Date.now());
+  const [snapGuidePositions, setSnapGuidePositions] = useState<number[]>([]);
   
   useEffect(() => {
     const interval = setInterval(() => {
@@ -512,6 +514,13 @@ export const AdvancedTimelineView: React.FC<AdvancedTimelineViewProps> = ({
                   width={totalWidth}
                   height={tracks.length * TRACK_HEIGHT}
                   bpm={120}
+                />
+                
+                {/* Snap guides */}
+                <SnapGuide
+                  snapPositions={snapGuidePositions}
+                  zoom={zoom}
+                  height={tracks.length * TRACK_HEIGHT}
                 />
                 
                 {/* Playhead */}

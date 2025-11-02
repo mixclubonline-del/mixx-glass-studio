@@ -49,7 +49,13 @@ export interface TimelineTrack {
   locked?: boolean;
   volume: number; // 0-1 range
   inserts?: import('@/audio/Track').PluginInsert[];
+  automationVisible?: boolean;
+  automationLanes?: {
+    type: 'volume' | 'pan' | 'plugin';
+    points: { time: number; value: number }[];
+  }[];
 }
 
-export type GridResolution = '1/4' | '1/8' | '1/16' | '1/32' | '1/64';
+export type GridResolution = '1/4' | '1/8' | '1/16' | '1/32' | '1/64' | '1/4T' | '1/8T' | '1/16T';
 export type ViewMode = 'bars' | 'seconds';
+export type CurveType = 'linear' | 'exponential' | 'logarithmic' | 'scurve';
