@@ -19,6 +19,9 @@ import { CrossfadeRenderer } from './CrossfadeRenderer';
 import { ArrangeBrowserPanel } from './ArrangeBrowserPanel';
 import { RippleEditIndicator } from './RippleEditIndicator';
 import { KeyboardShortcutsHelper } from './KeyboardShortcutsHelper';
+import { TrackGroupManager } from './TrackGroupManager';
+import { TrackTemplateManager } from './TrackTemplateManager';
+import { ProductionSidebar } from './ProductionSidebar';
 import { useRegionClipboard } from '@/hooks/useRegionClipboard';
 import { useTimelineKeyboardShortcuts } from '@/hooks/useTimelineKeyboardShortcuts';
 import { ZoomIn, ZoomOut, Grid3x3, Maximize2, Plus, ChevronLeft, ChevronRight } from 'lucide-react';
@@ -116,6 +119,17 @@ export const AdvancedTimelineView: React.FC<AdvancedTimelineViewProps> = ({
     addRegion,
     removeRegion,
     updateRegion,
+    trackGroups,
+    trackTemplates,
+    createTrackGroup,
+    deleteTrackGroup,
+    toggleGroupCollapse,
+    updateGroupVCA,
+    saveTrackTemplate,
+    loadTrackTemplate,
+    deleteTrackTemplate,
+    setAddTrackDialogOpen,
+    addTrackDialogOpen,
   } = useTracksStore();
   
   // Track control handlers
@@ -146,8 +160,6 @@ export const AdvancedTimelineView: React.FC<AdvancedTimelineViewProps> = ({
       updateTrack(trackId, { locked: !track.locked });
     }
   };
-  
-  const [addTrackDialogOpen, setAddTrackDialogOpen] = useState(false);
   
   // Handler for creating new tracks
   const handleCreateTrack = (config: TrackConfig) => {
@@ -486,6 +498,21 @@ export const AdvancedTimelineView: React.FC<AdvancedTimelineViewProps> = ({
         
         {/* Timeline content area with ruler, tracks, and browser */}
         <div className="flex-1 flex overflow-hidden">
+          {/* Left Panel - Production Features */}
+          {!trackListCollapsed && (
+            <ProductionSidebar
+              trackGroups={trackGroups}
+              selectedTrackIds={selectedRegionIds}
+              onCreateGroup={createTrackGroup}
+              onDeleteGroup={deleteTrackGroup}
+              onToggleCollapse={toggleGroupCollapse}
+              onVCAChange={updateGroupVCA}
+              templates={trackTemplates}
+              onSaveTemplate={saveTrackTemplate}
+              onLoadTemplate={loadTrackTemplate}
+              onDeleteTemplate={deleteTrackTemplate}
+            />
+          )}
           {/* Timeline area */}
           <div className="flex-1 flex flex-col overflow-hidden min-w-0">
             {/* Timeline ruler - STANDARD HEIGHT */}
