@@ -4,3 +4,4 @@ export { CreativePromptEngine } from './CreativePromptEngine';
 export { VocalIntelligenceZone } from './VocalIntelligenceZone';
 export { MixxOutputConsole } from './MixxOutputConsole';
 export { AIMixingAssistant } from './AIMixingAssistant';
+export { FloatingBeastMode } from './FloatingBeastMode';

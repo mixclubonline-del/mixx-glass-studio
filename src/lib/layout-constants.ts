@@ -4,10 +4,13 @@
  */
 
 // Header Heights (standardized across all views)
+export const CREATIVE_HEADER_HEIGHT = 48; // Creative breathing controls (BPM/Time/Position)
 export const HEADER_HEIGHT = 72; // Main view headers
 export const TOOLBAR_HEIGHT = 48; // Toolbars and secondary bars
-export const TRANSPORT_HEIGHT = 64; // Transport controls
+export const TRANSPORT_HEIGHT = 60; // Transport controls
+export const VIEW_SWITCHER_HEIGHT = 48; // View navigation tabs
 export const RULER_HEIGHT = 40; // Timeline ruler
+export const HEADER_TOTAL_HEIGHT = 168; // Sum of all header sections + spacing
 
 // Panel Widths (standardized sidebar/panel sizes)
 export const PANEL_WIDTH_SM = 280; // Small panels (metering, browser)

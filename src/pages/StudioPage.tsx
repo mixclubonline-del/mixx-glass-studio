@@ -12,6 +12,8 @@ import { ProducerLab } from "../studio/components/Producer/ProducerLab";
 import { ViewSwitcher } from "../studio/components/Navigation/ViewSwitcher";
 import { ViewContainer } from "../studio/components/Navigation/ViewContainer";
 import { UnifiedTransportBar } from "../studio/components/Navigation/UnifiedTransportBar";
+import { CreativeHeader } from "../studio/components/Navigation/CreativeHeader";
+import { FloatingBeastMode } from "../studio/components/AI/FloatingBeastMode";
 import { CollapsibleMeteringPanel } from "../studio/components/Metering/CollapsibleMeteringPanel";
 import { AdvancedTimelineView } from "../studio/components/Timeline/AdvancedTimelineView";
 
@@ -60,17 +62,16 @@ function StudioPageContent() {
 
   return (
     <div className="h-screen flex flex-col bg-background overflow-hidden">
-      {/* Fixed Top Bar - Transport + View Switcher */}
-      <div className="flex-none border-b border-border/30">
-        {/* Transport Controls - Fixed at top */}
-        <div className="px-4 py-2 border-b border-border/10">
-          <UnifiedTransportBar />
-        </div>
+      {/* Fixed Top Header - Creative Controls + Transport + View Switcher */}
+      <div className="flex-none space-y-3 p-4 border-b border-border/30">
+        {/* Creative Header - BPM, Time Signature, Position */}
+        <CreativeHeader />
         
-        {/* View Switcher - Secondary nav */}
-        <div className="px-4 py-2">
-          <ViewSwitcher />
-        </div>
+        {/* Transport Controls */}
+        <UnifiedTransportBar />
+        
+        {/* View Switcher */}
+        <ViewSwitcher />
       </div>
 
       {/* View Content - Fills remaining space */}
@@ -103,6 +104,9 @@ function StudioPageContent() {
 
       {/* Global Collapsible Metering Panel - accessible from View menu */}
       <CollapsibleMeteringPanel />
+      
+      {/* Floating Beast Mode Panel - Bottom right */}
+      <FloatingBeastMode />
     </div>
   );
 }
