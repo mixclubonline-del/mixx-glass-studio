@@ -19,12 +19,16 @@ import { CrossfadeRenderer } from './CrossfadeRenderer';
 import { ArrangeBrowserPanel } from './ArrangeBrowserPanel';
 import { RippleEditIndicator } from './RippleEditIndicator';
 import { KeyboardShortcutsHelper } from './KeyboardShortcutsHelper';
-import { TrackGroupManager } from './TrackGroupManager';
-import { TrackTemplateManager } from './TrackTemplateManager';
-import { ProductionSidebar } from './ProductionSidebar';
 import { useRegionClipboard } from '@/hooks/useRegionClipboard';
 import { useTimelineKeyboardShortcuts } from '@/hooks/useTimelineKeyboardShortcuts';
-import { ZoomIn, ZoomOut, Grid3x3, Maximize2, Plus, ChevronLeft, ChevronRight } from 'lucide-react';
+import { ZoomIn, ZoomOut, Grid3x3, Plus, Folders, Settings2 } from 'lucide-react';
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuSeparator,
+  DropdownMenuTrigger,
+} from '@/components/ui/dropdown-menu';
 import { Button } from '@/components/ui/button';
 import { cn } from '@/lib/utils';
 import mixxclubLogo from '@/assets/mixxclub-logo.png';
@@ -119,15 +123,6 @@ export const AdvancedTimelineView: React.FC<AdvancedTimelineViewProps> = ({
     addRegion,
     removeRegion,
     updateRegion,
-    trackGroups,
-    trackTemplates,
-    createTrackGroup,
-    deleteTrackGroup,
-    toggleGroupCollapse,
-    updateGroupVCA,
-    saveTrackTemplate,
-    loadTrackTemplate,
-    deleteTrackTemplate,
     setAddTrackDialogOpen,
     addTrackDialogOpen,
   } = useTracksStore();
@@ -298,7 +293,7 @@ export const AdvancedTimelineView: React.FC<AdvancedTimelineViewProps> = ({
   }, [currentTime, zoom, autoScrollEnabled]);
   
   return (
-    <div className="flex h-full relative">
+    <div className="h-full flex flex-col relative bg-background">
       {/* Ripple Edit Indicator */}
       <RippleEditIndicator active={rippleEdit} />
       
@@ -411,110 +406,55 @@ export const AdvancedTimelineView: React.FC<AdvancedTimelineViewProps> = ({
         </div>
       )}
       
-      {/* Main Timeline Area with Browser */}
-      <div className="flex-1 flex flex-col overflow-hidden">
-        {/* Timeline toolbar with tools - STANDARDIZED to 72px */}
-        <div 
-          className="flex items-center justify-between px-6 glass-ultra border-b border-gradient"
-          style={{ 
-            height: `${HEADER_HEIGHT}px`,
-            gap: `${SPACING.md}px`,
-            backdropFilter: 'blur(60px) saturate(200%)',
-            background: 'linear-gradient(135deg, hsl(var(--glass-light)), hsl(var(--glass-ultra)))'
-          }}
-        >
-          <div className="flex items-center" style={{ gap: `${SPACING.lg}px` }}>
-            <img 
-              src={mixxclubLogo} 
-              alt="MixxClub Studio" 
-              className="h-10 w-auto logo-pulse logo-glow" 
-            />
-            <div className="flex flex-col">
-              <h3 className="text-lg font-bold gradient-flow uppercase tracking-wide">
-                Arrange View
-              </h3>
-              <p className="text-xs text-[#ec4899] font-bold text-glow-hype uppercase tracking-wider">
-                {getHipHopEncouragement(sessionMinutes)}
-              </p>
-            </div>
-            <div className="border-l-2 border-[#a855f7]/50 h-10"></div>
-            <ContextualBloomWrapper config={{
-              triggerZone: 'top',
-              idleOpacity: 0.2,
-              activeOpacity: 1,
-              blurAmount: 8,
-              preferenceKey: 'timeline-toolbar'
-            }}>
-              <TimelineToolbar />
-            </ContextualBloomWrapper>
-          </div>
-          
-          <div className="flex items-center gap-2">
-            <button 
-              onClick={() => setZoom(zoom * 0.8)}
-              className="p-1.5 rounded hover:bg-muted/50 transition-colors"
-              title="Zoom Out"
-            >
-              <ZoomOut size={16} />
-            </button>
-            
-            <button 
-              onClick={() => setZoom(zoom * 1.2)}
-              className="p-1.5 rounded hover:bg-muted/50 transition-colors"
-              title="Zoom In"
-            >
-              <ZoomIn size={16} />
-            </button>
-            
-            <div className="text-xs text-muted-foreground px-2">
-              {zoom.toFixed(0)}px/s
-            </div>
-            
-            <div className="w-px h-4 bg-border/50 mx-2" />
-            
-            <KeyboardShortcutsHelper />
-            
-            <button
-              onClick={() => setSnapMode(snapMode === 'off' ? 'grid' : 'off')}
-              className={`p-1.5 rounded transition-colors ${
-                snapMode !== 'off' ? 'bg-primary/20 text-primary' : 'hover:bg-muted/50'
-              }`}
-              title={`Snap: ${snapMode}`}
-            >
-              <Grid3x3 size={16} />
-            </button>
-            
-            <Button
-              size="sm"
-              variant="outline"
-              onClick={() => setAddTrackDialogOpen(true)}
-              className="gap-1"
-            >
-              <Plus size={14} />
-              Add Track
-            </Button>
-          </div>
+      {/* Timeline Toolbar - COMPACT professional style */}
+      <div 
+        className="flex-none flex items-center justify-between px-4 border-b border-border/30 bg-background/80"
+        style={{ height: '48px' }}
+      >
+        {/* Left section - Tools */}
+        <div className="flex items-center gap-2">
+          <TimelineToolbar />
         </div>
         
-        {/* Timeline content area with ruler, tracks, and browser */}
-        <div className="flex-1 flex overflow-hidden">
-          {/* Left Panel - Production Features */}
-          {!trackListCollapsed && (
-            <ProductionSidebar
-              trackGroups={trackGroups}
-              selectedTrackIds={selectedRegionIds}
-              onCreateGroup={createTrackGroup}
-              onDeleteGroup={deleteTrackGroup}
-              onToggleCollapse={toggleGroupCollapse}
-              onVCAChange={updateGroupVCA}
-              templates={trackTemplates}
-              onSaveTemplate={saveTrackTemplate}
-              onLoadTemplate={loadTrackTemplate}
-              onDeleteTemplate={deleteTrackTemplate}
-            />
-          )}
-          {/* Timeline area */}
-          <div className="flex-1 flex flex-col overflow-hidden min-w-0">
+        {/* Right section - Controls */}
+        <div className="flex items-center gap-2">
+          <Button size="sm" variant="ghost" onClick={() => setZoom(zoom * 0.8)} title="Zoom Out">
+            <ZoomOut className="h-4 w-4" />
+          </Button>
+          
+          <span className="text-xs text-muted-foreground min-w-[60px] text-center">
+            {zoom.toFixed(0)}px/s
+          </span>
+          
+          <Button size="sm" variant="ghost" onClick={() => setZoom(zoom * 1.2)} title="Zoom In">
+            <ZoomIn className="h-4 w-4" />
+          </Button>
+          
+          <div className="w-px h-6 bg-border/50 mx-1" />
+          
+          <Button
+            size="sm"
+            variant={snapMode !== 'off' ? 'secondary' : 'ghost'}
+            onClick={() => setSnapMode(snapMode === 'off' ? 'grid' : 'off')}
+            title={`Snap: ${snapMode}`}
+          >
+            <Grid3x3 className="h-4 w-4" />
+          </Button>
+          
+          <KeyboardShortcutsHelper />
+          
+          <div className="w-px h-6 bg-border/50 mx-1" />
+          
+          <Button size="sm" variant="default" onClick={() => setAddTrackDialogOpen(true)}>
+            <Plus className="h-4 w-4 mr-1" />
+            Track
+          </Button>
+      </div>
+        
+      {/* Main Timeline Area */}
+      <div className="flex-1 flex overflow-hidden">
+        {/* Timeline area */}
+        <div className="flex-1 flex flex-col overflow-hidden min-w-0">
             {/* Timeline ruler - STANDARD HEIGHT */}
             <div 
               className="relative glass-light border-b border-gradient"
@@ -604,31 +544,15 @@ export const AdvancedTimelineView: React.FC<AdvancedTimelineViewProps> = ({
             </div>
           </div>
 
-          {/* Right Browser Panel - Aligned with timeline content */}
-          <EdgeBloomTrigger 
-            edge="right" 
-            thickness={20}
-            offset={0}
+          {/* Right Browser Panel */}
+          <ArrangeBrowserPanel
+            selectedTrackId={selectedTrackId}
+            onFileSelect={onFileSelect}
+            onPluginSelect={onPluginSelect}
+            isCollapsed={browserCollapsed}
+            onToggleCollapse={() => setBrowserCollapsed(!browserCollapsed)}
           />
-          
-          <ContextualBloomWrapper config={{
-            triggerZone: 'right',
-            idleOpacity: 0,
-            activeOpacity: 1,
-            blurAmount: 12,
-            springConfig: { stiffness: 200, damping: 25 },
-            preferenceKey: 'browser-panel'
-          }}>
-            <ArrangeBrowserPanel
-              selectedTrackId={selectedTrackId}
-              onFileSelect={onFileSelect}
-              onPluginSelect={onPluginSelect}
-              isCollapsed={browserCollapsed}
-              onToggleCollapse={() => setBrowserCollapsed(!browserCollapsed)}
-            />
-          </ContextualBloomWrapper>
         </div>
-      </div>
 
       {/* Add Track Dialog */}
       <AddTrackDialog

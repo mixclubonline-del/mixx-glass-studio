@@ -59,19 +59,22 @@ function StudioPageContent() {
   };
 
   return (
-    <div className="h-screen flex flex-col bg-background">
-      {/* Unified Transport Bar - Always visible */}
-      <div className="px-3 pt-3">
-        <UnifiedTransportBar />
-      </div>
-      
-      {/* View Switcher */}
-      <div className="px-3 py-2 border-b border-border/30">
-        <ViewSwitcher />
+    <div className="h-screen flex flex-col bg-background overflow-hidden">
+      {/* Fixed Top Bar - Transport + View Switcher */}
+      <div className="flex-none border-b border-border/30">
+        {/* Transport Controls - Fixed at top */}
+        <div className="px-4 py-2 border-b border-border/10">
+          <UnifiedTransportBar />
+        </div>
+        
+        {/* View Switcher - Secondary nav */}
+        <div className="px-4 py-2">
+          <ViewSwitcher />
+        </div>
       </div>
 
-      {/* View Content */}
-      <ViewContainer className="flex-1">
+      {/* View Content - Fills remaining space */}
+      <ViewContainer className="flex-1 overflow-hidden">
         {currentView === 'arrange' ? (
           <AdvancedTimelineView
             audioBuffers={new Map()}
@@ -82,36 +85,20 @@ function StudioPageContent() {
         ) : currentView === 'producer-lab' ? (
           <ProducerLab />
         ) : currentView === 'mix' ? (
-          <div style={{ padding: 12 }}>
-            {/* Mixer view coming soon */}
+          <div className="h-full flex items-center justify-center bg-background/50">
             <div className="text-center text-muted-foreground py-12">
               <h2 className="text-2xl font-bold mb-2">Mixer View</h2>
-              <p>Coming soon...</p>
+              <p>Dedicated mixer console coming soon...</p>
             </div>
           </div>
         ) : currentView === 'edit' ? (
-          <div style={{ padding: 12 }}>
-            {/* Edit view coming soon */}
+          <div className="h-full flex items-center justify-center bg-background/50">
             <div className="text-center text-muted-foreground py-12">
               <h2 className="text-2xl font-bold mb-2">Edit View</h2>
-              <p>Coming soon...</p>
+              <p>Waveform editor coming soon...</p>
             </div>
           </div>
-        ) : (
-          <div style={{ padding: 12 }}>
-            {/* Main rack (your plugins live here) */}
-            <div style={{ marginBottom: 12 }}>
-              <EffectsRack
-                reverbMix={reverbMix}
-                delayTime={delayTime}
-                delayFeedback={delayFeedback}
-                delayMix={delayMix}
-                limiterThreshold={limiterThreshold}
-                onEffectChange={handleEffectChange}
-              />
-            </div>
-          </div>
-        )}
+        ) : null}
       </ViewContainer>
 
       {/* Global Collapsible Metering Panel - accessible from View menu */}
