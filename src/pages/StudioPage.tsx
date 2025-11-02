@@ -11,15 +11,15 @@ import { MixxAIStudio } from "../studio/components/AI/MixxAIStudio";
 import { ProducerLab } from "../studio/components/Producer/ProducerLab";
 import { ViewSwitcher } from "../studio/components/Navigation/ViewSwitcher";
 import { ViewContainer } from "../studio/components/Navigation/ViewContainer";
-import { UnifiedTransportBar } from "../studio/components/Navigation/UnifiedTransportBar";
-import { CreativeHeader } from "../studio/components/Navigation/CreativeHeader";
+import { CompactStudioHeader } from "../studio/components/Navigation/CompactStudioHeader";
 import { FloatingBeastMode } from "../studio/components/AI/FloatingBeastMode";
 import { CollapsibleMeteringPanel } from "../studio/components/Metering/CollapsibleMeteringPanel";
 import { AdvancedTimelineView } from "../studio/components/Timeline/AdvancedTimelineView";
 
 // Inner component that uses ProjectContext
 function StudioPageContent() {
-  const { currentView } = useViewStore();
+  const viewStore = useViewStore();
+  const { currentView } = viewStore;
   const { audioEngine } = useProject();
   const { transport } = useTransport();
   const [duration, setDuration] = useState(180);
@@ -28,6 +28,18 @@ function StudioPageContent() {
   const [delayFeedback, setDelayFeedback] = useState(0.4);
   const [delayMix, setDelayMix] = useState(0.3);
   const [limiterThreshold, setLimiterThreshold] = useState(-1);
+  
+  const handleViewChange = (view: string) => {
+    // Map from compact header view names to store view names
+    const viewMap: Record<string, typeof currentView> = {
+      'arrange': 'arrange',
+      'mix': 'mix',
+      'edit': 'edit',
+      'produce': 'producer-lab',
+      'ai': 'ai-studio'
+    };
+    viewStore.setView(viewMap[view] || 'arrange');
+  };
 
   // Enable global keyboard shortcuts
   useGlobalKeyboardShortcuts();
@@ -61,18 +73,12 @@ function StudioPageContent() {
   };
 
   return (
-    <div className="h-screen flex flex-col bg-background overflow-hidden">
-      {/* Fixed Top Header - Creative Controls + Transport + View Switcher */}
-      <div className="flex-none space-y-3 p-4 border-b border-border/30">
-        {/* Creative Header - BPM, Time Signature, Position */}
-        <CreativeHeader />
-        
-        {/* Transport Controls */}
-        <UnifiedTransportBar />
-        
-        {/* View Switcher */}
-        <ViewSwitcher />
-      </div>
+    <div className="h-screen flex flex-col bg-black overflow-hidden">
+      {/* Compact Studio Header - Single 64px header */}
+      <CompactStudioHeader 
+        currentView={currentView}
+        onViewChange={handleViewChange}
+      />
 
       {/* View Content - Fills remaining space */}
       <ViewContainer className="flex-1 overflow-hidden">

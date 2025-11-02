@@ -73,26 +73,28 @@ export const WaveformRenderer: React.FC<WaveformRendererProps> = ({
       if (sample > maxAmplitude) maxAmplitude = sample;
     }
     
-    // Create amplitude-based ice-to-fire gradient
+    // Create amplitude-based vibrant gradient - high contrast for black background
     const gradient = ctx.createLinearGradient(0, 0, 0, height);
     if (maxAmplitude > 0.8) {
-      // Hot zone - fire colors
-      gradient.addColorStop(0, 'hsl(0 100% 70%)');
-      gradient.addColorStop(0.5, 'hsl(30 100% 60%)');
-      gradient.addColorStop(1, 'hsl(45 100% 50%)');
+      // Hot zone - fire colors (brighter)
+      gradient.addColorStop(0, 'hsl(0 100% 75%)');
+      gradient.addColorStop(0.5, 'hsl(30 100% 70%)');
+      gradient.addColorStop(1, 'hsl(45 100% 65%)');
     } else if (maxAmplitude > 0.5) {
-      // Warm zone
-      gradient.addColorStop(0, 'hsl(275 100% 70%)');
-      gradient.addColorStop(1, 'hsl(314 100% 65%)');
+      // Warm zone - vibrant purple/pink
+      gradient.addColorStop(0, 'hsl(275 100% 75%)');
+      gradient.addColorStop(1, 'hsl(314 100% 75%)');
     } else {
-      // Cool zone - ice colors
-      gradient.addColorStop(0, 'hsl(191 100% 60%)');
-      gradient.addColorStop(1, 'hsl(220 100% 70%)');
+      // Cool zone - vibrant cyan
+      gradient.addColorStop(0, 'hsl(191 100% 70%)');
+      gradient.addColorStop(1, 'hsl(220 100% 75%)');
     }
     
     ctx.beginPath();
     ctx.strokeStyle = gradient;
-    ctx.lineWidth = 1;
+    ctx.lineWidth = 1.5; // Slightly thicker for better visibility
+    ctx.shadowBlur = 4; // Subtle glow
+    ctx.shadowColor = maxAmplitude > 0.8 ? 'hsl(0 100% 75% / 0.5)' : maxAmplitude > 0.5 ? 'hsl(275 100% 75% / 0.5)' : 'hsl(191 100% 70% / 0.5)';
     
     for (let x = 0; x < width; x += detailLevel) {
       const start = startSample + Math.floor(x * samplesPerPixel);
@@ -161,21 +163,22 @@ export const WaveformRenderer: React.FC<WaveformRendererProps> = ({
     
     ctx.closePath();
     
-    // Use gradient for fill with transparency
+    // Use gradient for fill with higher opacity
     const fillGradient = ctx.createLinearGradient(0, 0, 0, height);
     if (maxAmplitude > 0.8) {
-      fillGradient.addColorStop(0, 'hsl(0 100% 70% / 0.3)');
-      fillGradient.addColorStop(0.5, 'hsl(30 100% 60% / 0.2)');
-      fillGradient.addColorStop(1, 'hsl(45 100% 50% / 0.15)');
+      fillGradient.addColorStop(0, 'hsl(0 100% 75% / 0.5)');
+      fillGradient.addColorStop(0.5, 'hsl(30 100% 70% / 0.4)');
+      fillGradient.addColorStop(1, 'hsl(45 100% 65% / 0.3)');
     } else if (maxAmplitude > 0.5) {
-      fillGradient.addColorStop(0, 'hsl(275 100% 70% / 0.3)');
-      fillGradient.addColorStop(1, 'hsl(314 100% 65% / 0.2)');
+      fillGradient.addColorStop(0, 'hsl(275 100% 75% / 0.5)');
+      fillGradient.addColorStop(1, 'hsl(314 100% 75% / 0.4)');
     } else {
-      fillGradient.addColorStop(0, 'hsl(191 100% 60% / 0.3)');
-      fillGradient.addColorStop(1, 'hsl(220 100% 70% / 0.2)');
+      fillGradient.addColorStop(0, 'hsl(191 100% 70% / 0.5)');
+      fillGradient.addColorStop(1, 'hsl(220 100% 75% / 0.4)');
     }
     ctx.fillStyle = fillGradient;
     ctx.fill();
+    ctx.shadowBlur = 0; // Remove shadow for fill
     ctx.stroke();
     
     // Log performance

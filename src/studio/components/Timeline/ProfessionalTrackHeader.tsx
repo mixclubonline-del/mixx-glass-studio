@@ -81,59 +81,39 @@ export const ProfessionalTrackHeader: React.FC<TrackHeaderProps> = ({
   return (
     <div
       className={cn(
-        "flex flex-col gap-1 px-2 py-1.5 border-b border-border/50 transition-all duration-400 cursor-pointer select-none",
+        "relative flex flex-col gap-1 px-2 py-1.5 border-b border-border/20 transition-all duration-300 cursor-pointer select-none",
         isSelected 
-          ? "glass-light bloom-visible border-l-2 border-gradient" 
+          ? "bg-background/30" 
           : isHovered 
-            ? "glass-light bloom-visible" 
-            : "bloom-dimmed"
+            ? "bg-background/10" 
+            : "bg-transparent"
       )}
       style={{ height: `${height}px` }}
       onClick={() => onSelect(id)}
       onMouseEnter={() => setIsHovered(true)}
       onMouseLeave={() => setIsHovered(false)}
     >
-      {/* Top row: Track name, expand/collapse */}
-      <div className="flex items-center gap-1.5">
-        {/* Expand/Collapse */}
-        {onExpandToggle && (
-          <button
-            onClick={(e) => {
-              e.stopPropagation();
-              onExpandToggle(id);
-            }}
-            className="p-0.5 hover:bg-secondary/50 rounded transition-colors"
-          >
-            {expanded ? <ChevronDown size={12} /> : <ChevronRight size={12} />}
-          </button>
-        )}
-
-        {/* Color indicator */}
-        <Circle
-          className="w-2.5 h-2.5 shrink-0"
-          fill={color}
-          stroke={color}
-        />
-        
+      {/* Colored indicator strip */}
+      <div 
+        className="absolute left-0 top-0 bottom-0 w-1"
+        style={{ backgroundColor: color }}
+      />
+      {/* Track name only - clean and minimal */}
+      <div className="flex items-center gap-2">
         {/* Track name */}
-        <span className="flex-1 text-xs font-medium truncate">{name}</span>
+        <span className="flex-1 text-xs font-medium truncate text-foreground/90">{name}</span>
 
-        {/* Lock indicator */}
-        {locked && <Lock size={10} className="text-muted-foreground" />}
-        
-        {/* Freeze indicator */}
-        {frozen && <Snowflake size={10} className="text-blue-400" />}
+        {/* Status indicators - always visible */}
+        {locked && <Lock size={10} className="text-muted-foreground/50" />}
+        {frozen && <Snowflake size={10} className="text-blue-400/50" />}
       </div>
 
-      {/* Middle row: Main controls with stagger animation */}
+      {/* Controls - only show on hover */}
       <div 
         className={cn(
-          "flex items-center gap-1 transition-all duration-300",
-          isHovered ? "opacity-100 scale-100" : "opacity-60 scale-95"
+          "flex items-center gap-1 transition-all duration-200",
+          isHovered ? "opacity-100" : "opacity-0"
         )}
-        style={{
-          transitionDelay: isHovered ? '50ms' : '0ms'
-        }}
       >
         {/* Record Arm */}
         <Button

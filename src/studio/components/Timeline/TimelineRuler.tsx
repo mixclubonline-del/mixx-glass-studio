@@ -30,8 +30,9 @@ export function TimelineRuler({ width, height, bpm, onSeek }: TimelineRulerProps
     canvas.style.height = `${height}px`;
     ctx.scale(dpr, dpr);
     
-    // Clear - transparent for glass effect
-    ctx.clearRect(0, 0, width, height);
+    // Clear with pure black background
+    ctx.fillStyle = 'hsl(0, 0%, 0%)';
+    ctx.fillRect(0, 0, width, height);
     
     // Calculate time range visible
     const startTime = scrollX / zoom;
@@ -52,7 +53,7 @@ export function TimelineRuler({ width, height, bpm, onSeek }: TimelineRulerProps
     const startBar = Math.floor(startTime / secondsPerBar);
     const endBar = Math.ceil(endTime / secondsPerBar);
     
-    ctx.font = '11px Inter';
+    ctx.font = '10px "SF Mono", "Courier New", monospace';
     ctx.textBaseline = 'middle';
     
     for (let bar = startBar; bar <= endBar; bar++) {
@@ -60,41 +61,17 @@ export function TimelineRuler({ width, height, bpm, onSeek }: TimelineRulerProps
       const x = (barTime * zoom) - scrollX;
       
       if (x >= 0 && x <= width) {
-        // Bar line
-        ctx.strokeStyle = 'hsl(0, 0%, 40%)';
+        // Bar line - white, clean
+        ctx.strokeStyle = 'hsl(0, 0%, 30%)';
         ctx.lineWidth = 1;
         ctx.beginPath();
-        ctx.moveTo(x, height * 0.3);
+        ctx.moveTo(x, 0);
         ctx.lineTo(x, height);
         ctx.stroke();
         
-        // Bar number with gradient (start at 1, not 0)
-        const gradient = ctx.createLinearGradient(x, 0, x + 50, 0);
-        gradient.addColorStop(0, 'hsl(275 100% 70%)');
-        gradient.addColorStop(1, 'hsl(191 100% 60%)');
-        ctx.fillStyle = gradient;
+        // Bar number - white mono font (start at 1, not 0)
+        ctx.fillStyle = 'hsl(0, 0%, 70%)';
         ctx.fillText(`${bar + 1}`, x + 4, height / 2);
-        
-        // Beat subdivisions (show beats 2, 3, 4)
-        for (let beat = 1; beat < 4; beat++) {
-          const beatTime = barTime + (beat * secondsPerBeat);
-          const beatX = (beatTime * zoom) - scrollX;
-          
-          if (beatX >= 0 && beatX <= width) {
-            ctx.strokeStyle = 'hsl(0, 0%, 20%)';
-            ctx.lineWidth = 1;
-            ctx.beginPath();
-            ctx.moveTo(beatX, height * 0.5);
-            ctx.lineTo(beatX, height);
-            ctx.stroke();
-            
-            // Show beat numbers for clarity
-            ctx.fillStyle = 'hsl(0, 0%, 40%)';
-            ctx.font = '9px Inter';
-            ctx.fillText(`${beat + 1}`, beatX + 2, height * 0.7);
-            ctx.font = '11px Inter';
-          }
-        }
       }
     }
   };
@@ -103,17 +80,17 @@ export function TimelineRuler({ width, height, bpm, onSeek }: TimelineRulerProps
     const startSecond = Math.floor(startTime);
     const endSecond = Math.ceil(endTime);
     
-    ctx.font = '11px Inter';
+    ctx.font = '10px "SF Mono", "Courier New", monospace';
     ctx.textBaseline = 'middle';
     
     for (let second = startSecond; second <= endSecond; second++) {
       const x = (second * zoom) - scrollX;
       
       if (x >= 0 && x <= width) {
-        ctx.strokeStyle = 'hsl(0, 0%, 40%)';
+        ctx.strokeStyle = 'hsl(0, 0%, 30%)';
         ctx.lineWidth = 1;
         ctx.beginPath();
-        ctx.moveTo(x, height * 0.3);
+        ctx.moveTo(x, 0);
         ctx.lineTo(x, height);
         ctx.stroke();
         
@@ -136,9 +113,9 @@ export function TimelineRuler({ width, height, bpm, onSeek }: TimelineRulerProps
     <canvas
       ref={canvasRef}
       onClick={handleClick}
-      className="cursor-pointer glass-light border-b border-border/30"
+      className="cursor-pointer border-b border-border/50"
       style={{
-        backdropFilter: 'blur(40px) saturate(180%)',
+        backgroundColor: 'hsl(0, 0%, 0%)',
       }}
     />
   );

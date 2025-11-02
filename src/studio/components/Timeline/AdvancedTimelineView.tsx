@@ -297,115 +297,28 @@ export const AdvancedTimelineView: React.FC<AdvancedTimelineViewProps> = ({
       {/* Ripple Edit Indicator */}
       <RippleEditIndicator active={rippleEdit} />
       
-      {/* Background ambience */}
-      <div className="absolute inset-0 -z-10 overflow-hidden pointer-events-none">
-        <div 
-          className="absolute top-1/3 left-1/4 w-[500px] h-[500px] rounded-full"
-          style={{
-            background: 'radial-gradient(circle, hsl(275 100% 65% / 0.08) 0%, transparent 70%)',
-            filter: 'blur(120px)',
-            animation: 'float 25s ease-in-out infinite'
-          }}
-        />
-        <div 
-          className="absolute bottom-1/3 right-1/3 w-[400px] h-[400px] rounded-full"
-          style={{
-            background: 'radial-gradient(circle, hsl(191 100% 50% / 0.06) 0%, transparent 70%)',
-            filter: 'blur(100px)',
-            animation: 'float 30s ease-in-out infinite reverse'
-          }}
-        />
-      </div>
-      
-      {/* Main background with gradient mesh */}
-      <div 
-        className="absolute inset-0 -z-20"
-        style={{
-          background: `
-            var(--gradient-mesh),
-            linear-gradient(180deg, 
-              hsl(240 15% 4%) 0%, 
-              hsl(240 10% 2%) 100%
-            )
-          `
-        }}
-      />
-      
-      {/* Timeline Toolbar - COMPACT professional style - SPANS FULL WIDTH */}
-      <div 
-        className="flex-none flex items-center justify-between px-4 border-b border-border/30 bg-background/80"
-        style={{ height: '48px' }}
-      >
-        {/* Left section - Tools */}
-        <div className="flex items-center gap-2">
-          <TimelineToolbar />
-        </div>
-        
-        {/* Right section - Controls */}
-        <div className="flex items-center gap-2">
-          <Button size="sm" variant="ghost" onClick={() => setZoom(zoom * 0.8)} title="Zoom Out">
-            <ZoomOut className="h-4 w-4" />
-          </Button>
-          
-          <span className="text-xs text-muted-foreground min-w-[60px] text-center">
-            {zoom.toFixed(0)}px/s
-          </span>
-          
-          <Button size="sm" variant="ghost" onClick={() => setZoom(zoom * 1.2)} title="Zoom In">
-            <ZoomIn className="h-4 w-4" />
-          </Button>
-          
-          <div className="w-px h-6 bg-border/50 mx-1" />
-          
-          <Button
-            size="sm"
-            variant={snapMode !== 'off' ? 'secondary' : 'ghost'}
-            onClick={() => setSnapMode(snapMode === 'off' ? 'grid' : 'off')}
-            title={`Snap: ${snapMode}`}
-          >
-            <Grid3x3 className="h-4 w-4" />
-          </Button>
-          
-          <KeyboardShortcutsHelper />
-          
-          <div className="w-px h-6 bg-border/50 mx-1" />
-          
-          <Button size="sm" variant="default" onClick={() => setAddTrackDialogOpen(true)}>
-            <Plus className="h-4 w-4 mr-1" />
-            Track
-          </Button>
-        </div>
-      </div>
-        
       {/* Main Timeline Area - Sidebar + Content */}
       <div className="flex-1 flex overflow-hidden">
         {/* Left Track List Sidebar - STANDARD WIDTH */}
         {!trackListCollapsed && (
           <div 
-            className="flex-shrink-0 border-r border-gradient flex flex-col"
+            className="flex-shrink-0 border-r border-border/20 flex flex-col bg-black"
             style={{ 
-              width: `${TRACK_LIST_WIDTH}px`,
-              background: `
-                radial-gradient(circle at 20% 50%, hsl(275 100% 65% / 0.03) 0%, transparent 50%),
-                var(--gradient-mesh),
-                linear-gradient(135deg, hsl(var(--glass-medium)), hsl(var(--glass-ultra)))
-              `,
-              backdropFilter: 'blur(80px) saturate(220%)',
-              boxShadow: 'inset 1px 0 0 rgba(255, 255, 255, 0.1)'
+              width: `${TRACK_LIST_WIDTH}px`
             }}
           >
             {/* Sidebar Header - MATCHES RULER HEIGHT */}
             <div 
-              className="flex items-center justify-end px-4 glass-ultra border-b border-gradient"
+              className="flex items-center justify-end px-2 bg-black/50 border-b border-border/20"
               style={{ height: `${RULER_HEIGHT}px` }}
             >
               <Button
                 size="sm"
                 variant="ghost"
                 onClick={() => setTrackListCollapsed(true)}
-                className="h-8 w-8 p-0 micro-interact chromatic-hover"
+                className="h-6 w-6 p-0"
               >
-                <ChevronLeft size={16} />
+                <ChevronLeft size={14} />
               </Button>
             </div>
             
@@ -434,35 +347,33 @@ export const AdvancedTimelineView: React.FC<AdvancedTimelineViewProps> = ({
           </div>
         )}
         
-        {/* Collapsed Track List Toggle Button - STANDARD COLLAPSED WIDTH */}
+        {/* Collapsed Track List Toggle Button */}
         {trackListCollapsed && (
           <div 
-            className="flex-shrink-0 glass-light border-r border-gradient flex items-start justify-center pt-2"
+            className="flex-shrink-0 bg-black border-r border-border/20 flex items-start justify-center pt-2"
             style={{ 
-              width: `${TRACK_LIST_COLLAPSED}px`,
-              backdropFilter: 'blur(60px) saturate(200%)'
+              width: `${TRACK_LIST_COLLAPSED}px`
             }}
           >
             <Button
               size="sm"
               variant="ghost"
               onClick={() => setTrackListCollapsed(false)}
-              className="h-8 w-8 p-0 micro-interact chromatic-hover"
+              className="h-6 w-6 p-0"
             >
-              <ChevronRight size={16} />
+              <ChevronRight size={14} />
             </Button>
           </div>
         )}
         
         {/* Timeline area */}
         {/* Timeline area */}
-        <div className="flex-1 flex flex-col overflow-hidden min-w-0">
-            {/* Timeline ruler - STANDARD HEIGHT */}
+        <div className="flex-1 flex flex-col overflow-hidden min-w-0 bg-black">
+            {/* Timeline ruler */}
             <div 
-              className="relative glass-light border-b border-gradient"
+              className="relative bg-black border-b border-border/50"
               style={{ 
-                height: `${RULER_HEIGHT}px`,
-                backdropFilter: 'blur(40px) saturate(180%)'
+                height: `${RULER_HEIGHT}px`
               }}
             >
               <TimelineRuler
@@ -473,14 +384,12 @@ export const AdvancedTimelineView: React.FC<AdvancedTimelineViewProps> = ({
               />
             </div>
             
-            {/* Scrollable timeline content */}
+            {/* Scrollable timeline content - Pure black */}
             <div 
               ref={containerRef}
-              className="flex-1 overflow-auto relative"
+              className="flex-1 overflow-auto relative bg-black"
               onScroll={handleScroll}
               style={{
-                background: 'linear-gradient(180deg, hsl(240 15% 4% / 0.8) 0%, hsl(240 10% 2% / 0.6) 100%)',
-                backdropFilter: 'blur(20px)',
                 minHeight: 0
               }}
             >
