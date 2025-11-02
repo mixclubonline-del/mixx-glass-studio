@@ -16,6 +16,8 @@ import { TimelineToolbar } from './TimelineToolbar';
 import { AddTrackDialog, TrackConfig } from './AddTrackDialog';
 import { CrossfadeRenderer } from './CrossfadeRenderer';
 import { ArrangeBrowserPanel } from './ArrangeBrowserPanel';
+import { RippleEditIndicator } from './RippleEditIndicator';
+import { useRegionClipboard } from '@/hooks/useRegionClipboard';
 import { ZoomIn, ZoomOut, Grid3x3, Maximize2, Plus, ChevronLeft, ChevronRight } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { cn } from '@/lib/utils';
@@ -86,6 +88,9 @@ export const AdvancedTimelineView: React.FC<AdvancedTimelineViewProps> = ({
     setSnapMode,
     clearSelection,
   } = useTimelineStore();
+  
+  // Clipboard functionality
+  const { handleCopy, handlePaste, handleDuplicate, hasClipboard } = useRegionClipboard();
   
   const { 
     tracks, 
@@ -270,6 +275,9 @@ export const AdvancedTimelineView: React.FC<AdvancedTimelineViewProps> = ({
   
   return (
     <div className="flex h-full relative">
+      {/* Ripple Edit Indicator */}
+      <RippleEditIndicator active={rippleEdit} />
+      
       {/* Background ambience */}
       <div className="absolute inset-0 -z-10 overflow-hidden pointer-events-none">
         <div 

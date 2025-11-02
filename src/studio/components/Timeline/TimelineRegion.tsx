@@ -31,11 +31,13 @@ export const TimelineRegion: React.FC<TimelineRegionProps> = ({
   const [isDragging, setIsDragging] = useState(false);
   const [isTrimming, setIsTrimming] = useState<'left' | 'right' | null>(null);
   const [isFading, setIsFading] = useState<'in' | 'out' | null>(null);
+  const [isSlipping, setIsSlipping] = useState(false);
+  const [isDuplicating, setIsDuplicating] = useState(false);
   const [dragStart, setDragStart] = useState(0);
   const [hoverX, setHoverX] = useState<number | null>(null);
   const [showTooltip, setShowTooltip] = useState(false);
   const regionRef = useRef<HTMLDivElement>(null);
-  const { currentTool } = useTimelineStore();
+  const { currentTool, rippleEdit } = useTimelineStore();
   
   const left = region.startTime * zoom;
   const width = region.duration * zoom;
@@ -48,9 +50,20 @@ export const TimelineRegion: React.FC<TimelineRegionProps> = ({
     
     const clickX = e.clientX - rect.left;
     const edgeTolerance = 8;
+    const fadeHandleSize = 20;
     
     // Multi-select with Cmd/Ctrl
     const isMultiSelect = e.metaKey || e.ctrlKey;
+    
+    // Alt+drag to duplicate
+    if (e.altKey && currentTool === 'select') {
+      setIsDuplicating(true);
+      setDragStart(e.clientX - left);
+      onSelect(region.id, false);
+      e.stopPropagation();
+      return;
+    }
+    
     onSelect(region.id, isMultiSelect);
     e.stopPropagation();
     
@@ -61,7 +74,21 @@ export const TimelineRegion: React.FC<TimelineRegionProps> = ({
       return;
     }
     
-    // Trim tool or edge detection
+    // Fade handles (top corners)
+    const clickY = e.clientY - rect.top;
+    const isFadeHandleArea = clickY < fadeHandleSize;
+    
+    if (isFadeHandleArea && clickX < fadeHandleSize) {
+      setIsFading('in');
+      setDragStart(e.clientX);
+      return;
+    } else if (isFadeHandleArea && clickX > width - fadeHandleSize) {
+      setIsFading('out');
+      setDragStart(e.clientX);
+      return;
+    }
+    
+    // Trim handles (edges)
     if (currentTool === 'select' && clickX < edgeTolerance) {
       setIsTrimming('left');
       setDragStart(e.clientX);
@@ -69,15 +96,10 @@ export const TimelineRegion: React.FC<TimelineRegionProps> = ({
       setIsTrimming('right');
       setDragStart(e.clientX);
     }
-    // Fade tool or fade handle detection
-    else if (currentTool === 'fade') {
-      if (clickX < width / 2) {
-        setIsFading('in');
-        setDragStart(e.clientX);
-      } else {
-        setIsFading('out');
-        setDragStart(e.clientX);
-      }
+    // Slip editing (Cmd+drag center)
+    else if (currentTool === 'select' && (e.metaKey || e.ctrlKey)) {
+      setIsSlipping(true);
+      setDragStart(e.clientX);
     }
     // Default: move
     else {
@@ -87,10 +109,33 @@ export const TimelineRegion: React.FC<TimelineRegionProps> = ({
   };
   
   const handleMouseMove = (e: MouseEvent) => {
+    if (isDuplicating) {
+      // Create duplicate and start dragging it
+      const newRegion = {
+        ...region,
+        id: `${region.id}-dup-${Date.now()}`,
+        startTime: Math.max(0, (e.clientX - dragStart) / zoom),
+        name: `${region.name} (copy)`
+      };
+      onUpdate(newRegion.id, newRegion);
+      setIsDuplicating(false);
+      setIsDragging(true);
+      return;
+    }
+    
     if (isDragging) {
       const newLeft = e.clientX - dragStart;
       const newStartTime = Math.max(0, newLeft / zoom);
       onUpdate(region.id, { startTime: newStartTime });
+    } else if (isSlipping) {
+      // Slip editing - shift audio within fixed region boundaries
+      const delta = (e.clientX - dragStart) / zoom;
+      const newBufferOffset = Math.max(0, Math.min(
+        audioBuffer?.duration ?? region.bufferOffset,
+        region.bufferOffset + delta
+      ));
+      onUpdate(region.id, { bufferOffset: newBufferOffset });
+      setDragStart(e.clientX);
     } else if (isTrimming) {
       const delta = (e.clientX - dragStart) / zoom;
       
@@ -127,8 +172,10 @@ export const TimelineRegion: React.FC<TimelineRegionProps> = ({
   
   const handleMouseUp = () => {
     setIsDragging(false);
+    setIsDuplicating(false);
     setIsTrimming(null);
     setIsFading(null);
+    setIsSlipping(false);
   };
   
   const handleRegionMouseMove = (e: React.MouseEvent) => {
@@ -140,10 +187,18 @@ export const TimelineRegion: React.FC<TimelineRegionProps> = ({
   
   const getCursor = () => {
     if (currentTool === 'split') return 'text';
-    if (currentTool === 'fade') return 'col-resize';
+    if (isSlipping) return 'grab';
     
     if (hoverX !== null) {
+      const rect = regionRef.current?.getBoundingClientRect();
       const edgeTolerance = 8;
+      const fadeHandleSize = 20;
+      
+      // Check if over fade handles
+      if (rect && hoverX < fadeHandleSize) return 'nw-resize';
+      if (rect && hoverX > width - fadeHandleSize) return 'ne-resize';
+      
+      // Check if over trim edges
       if (hoverX < edgeTolerance || hoverX > width - edgeTolerance) {
         return 'ew-resize';
       }
@@ -152,7 +207,7 @@ export const TimelineRegion: React.FC<TimelineRegionProps> = ({
   };
   
   React.useEffect(() => {
-    if (isDragging) {
+    if (isDragging || isTrimming || isFading || isSlipping || isDuplicating) {
       window.addEventListener('mousemove', handleMouseMove);
       window.addEventListener('mouseup', handleMouseUp);
       return () => {
@@ -160,7 +215,7 @@ export const TimelineRegion: React.FC<TimelineRegionProps> = ({
         window.removeEventListener('mouseup', handleMouseUp);
       };
     }
-  }, [isDragging, dragStart, zoom]);
+  }, [isDragging, isTrimming, isFading, isSlipping, isDuplicating, dragStart, zoom]);
   
   return (
     <RegionContextMenu
@@ -228,25 +283,41 @@ export const TimelineRegion: React.FC<TimelineRegionProps> = ({
         {region.name}
       </div>
       
-      {/* Fade handles */}
+      {/* Enhanced fade handles with visible controls */}
       {region.fadeIn > 0 && (
-        <div 
-          className="absolute left-0 top-0 bottom-0 pointer-events-none"
-          style={{
-            width: `${region.fadeIn * zoom}px`,
-            background: `linear-gradient(to right, transparent, ${region.color}40)`
-          }}
-        />
+        <>
+          <div 
+            className="absolute left-0 top-0 bottom-0 pointer-events-none"
+            style={{
+              width: `${region.fadeIn * zoom}px`,
+              background: `linear-gradient(to right, rgba(0,0,0,0.4), transparent)`
+            }}
+          />
+          {isSelected && (
+            <div 
+              className="absolute left-0 top-0 w-4 h-4 bg-primary/80 rounded-br cursor-nw-resize opacity-0 group-hover:opacity-100 transition-opacity"
+              title="Drag to adjust fade-in"
+            />
+          )}
+        </>
       )}
       
       {region.fadeOut > 0 && (
-        <div 
-          className="absolute right-0 top-0 bottom-0 pointer-events-none"
-          style={{
-            width: `${region.fadeOut * zoom}px`,
-            background: `linear-gradient(to left, transparent, ${region.color}40)`
-          }}
-        />
+        <>
+          <div 
+            className="absolute right-0 top-0 bottom-0 pointer-events-none"
+            style={{
+              width: `${region.fadeOut * zoom}px`,
+              background: `linear-gradient(to left, rgba(0,0,0,0.4), transparent)`
+            }}
+          />
+          {isSelected && (
+            <div 
+              className="absolute right-0 top-0 w-4 h-4 bg-primary/80 rounded-bl cursor-ne-resize opacity-0 group-hover:opacity-100 transition-opacity"
+              title="Drag to adjust fade-out"
+            />
+          )}
+        </>
       )}
       
       {/* Selection info tooltip */}
