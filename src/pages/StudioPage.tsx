@@ -15,6 +15,7 @@ import { CompactStudioHeader } from "../studio/components/Navigation/CompactStud
 import { FloatingBeastMode } from "../studio/components/AI/FloatingBeastMode";
 import { CollapsibleMeteringPanel } from "../studio/components/Metering/CollapsibleMeteringPanel";
 import { AdvancedTimelineView } from "../studio/components/Timeline/AdvancedTimelineView";
+import { TransportFloatingMini } from "../studio/components/TransportFloatingMini";
 
 // Inner component that uses ProjectContext
 function StudioPageContent() {
@@ -121,6 +122,17 @@ function StudioPageContent() {
       
       {/* Floating Beast Mode Panel - Bottom right */}
       <FloatingBeastMode />
+
+      {/* Floating Mini Transport - Always visible */}
+      <TransportFloatingMini
+        isPlaying={transport.isPlaying}
+        onPlay={() => audioEngine.play()}
+        onPause={() => audioEngine.pause()}
+        onStop={() => audioEngine.stop()}
+        onToggleFloat={() => {}}
+        isFloating={true}
+        currentTime={transport.currentTime}
+      />
     </div>
   );
 }
