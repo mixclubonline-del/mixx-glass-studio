@@ -39,7 +39,7 @@ export const MixxAmbientOverlay = () => {
       />
       
       {/* Mood indicator (dev/debug) */}
-      <div className="fixed bottom-4 left-4 glass-glow rounded-lg px-3 py-2 text-xs font-mono z-50 pointer-events-none">
+      <div className="fixed top-20 left-4 glass-glow rounded-lg px-3 py-2 text-xs font-mono z-50 pointer-events-none">
         <div className="flex items-center gap-2">
           <div
             className="w-3 h-3 rounded-full"
