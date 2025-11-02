@@ -12,6 +12,8 @@ interface WaveformRendererProps {
   peaks?: Float32Array;
   startTime?: number;
   duration?: number;
+  displayMode?: 'peak' | 'rms';
+  zoom?: number;
 }
 
 export const WaveformRenderer: React.FC<WaveformRendererProps> = ({
@@ -21,7 +23,9 @@ export const WaveformRenderer: React.FC<WaveformRendererProps> = ({
   color,
   peaks,
   startTime = 0,
-  duration
+  duration,
+  displayMode = 'peak',
+  zoom = 100
 }) => {
   const canvasRef = useRef<HTMLCanvasElement>(null);
   
@@ -54,6 +58,8 @@ export const WaveformRenderer: React.FC<WaveformRendererProps> = ({
       : channelData.length;
     const totalSamples = endSample - startSample;
     
+    // Adaptive detail based on zoom level
+    const detailLevel = zoom > 200 ? 1 : zoom > 100 ? 2 : zoom > 50 ? 4 : 8;
     const samplesPerPixel = Math.max(1, Math.floor(totalSamples / width));
     const centerY = height / 2;
     
@@ -85,17 +91,31 @@ export const WaveformRenderer: React.FC<WaveformRendererProps> = ({
     ctx.strokeStyle = gradient;
     ctx.lineWidth = 1;
     
-    for (let x = 0; x < width; x++) {
+    for (let x = 0; x < width; x += detailLevel) {
       const start = startSample + Math.floor(x * samplesPerPixel);
       const end = Math.min(startSample + Math.floor((x + 1) * samplesPerPixel), endSample);
       
       let min = 1;
       let max = -1;
+      let rmsSum = 0;
+      let sampleCount = 0;
       
       for (let i = start; i < end; i++) {
         const sample = channelData[i] || 0;
         if (sample < min) min = sample;
         if (sample > max) max = sample;
+        
+        if (displayMode === 'rms') {
+          rmsSum += sample * sample;
+          sampleCount++;
+        }
+      }
+      
+      // Use RMS if in RMS mode
+      if (displayMode === 'rms' && sampleCount > 0) {
+        const rms = Math.sqrt(rmsSum / sampleCount);
+        max = rms;
+        min = -rms;
       }
       
       const yMax = centerY - (max * centerY * 0.9);
@@ -109,15 +129,27 @@ export const WaveformRenderer: React.FC<WaveformRendererProps> = ({
     }
     
     // Mirror for bottom half
-    for (let x = width - 1; x >= 0; x--) {
+    for (let x = width - 1; x >= 0; x -= detailLevel) {
       const start = startSample + Math.floor(x * samplesPerPixel);
       const end = Math.min(startSample + Math.floor((x + 1) * samplesPerPixel), endSample);
       
       let min = 1;
+      let rmsSum = 0;
+      let sampleCount = 0;
       
       for (let i = start; i < end; i++) {
         const sample = channelData[i] || 0;
         if (sample < min) min = sample;
+        
+        if (displayMode === 'rms') {
+          rmsSum += sample * sample;
+          sampleCount++;
+        }
+      }
+      
+      if (displayMode === 'rms' && sampleCount > 0) {
+        const rms = Math.sqrt(rmsSum / sampleCount);
+        min = -rms;
       }
       
       const yMin = centerY - (min * centerY * 0.9);
@@ -143,7 +175,7 @@ export const WaveformRenderer: React.FC<WaveformRendererProps> = ({
     ctx.fill();
     ctx.stroke();
     
-  }, [audioBuffer, width, height, color]);
+  }, [audioBuffer, width, height, color, displayMode, zoom, startTime, duration]);
   
   return (
     <canvas

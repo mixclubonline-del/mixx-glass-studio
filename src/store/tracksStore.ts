@@ -9,6 +9,7 @@ interface TracksState {
   tracks: TimelineTrack[];
   regions: Region[];
   selectedTrackId: string | null;
+  selectedRegionIds: string[];
   addTrackDialogOpen: boolean;
   
   // Actions
@@ -20,6 +21,9 @@ interface TracksState {
   removeRegion: (id: string) => void;
   duplicateRegion: (id: string) => void;
   selectTrack: (id: string | null) => void;
+  selectRegion: (id: string, multi?: boolean) => void;
+  selectRegions: (ids: string[]) => void;
+  clearRegionSelection: () => void;
   getTrackRegions: (trackId: string) => Region[];
   setAddTrackDialogOpen: (open: boolean) => void;
 }
@@ -28,6 +32,7 @@ export const useTracksStore = create<TracksState>((set, get) => ({
   tracks: [],
   regions: [],
   selectedTrackId: null,
+  selectedRegionIds: [],
   addTrackDialogOpen: false,
   
   addTrack: (track) => set((state) => ({
@@ -80,6 +85,25 @@ export const useTracksStore = create<TracksState>((set, get) => ({
   }),
   
   selectTrack: (id) => set({ selectedTrackId: id }),
+  
+  selectRegion: (id, multi = false) => set((state) => {
+    if (multi) {
+      // Toggle selection with Cmd/Ctrl
+      const isSelected = state.selectedRegionIds.includes(id);
+      return {
+        selectedRegionIds: isSelected
+          ? state.selectedRegionIds.filter(rid => rid !== id)
+          : [...state.selectedRegionIds, id]
+      };
+    } else {
+      // Single selection
+      return { selectedRegionIds: [id] };
+    }
+  }),
+  
+  selectRegions: (ids) => set({ selectedRegionIds: ids }),
+  
+  clearRegionSelection: () => set({ selectedRegionIds: [] }),
   
   getTrackRegions: (trackId) => {
     return get().regions.filter(r => r.trackId === trackId);

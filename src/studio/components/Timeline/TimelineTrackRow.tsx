@@ -17,7 +17,7 @@ interface TimelineTrackRowProps {
   isSelected: boolean;
   onSelectTrack: (id: string) => void;
   onUpdateRegion: (id: string, updates: Partial<Region>) => void;
-  onSelectRegion: (id: string) => void;
+  onSelectRegion: (id: string, multi?: boolean) => void;
   onSplitRegion: (id: string, splitTime: number) => void;
   selectedRegionIds: Set<string>;
 }

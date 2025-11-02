@@ -91,7 +91,9 @@ export const AdvancedTimelineView: React.FC<AdvancedTimelineViewProps> = ({
     tracks, 
     regions, 
     selectedTrackId,
+    selectedRegionIds,
     selectTrack,
+    selectRegion,
     updateTrack,
     getTrackRegions,
     addRegion,
@@ -148,6 +150,14 @@ export const AdvancedTimelineView: React.FC<AdvancedTimelineViewProps> = ({
       selectTrack(externalSelectedTrackId);
     }
   }, [externalSelectedTrackId, selectedTrackId, selectTrack]);
+  
+  const handleSelectRegion = (id: string, multi?: boolean) => {
+    const region = regions.find(r => r.id === id);
+    if (region && !multi) {
+      selectTrack(region.trackId);
+    }
+    selectRegion(id, multi);
+  };
   
   const handleSplitRegion = (regionId: string, splitTime: number) => {
     const region = regions.find(r => r.id === regionId);
@@ -226,6 +236,21 @@ export const AdvancedTimelineView: React.FC<AdvancedTimelineViewProps> = ({
   useEffect(() => {
     localStorage.setItem('trackListCollapsed', trackListCollapsed.toString());
   }, [trackListCollapsed]);
+  
+  // Browser panel keyboard shortcut (B key)
+  useEffect(() => {
+    const handleKeyDown = (e: KeyboardEvent) => {
+      // Ignore if typing in input fields
+      if (e.target instanceof HTMLInputElement || e.target instanceof HTMLTextAreaElement) return;
+      
+      if (e.key === 'b' || e.key === 'B') {
+        setBrowserCollapsed(prev => !prev);
+      }
+    };
+    
+    window.addEventListener('keydown', handleKeyDown);
+    return () => window.removeEventListener('keydown', handleKeyDown);
+  }, []);
   
   // Auto-scroll follow playhead when enabled
   const { autoScrollEnabled } = useTimelineStore();
@@ -505,9 +530,9 @@ export const AdvancedTimelineView: React.FC<AdvancedTimelineViewProps> = ({
                     isSelected={selectedTrackId === track.id}
                     onSelectTrack={handleSelectTrack}
                     onUpdateRegion={updateRegion}
-                    onSelectRegion={() => {}}
+                    onSelectRegion={handleSelectRegion}
                     onSplitRegion={handleSplitRegion}
-                    selectedRegionIds={new Set()}
+                    selectedRegionIds={new Set(selectedRegionIds)}
                   />
                 ))}
                 

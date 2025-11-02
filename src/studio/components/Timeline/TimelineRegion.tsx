@@ -14,7 +14,7 @@ interface TimelineRegionProps {
   audioBuffer: AudioBuffer | null;
   zoom: number;
   onUpdate: (id: string, updates: Partial<Region>) => void;
-  onSelect: (id: string) => void;
+  onSelect: (id: string, multi?: boolean) => void;
   onSplit: (id: string, splitTime: number) => void;
   isSelected: boolean;
 }
@@ -33,6 +33,7 @@ export const TimelineRegion: React.FC<TimelineRegionProps> = ({
   const [isFading, setIsFading] = useState<'in' | 'out' | null>(null);
   const [dragStart, setDragStart] = useState(0);
   const [hoverX, setHoverX] = useState<number | null>(null);
+  const [showTooltip, setShowTooltip] = useState(false);
   const regionRef = useRef<HTMLDivElement>(null);
   const { currentTool } = useTimelineStore();
   
@@ -48,7 +49,9 @@ export const TimelineRegion: React.FC<TimelineRegionProps> = ({
     const clickX = e.clientX - rect.left;
     const edgeTolerance = 8;
     
-    onSelect(region.id);
+    // Multi-select with Cmd/Ctrl
+    const isMultiSelect = e.metaKey || e.ctrlKey;
+    onSelect(region.id, isMultiSelect);
     e.stopPropagation();
     
     // Split tool
@@ -192,7 +195,11 @@ export const TimelineRegion: React.FC<TimelineRegionProps> = ({
         }}
         onMouseDown={handleMouseDown}
         onMouseMove={handleRegionMouseMove}
-        onMouseLeave={() => setHoverX(null)}
+        onMouseEnter={() => setShowTooltip(true)}
+        onMouseLeave={() => {
+          setHoverX(null);
+          setShowTooltip(false);
+        }}
       >
       {/* Gradient accent border */}
       <div 
@@ -211,6 +218,8 @@ export const TimelineRegion: React.FC<TimelineRegionProps> = ({
           color={region.color}
           startTime={region.bufferOffset}
           duration={region.bufferDuration}
+          zoom={zoom}
+          displayMode="peak"
         />
       )}
       
@@ -240,11 +249,37 @@ export const TimelineRegion: React.FC<TimelineRegionProps> = ({
         />
       )}
       
+      {/* Selection info tooltip */}
+      {showTooltip && isSelected && (
+        <div className="absolute -top-16 left-1/2 -translate-x-1/2 glass-ultra px-3 py-2 rounded-lg text-xs pointer-events-none z-50 min-w-[180px]">
+          <div className="flex flex-col gap-1">
+            <div className="flex justify-between">
+              <span className="text-muted-foreground">Start:</span>
+              <span className="font-mono text-foreground">{region.startTime.toFixed(3)}s</span>
+            </div>
+            <div className="flex justify-between">
+              <span className="text-muted-foreground">Duration:</span>
+              <span className="font-mono text-foreground">{region.duration.toFixed(3)}s</span>
+            </div>
+            <div className="flex justify-between">
+              <span className="text-muted-foreground">End:</span>
+              <span className="font-mono text-foreground">{(region.startTime + region.duration).toFixed(3)}s</span>
+            </div>
+            {region.gain !== 1 && (
+              <div className="flex justify-between">
+                <span className="text-muted-foreground">Gain:</span>
+                <span className="font-mono text-foreground">{(region.gain * 100).toFixed(0)}%</span>
+              </div>
+            )}
+          </div>
+        </div>
+      )}
+      
       {/* Trim handles (visible on hover) */}
       {currentTool === 'select' && isSelected && (
         <>
-          <div className="absolute left-0 top-0 bottom-0 w-1 bg-primary opacity-0 group-hover:opacity-100 transition-opacity cursor-ew-resize" />
-          <div className="absolute right-0 top-0 bottom-0 w-1 bg-primary opacity-0 group-hover:opacity-100 transition-opacity cursor-ew-resize" />
+          <div className="absolute left-0 top-0 bottom-0 w-2 bg-primary/80 opacity-0 group-hover:opacity-100 transition-opacity cursor-ew-resize rounded-l-md" />
+          <div className="absolute right-0 top-0 bottom-0 w-2 bg-primary/80 opacity-0 group-hover:opacity-100 transition-opacity cursor-ew-resize rounded-r-md" />
         </>
       )}
       
