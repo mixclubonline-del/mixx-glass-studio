@@ -1,187 +1,145 @@
 /**
- * TakeLaneView - Comping system for recording takes
+ * Take Lane View - Manages multiple takes/comps per region
  */
 
-import { useState } from 'react';
-import { Star, Trash2, ChevronDown, ChevronUp } from 'lucide-react';
+import React, { useState } from 'react';
+import { ChevronDown, ChevronUp, Check, Eye, EyeOff } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { cn } from '@/lib/utils';
-import { WaveformRenderer } from './WaveformRenderer';
-
-interface Take {
-  id: string;
-  name: string;
-  audioBuffer: AudioBuffer;
-  isFavorite: boolean;
-  startTime: number;
-  duration: number;
-}
-
-interface CompSegment {
-  takeId: string;
-  startTime: number;
-  duration: number;
-}
+import { Take } from '@/types/timeline-extended';
 
 interface TakeLaneViewProps {
   regionId: string;
   takes: Take[];
-  activeComp: CompSegment[];
-  zoom: number;
-  onCompChange: (regionId: string, comp: CompSegment[]) => void;
-  onTakeFavorite: (takeId: string) => void;
-  onTakeDelete: (takeId: string) => void;
-  onFlattenComp: (regionId: string) => void;
+  onTakeSelect: (takeId: string) => void;
+  onTakeToggle: (takeId: string) => void;
+  onTakeComp: (takeIds: string[]) => void;
+  expanded?: boolean;
 }
 
-export function TakeLaneView({
+export const TakeLaneView: React.FC<TakeLaneViewProps> = ({
   regionId,
   takes,
-  activeComp,
-  zoom,
-  onCompChange,
-  onTakeFavorite,
-  onTakeDelete,
-  onFlattenComp,
-}: TakeLaneViewProps) {
-  const [expanded, setExpanded] = useState(true);
-  const [selectedTakeId, setSelectedTakeId] = useState<string | null>(null);
-  const [compSelectionStart, setCompSelectionStart] = useState<number | null>(null);
+  onTakeSelect,
+  onTakeToggle,
+  onTakeComp,
+  expanded = false
+}) => {
+  const [isExpanded, setIsExpanded] = useState(expanded);
+  const [selectedTakes, setSelectedTakes] = useState<Set<string>>(new Set());
 
-  if (takes.length === 0) return null;
+  if (takes.length <= 1) return null;
 
-  const handleTakeClick = (takeId: string, time: number, e: React.MouseEvent) => {
-    if (e.shiftKey && compSelectionStart !== null) {
-      // Create comp segment
-      const duration = Math.abs(time - compSelectionStart);
-      const startTime = Math.min(time, compSelectionStart);
-      
-      const newSegment: CompSegment = {
-        takeId,
-        startTime,
-        duration,
-      };
-
-      onCompChange(regionId, [...activeComp, newSegment]);
-      setCompSelectionStart(null);
+  const handleTakeClick = (takeId: string, multi: boolean) => {
+    if (multi) {
+      const newSelected = new Set(selectedTakes);
+      if (newSelected.has(takeId)) {
+        newSelected.delete(takeId);
+      } else {
+        newSelected.add(takeId);
+      }
+      setSelectedTakes(newSelected);
     } else {
-      // Start comp selection
-      setCompSelectionStart(time);
-      setSelectedTakeId(takeId);
+      onTakeSelect(takeId);
+    }
+  };
+
+  const handleCompClick = () => {
+    if (selectedTakes.size > 0) {
+      onTakeComp(Array.from(selectedTakes));
+      setSelectedTakes(new Set());
     }
   };
 
   return (
-    <div className="glass border-t border-border/50">
-      {/* Header */}
-      <div className="flex items-center justify-between px-3 py-2 border-b border-border/50 bg-secondary/20">
-        <div className="flex items-center gap-2">
-          <Button
-            variant="ghost"
-            size="icon"
-            className="w-6 h-6"
-            onClick={() => setExpanded(!expanded)}
-          >
-            {expanded ? <ChevronUp className="w-4 h-4" /> : <ChevronDown className="w-4 h-4" />}
-          </Button>
-          <span className="text-xs font-medium text-muted-foreground">
-            TAKES ({takes.length})
-          </span>
-        </div>
-
-        <div className="flex items-center gap-2">
+    <div className="border-t border-border/50">
+      {/* Take Lane Header */}
+      <div className="flex items-center gap-2 px-2 py-1 bg-background/50 hover:bg-background/80 transition-colors">
+        <Button
+          variant="ghost"
+          size="sm"
+          className="h-6 w-6 p-0"
+          onClick={() => setIsExpanded(!isExpanded)}
+        >
+          {isExpanded ? (
+            <ChevronUp className="h-3 w-3" />
+          ) : (
+            <ChevronDown className="h-3 w-3" />
+          )}
+        </Button>
+        <span className="text-xs text-muted-foreground">
+          {takes.length} takes
+        </span>
+        {selectedTakes.size > 0 && (
           <Button
             variant="outline"
             size="sm"
-            className="h-7 text-xs"
-            onClick={() => onFlattenComp(regionId)}
-            disabled={activeComp.length === 0}
+            className="h-6 text-xs ml-auto"
+            onClick={handleCompClick}
           >
-            Flatten Comp
+            Comp {selectedTakes.size} takes
           </Button>
-        </div>
+        )}
       </div>
 
-      {/* Take lanes */}
-      {expanded && (
-        <div className="space-y-1 p-2">
-          {takes.map((take, index) => (
-            <div
-              key={take.id}
-              className={cn(
-                "relative h-16 rounded border border-border/30 bg-background/50 overflow-hidden cursor-crosshair hover:ring-1 hover:ring-primary/50 transition-all",
-                selectedTakeId === take.id && "ring-2 ring-primary"
-              )}
-              onClick={(e) => {
-                const rect = e.currentTarget.getBoundingClientRect();
-                const clickX = e.clientX - rect.left;
-                const clickTime = clickX / zoom;
-                handleTakeClick(take.id, clickTime, e);
-              }}
-            >
-              {/* Take waveform */}
-              <WaveformRenderer
-                audioBuffer={take.audioBuffer}
-                width={take.duration * zoom}
-                height={64}
-                color={take.isFavorite ? 'hsl(var(--fire-red))' : 'hsl(var(--prime-purple))'}
-                startTime={0}
-                duration={take.duration}
-              />
+      {/* Take Lanes */}
+      {isExpanded && (
+        <div className="space-y-px bg-background/30">
+          {takes.map((take) => {
+            const isSelected = selectedTakes.has(take.id);
+            const isActive = take.active;
 
-              {/* Take info */}
-              <div className="absolute top-1 left-2 flex items-center gap-2 pointer-events-none">
-                <span className="text-xs font-medium text-foreground/90 mix-blend-difference">
-                  Take {index + 1}: {take.name}
-                </span>
-              </div>
+            return (
+              <div
+                key={take.id}
+                className={cn(
+                  'flex items-center gap-2 px-4 py-2 cursor-pointer transition-colors',
+                  'hover:bg-accent/50',
+                  isSelected && 'bg-accent',
+                  isActive && 'border-l-2 border-primary'
+                )}
+                onClick={(e) => handleTakeClick(take.id, e.shiftKey || e.metaKey)}
+              >
+                {/* Active Indicator */}
+                <div className="w-4 flex items-center justify-center">
+                  {isActive && <Check className="h-3 w-3 text-primary" />}
+                </div>
 
-              {/* Actions */}
-              <div className="absolute top-1 right-2 flex items-center gap-1" onClick={(e) => e.stopPropagation()}>
+                {/* Take Color */}
+                <div
+                  className="w-3 h-3 rounded-sm"
+                  style={{ backgroundColor: take.color }}
+                />
+
+                {/* Take Name */}
+                <span className="text-xs flex-1">{take.name}</span>
+
+                {/* Mute Toggle */}
                 <Button
                   variant="ghost"
-                  size="icon"
-                  className={cn(
-                    "w-6 h-6",
-                    take.isFavorite && "text-[hsl(var(--fire-red))]"
+                  size="sm"
+                  className="h-6 w-6 p-0"
+                  onClick={(e) => {
+                    e.stopPropagation();
+                    onTakeToggle(take.id);
+                  }}
+                >
+                  {take.muted ? (
+                    <EyeOff className="h-3 w-3 text-muted-foreground" />
+                  ) : (
+                    <Eye className="h-3 w-3" />
                   )}
-                  onClick={(e) => {
-                    e.stopPropagation();
-                    onTakeFavorite(take.id);
-                  }}
-                >
-                  <Star className={cn("w-3 h-3", take.isFavorite && "fill-current")} />
                 </Button>
-                <Button
-                  variant="ghost"
-                  size="icon"
-                  className="w-6 h-6"
-                  onClick={(e) => {
-                    e.stopPropagation();
-                    onTakeDelete(take.id);
-                  }}
-                >
-                  <Trash2 className="w-3 h-3" />
-                </Button>
-              </div>
 
-              {/* Comp segments overlay */}
-              {activeComp
-                .filter(seg => seg.takeId === take.id)
-                .map((seg, idx) => (
-                  <div
-                    key={idx}
-                    className="absolute top-0 bottom-0 bg-primary/30 border-l-2 border-r-2 border-primary pointer-events-none"
-                    style={{
-                      left: `${seg.startTime * zoom}px`,
-                      width: `${seg.duration * zoom}px`,
-                    }}
-                  />
-                ))}
-            </div>
-          ))}
+                {/* Selection Indicator */}
+                {isSelected && (
+                  <div className="w-2 h-2 rounded-full bg-primary" />
+                )}
+              </div>
+            );
+          })}
         </div>
       )}
     </div>
   );
-}
+};

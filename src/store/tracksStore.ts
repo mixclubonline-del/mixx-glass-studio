@@ -4,6 +4,7 @@
 
 import { create } from 'zustand';
 import { TimelineTrack, Region } from '@/types/timeline';
+import { TrackGroup, TrackTemplate, Take } from '@/types/timeline-extended';
 
 interface TracksState {
   tracks: TimelineTrack[];
@@ -12,6 +13,9 @@ interface TracksState {
   selectedRegionIds: string[];
   clipboardRegions: Region[];
   addTrackDialogOpen: boolean;
+  trackGroups: TrackGroup[];
+  trackTemplates: TrackTemplate[];
+  takes: Take[];
   
   // Actions
   addTrack: (track: TimelineTrack) => void;
@@ -31,6 +35,23 @@ interface TracksState {
   deleteRegionWithRipple: (id: string, rippleEnabled: boolean) => void;
   getTrackRegions: (trackId: string) => Region[];
   setAddTrackDialogOpen: (open: boolean) => void;
+  
+  // Track Groups
+  createTrackGroup: (name: string, trackIds: string[]) => void;
+  deleteTrackGroup: (groupId: string) => void;
+  toggleGroupCollapse: (groupId: string) => void;
+  updateGroupVCA: (groupId: string, volume: number) => void;
+  
+  // Track Templates
+  saveTrackTemplate: (name: string, description: string) => void;
+  loadTrackTemplate: (templateId: string) => void;
+  deleteTrackTemplate: (templateId: string) => void;
+  
+  // Takes Management
+  addTake: (regionId: string, take: Take) => void;
+  selectTake: (regionId: string, takeId: string) => void;
+  toggleTakeMute: (takeId: string) => void;
+  compTakes: (regionId: string, takeIds: string[]) => void;
 }
 
 export const useTracksStore = create<TracksState>((set, get) => ({
@@ -40,6 +61,9 @@ export const useTracksStore = create<TracksState>((set, get) => ({
   selectedRegionIds: [],
   clipboardRegions: [],
   addTrackDialogOpen: false,
+  trackGroups: [],
+  trackTemplates: [],
+  takes: [],
   
   addTrack: (track) => set((state) => ({
     tracks: [...state.tracks, {
@@ -194,5 +218,117 @@ export const useTracksStore = create<TracksState>((set, get) => ({
     return get().regions.filter(r => r.trackId === trackId);
   },
   
-  setAddTrackDialogOpen: (open) => set({ addTrackDialogOpen: open })
+  setAddTrackDialogOpen: (open) => set({ addTrackDialogOpen: open }),
+
+  // Track Groups
+  createTrackGroup: (name: string, trackIds: string[]) => {
+    const newGroup: TrackGroup = {
+      id: `group-${Date.now()}`,
+      name,
+      color: `hsl(${Math.random() * 360}, 70%, 50%)`,
+      trackIds,
+      vcaVolume: 100,
+      collapsed: false,
+    };
+    set((state) => ({
+      trackGroups: [...state.trackGroups, newGroup],
+      tracks: state.tracks.map(t => 
+        trackIds.includes(t.id) ? { ...t, groupId: newGroup.id } : t
+      ),
+    }));
+  },
+
+  deleteTrackGroup: (groupId: string) => {
+    set((state) => ({
+      trackGroups: state.trackGroups.filter(g => g.id !== groupId),
+      tracks: state.tracks.map(t => 
+        t.groupId === groupId ? { ...t, groupId: undefined } : t
+      ),
+    }));
+  },
+
+  toggleGroupCollapse: (groupId: string) => {
+    set((state) => ({
+      trackGroups: state.trackGroups.map(g =>
+        g.id === groupId ? { ...g, collapsed: !g.collapsed } : g
+      ),
+    }));
+  },
+
+  updateGroupVCA: (groupId: string, volume: number) => {
+    set((state) => ({
+      trackGroups: state.trackGroups.map(g =>
+        g.id === groupId ? { ...g, vcaVolume: volume } : g
+      ),
+    }));
+  },
+
+  // Track Templates
+  saveTrackTemplate: (name: string, description: string) => {
+    const state = get();
+    const newTemplate: TrackTemplate = {
+      id: `template-${Date.now()}`,
+      name,
+      description,
+      trackCount: state.tracks.length,
+      config: {
+        tracks: state.tracks,
+        routing: {},
+        effects: {},
+      },
+      createdAt: new Date().toISOString(),
+    };
+    set({ trackTemplates: [...state.trackTemplates, newTemplate] });
+  },
+
+  loadTrackTemplate: (templateId: string) => {
+    const state = get();
+    const template = state.trackTemplates.find(t => t.id === templateId);
+    if (template) {
+      set({
+        tracks: template.config.tracks.map(t => ({ ...t, id: `track-${Date.now()}-${Math.random()}` })),
+        regions: [],
+      });
+    }
+  },
+
+  deleteTrackTemplate: (templateId: string) => {
+    set((state) => ({
+      trackTemplates: state.trackTemplates.filter(t => t.id !== templateId),
+    }));
+  },
+
+  // Takes Management
+  addTake: (regionId: string, take: Take) => {
+    set((state) => ({
+      takes: [...state.takes, { ...take, regionId }],
+    }));
+  },
+
+  selectTake: (regionId: string, takeId: string) => {
+    set((state) => ({
+      takes: state.takes.map(t =>
+        t.regionId === regionId
+          ? { ...t, active: t.id === takeId }
+          : t
+      ),
+      regions: state.regions.map(r =>
+        r.id === regionId ? { ...r, takeId } : r
+      ),
+    }));
+  },
+
+  toggleTakeMute: (takeId: string) => {
+    set((state) => ({
+      takes: state.takes.map(t =>
+        t.id === takeId ? { ...t, muted: !t.muted } : t
+      ),
+    }));
+  },
+
+  compTakes: (regionId: string, takeIds: string[]) => {
+    // Create composite from selected takes
+    // This would involve audio processing to combine the takes
+    console.log('Comping takes:', regionId, takeIds);
+  },
 }));

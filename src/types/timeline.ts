@@ -27,6 +27,13 @@ export interface Region {
   // State
   locked: boolean;
   muted: boolean;
+  
+  // Production features
+  takeId?: string; // Reference to active take
+  crossfadeIn?: number; // Crossfade with previous region
+  crossfadeOut?: number; // Crossfade with next region
+  timeStretch?: number; // Time stretch factor (1.0 = normal)
+  pitchShift?: number; // Pitch shift in semitones
 }
 
 export interface Marker {
@@ -54,6 +61,10 @@ export interface TimelineTrack {
     type: 'volume' | 'pan' | 'plugin';
     points: { time: number; value: number }[];
   }[];
+  
+  // Production features
+  groupId?: string; // Track group membership
+  template?: string; // Reference to track template
 }
 
 export type GridResolution = '1/4' | '1/8' | '1/16' | '1/32' | '1/64' | '1/4T' | '1/8T' | '1/16T';
