@@ -89,7 +89,7 @@ const IndexContent = () => {
   const { isActive: beastModeActive } = useBeastModeStore();
   
   // Bloom System
-  useBloomDetection({ idleTimeout: 3000 });
+  useBloomDetection({ idleTimeout: 5000 });
   const { toggleUltraMinimal, toggleDebugMode } = useBloomStore();
   
   useEffect(() => {
@@ -833,6 +833,7 @@ const IndexContent = () => {
         <ContextualBloomWrapper
           config={{
             triggerZone: 'bottom',
+            idleOpacity: 0.4,
             className: "fixed bottom-4 left-1/2 -translate-x-1/2 z-50 w-[95%] max-w-[1400px]",
             preferenceKey: 'transport'
           }}

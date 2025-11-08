@@ -32,7 +32,7 @@ export const ContextualBloomWrapper: React.FC<ContextualBloomWrapperProps> = ({
     triggerZone,
     idleOpacity = 0.2,
     activeOpacity = 1,
-    blurAmount = 8,
+    blurAmount = 3,
     className = '',
     preferenceKey
   } = config;
@@ -74,15 +74,15 @@ export const ContextualBloomWrapper: React.FC<ContextualBloomWrapperProps> = ({
   return (
     <div
       className={cn(
-        'transition-all duration-400 ease-out',
+        'transition-all duration-600 ease-in-out',
         isVisible ? 'bloom-enter' : '',
         className
       )}
       style={{
         opacity: currentOpacity,
         filter: `blur(${currentBlur}px)`,
-        pointerEvents: currentOpacity < 0.5 ? 'none' : 'auto',
-        transitionTimingFunction: 'cubic-bezier(0.34, 1.56, 0.64, 1)'
+        pointerEvents: currentOpacity < 0.1 ? 'none' : 'auto',
+        transitionTimingFunction: 'cubic-bezier(0.4, 0, 0.2, 1)'
       }}
     >
       {children}

@@ -38,6 +38,7 @@ interface ProjectContextValue {
   toggleRecord: () => void;
   prevBar: () => void;
   nextBar: () => void;
+  seekToEnd: () => void;
   
   // Position
   getBarPosition: () => { bar: number; beat: number; tick: number };
@@ -124,6 +125,17 @@ export const ProjectProvider: React.FC<{ children: React.ReactNode }> = ({ child
     seek(nextBarTime);
   }, [audioEngine, transport.currentTime, seek]);
   
+  const seekToEnd = useCallback(() => {
+    const tracks = audioEngine.getTracks();
+    const maxDuration = tracks.reduce((max, track) => {
+      return track.buffer ? Math.max(max, track.buffer.duration) : max;
+    }, 0);
+    
+    if (maxDuration > 0) {
+      seek(maxDuration - 0.1);
+    }
+  }, [audioEngine, seek]);
+  
   const getBarPosition = useCallback(() => {
     return audioEngine.timeToBarsBeatsTicks(transport.currentTime);
   }, [audioEngine, transport.currentTime]);
@@ -170,6 +182,7 @@ export const ProjectProvider: React.FC<{ children: React.ReactNode }> = ({ child
     toggleRecord,
     prevBar,
     nextBar,
+    seekToEnd,
     getBarPosition,
     masterVolume,
     setMasterVolume,
@@ -199,6 +212,7 @@ export const useTransport = () => {
     toggleRecord: context.toggleRecord,
     prevBar: context.prevBar,
     nextBar: context.nextBar,
+    seekToEnd: context.seekToEnd,
     getBarPosition: context.getBarPosition,
   };
 };

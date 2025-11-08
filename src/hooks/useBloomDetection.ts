@@ -11,7 +11,7 @@ interface BloomDetectionConfig {
 }
 
 export const useBloomDetection = (config: BloomDetectionConfig = {}) => {
-  const { idleTimeout = 3000, proximityThreshold = 100 } = config;
+  const { idleTimeout = 5000, proximityThreshold = 100 } = config;
   
   const [mousePosition, setMousePosition] = useState({ x: 0, y: 0 });
   const { setIdle, isIdle } = useBloomStore();
@@ -19,9 +19,7 @@ export const useBloomDetection = (config: BloomDetectionConfig = {}) => {
   useEffect(() => {
     let idleTimer: NodeJS.Timeout;
     
-    const handleMouseMove = (e: MouseEvent) => {
-      setMousePosition({ x: e.clientX, y: e.clientY });
-      
+    const resetIdleTimer = () => {
       // Reset idle state
       if (isIdle) {
         setIdle(false);
@@ -34,7 +32,17 @@ export const useBloomDetection = (config: BloomDetectionConfig = {}) => {
       }, idleTimeout);
     };
     
+    const handleMouseMove = (e: MouseEvent) => {
+      setMousePosition({ x: e.clientX, y: e.clientY });
+      resetIdleTimer();
+    };
+    
+    const handleKeyDown = (e: KeyboardEvent) => {
+      resetIdleTimer();
+    };
+    
     window.addEventListener('mousemove', handleMouseMove);
+    window.addEventListener('keydown', handleKeyDown);
     
     // Start idle timer
     idleTimer = setTimeout(() => {
@@ -43,6 +51,7 @@ export const useBloomDetection = (config: BloomDetectionConfig = {}) => {
     
     return () => {
       window.removeEventListener('mousemove', handleMouseMove);
+      window.removeEventListener('keydown', handleKeyDown);
       clearTimeout(idleTimer);
     };
   }, [idleTimeout, isIdle, setIdle]);

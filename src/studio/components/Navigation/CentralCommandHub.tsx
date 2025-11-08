@@ -19,7 +19,9 @@ import {
   Volume2,
   Layout,
   Sliders,
-  Edit3
+  Edit3,
+  Repeat,
+  RotateCcw
 } from 'lucide-react';
 import { useTransport, useProject } from '@/contexts/ProjectContext';
 import { useViewStore, ViewType } from '@/store/viewStore';
@@ -38,9 +40,22 @@ export const CentralCommandHub = ({
   onTogglePluginBrowser,
   onToggleAIAssistant 
 }: CentralCommandHubProps) => {
-  const { masterVolume, setMasterVolume, bpm, setBpm, timeSignature, getBarPosition } = useProject();
-  const { transport, play, pause, stop, toggleRecord, prevBar, nextBar, toggleLoop } = useTransport();
+  const { masterVolume, setMasterVolume, bpm, setBpm, timeSignature, getBarPosition, audioEngine } = useProject();
+  const { transport, play, pause, stop, toggleRecord, prevBar, nextBar, toggleLoop, seek } = useTransport();
   const { currentView, setView } = useViewStore();
+  
+  // Seek to end functionality
+  const handleSeekToEnd = () => {
+    // Get the total duration from all tracks
+    const tracks = audioEngine.getTracks();
+    const maxDuration = tracks.reduce((max, track) => {
+      return track.buffer ? Math.max(max, track.buffer.duration) : max;
+    }, 0);
+    
+    if (maxDuration > 0) {
+      seek(maxDuration - 0.1); // Seek to just before the end
+    }
+  };
   
   // BPM editing
   const [isEditingBpm, setIsEditingBpm] = useState(false);
@@ -137,7 +152,7 @@ export const CentralCommandHub = ({
             variant="outline"
             size="sm"
             onClick={onImport}
-            className="gap-2 h-9 micro-interact"
+            className="gap-2 h-9 transition-all duration-150 hover:scale-105 active:scale-95"
             title="Import Audio Files"
           >
             <Upload className="w-4 h-4" />
@@ -148,7 +163,7 @@ export const CentralCommandHub = ({
             variant="outline"
             size="sm"
             onClick={onTogglePluginBrowser}
-            className="gap-2 h-9 micro-interact"
+            className="gap-2 h-9 transition-all duration-150 hover:scale-105 active:scale-95"
             title="Open Plugin Suite"
           >
             <Grid3x3 className="w-4 h-4" />
@@ -162,17 +177,17 @@ export const CentralCommandHub = ({
             variant="ghost"
             size="icon"
             onClick={stop}
-            className="h-9 w-9 hover:bg-muted"
+            className="h-9 w-9 hover:bg-muted transition-all duration-150 hover:scale-105 active:scale-95"
             title="Return to Start"
           >
-            <SkipBack className="h-4 w-4" />
+            <RotateCcw className="h-4 w-4" />
           </Button>
           
           <Button
             variant="ghost"
             size="icon"
             onClick={prevBar}
-            className="h-9 w-9 hover:bg-muted"
+            className="h-9 w-9 hover:bg-muted transition-all duration-150 hover:scale-105 active:scale-95"
             title="Previous Bar"
           >
             <StepBack className="h-4 w-4" />
@@ -184,8 +199,8 @@ export const CentralCommandHub = ({
             size="icon"
             onClick={transport.isPlaying ? pause : () => play()}
             className={transport.isPlaying 
-              ? 'bg-[hsl(var(--prime-500))] hover:bg-[hsl(var(--prime-500))]/90 shadow-[var(--glow-intense)] h-14 w-14 scale-110 chromatic-hover' 
-              : 'hover:bg-muted h-14 w-14 scale-110 micro-interact'
+              ? 'bg-[hsl(var(--prime-500))] hover:bg-[hsl(var(--prime-500))]/90 shadow-[var(--glow-intense)] h-14 w-14 scale-110 transition-all duration-150 hover:scale-[1.15] active:scale-105' 
+              : 'hover:bg-muted h-14 w-14 scale-110 transition-all duration-150 hover:scale-[1.15] active:scale-105'
             }
             title="Play/Pause (Space)"
           >
@@ -196,7 +211,7 @@ export const CentralCommandHub = ({
             variant="ghost"
             size="icon"
             onClick={nextBar}
-            className="h-9 w-9 hover:bg-muted"
+            className="h-9 w-9 hover:bg-muted transition-all duration-150 hover:scale-105 active:scale-95"
             title="Next Bar"
           >
             <StepForward className="h-4 w-4" />
@@ -205,8 +220,8 @@ export const CentralCommandHub = ({
           <Button
             variant="ghost"
             size="icon"
-            onClick={stop}
-            className="h-9 w-9 hover:bg-muted"
+            onClick={handleSeekToEnd}
+            className="h-9 w-9 hover:bg-muted transition-all duration-150 hover:scale-105 active:scale-95"
             title="Skip to End"
           >
             <SkipForward className="h-4 w-4" />
@@ -218,7 +233,7 @@ export const CentralCommandHub = ({
             variant={transport.isRecording ? 'destructive' : 'ghost'}
             size="icon"
             onClick={toggleRecord}
-            className={`h-9 w-9 ${transport.isRecording ? 'animate-pulse' : 'hover:bg-muted'}`}
+            className={`h-9 w-9 transition-all duration-150 ${transport.isRecording ? 'animate-pulse shadow-[0_0_20px_hsl(var(--destructive))]' : 'hover:bg-muted hover:scale-105 active:scale-95'}`}
             title="Record (Shift+Space)"
           >
             <Circle className={`h-4 w-4 ${transport.isRecording ? 'fill-current' : ''}`} />
@@ -231,10 +246,10 @@ export const CentralCommandHub = ({
             variant={transport.loopEnabled ? 'default' : 'ghost'}
             size="icon"
             onClick={toggleLoop}
-            className={`h-9 w-9 ${transport.loopEnabled ? 'bg-primary/80 shadow-[var(--glow-medium)]' : 'hover:bg-muted'}`}
+            className={`h-9 w-9 transition-all duration-150 ${transport.loopEnabled ? 'bg-primary/80 shadow-[var(--glow-medium)]' : 'hover:bg-muted hover:scale-105 active:scale-95'}`}
             title="Toggle Loop (L)"
           >
-            <span className="text-xs font-bold">⟲</span>
+            <Repeat className="h-4 w-4" />
           </Button>
         </div>
         
@@ -266,7 +281,7 @@ export const CentralCommandHub = ({
             variant="outline"
             size="sm"
             onClick={onToggleAIAssistant}
-            className="gap-2 h-9 micro-interact chromatic-hover"
+            className="gap-2 h-9 transition-all duration-200 hover:scale-105 active:scale-95 hover:shadow-[0_0_20px_hsl(var(--prime-500))]"
             title="AI Assistant"
           >
             <Bot className="w-4 h-4" />
