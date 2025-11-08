@@ -673,4 +673,223 @@
     0 0 10px hsl(var(--prime-500) / 0.3),
     0 0 20px hsl(var(--prime-500) / 0.15);
 }
+
+/* Bloom Orbital System */
+.bloom-orbital-container {
+  @apply relative flex items-center justify-center;
+  transition: transform 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+}
+
+/* Orbital Rings */
+.bloom-orbital-ring {
+  animation: bloom-ring-pulse 3s ease-in-out infinite;
+}
+
+@keyframes bloom-ring-pulse {
+  0%, 100% {
+    opacity: 0.3;
+    stroke-width: 1;
+  }
+  50% {
+    opacity: 0.6;
+    stroke-width: 1.5;
+  }
+}
+
+.bloom-ring-node {
+  animation: bloom-node-orbit 8s linear infinite;
+}
+
+@keyframes bloom-node-orbit {
+  from {
+    transform: rotate(0deg) translateX(var(--radius, 100px));
+  }
+  to {
+    transform: rotate(360deg) translateX(var(--radius, 100px));
+  }
+}
+
+/* Central Orb */
+.bloom-orb-open {
+  animation: bloom-orb-activate 0.6s ease-out;
+}
+
+@keyframes bloom-orb-activate {
+  0% {
+    transform: scale(1);
+  }
+  40% {
+    transform: scale(1.2) rotate(180deg);
+  }
+  100% {
+    transform: scale(1.1) rotate(360deg);
+  }
+}
+
+.bloom-orb-submenu {
+  @apply bg-accent/10;
+}
+
+/* Menu Items - Orbital Style */
+.bloom-menu-item-orbital {
+  @apply absolute;
+  animation: bloom-orbital-item-enter 0.7s cubic-bezier(0.34, 1.56, 0.64, 1) forwards;
+  opacity: 0;
+  z-index: 10;
+}
+
+@keyframes bloom-orbital-item-enter {
+  0% {
+    opacity: 0;
+    transform: scale(0) rotate(-180deg);
+  }
+  60% {
+    transform: scale(1.15) rotate(10deg);
+  }
+  100% {
+    opacity: 1;
+    transform: scale(1) rotate(0deg);
+  }
+}
+
+.bloom-item-glass {
+  @apply relative w-16 h-16 rounded-full;
+  @apply flex items-center justify-center;
+  backdrop-filter: blur(16px);
+  background: linear-gradient(135deg, 
+    hsl(var(--background) / 0.4), 
+    hsl(var(--background) / 0.1));
+  border: 1px solid hsl(var(--border) / 0.3);
+  transition: all 0.4s cubic-bezier(0.4, 0, 0.2, 1);
+}
+
+.bloom-menu-item-orbital:hover .bloom-item-glass {
+  transform: scale(1.2);
+  backdrop-filter: blur(20px);
+  box-shadow: 
+    0 0 30px hsl(var(--zone-color, var(--primary)) / 0.5),
+    inset 0 0 20px hsl(var(--zone-color, var(--primary)) / 0.1);
+}
+
+.bloom-item-border-glow {
+  @apply absolute inset-0 rounded-full opacity-0;
+  transition: opacity 0.4s ease-out;
+  z-index: -1;
+  filter: blur(8px);
+}
+
+.bloom-menu-item-orbital:hover .bloom-item-border-glow {
+  opacity: 0.6;
+}
+
+.bloom-item-icon-orbital {
+  @apply relative z-10 text-foreground;
+  filter: drop-shadow(0 0 4px hsl(var(--zone-color, var(--primary)) / 0.6));
+  transition: all 0.3s ease-out;
+}
+
+.bloom-menu-item-orbital:hover .bloom-item-icon-orbital {
+  transform: scale(1.1);
+  filter: drop-shadow(0 0 8px hsl(var(--zone-color, var(--primary)) / 1));
+}
+
+.bloom-item-text-orbital {
+  @apply text-2xl font-bold text-foreground;
+  filter: drop-shadow(0 0 4px hsl(var(--zone-color, var(--primary)) / 0.6));
+}
+
+.bloom-item-inner-glow {
+  @apply absolute inset-0 rounded-full opacity-0 pointer-events-none;
+  transition: opacity 0.4s ease-out;
+}
+
+.bloom-menu-item-orbital:hover .bloom-item-inner-glow {
+  opacity: 1;
+}
+
+.bloom-item-label {
+  @apply absolute top-full mt-3 text-xs font-medium text-foreground/80;
+  @apply whitespace-nowrap opacity-0;
+  transition: opacity 0.3s ease-out;
+  pointer-events: none;
+  text-shadow: 0 0 8px hsl(var(--background));
+}
+
+.bloom-menu-item-orbital:hover .bloom-item-label {
+  opacity: 1;
+}
+
+.bloom-menu-item-disabled {
+  @apply opacity-30 cursor-not-allowed pointer-events-none;
+}
+
+/* Connection Lines */
+.bloom-connection-line {
+  transition: opacity 0.3s ease-out;
+}
+
+.bloom-line-path {
+  animation: bloom-line-draw 1s ease-out forwards;
+  stroke-dashoffset: 100;
+}
+
+@keyframes bloom-line-draw {
+  to {
+    stroke-dashoffset: 0;
+  }
+}
+
+.bloom-line-node {
+  animation: bloom-node-pulse 2s ease-in-out infinite;
+}
+
+@keyframes bloom-node-pulse {
+  0%, 100% {
+    opacity: 0.6;
+    transform: scale(1);
+  }
+  50% {
+    opacity: 1;
+    transform: scale(1.5);
+  }
+}
+
+/* Tooltip */
+.bloom-tooltip {
+  @apply fixed px-3 py-2 rounded-lg;
+  @apply text-xs text-foreground font-medium;
+  backdrop-filter: blur(16px);
+  background: linear-gradient(135deg, 
+    hsl(var(--background) / 0.95), 
+    hsl(var(--background) / 0.85));
+  border: 1px solid hsl(var(--primary) / 0.3);
+  box-shadow: 0 8px 32px hsl(var(--background) / 0.8);
+  @apply pointer-events-none z-[100];
+  animation: tooltip-fade-in 0.2s ease-out;
+}
+
+@keyframes tooltip-fade-in {
+  from {
+    opacity: 0;
+    transform: translateY(5px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+/* Utility animations */
+@keyframes spin-slow {
+  from {
+    transform: rotate(0deg);
+  }
+  to {
+    transform: rotate(360deg);
+  }
+}
+
+.animate-spin-slow {
+  animation: spin-slow 8s linear infinite;
+}
 }

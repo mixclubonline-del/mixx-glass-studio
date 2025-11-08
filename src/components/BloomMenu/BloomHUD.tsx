@@ -4,8 +4,13 @@
 
 import React, { useState, useEffect, useMemo, useRef } from 'react';
 import { MenuItem, MenuConfig } from './types';
-import { ChevronLeft, Star } from 'lucide-react';
+import { ChevronLeft } from 'lucide-react';
 import { cn } from '@/lib/utils';
+import { BloomOrbitalRings } from './BloomOrbitalRings';
+import { BloomCentralOrb } from './BloomCentralOrb';
+import { BloomParticles } from './BloomParticles';
+import { BloomMenuItem } from './BloomMenuItem';
+import { BloomConnectionLine } from './BloomConnectionLine';
 
 export interface BloomHUDProps {
   size?: 'small' | 'medium' | 'large';
@@ -25,6 +30,7 @@ export const BloomHUD: React.FC<BloomHUDProps> = ({
   const allMenuItemsRef = useRef<Map<string, MenuItem>>(new Map());
   const [isDragging, setIsDragging] = useState(false);
   const [position, setPosition] = useState({ x: 0, y: 0 });
+  const [hoveredIndex, setHoveredIndex] = useState<number | null>(null);
   const dragStartRef = useRef({ x: 0, y: 0 });
   const containerRef = useRef<HTMLDivElement>(null);
 
@@ -100,13 +106,15 @@ export const BloomHUD: React.FC<BloomHUDProps> = ({
     setMenuPath(prev => prev.slice(0, -1));
   };
 
-  const handleMouseEnter = (e: React.MouseEvent, description: string | undefined) => {
+  const handleMouseEnter = (e: React.MouseEvent, description: string | undefined, index: number) => {
+    setHoveredIndex(index);
     if (description) {
       setTooltip({ content: description, x: e.clientX, y: e.clientY });
     }
   };
 
   const handleMouseLeave = () => {
+    setHoveredIndex(null);
     setTooltip(null);
   };
 
@@ -132,21 +140,15 @@ export const BloomHUD: React.FC<BloomHUDProps> = ({
   const parentMenuKey = currentMenu?.parent;
   const parentMenuTitle = parentMenuKey ? finalMenuConfig[parentMenuKey]?.items.find(item => item.subMenu === currentMenuKey)?.name : 'CORE';
 
-  const radius = useMemo(() => {
+  // Multi-ring configuration
+  const rings = useMemo(() => {
     const itemCount = currentMenu?.items.length || 0;
-    if (itemCount === 0) return 100;
-
-    const isLargeScreen = window.innerWidth > 768;
-    const baseRadius = isLargeScreen ? 140 : 110;
-    const baseItemCount = 6;
-    const factor = isLargeScreen ? 12 : 10;
-    const dynamicRadius = baseRadius + (itemCount - baseItemCount) * factor;
-
-    const minRadius = isLargeScreen ? 120 : 100;
-    const maxRadius = isLargeScreen ? 180 : 140;
-
-    return Math.max(minRadius, Math.min(dynamicRadius, maxRadius));
+    if (itemCount <= 4) return [160];
+    if (itemCount <= 8) return [160, 240];
+    return [140, 200, 280];
   }, [currentMenu]);
+
+  const primaryRing = rings[rings.length - 1];
 
   const isSubMenu = menuPath.length > 1;
 
@@ -187,69 +189,79 @@ export const BloomHUD: React.FC<BloomHUDProps> = ({
   return (
     <div 
       ref={containerRef}
-      className="relative flex items-center justify-center" 
+      className="bloom-orbital-container" 
       onMouseMove={handleMouseMove}
       style={{ 
-        width: radius * 2.5, 
-        height: radius * 2.5,
+        width: primaryRing * 2.8, 
+        height: primaryRing * 2.8,
         transform: `translate(${position.x}px, ${position.y}px)`,
         cursor: isDragging ? 'grabbing' : isMenuOpen ? 'default' : 'grab'
       }}
     >
-      <div
-        className={cn(
-          'bloom-dial',
-          isMenuOpen && 'bloom-dial-open',
-          isSubMenu && 'bloom-dial-submenu',
-          isDragging && 'bloom-dial-dragging'
-        )}
+      {/* Particle system */}
+      <BloomParticles isOpen={isMenuOpen} count={80} />
+
+      {/* Orbital rings */}
+      <BloomOrbitalRings isOpen={isMenuOpen} rings={rings} />
+
+      {/* Connection lines */}
+      {isMenuOpen && currentMenu && (
+        <svg className="absolute inset-0 pointer-events-none" style={{ width: '100%', height: '100%' }}>
+          <g transform={`translate(${primaryRing * 1.4}, ${primaryRing * 1.4})`}>
+            {currentMenu.items.map((item, index) => {
+              const angle = (index / currentMenu.items.length) * 2 * Math.PI - Math.PI / 2;
+              const x = Math.cos(angle) * primaryRing;
+              const y = Math.sin(angle) * primaryRing;
+              return (
+                <BloomConnectionLine
+                  key={`line-${index}`}
+                  x={x}
+                  y={y}
+                  angle={(angle * 180) / Math.PI}
+                  index={index}
+                  isHovered={hoveredIndex === index}
+                />
+              );
+            })}
+          </g>
+        </svg>
+      )}
+
+      {/* Central orb */}
+      <BloomCentralOrb
+        isOpen={isMenuOpen}
+        isSubMenu={isSubMenu}
         onClick={isSubMenu ? handleBackClick : handleCoreClick}
         onMouseDown={handleMouseDown}
-      >
-        {isSubMenu ? (
-          <ChevronLeft className="w-6 h-6" />
-        ) : (
-          <div className="bloom-dial-icon">
-            <div className="bloom-dial-ring" />
-            <div className="bloom-dial-ring bloom-dial-ring-delayed" />
-          </div>
-        )}
-      </div>
+        icon={isSubMenu ? <ChevronLeft className="w-6 h-6" /> : undefined}
+      />
 
+      {/* Menu items */}
       {isMenuOpen && currentMenu && (
         <>
           {currentMenu.items.map((item, index) => {
             const angle = (index / currentMenu.items.length) * 2 * Math.PI - Math.PI / 2;
-            const x = Math.cos(angle) * radius;
-            const y = Math.sin(angle) * radius;
+            const x = Math.cos(angle) * primaryRing;
+            const y = Math.sin(angle) * primaryRing;
 
             return (
-              <button
+              <BloomMenuItem
                 key={`${item.name}-${index}`}
-                className={cn(
-                  'bloom-item',
-                  item.disabled && 'bloom-item-disabled'
-                )}
-                style={{
-                  transform: `translate(${x}px, ${y}px)`,
-                  animationDelay: `${index * 50}ms`
-                }}
+                item={item}
+                x={x}
+                y={y}
+                angle={(angle * 180) / Math.PI}
+                index={index}
                 onClick={() => handleItemClick(item)}
-                onMouseEnter={(e) => handleMouseEnter(e, item.description)}
+                onMouseEnter={(e) => handleMouseEnter(e, item.description, index)}
                 onMouseLeave={handleMouseLeave}
-                disabled={item.disabled}
-              >
-                {item.icon ? (
-                  <div className="bloom-item-icon">{item.icon}</div>
-                ) : (
-                  <span className="bloom-item-text">{item.name}</span>
-                )}
-              </button>
+              />
             );
           })}
         </>
       )}
 
+      {/* Tooltip */}
       {tooltip && (
         <div
           className="bloom-tooltip"
