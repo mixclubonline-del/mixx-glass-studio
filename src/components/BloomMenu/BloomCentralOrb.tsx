@@ -40,7 +40,7 @@ export const BloomCentralOrb: React.FC<BloomCentralOrbProps> = ({
       {/* Main orb */}
       <button
         className={cn(
-          "relative w-20 h-20 rounded-full",
+          "relative w-16 h-16 rounded-full",
           "glass-ultra border border-primary/30",
           "flex items-center justify-center",
           "transition-all duration-600 cursor-grab active:cursor-grabbing",

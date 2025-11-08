@@ -752,8 +752,8 @@
   }
 }
 
-.bloom-item-glass {
-  @apply relative w-16 h-16 rounded-full;
+.bloom-item-glass-compact {
+  @apply relative w-14 h-14 rounded-full;
   @apply flex items-center justify-center;
   backdrop-filter: blur(16px);
   background: linear-gradient(135deg, 
@@ -763,8 +763,8 @@
   transition: all 0.4s cubic-bezier(0.4, 0, 0.2, 1);
 }
 
-.bloom-menu-item-orbital:hover .bloom-item-glass {
-  transform: scale(1.2);
+.bloom-menu-item-orbital:hover .bloom-item-glass-compact {
+  transform: scale(1.15);
   backdrop-filter: blur(20px);
   box-shadow: 
     0 0 30px hsl(var(--zone-color, var(--primary)) / 0.5),

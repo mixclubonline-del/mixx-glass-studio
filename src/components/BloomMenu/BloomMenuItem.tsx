@@ -54,7 +54,7 @@ export const BloomMenuItem: React.FC<BloomMenuItemProps> = ({
       disabled={item.disabled}
     >
       {/* Glassmorphic container */}
-      <div className="bloom-item-glass">
+      <div className="bloom-item-glass-compact">
         {/* Border gradient */}
         <div 
           className="bloom-item-border-glow"

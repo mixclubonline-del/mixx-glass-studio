@@ -8,7 +8,6 @@ import { ChevronLeft } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { BloomOrbitalRings } from './BloomOrbitalRings';
 import { BloomCentralOrb } from './BloomCentralOrb';
-import { BloomParticles } from './BloomParticles';
 import { BloomMenuItem } from './BloomMenuItem';
 import { BloomConnectionLine } from './BloomConnectionLine';
 
@@ -143,9 +142,9 @@ export const BloomHUD: React.FC<BloomHUDProps> = ({
   // Multi-ring configuration
   const rings = useMemo(() => {
     const itemCount = currentMenu?.items.length || 0;
-    if (itemCount <= 4) return [160];
-    if (itemCount <= 8) return [160, 240];
-    return [140, 200, 280];
+    if (itemCount <= 4) return [110];
+    if (itemCount <= 8) return [110, 170];
+    return [100, 140, 190];
   }, [currentMenu]);
 
   const primaryRing = rings[rings.length - 1];
@@ -192,22 +191,19 @@ export const BloomHUD: React.FC<BloomHUDProps> = ({
       className="bloom-orbital-container" 
       onMouseMove={handleMouseMove}
       style={{ 
-        width: primaryRing * 2.8, 
-        height: primaryRing * 2.8,
+        width: primaryRing * 2.5, 
+        height: primaryRing * 2.5,
         transform: `translate(${position.x}px, ${position.y}px)`,
         cursor: isDragging ? 'grabbing' : isMenuOpen ? 'default' : 'grab'
       }}
     >
-      {/* Particle system */}
-      <BloomParticles isOpen={isMenuOpen} count={80} />
-
       {/* Orbital rings */}
       <BloomOrbitalRings isOpen={isMenuOpen} rings={rings} />
 
       {/* Connection lines */}
       {isMenuOpen && currentMenu && (
         <svg className="absolute inset-0 pointer-events-none" style={{ width: '100%', height: '100%' }}>
-          <g transform={`translate(${primaryRing * 1.4}, ${primaryRing * 1.4})`}>
+          <g transform={`translate(${primaryRing * 1.25}, ${primaryRing * 1.25})`}>
             {currentMenu.items.map((item, index) => {
               const angle = (index / currentMenu.items.length) * 2 * Math.PI - Math.PI / 2;
               const x = Math.cos(angle) * primaryRing;
