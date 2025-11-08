@@ -2,7 +2,7 @@
  * Sample Chop Mode - Visual sample chopping with transient detection
  */
 
-import React, { useState, useEffect, useRef } from 'react';
+import React, { useState, useEffect, useRef, useCallback } from 'react';
 import { Button } from '@/components/ui/button';
 import { Slider } from '@/components/ui/slider';
 import { Label } from '@/components/ui/label';
@@ -13,7 +13,9 @@ import {
   Wand2, 
   Trash2,
   Layers,
-  Check
+  Check,
+  Play,
+  Pause
 } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { TransientDetector, Transient } from '@/audio/analysis/TransientDetector';
@@ -44,7 +46,24 @@ export const SampleChopMode: React.FC<SampleChopModeProps> = ({
   const [threshold, setThreshold] = useState(0.3);
   const [sensitivity, setSensitivity] = useState(0.7);
   const [showTransients, setShowTransients] = useState(true);
+  const [isPlaying, setIsPlaying] = useState(false);
+  const [currentSliceIndex, setCurrentSliceIndex] = useState(-1);
   const canvasRef = useRef<HTMLCanvasElement>(null);
+  const audioContextRef = useRef<AudioContext | null>(null);
+  const sourceNodeRef = useRef<AudioBufferSourceNode | null>(null);
+
+  // Initialize audio context
+  useEffect(() => {
+    audioContextRef.current = new AudioContext();
+    
+    return () => {
+      if (sourceNodeRef.current) {
+        sourceNodeRef.current.stop();
+        sourceNodeRef.current.disconnect();
+      }
+      audioContextRef.current?.close();
+    };
+  }, []);
 
   // Detect transients on load
   useEffect(() => {
@@ -57,6 +76,23 @@ export const SampleChopMode: React.FC<SampleChopModeProps> = ({
     
     setTransients(detected);
   }, [audioBuffer, threshold, sensitivity]);
+
+  // Keyboard handler for space bar
+  useEffect(() => {
+    const handleKeyDown = (e: KeyboardEvent) => {
+      if (e.code === 'Space' && !e.repeat) {
+        e.preventDefault();
+        if (isPlaying) {
+          stopPreview();
+        } else {
+          playPreview();
+        }
+      }
+    };
+
+    window.addEventListener('keydown', handleKeyDown);
+    return () => window.removeEventListener('keydown', handleKeyDown);
+  }, [isPlaying, sliceMarkers, audioBuffer]);
 
   // Draw waveform and markers
   useEffect(() => {
@@ -128,29 +164,30 @@ export const SampleChopMode: React.FC<SampleChopModeProps> = ({
     }
 
     // Draw slice markers
-    sliceMarkers.forEach((marker) => {
+    sliceMarkers.forEach((marker, index) => {
       const x = marker * zoom;
+      const isCurrentSlice = index === currentSliceIndex;
 
       // Marker line
-      ctx.strokeStyle = 'hsl(320 100% 60%)';
-      ctx.lineWidth = 3;
-      ctx.shadowBlur = 8;
-      ctx.shadowColor = 'hsl(320 100% 60%)';
+      ctx.strokeStyle = isCurrentSlice ? 'hsl(142 100% 60%)' : 'hsl(320 100% 60%)';
+      ctx.lineWidth = isCurrentSlice ? 4 : 3;
+      ctx.shadowBlur = isCurrentSlice ? 12 : 8;
+      ctx.shadowColor = isCurrentSlice ? 'hsl(142 100% 60%)' : 'hsl(320 100% 60%)';
       ctx.beginPath();
       ctx.moveTo(x, 0);
       ctx.lineTo(x, height);
       ctx.stroke();
 
       // Marker handle
-      ctx.fillStyle = 'hsl(320 100% 60%)';
+      ctx.fillStyle = isCurrentSlice ? 'hsl(142 100% 60%)' : 'hsl(320 100% 60%)';
       ctx.shadowBlur = 0;
       ctx.beginPath();
-      ctx.arc(x, 0, 6, 0, Math.PI * 2);
+      ctx.arc(x, 0, isCurrentSlice ? 8 : 6, 0, Math.PI * 2);
       ctx.fill();
     });
 
     ctx.shadowBlur = 0;
-  }, [region, audioBuffer, zoom, sliceMarkers, transients, showTransients]);
+  }, [region, audioBuffer, zoom, sliceMarkers, transients, showTransients, currentSliceIndex]);
 
   const handleCanvasClick = (e: React.MouseEvent<HTMLCanvasElement>) => {
     const rect = e.currentTarget.getBoundingClientRect();
@@ -210,6 +247,81 @@ export const SampleChopMode: React.FC<SampleChopModeProps> = ({
     toast.success(`Converted to pattern with ${sliceMarkers.length} slices`);
   };
 
+  const playPreview = useCallback(() => {
+    if (!audioBuffer || !audioContextRef.current) return;
+
+    stopPreview();
+
+    if (sliceMarkers.length === 0) {
+      // Play entire sample if no slices
+      const source = audioContextRef.current.createBufferSource();
+      source.buffer = audioBuffer;
+      source.connect(audioContextRef.current.destination);
+      source.start();
+      source.onended = () => {
+        setIsPlaying(false);
+        setCurrentSliceIndex(-1);
+      };
+      sourceNodeRef.current = source;
+      setIsPlaying(true);
+      return;
+    }
+
+    // Play slices sequentially
+    setIsPlaying(true);
+    let sliceIndex = 0;
+
+    const playNextSlice = () => {
+      if (sliceIndex >= sliceMarkers.length && !audioContextRef.current) {
+        setIsPlaying(false);
+        setCurrentSliceIndex(-1);
+        return;
+      }
+
+      setCurrentSliceIndex(sliceIndex);
+
+      const startTime = sliceMarkers[sliceIndex];
+      const endTime = sliceIndex < sliceMarkers.length - 1 
+        ? sliceMarkers[sliceIndex + 1] 
+        : audioBuffer.duration;
+      const duration = endTime - startTime;
+
+      const source = audioContextRef.current!.createBufferSource();
+      source.buffer = audioBuffer;
+      source.connect(audioContextRef.current!.destination);
+      source.start(0, startTime, duration);
+      
+      sourceNodeRef.current = source;
+      sliceIndex++;
+
+      source.onended = () => {
+        if (sliceIndex < sliceMarkers.length) {
+          playNextSlice();
+        } else {
+          setIsPlaying(false);
+          setCurrentSliceIndex(-1);
+          sourceNodeRef.current = null;
+        }
+      };
+    };
+
+    playNextSlice();
+  }, [audioBuffer, sliceMarkers]);
+
+  const stopPreview = useCallback(() => {
+    if (sourceNodeRef.current) {
+      try {
+        sourceNodeRef.current.stop();
+        sourceNodeRef.current.disconnect();
+      } catch (e) {
+        // Already stopped
+      }
+      sourceNodeRef.current = null;
+    }
+    setIsPlaying(false);
+    setCurrentSliceIndex(-1);
+  }, []);
+
   return (
     <div className="fixed inset-0 z-50 bg-black/90 backdrop-blur-sm flex items-center justify-center">
       <div className="w-[90vw] h-[80vh] bg-background rounded-lg border border-gradient shadow-2xl flex flex-col">
@@ -230,6 +342,24 @@ export const SampleChopMode: React.FC<SampleChopModeProps> = ({
         {/* Controls */}
         <div className="px-4 py-3 border-b border-border/30 space-y-3">
           <div className="flex items-center gap-2">
+            <Button 
+              size="sm" 
+              variant={isPlaying ? "secondary" : "outline"}
+              onClick={isPlaying ? stopPreview : playPreview}
+            >
+              {isPlaying ? (
+                <>
+                  <Pause className="h-3 w-3 mr-1" />
+                  Stop Preview
+                </>
+              ) : (
+                <>
+                  <Play className="h-3 w-3 mr-1" />
+                  Preview (Space)
+                </>
+              )}
+            </Button>
+            <div className="h-4 w-px bg-border/30" />
             <Button size="sm" onClick={handleAutoSliceTransients}>
               <Wand2 className="h-3 w-3 mr-1" />
               Auto-Slice Transients
@@ -292,6 +422,7 @@ export const SampleChopMode: React.FC<SampleChopModeProps> = ({
           <div className="flex items-center gap-2 text-xs text-muted-foreground">
             <span>• Click waveform to add slice markers</span>
             <span>• Click marker to remove</span>
+            <span>• Press Space to preview</span>
             <span>• {sliceMarkers.length} markers</span>
             <span>• {transients.length} transients detected</span>
           </div>
