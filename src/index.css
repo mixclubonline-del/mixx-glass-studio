@@ -298,6 +298,109 @@
     animation: ripple 2s ease-out infinite;
   }
   
+  /* Bloom Menu Styles */
+  .bloom-dial {
+    @apply absolute w-16 h-16 rounded-full cursor-pointer flex items-center justify-center z-50;
+    @apply bg-gradient-to-br from-primary/20 to-accent/20 backdrop-blur-md;
+    @apply border-2 border-primary/30 shadow-[var(--glow-medium)];
+    transition: all 0.4s cubic-bezier(0.4, 0, 0.2, 1);
+  }
+
+  .bloom-dial:hover {
+    @apply scale-110 shadow-[var(--glow-intense)];
+    @apply border-primary/60;
+  }
+
+  .bloom-dial-open {
+    @apply bg-gradient-to-br from-primary/40 to-accent/40;
+    @apply border-primary/60;
+    transform: scale(1.05) rotate(90deg);
+  }
+
+  .bloom-dial-submenu {
+    @apply bg-gradient-to-br from-accent/40 to-primary/40;
+    transform: scale(1) rotate(0deg);
+  }
+
+  .bloom-dial-icon {
+    @apply relative w-8 h-8;
+  }
+
+  .bloom-dial-ring {
+    @apply absolute inset-0 rounded-full border-2 border-primary;
+    animation: bloom-pulse 2s cubic-bezier(0.4, 0, 0.6, 1) infinite;
+  }
+
+  .bloom-dial-ring-delayed {
+    animation-delay: 1s;
+  }
+
+  @keyframes bloom-pulse {
+    0%, 100% {
+      transform: scale(1);
+      opacity: 1;
+    }
+    50% {
+      transform: scale(1.5);
+      opacity: 0;
+    }
+  }
+
+  .bloom-item {
+    @apply absolute w-12 h-12 rounded-full cursor-pointer flex items-center justify-center;
+    @apply bg-gradient-to-br from-background/90 to-background/70 backdrop-blur-sm;
+    @apply border border-border/50 shadow-lg;
+    @apply transition-all duration-200;
+    animation: bloom-item-enter 0.3s cubic-bezier(0.34, 1.56, 0.64, 1) forwards;
+    transform-origin: center;
+  }
+
+  .bloom-item:hover {
+    @apply scale-125 shadow-[var(--glow-medium)] border-primary/60;
+    @apply bg-gradient-to-br from-primary/20 to-accent/20;
+    z-index: 10;
+  }
+
+  .bloom-item:active {
+    @apply scale-110;
+  }
+
+  .bloom-item-disabled {
+    @apply opacity-40 cursor-not-allowed;
+  }
+
+  .bloom-item-disabled:hover {
+    @apply scale-100 shadow-lg border-border/50;
+  }
+
+  @keyframes bloom-item-enter {
+    0% {
+      transform: scale(0) translate(0, 0);
+      opacity: 0;
+    }
+    60% {
+      transform: scale(1.2);
+    }
+    100% {
+      opacity: 1;
+    }
+  }
+
+  .bloom-item-icon {
+    @apply flex items-center justify-center text-foreground;
+  }
+
+  .bloom-item-text {
+    @apply text-[10px] font-semibold text-foreground text-center px-1;
+  }
+
+  .bloom-tooltip {
+    @apply fixed px-3 py-1.5 rounded-md glass-ultra text-xs font-medium;
+    @apply text-foreground shadow-[var(--shadow-float)] border border-border/30;
+    @apply pointer-events-none z-[100];
+    animation: fade-in 0.2s ease-out;
+  }
+  
   .animate-float-up {
     animation: float-up 3s ease-out forwards;
   }

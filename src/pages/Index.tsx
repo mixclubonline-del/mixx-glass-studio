@@ -40,6 +40,7 @@ import { ContextualBloomWrapper } from "@/components/Bloom/ContextualBloomWrappe
 import { EdgeBloomTrigger } from "@/components/Bloom/EdgeBloomTrigger";
 import { useBloomDetection } from "@/hooks/useBloomDetection";
 import { useBloomStore } from "@/store/bloomStore";
+import { BloomHUD, createMenuConfig } from "@/components/BloomMenu";
 
 const IndexContent = () => {
   const engineRef = useRef<AudioEngine | null>(null);
@@ -844,6 +845,67 @@ const IndexContent = () => {
             onToggleAIAssistant={() => setShowAIAssistant(!showAIAssistant)}
           />
         </ContextualBloomWrapper>
+        
+        {/* Bloom Menu - Bottom Right Corner, Above Transport */}
+        <div className="fixed bottom-28 right-8 z-[60]">
+          <BloomHUD
+            size="medium"
+            menuConfig={createMenuConfig({
+              onImport: handleImport,
+              onExport: async () => {
+                toast({
+                  title: "Export",
+                  description: "Export functionality coming soon",
+                });
+              },
+              onSave: () => {
+                toast({
+                  title: "Project Saved",
+                  description: "Your project has been saved",
+                });
+              },
+              onLoad: () => {
+                toast({
+                  title: "Load Project",
+                  description: "Project loading functionality coming soon",
+                });
+              },
+              onTogglePluginBrowser: () => togglePanel('browser'),
+              onToggleAIAssistant: () => setShowAIAssistant(!showAIAssistant),
+              onPlay: () => {
+                if (engineRef.current) {
+                  engineRef.current.play();
+                  setIsPlaying(true);
+                }
+              },
+              onPause: () => {
+                if (engineRef.current) {
+                  engineRef.current.pause();
+                  setIsPlaying(false);
+                }
+              },
+              onStop: () => {
+                if (engineRef.current) {
+                  engineRef.current.stop();
+                  setIsPlaying(false);
+                  setCurrentTime(0);
+                }
+              },
+              onRecord: () => {
+                toast({
+                  title: "Recording",
+                  description: "Record functionality coming soon",
+                });
+              },
+              onSwitchView: (view) => {
+                useViewStore.getState().setView(view);
+              }
+            })}
+            onAction={(actionName, payload) => {
+              console.log('Bloom action:', actionName, payload);
+            }}
+          />
+        </div>
         
         {/* Transport is now permanently visible - no toggle buttons needed */}
       </div>
