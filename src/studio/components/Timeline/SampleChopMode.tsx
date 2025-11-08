@@ -22,14 +22,19 @@ import { TransientDetector, Transient } from '@/audio/analysis/TransientDetector
 import { Region } from '@/types/timeline';
 import { toast } from 'sonner';
 
+interface SliceMarker {
+  time: number;
+  velocity: number; // 0.0 to 1.0
+}
+
 interface SampleChopModeProps {
   region: Region;
   audioBuffer: AudioBuffer;
   zoom: number;
   scrollX: number;
   onClose: () => void;
-  onCreateSlices: (slicePoints: number[]) => void;
-  onConvertToPattern: (slicePoints: number[]) => void;
+  onCreateSlices: (slicePoints: number[], velocities?: number[]) => void;
+  onConvertToPattern: (slicePoints: number[], velocities?: number[]) => void;
 }
 
 export const SampleChopMode: React.FC<SampleChopModeProps> = ({
@@ -41,7 +46,7 @@ export const SampleChopMode: React.FC<SampleChopModeProps> = ({
   onCreateSlices,
   onConvertToPattern,
 }) => {
-  const [sliceMarkers, setSliceMarkers] = useState<number[]>([]);
+  const [sliceMarkers, setSliceMarkers] = useState<SliceMarker[]>([]);
   const [transients, setTransients] = useState<Transient[]>([]);
   const [threshold, setThreshold] = useState(0.3);
   const [sensitivity, setSensitivity] = useState(0.7);
@@ -165,25 +170,47 @@ export const SampleChopMode: React.FC<SampleChopModeProps> = ({
 
     // Draw slice markers
     sliceMarkers.forEach((marker, index) => {
-      const x = marker * zoom;
+      const x = marker.time * zoom;
       const isCurrentSlice = index === currentSliceIndex;
+      const velocityPercent = Math.round(marker.velocity * 100);
 
-      // Marker line
-      ctx.strokeStyle = isCurrentSlice ? 'hsl(142 100% 60%)' : 'hsl(320 100% 60%)';
-      ctx.lineWidth = isCurrentSlice ? 4 : 3;
-      ctx.shadowBlur = isCurrentSlice ? 12 : 8;
-      ctx.shadowColor = isCurrentSlice ? 'hsl(142 100% 60%)' : 'hsl(320 100% 60%)';
+      // Color based on velocity (red = high, yellow = medium, cyan = low)
+      let hue = 320; // Default magenta
+      if (isCurrentSlice) {
+        hue = 142; // Green when playing
+      } else if (marker.velocity > 0.7) {
+        hue = 0; // Red for high velocity
+      } else if (marker.velocity > 0.4) {
+        hue = 45; // Yellow for medium velocity
+      } else {
+        hue = 191; // Cyan for low velocity
+      }
+
+      const color = `hsl(${hue} 100% 60%)`;
+
+      // Marker line with alpha based on velocity
+      ctx.strokeStyle = color;
+      ctx.lineWidth = isCurrentSlice ? 4 : 2 + (marker.velocity * 2);
+      ctx.shadowBlur = isCurrentSlice ? 12 : 4 + (marker.velocity * 8);
+      ctx.shadowColor = color;
       ctx.beginPath();
       ctx.moveTo(x, 0);
       ctx.lineTo(x, height);
       ctx.stroke();
 
       // Marker handle
-      ctx.fillStyle = isCurrentSlice ? 'hsl(142 100% 60%)' : 'hsl(320 100% 60%)';
+      ctx.fillStyle = color;
       ctx.shadowBlur = 0;
       ctx.beginPath();
-      ctx.arc(x, 0, isCurrentSlice ? 8 : 6, 0, Math.PI * 2);
+      const radius = isCurrentSlice ? 8 : 4 + (marker.velocity * 4);
+      ctx.arc(x, 0, radius, 0, Math.PI * 2);
       ctx.fill();
+
+      // Velocity label
+      ctx.fillStyle = 'rgba(255, 255, 255, 0.9)';
+      ctx.font = '10px monospace';
+      ctx.textAlign = 'center';
+      ctx.fillText(`${velocityPercent}`, x, height - 5);
     });
 
     ctx.shadowBlur = 0;
@@ -197,29 +224,68 @@ export const SampleChopMode: React.FC<SampleChopModeProps> = ({
     // Check if clicking near existing marker to remove it
     const clickThreshold = 5 / zoom;
     const nearbyMarkerIndex = sliceMarkers.findIndex(
-      (marker) => Math.abs(marker - time) < clickThreshold
+      (marker) => Math.abs(marker.time - time) < clickThreshold
     );
 
     if (nearbyMarkerIndex !== -1) {
       // Remove marker
       setSliceMarkers((prev) => prev.filter((_, i) => i !== nearbyMarkerIndex));
     } else {
-      // Add marker
-      setSliceMarkers((prev) => [...prev, time].sort((a, b) => a - b));
+      // Add marker with calculated velocity based on waveform amplitude
+      const sampleIndex = Math.floor((time / audioBuffer.duration) * audioBuffer.length);
+      const channelData = audioBuffer.getChannelData(0);
+      
+      // Calculate RMS in a small window around this point
+      const windowSize = 512;
+      const start = Math.max(0, sampleIndex - windowSize / 2);
+      const end = Math.min(channelData.length, sampleIndex + windowSize / 2);
+      
+      let sum = 0;
+      for (let i = start; i < end; i++) {
+        sum += channelData[i] * channelData[i];
+      }
+      const rms = Math.sqrt(sum / (end - start));
+      const velocity = Math.min(1, rms * 3); // Scale and clamp to 0-1
+
+      setSliceMarkers((prev) => 
+        [...prev, { time, velocity }].sort((a, b) => a.time - b.time)
+      );
     }
   };
 
   const handleAutoSliceTransients = () => {
-    const slicePoints = transients.map((t) => t.time);
+    const slicePoints: SliceMarker[] = transients.map((t) => ({
+      time: t.time,
+      velocity: t.strength, // Use transient strength as velocity
+    }));
     setSliceMarkers(slicePoints);
-    toast.success(`Added ${slicePoints.length} slice markers at transients`);
+    toast.success(`Added ${slicePoints.length} slice markers with velocity from transients`);
   };
 
   const handleAutoSliceGrid = () => {
     const bpm = 120; // TODO: Get from project
-    const slicePoints = TransientDetector.sliceToGrid(audioBuffer, bpm, 16);
+    const sliceTimes = TransientDetector.sliceToGrid(audioBuffer, bpm, 16);
+    
+    // Calculate velocity for each grid slice based on RMS
+    const channelData = audioBuffer.getChannelData(0);
+    const slicePoints: SliceMarker[] = sliceTimes.map((time) => {
+      const sampleIndex = Math.floor((time / audioBuffer.duration) * audioBuffer.length);
+      const windowSize = 1024;
+      const start = Math.max(0, sampleIndex);
+      const end = Math.min(channelData.length, sampleIndex + windowSize);
+      
+      let sum = 0;
+      for (let i = start; i < end; i++) {
+        sum += channelData[i] * channelData[i];
+      }
+      const rms = Math.sqrt(sum / (end - start));
+      const velocity = Math.min(1, rms * 3);
+      
+      return { time, velocity };
+    });
+    
     setSliceMarkers(slicePoints);
-    toast.success(`Added ${slicePoints.length} grid-aligned slices`);
+    toast.success(`Added ${slicePoints.length} grid-aligned slices with velocity`);
   };
 
   const handleClearMarkers = () => {
@@ -232,9 +298,11 @@ export const SampleChopMode: React.FC<SampleChopModeProps> = ({
       toast.error('Add slice markers first');
       return;
     }
-    onCreateSlices(sliceMarkers);
+    const times = sliceMarkers.map(m => m.time);
+    const velocities = sliceMarkers.map(m => m.velocity);
+    onCreateSlices(times, velocities);
     onClose();
-    toast.success(`Created ${sliceMarkers.length} slices`);
+    toast.success(`Created ${sliceMarkers.length} slices with velocity`);
   };
 
   const handleConvertToPattern = () => {
@@ -242,9 +310,11 @@ export const SampleChopMode: React.FC<SampleChopModeProps> = ({
       toast.error('Add slice markers first');
       return;
     }
-    onConvertToPattern(sliceMarkers);
+    const times = sliceMarkers.map(m => m.time);
+    const velocities = sliceMarkers.map(m => m.velocity);
+    onConvertToPattern(times, velocities);
     onClose();
-    toast.success(`Converted to pattern with ${sliceMarkers.length} slices`);
+    toast.success(`Converted to pattern with ${sliceMarkers.length} slices and velocity`);
   };
 
   const playPreview = useCallback(() => {
@@ -280,15 +350,21 @@ export const SampleChopMode: React.FC<SampleChopModeProps> = ({
 
       setCurrentSliceIndex(sliceIndex);
 
-      const startTime = sliceMarkers[sliceIndex];
+      const startTime = sliceMarkers[sliceIndex].time;
       const endTime = sliceIndex < sliceMarkers.length - 1 
-        ? sliceMarkers[sliceIndex + 1] 
+        ? sliceMarkers[sliceIndex + 1].time
         : audioBuffer.duration;
       const duration = endTime - startTime;
+      const velocity = sliceMarkers[sliceIndex].velocity;
 
       const source = audioContextRef.current!.createBufferSource();
+      const gainNode = audioContextRef.current!.createGain();
+      
       source.buffer = audioBuffer;
-      source.connect(audioContextRef.current!.destination);
+      gainNode.gain.value = velocity; // Apply velocity as gain
+      
+      source.connect(gainNode);
+      gainNode.connect(audioContextRef.current!.destination);
       source.start(0, startTime, duration);
       
       sourceNodeRef.current = source;
@@ -423,8 +499,8 @@ export const SampleChopMode: React.FC<SampleChopModeProps> = ({
             <span>• Click waveform to add slice markers</span>
             <span>• Click marker to remove</span>
             <span>• Press Space to preview</span>
+            <span>• Color: <span className="text-red-400">Red</span> = high velocity, <span className="text-yellow-400">Yellow</span> = medium, <span className="text-cyan-400">Cyan</span> = low</span>
             <span>• {sliceMarkers.length} markers</span>
-            <span>• {transients.length} transients detected</span>
           </div>
         </div>
 

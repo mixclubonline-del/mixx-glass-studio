@@ -326,7 +326,7 @@ export const AdvancedTimelineView: React.FC<AdvancedTimelineViewProps> = ({
     setChopModeRegion({ regionId, buffer });
   };
   
-  const handleCreateSlices = (slicePoints: number[]) => {
+  const handleCreateSlices = (slicePoints: number[], velocities?: number[]) => {
     if (!chopModeRegion) return;
     
     const region = regions.find(r => r.id === chopModeRegion.regionId);
@@ -349,16 +349,17 @@ export const AdvancedTimelineView: React.FC<AdvancedTimelineViewProps> = ({
           duration: sliceDuration,
           bufferOffset: region.bufferOffset + sliceTime,
           bufferDuration: sliceDuration,
+          velocity: velocities?.[index] || 1.0, // Store velocity
         };
         
         addRegion(newRegion);
       }
     });
     
-    toast.success(`Created ${slicePoints.length} slices`);
+    toast.success(`Created ${slicePoints.length} slices with velocity`);
   };
   
-  const handleConvertSlicesToPattern = (slicePoints: number[]) => {
+  const handleConvertSlicesToPattern = (slicePoints: number[], velocities?: number[]) => {
     if (!chopModeRegion) return;
     
     const region = regions.find(r => r.id === chopModeRegion.regionId);
@@ -380,6 +381,7 @@ export const AdvancedTimelineView: React.FC<AdvancedTimelineViewProps> = ({
           duration: sliceDuration,
           bufferOffset: region.bufferOffset + sliceTime,
           bufferDuration: sliceDuration,
+          velocity: velocities?.[index] || 1.0, // Store velocity
         };
         
         addRegion(newRegion);
@@ -398,7 +400,7 @@ export const AdvancedTimelineView: React.FC<AdvancedTimelineViewProps> = ({
     );
     
     if (pattern) {
-      toast.success(`Created pattern with ${slicePoints.length} slices`);
+      toast.success(`Created pattern with ${slicePoints.length} slices and velocity`);
     }
   };
   

@@ -34,6 +34,7 @@ export interface Region {
   crossfadeOut?: number; // Crossfade with next region
   timeStretch?: number; // Time stretch factor (1.0 = normal)
   pitchShift?: number; // Pitch shift in semitones
+  velocity?: number; // MIDI-style velocity (0-1) for sliced samples
 }
 
 export interface Marker {
