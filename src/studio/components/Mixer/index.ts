@@ -7,6 +7,7 @@ export { SendKnob } from './SendKnob';
 export { EQMini } from './EQMini';
 export { CompressorMini } from './CompressorMini';
 export { MixerPanel } from './MixerPanel';
+export { AdvancedRoutingMatrix } from './AdvancedRoutingMatrix';
 export { ChannelFader } from './ChannelFader';
 export { NextGenMixerView } from './NextGenMixerView';
 export { GlassChannelStrip } from './GlassChannelStrip';

@@ -62,6 +62,10 @@ export { EnhancedPianoRoll } from './EnhancedPianoRoll';
 // Sample Chopping
 export { SampleChopMode } from './SampleChopMode';
 
+// Time Stretching & Comping
+export { TimeStretchDialog } from './TimeStretchDialog';
+export { CompingManager } from './CompingManager';
+
 // Utilities
 export * from './CursorTools';
 export * from './MultiRegionOperations';

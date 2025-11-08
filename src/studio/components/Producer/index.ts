@@ -6,3 +6,4 @@ export { FileBrowser } from './FileBrowser';
 export { MIDITools } from './MIDITools';
 export { AIComposer } from './AIComposer';
 export { StepSequencer } from './StepSequencer';
+export { GrooveEngine } from './GrooveEngine';
