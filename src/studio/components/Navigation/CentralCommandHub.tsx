@@ -17,9 +17,6 @@ import {
   Grid3x3,
   Bot,
   Volume2,
-  Layout,
-  Sliders,
-  Edit3,
   Repeat,
   RotateCcw
 } from 'lucide-react';
@@ -42,7 +39,6 @@ export const CentralCommandHub = ({
 }: CentralCommandHubProps) => {
   const { masterVolume, setMasterVolume, bpm, setBpm, timeSignature, getBarPosition, audioEngine } = useProject();
   const { transport, play, pause, stop, toggleRecord, prevBar, nextBar, toggleLoop, seek } = useTransport();
-  const { currentView, setView } = useViewStore();
   
   // Seek to end functionality
   const handleSeekToEnd = () => {
@@ -83,12 +79,6 @@ export const CentralCommandHub = ({
   const formatPosition = () => {
     return `${position.bar}.${position.beat}.${position.tick.toString().padStart(3, '0')}`;
   };
-  
-  const views: { id: ViewType; label: string; icon: React.ReactNode }[] = [
-    { id: 'arrange', label: 'Arrange', icon: <Layout size={18} /> },
-    { id: 'mix', label: 'Mix', icon: <Sliders size={18} /> },
-    { id: 'edit', label: 'Edit', icon: <Edit3 size={18} /> },
-  ];
   
   return (
     <div className="glass-ultra border-gradient px-6 py-3 rounded-lg shadow-[var(--shadow-float)]">
@@ -253,29 +243,8 @@ export const CentralCommandHub = ({
           </Button>
         </div>
         
-        {/* RIGHT: Navigation & AI */}
+        {/* RIGHT: AI Assistant & Master Volume */}
         <div className="flex items-center gap-2">
-          {/* View Switcher */}
-          <div className="flex gap-1 glass-light rounded-lg p-1">
-            {views.map((view) => (
-              <button
-                key={view.id}
-                onClick={() => setView(view.id)}
-                className={`flex items-center gap-1.5 px-3 py-1.5 rounded transition-all text-sm micro-interact ${
-                  currentView === view.id
-                    ? 'bg-primary text-primary-foreground shadow-[var(--glow-medium)]'
-                    : 'text-muted-foreground hover:text-foreground hover:bg-muted/50'
-                }`}
-                title={`${view.label} View`}
-              >
-                {view.icon}
-                <span className="text-xs font-medium">{view.label}</span>
-              </button>
-            ))}
-          </div>
-          
-          <div className="w-px h-8 bg-border/50 mx-1" />
-          
           {/* AI Assistant */}
           <Button
             variant="outline"

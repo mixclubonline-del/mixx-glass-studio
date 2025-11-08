@@ -8,6 +8,7 @@ import { TimelineRuler } from './TimelineRuler';
 import { GridOverlay } from './GridOverlay';
 import { Playhead } from './Playhead';
 import { ScrollArea } from '@/components/ui/scroll-area';
+import { TimelineViewSwitcher } from './TimelineViewSwitcher';
 
 interface TimelineContainerProps {
   currentTime: number;
@@ -118,7 +119,8 @@ export function TimelineContainer({
   }, [zoom, setZoom]);
   
   const rulerHeight = 32;
-  const contentHeight = dimensions.height - rulerHeight;
+  const headerHeight = rulerHeight + 16; // Extra padding for view switcher
+  const contentHeight = dimensions.height - headerHeight;
   const timelineWidth = Math.max(dimensions.width, duration * zoom);
   
   return (
@@ -126,14 +128,17 @@ export function TimelineContainer({
       ref={containerRef}
       className="relative w-full h-full glass rounded-lg overflow-hidden"
     >
-      {/* Ruler */}
-      <div className="relative w-full" style={{ height: `${rulerHeight}px` }}>
-        <TimelineRuler
-          width={dimensions.width}
-          height={rulerHeight}
-          bpm={bpm}
-          onSeek={onSeek}
-        />
+      {/* View Switcher + Ruler */}
+      <div className="relative w-full flex items-center justify-between px-3 py-2 border-b border-border/30 bg-background/30" style={{ height: `${rulerHeight + 8}px` }}>
+        <TimelineViewSwitcher />
+        <div className="flex-1 ml-4">
+          <TimelineRuler
+            width={dimensions.width - 200}
+            height={rulerHeight}
+            bpm={bpm}
+            onSeek={onSeek}
+          />
+        </div>
       </div>
       
       {/* Scrollable timeline content */}
