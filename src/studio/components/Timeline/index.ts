@@ -57,6 +57,7 @@ export { PatternInstance } from './PatternInstance';
 // 808 Workflow
 export { EightZeroEightPanel } from './EightZeroEightPanel';
 export { PianoRollOverlay } from './PianoRollOverlay';
+export { EnhancedPianoRoll } from './EnhancedPianoRoll';
 
 // Sample Chopping
 export { SampleChopMode } from './SampleChopMode';
