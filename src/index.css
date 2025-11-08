@@ -497,6 +497,62 @@
     animation: pulse 3s cubic-bezier(0.4, 0, 0.6, 1) infinite;
   }
   
+  /* Button Utility Classes */
+  .btn-glass {
+    @apply bg-[hsl(var(--glass-light))] backdrop-blur-xl border border-border/30;
+    @apply hover:bg-[hsl(var(--glass-medium))] hover:border-border/50;
+    @apply transition-all duration-200;
+  }
+
+  .btn-glass-active {
+    @apply bg-[hsl(var(--glass-medium))] border border-primary/30;
+    @apply shadow-[0_0_15px_hsl(var(--prime-500)/0.4)];
+  }
+
+  .btn-icon-glow {
+    @apply relative;
+    animation: icon-glow 2s ease-in-out infinite;
+  }
+
+  @keyframes icon-glow {
+    0%, 100% {
+      filter: drop-shadow(0 0 4px hsl(var(--prime-500) / 0.4));
+    }
+    50% {
+      filter: drop-shadow(0 0 8px hsl(var(--prime-500) / 0.6));
+    }
+  }
+
+  .btn-group {
+    @apply flex gap-1 p-1 bg-[hsl(var(--glass-light))] backdrop-blur-xl rounded-lg;
+  }
+
+  .micro-interact {
+    @apply transition-all duration-200 hover:scale-[1.02];
+  }
+
+  /* Icon Animation Classes */
+  .icon-pulse {
+    @apply animate-pulse;
+  }
+
+  .icon-spin-slow {
+    animation: spin 3s linear infinite;
+  }
+
+  @keyframes bounce-subtle {
+    0%, 100% {
+      transform: translateY(0);
+    }
+    50% {
+      transform: translateY(-2px);
+    }
+  }
+
+  .icon-bounce-subtle {
+    animation: bounce-subtle 2s ease-in-out infinite;
+  }
+
   /* Vertical text for collapsed sidebar */
 .writing-mode-vertical {
   writing-mode: vertical-rl;

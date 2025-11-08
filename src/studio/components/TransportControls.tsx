@@ -95,65 +95,60 @@ export function TransportControls({
     <div className="glass rounded-xl p-4 border border-border shadow-lg">
       <div className="flex items-center justify-between gap-6">
         {/* Left: Transport Controls */}
-        <div className="flex items-center gap-2">
+        <div className="flex items-center gap-1">
           <Button
-            variant="outline"
+            variant="glass"
             size="icon"
             onClick={onStop}
-            className="hover:bg-secondary"
             title="Return to start"
           >
-            <SkipBack className="h-4 w-4" />
+            <SkipBack size={16} />
           </Button>
           
           <Button
-            variant="outline"
+            variant="glass"
             size="icon"
             onClick={onPrevBar}
-            className="hover:bg-secondary"
             title="Previous bar"
           >
-            <StepBack className="h-4 w-4" />
+            <StepBack size={16} />
           </Button>
           
           <Button
-            variant={isPlaying ? 'default' : 'outline'}
-            size="icon"
+            variant={isPlaying ? 'prime' : 'glass'}
+            size="icon-lg"
             onClick={isPlaying ? onPause : onPlay}
-            className={isPlaying ? 'bg-[hsl(var(--prime-500))] hover:bg-[hsl(var(--prime-500))]/90 shadow-[0_0_20px_hsl(var(--prime-500)/0.5)]' : 'hover:bg-secondary'}
             title="Play/Pause (Space)"
           >
-            {isPlaying ? <Pause className="h-4 w-4" /> : <Play className="h-4 w-4" />}
+            {isPlaying ? <Pause size={20} /> : <Play size={20} />}
           </Button>
           
           <Button
-            variant="outline"
+            variant="glass"
             size="icon"
             onClick={onNextBar}
-            className="hover:bg-secondary"
             title="Next bar"
           >
-            <StepForward className="h-4 w-4" />
+            <StepForward size={16} />
           </Button>
           
           <Button
-            variant="outline"
+            variant="glass"
             size="icon"
             onClick={onStop}
-            className="hover:bg-secondary"
             title="Skip to end"
           >
-            <SkipForward className="h-4 w-4" />
+            <SkipForward size={16} />
           </Button>
           
           <Button
-            variant={activeIsRecording ? 'destructive' : 'outline'}
+            variant={activeIsRecording ? 'destructive' : 'glass'}
             size="icon"
             onClick={handleRecordToggle}
             className={activeIsRecording ? 'animate-pulse' : ''}
             title="Record (Shift+Space)"
           >
-            <Circle className={`h-4 w-4 ${activeIsRecording ? 'fill-current' : ''}`} />
+            <Circle size={16} className={activeIsRecording ? 'fill-current' : ''} />
           </Button>
         </div>
         
@@ -214,13 +209,12 @@ export function TransportControls({
           </div>
           
           <Button
-            variant={activeIsLooping ? 'default' : 'outline'}
+            variant={activeIsLooping ? 'neon' : 'glass'}
             size="sm"
             onClick={handleLoopToggle}
-            className={activeIsLooping ? 'bg-accent hover:bg-accent/90 shadow-[0_0_15px_hsl(var(--accent)/0.4)]' : ''}
             title="Loop/Cycle (Ctrl+L)"
           >
-            <Repeat className="h-4 w-4 mr-1" />
+            <Repeat size={14} className="mr-1" />
             Loop
           </Button>
         </div>
@@ -247,19 +241,18 @@ export function TransportControls({
           <div className="w-px h-12 bg-border/50" />
 
           <Button
-            variant="outline"
+            variant="glass"
             onClick={onExport}
             disabled={isExporting}
-            className="hover:bg-secondary"
           >
             {isExporting ? (
               <>
-                <Loader2 className="h-4 w-4 mr-2 animate-spin" />
+                <Loader2 size={16} className="mr-2 animate-spin" />
                 Exporting...
               </>
             ) : (
               <>
-                <FileDown className="h-4 w-4 mr-2" />
+                <FileDown size={16} className="mr-2" />
                 Export
               </>
             )}

@@ -26,84 +26,72 @@ export const UnifiedTransportBar = () => {
     <div className="glass rounded-lg px-4 py-3 border border-border/30 backdrop-blur-xl">
       <div className="flex items-center justify-between gap-6">
         {/* Left: Transport Controls */}
-        <div className="flex items-center gap-2">
+        <div className="flex items-center gap-1">
           <Button
-            variant="outline"
+            variant="glass"
             size="icon"
             onClick={stop}
-            className="hover:bg-secondary h-9 w-9"
             title="Return to start"
           >
-            <SkipBack className="h-4 w-4" />
+            <SkipBack size={16} />
           </Button>
           
           <Button
-            variant="outline"
+            variant="glass"
             size="icon"
             onClick={prevBar}
-            className="hover:bg-secondary h-9 w-9"
             title="Previous bar"
           >
-            <StepBack className="h-4 w-4" />
+            <StepBack size={16} />
           </Button>
           
           <Button
-            variant={transport.isPlaying ? 'default' : 'outline'}
-            size="icon"
+            variant={transport.isPlaying ? 'prime' : 'glass'}
+            size="icon-lg"
             onClick={transport.isPlaying ? pause : () => play()}
-            className={transport.isPlaying 
-              ? 'bg-[hsl(var(--prime-500))] hover:bg-[hsl(var(--prime-500))]/90 shadow-[0_0_20px_hsl(var(--prime-500)/0.5)] h-10 w-10' 
-              : 'hover:bg-secondary h-10 w-10'
-            }
             title="Play/Pause (Space)"
           >
-            {transport.isPlaying ? <Pause className="h-5 w-5" /> : <Play className="h-5 w-5" />}
+            {transport.isPlaying ? <Pause size={20} /> : <Play size={20} />}
           </Button>
           
           <Button
-            variant="outline"
+            variant="glass"
             size="icon"
             onClick={nextBar}
-            className="hover:bg-secondary h-9 w-9"
             title="Next bar"
           >
-            <StepForward className="h-4 w-4" />
+            <StepForward size={16} />
           </Button>
           
           <Button
-            variant="outline"
+            variant="glass"
             size="icon"
             onClick={stop}
-            className="hover:bg-secondary h-9 w-9"
             title="Skip to end"
           >
-            <SkipForward className="h-4 w-4" />
+            <SkipForward size={16} />
           </Button>
           
           <Button
-            variant={transport.isRecording ? 'destructive' : 'outline'}
+            variant={transport.isRecording ? 'destructive' : 'glass'}
             size="icon"
             onClick={toggleRecord}
-            className={`h-9 w-9 ${transport.isRecording ? 'animate-pulse' : ''}`}
+            className={transport.isRecording ? 'animate-pulse' : ''}
             title="Record (Shift+Space)"
           >
-            <Circle className={`h-4 w-4 ${transport.isRecording ? 'fill-current' : ''}`} />
+            <Circle size={16} className={transport.isRecording ? 'fill-current' : ''} />
           </Button>
         </div>
         
         {/* Center: Loop Control */}
         <div className="flex items-center gap-2">
           <Button
-            variant={transport.loopEnabled ? 'default' : 'outline'}
+            variant={transport.loopEnabled ? 'neon' : 'glass'}
             size="sm"
             onClick={toggleLoop}
-            className={transport.loopEnabled 
-              ? 'bg-accent hover:bg-accent/90 shadow-[0_0_15px_hsl(var(--accent)/0.4)] h-8' 
-              : 'h-8'
-            }
             title="Loop/Cycle (Ctrl+L)"
           >
-            <Repeat className="h-4 w-4 mr-1" />
+            <Repeat size={14} className="mr-1" />
             Loop
           </Button>
         </div>

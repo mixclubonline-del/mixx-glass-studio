@@ -19,15 +19,15 @@ export const ViewSwitcher: React.FC = () => {
   ];
   
   return (
-    <div className="flex gap-1 glass rounded-lg p-1">
+    <div className="btn-group">
       {views.map((view) => (
         <button
           key={view.id}
           onClick={() => setView(view.id)}
-          className={`flex items-center gap-2 px-4 py-2 rounded-md transition-all ${
+          className={`flex items-center gap-2 px-4 py-2 rounded-md transition-all duration-200 ${
             currentView === view.id
-              ? 'bg-primary text-primary-foreground shadow-[0_0_15px_hsl(var(--primary)/0.4)]'
-              : 'text-muted-foreground hover:text-foreground hover:bg-muted/50'
+              ? 'btn-glass-active text-primary-foreground'
+              : 'btn-glass text-muted-foreground hover:text-foreground'
           }`}
         >
           {view.icon}

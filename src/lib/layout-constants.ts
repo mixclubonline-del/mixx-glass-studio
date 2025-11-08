@@ -54,6 +54,15 @@ export const Z_INDEX = {
   tooltip: 60,
 } as const;
 
+// Icon Sizes (consistent sizing across UI)
+export const ICON_SIZE = {
+  xs: 12,   // Extra small icons
+  sm: 14,   // Small icons (toolbar, compact)
+  md: 16,   // Default icons (standard buttons)
+  lg: 20,   // Large icons (emphasized actions)
+  xl: 24,   // Extra large icons (primary features)
+} as const;
+
 // Border Radius (consistent rounding)
 export const RADIUS = {
   sm: '0.25rem',  // 4px
