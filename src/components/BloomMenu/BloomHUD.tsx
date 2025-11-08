@@ -23,20 +23,29 @@ export const BloomHUD: React.FC<BloomHUDProps> = ({
   const [favorites, setFavorites] = useState<string[]>([]);
   const [tooltip, setTooltip] = useState<{ content: string; x: number; y: number } | null>(null);
   const allMenuItemsRef = useRef<Map<string, MenuItem>>(new Map());
+  const [isDragging, setIsDragging] = useState(false);
+  const [position, setPosition] = useState({ x: 0, y: 0 });
+  const dragStartRef = useRef({ x: 0, y: 0 });
+  const containerRef = useRef<HTMLDivElement>(null);
 
-  // Load favorites from localStorage
+  // Load favorites and position from localStorage
   useEffect(() => {
     try {
       const storedFavorites = localStorage.getItem('mixxclub_bloom_favorites');
       if (storedFavorites) {
         setFavorites(JSON.parse(storedFavorites));
       }
+      
+      const storedPosition = localStorage.getItem('mixxclub_bloom_position');
+      if (storedPosition) {
+        setPosition(JSON.parse(storedPosition));
+      }
     } catch (error) {
-      console.error('Error loading favorites:', error);
+      console.error('Error loading from localStorage:', error);
     }
   }, []);
 
-  // Save favorites to localStorage
+  // Save favorites and position to localStorage
   useEffect(() => {
     try {
       localStorage.setItem('mixxclub_bloom_favorites', JSON.stringify(favorites));
@@ -44,6 +53,14 @@ export const BloomHUD: React.FC<BloomHUDProps> = ({
       console.error('Error saving favorites:', error);
     }
   }, [favorites]);
+
+  useEffect(() => {
+    try {
+      localStorage.setItem('mixxclub_bloom_position', JSON.stringify(position));
+    } catch (error) {
+      console.error('Error saving position:', error);
+    }
+  }, [position]);
 
   // Build flat map of all menu items
   useEffect(() => {
@@ -117,31 +134,77 @@ export const BloomHUD: React.FC<BloomHUDProps> = ({
 
   const radius = useMemo(() => {
     const itemCount = currentMenu?.items.length || 0;
-    if (itemCount === 0) return 150;
+    if (itemCount === 0) return 100;
 
     const isLargeScreen = window.innerWidth > 768;
-    const baseRadius = isLargeScreen ? 240 : 190;
+    const baseRadius = isLargeScreen ? 140 : 110;
     const baseItemCount = 6;
-    const factor = isLargeScreen ? 22 : 18;
+    const factor = isLargeScreen ? 12 : 10;
     const dynamicRadius = baseRadius + (itemCount - baseItemCount) * factor;
 
-    const minRadius = isLargeScreen ? 180 : 160;
-    const maxRadius = isLargeScreen ? 320 : 240;
+    const minRadius = isLargeScreen ? 120 : 100;
+    const maxRadius = isLargeScreen ? 180 : 140;
 
     return Math.max(minRadius, Math.min(dynamicRadius, maxRadius));
   }, [currentMenu]);
 
   const isSubMenu = menuPath.length > 1;
 
+  const handleMouseDown = (e: React.MouseEvent) => {
+    if (!isMenuOpen && e.target === e.currentTarget) {
+      setIsDragging(true);
+      dragStartRef.current = {
+        x: e.clientX - position.x,
+        y: e.clientY - position.y
+      };
+    }
+  };
+
+  const handleMouseMoveGlobal = (e: MouseEvent) => {
+    if (isDragging) {
+      setPosition({
+        x: e.clientX - dragStartRef.current.x,
+        y: e.clientY - dragStartRef.current.y
+      });
+    }
+  };
+
+  const handleMouseUpGlobal = () => {
+    setIsDragging(false);
+  };
+
+  useEffect(() => {
+    if (isDragging) {
+      document.addEventListener('mousemove', handleMouseMoveGlobal);
+      document.addEventListener('mouseup', handleMouseUpGlobal);
+      return () => {
+        document.removeEventListener('mousemove', handleMouseMoveGlobal);
+        document.removeEventListener('mouseup', handleMouseUpGlobal);
+      };
+    }
+  }, [isDragging]);
+
   return (
-    <div className="relative flex items-center justify-center" onMouseMove={handleMouseMove} style={{ width: radius * 2.5, height: radius * 2.5 }}>
+    <div 
+      ref={containerRef}
+      className="relative flex items-center justify-center" 
+      onMouseMove={handleMouseMove}
+      style={{ 
+        width: radius * 2.5, 
+        height: radius * 2.5,
+        transform: `translate(${position.x}px, ${position.y}px)`,
+        cursor: isDragging ? 'grabbing' : isMenuOpen ? 'default' : 'grab'
+      }}
+    >
       <div
         className={cn(
           'bloom-dial',
           isMenuOpen && 'bloom-dial-open',
-          isSubMenu && 'bloom-dial-submenu'
+          isSubMenu && 'bloom-dial-submenu',
+          isDragging && 'bloom-dial-dragging'
         )}
         onClick={isSubMenu ? handleBackClick : handleCoreClick}
+        onMouseDown={handleMouseDown}
       >
         {isSubMenu ? (
           <ChevronLeft className="w-6 h-6" />
@@ -169,7 +232,7 @@ export const BloomHUD: React.FC<BloomHUDProps> = ({
                 )}
                 style={{
                   transform: `translate(${x}px, ${y}px)`,
-                  animationDelay: `${index * 30}ms`
+                  animationDelay: `${index * 50}ms`
                 }}
                 onClick={() => handleItemClick(item)}
                 onMouseEnter={(e) => handleMouseEnter(e, item.description)}

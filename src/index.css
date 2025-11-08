@@ -300,10 +300,10 @@
   
   /* Bloom Menu Styles */
   .bloom-dial {
-    @apply absolute w-16 h-16 rounded-full cursor-pointer flex items-center justify-center z-50;
+    @apply absolute w-16 h-16 rounded-full cursor-grab flex items-center justify-center z-50;
     @apply bg-gradient-to-br from-primary/20 to-accent/20 backdrop-blur-md;
     @apply border-2 border-primary/30 shadow-[var(--glow-medium)];
-    transition: all 0.4s cubic-bezier(0.4, 0, 0.2, 1);
+    transition: all 0.6s cubic-bezier(0.4, 0, 0.2, 1);
   }
 
   .bloom-dial:hover {
@@ -313,13 +313,17 @@
 
   .bloom-dial-open {
     @apply bg-gradient-to-br from-primary/40 to-accent/40;
-    @apply border-primary/60;
+    @apply border-primary/60 cursor-pointer;
     transform: scale(1.05) rotate(90deg);
   }
 
   .bloom-dial-submenu {
-    @apply bg-gradient-to-br from-accent/40 to-primary/40;
+    @apply bg-gradient-to-br from-accent/40 to-primary/40 cursor-pointer;
     transform: scale(1) rotate(0deg);
+  }
+
+  .bloom-dial-dragging {
+    @apply cursor-grabbing scale-95;
   }
 
   .bloom-dial-icon {
@@ -347,11 +351,11 @@
   }
 
   .bloom-item {
-    @apply absolute w-12 h-12 rounded-full cursor-pointer flex items-center justify-center;
+    @apply absolute w-11 h-11 rounded-full cursor-pointer flex items-center justify-center;
     @apply bg-gradient-to-br from-background/90 to-background/70 backdrop-blur-sm;
     @apply border border-border/50 shadow-lg;
-    @apply transition-all duration-200;
-    animation: bloom-item-enter 0.3s cubic-bezier(0.34, 1.56, 0.64, 1) forwards;
+    @apply transition-all duration-300;
+    animation: bloom-item-enter 0.5s cubic-bezier(0.34, 1.56, 0.64, 1) forwards;
     transform-origin: center;
   }
 
@@ -378,11 +382,12 @@
       transform: scale(0) translate(0, 0);
       opacity: 0;
     }
-    60% {
-      transform: scale(1.2);
+    70% {
+      transform: scale(1.15);
     }
     100% {
       opacity: 1;
+      transform: scale(1);
     }
   }
 
