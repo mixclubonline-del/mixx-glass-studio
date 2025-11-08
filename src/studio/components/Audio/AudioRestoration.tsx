@@ -5,8 +5,9 @@ import { Slider } from '@/components/ui/slider';
 import { Switch } from '@/components/ui/switch';
 import { Label } from '@/components/ui/label';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
-import { Volume2, Zap, Radio, AudioLines } from 'lucide-react';
+import { Volume2, Zap, Radio, AudioLines, Sparkles } from 'lucide-react';
 import { useToast } from '@/hooks/use-toast';
+import { RestorationPresets } from './RestorationPresets';
 
 interface AudioRestorationProps {
   audioBuffer?: AudioBuffer;
@@ -39,6 +40,23 @@ export const AudioRestoration: React.FC<AudioRestorationProps> = ({
   const [spectralEnabled, setSpectralEnabled] = useState(false);
   const [spectralThreshold, setSpectralThreshold] = useState(60);
   const [spectralBandwidth, setSpectralBandwidth] = useState(40);
+
+  const handlePresetApply = (preset: any) => {
+    setDeNoiseEnabled(preset.settings.deNoise > 0);
+    setNoiseThreshold(Math.abs(preset.settings.threshold));
+    setNoiseReduction(preset.settings.deNoise);
+    
+    setDeClickEnabled(preset.settings.deClick > 0);
+    setClickSensitivity(preset.settings.deClick);
+    setClickRepair(preset.settings.deClick);
+    
+    setDeHumEnabled(preset.settings.deHum > 0);
+    setHumReduction(preset.settings.deHum);
+    
+    setSpectralEnabled(preset.settings.spectralRepair > 0);
+    setSpectralThreshold(preset.settings.spectralRepair);
+    setSpectralBandwidth(preset.settings.smoothing);
+  };
 
   const handleProcess = async () => {
     if (!audioBuffer) {
@@ -117,8 +135,12 @@ export const AudioRestoration: React.FC<AudioRestorationProps> = ({
         </CardDescription>
       </CardHeader>
       <CardContent className="space-y-6">
-        <Tabs defaultValue="denoise" className="w-full">
-          <TabsList className="grid w-full grid-cols-4">
+        <Tabs defaultValue="presets" className="w-full">
+          <TabsList className="grid w-full grid-cols-5">
+            <TabsTrigger value="presets">
+              <Sparkles className="w-4 h-4 mr-2" />
+              Presets
+            </TabsTrigger>
             <TabsTrigger value="denoise">
               <Volume2 className="w-4 h-4 mr-2" />
               De-noise
@@ -136,6 +158,14 @@ export const AudioRestoration: React.FC<AudioRestorationProps> = ({
               Spectral
             </TabsTrigger>
           </TabsList>
+
+          {/* Presets Tab */}
+          <TabsContent value="presets">
+            <RestorationPresets 
+              audioBuffer={audioBuffer} 
+              onApplyPreset={handlePresetApply}
+            />
+          </TabsContent>
 
           {/* De-noise */}
           <TabsContent value="denoise" className="space-y-4">
