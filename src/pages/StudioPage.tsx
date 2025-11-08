@@ -28,7 +28,7 @@ import { TimeStretchDialog } from "../studio/components/Timeline/TimeStretchDial
 import { CompingManager } from "../studio/components/Timeline/CompingManager";
 import { AdvancedRoutingMatrix } from "../studio/components/Mixer/AdvancedRoutingMatrix";
 import { ExportDialog } from "../studio/components/Export";
-import { StemSeparation, AudioRestoration, AdvancedPitchCorrection, AudioToMIDI, VoiceIsolation } from "../studio/components/Audio";
+import { StemSeparation, AudioRestoration, AdvancedPitchCorrection, AudioToMIDI, VoiceIsolation, SpectralEditor } from "../studio/components/Audio";
 
 // Inner component that uses ProjectContext
 function StudioPageContent() {
@@ -311,6 +311,22 @@ function StudioPageContent() {
                 </Button>
               </div>
               <VoiceIsolation />
+            </div>
+          </div>
+        </div>
+      )}
+
+      {isPanelOpen.spectralEditor && (
+        <div className="fixed inset-0 z-50 bg-black/80 flex items-center justify-center p-4">
+          <div className="w-full max-w-5xl">
+            <div className="bg-background rounded-lg border border-border shadow-2xl overflow-hidden">
+              <div className="flex items-center justify-between px-4 py-3 border-b border-border/30">
+                <h2 className="font-semibold">Spectral Editor</h2>
+                <Button size="sm" variant="ghost" onClick={() => useViewStore.getState().togglePanel('spectralEditor')}>
+                  <X className="h-4 w-4" />
+                </Button>
+              </div>
+              <SpectralEditor />
             </div>
           </div>
         </div>

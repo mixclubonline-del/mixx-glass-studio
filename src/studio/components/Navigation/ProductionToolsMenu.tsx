@@ -28,6 +28,7 @@ import {
   Mic,
   FileMusic,
   AudioWaveform,
+  Wand2,
 } from 'lucide-react';
 import { useViewStore } from '@/store/viewStore';
 
@@ -120,6 +121,10 @@ export const ProductionToolsMenu: React.FC = () => {
         <DropdownMenuItem onClick={() => togglePanel('voiceIsolation')}>
           <AudioWaveform className="h-4 w-4 mr-2" />
           Voice Isolation
+        </DropdownMenuItem>
+        <DropdownMenuItem onClick={() => togglePanel('spectralEditor')}>
+          <Wand2 className="h-4 w-4 mr-2" />
+          Spectral Editor
         </DropdownMenuItem>
       </DropdownMenuContent>
     </DropdownMenu>
