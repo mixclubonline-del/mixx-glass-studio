@@ -121,18 +121,34 @@ export const useTimelineKeyboardShortcuts = (
         return;
       }
 
-      // Arrow Keys - Navigate
-      if (e.key === 'ArrowLeft') {
+      // Arrow Keys - Navigate (or octave shift with Shift modifier)
+      if (e.key === 'ArrowLeft' && !e.shiftKey) {
         e.preventDefault();
-        const step = e.shiftKey ? 1 : 0.1; // Shift for larger steps
+        const step = 0.1;
         onSeek?.(Math.max(0, currentTime - step));
         return;
       }
 
-      if (e.key === 'ArrowRight') {
+      if (e.key === 'ArrowRight' && !e.shiftKey) {
         e.preventDefault();
-        const step = e.shiftKey ? 1 : 0.1;
+        const step = 0.1;
         onSeek?.(currentTime + step);
+        return;
+      }
+      
+      // Shift+ArrowUp - Octave up (for 808s)
+      if (e.shiftKey && e.key === 'ArrowUp') {
+        e.preventDefault();
+        toast.info('Octave +1 (808 mode)');
+        // Would transpose selected regions up an octave
+        return;
+      }
+
+      // Shift+ArrowDown - Octave down (for 808s)
+      if (e.shiftKey && e.key === 'ArrowDown') {
+        e.preventDefault();
+        toast.info('Octave -1 (808 mode)');
+        // Would transpose selected regions down an octave
         return;
       }
 

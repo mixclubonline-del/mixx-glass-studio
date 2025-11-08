@@ -7,7 +7,8 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { FileBrowser } from './FileBrowser';
 import { PluginBrowserPanel } from './PluginBrowserPanel';
 import { InspectorPanel } from './InspectorPanel';
-import { Files, Grid3x3, Info, Music, Folder, ChevronLeft, ChevronRight } from 'lucide-react';
+import { EightZeroEightPanel } from './EightZeroEightPanel';
+import { Files, Grid3x3, Info, Music, Folder, ChevronLeft, ChevronRight, Waves } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 
 interface ArrangeBrowserPanelProps {
@@ -16,6 +17,7 @@ interface ArrangeBrowserPanelProps {
   onPluginSelect?: (pluginId: string) => void;
   isCollapsed?: boolean;
   onToggleCollapse?: () => void;
+  onOpenPianoRoll?: (regionId: string) => void;
 }
 
 export const ArrangeBrowserPanel: React.FC<ArrangeBrowserPanelProps> = ({
@@ -23,7 +25,8 @@ export const ArrangeBrowserPanel: React.FC<ArrangeBrowserPanelProps> = ({
   onFileSelect,
   onPluginSelect,
   isCollapsed = false,
-  onToggleCollapse
+  onToggleCollapse,
+  onOpenPianoRoll
 }) => {
   const [activeTab, setActiveTab] = useState('files');
 
@@ -59,6 +62,9 @@ export const ArrangeBrowserPanel: React.FC<ArrangeBrowserPanelProps> = ({
           </div>
           <div title="Loops">
             <Music size={18} className="text-muted-foreground hover:text-primary transition-colors cursor-pointer" />
+          </div>
+          <div title="808 Controls">
+            <Waves size={18} className="text-muted-foreground hover:text-primary transition-colors cursor-pointer" />
           </div>
           <div title="Project">
             <Folder size={18} className="text-muted-foreground hover:text-primary transition-colors cursor-pointer" />
@@ -127,6 +133,13 @@ export const ArrangeBrowserPanel: React.FC<ArrangeBrowserPanelProps> = ({
             Loops
           </TabsTrigger>
           <TabsTrigger 
+            value="808"
+            className="rounded-none border-b-2 border-transparent data-[state=active]:border-primary data-[state=active]:bg-primary/10 data-[state=active]:text-primary transition-all text-xs"
+          >
+            <Waves size={13} className="mr-1.5" />
+            808
+          </TabsTrigger>
+          <TabsTrigger 
             value="project"
             className="rounded-none border-b-2 border-transparent data-[state=active]:border-primary data-[state=active]:bg-primary/10 data-[state=active]:text-primary transition-all text-xs"
           >
@@ -155,6 +168,15 @@ export const ArrangeBrowserPanel: React.FC<ArrangeBrowserPanelProps> = ({
             <div className="p-4 text-sm text-muted-foreground text-center">
               <Music size={32} className="mx-auto mb-2 opacity-50" />
               Loop library coming soon
+            </div>
+          </TabsContent>
+
+          <TabsContent value="808" className="h-full m-0 p-0">
+            <div className="p-4">
+              <EightZeroEightPanel 
+                regionId={selectedTrackId || undefined}
+                onOpenPianoRoll={onOpenPianoRoll}
+              />
             </div>
           </TabsContent>
 

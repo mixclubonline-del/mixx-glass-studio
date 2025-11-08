@@ -22,6 +22,7 @@ import { RippleEditIndicator } from './RippleEditIndicator';
 import { KeyboardShortcutsHelper } from './KeyboardShortcutsHelper';
 import { PatternBrowser } from './PatternBrowser';
 import { PatternInstance } from './PatternInstance';
+import { PianoRollOverlay } from './PianoRollOverlay';
 import { useRegionClipboard } from '@/hooks/useRegionClipboard';
 import { useTimelineKeyboardShortcuts } from '@/hooks/useTimelineKeyboardShortcuts';
 import { ZoomIn, ZoomOut, Grid3x3, Plus, Folders, Settings2, ChevronLeft, ChevronRight, Layers, Music2 } from 'lucide-react';
@@ -142,6 +143,7 @@ export const AdvancedTimelineView: React.FC<AdvancedTimelineViewProps> = ({
   
   const [patternBrowserCollapsed, setPatternBrowserCollapsed] = useState(false);
   const [dropTarget, setDropTarget] = useState<{ trackId: string; time: number } | null>(null);
+  const [pianoRollRegionId, setPianoRollRegionId] = useState<string | null>(null);
   
   // Track control handlers
   const handleMuteToggle = (trackId: string) => {
@@ -691,8 +693,17 @@ export const AdvancedTimelineView: React.FC<AdvancedTimelineViewProps> = ({
             onPluginSelect={onPluginSelect}
             isCollapsed={browserCollapsed}
             onToggleCollapse={() => setBrowserCollapsed(!browserCollapsed)}
+            onOpenPianoRoll={setPianoRollRegionId}
           />
         </div>
+
+      {/* Piano Roll Overlay */}
+      {pianoRollRegionId && (
+        <PianoRollOverlay
+          regionId={pianoRollRegionId}
+          onClose={() => setPianoRollRegionId(null)}
+        />
+      )}
 
       {/* Add Track Dialog */}
       <AddTrackDialog

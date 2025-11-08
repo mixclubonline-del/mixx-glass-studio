@@ -54,6 +54,10 @@ export { TimelineStatusBar } from './TimelineStatusBar';
 export { PatternBrowser } from './PatternBrowser';
 export { PatternInstance } from './PatternInstance';
 
+// 808 Workflow
+export { EightZeroEightPanel } from './EightZeroEightPanel';
+export { PianoRollOverlay } from './PianoRollOverlay';
+
 // Utilities
 export * from './CursorTools';
 export * from './MultiRegionOperations';
