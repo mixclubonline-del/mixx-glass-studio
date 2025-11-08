@@ -18,6 +18,7 @@ interface TimelineRegionProps {
   onSelect: (id: string, multi?: boolean) => void;
   onSplit: (id: string, splitTime: number) => void;
   isSelected: boolean;
+  onChopSample?: (regionId: string) => void;
 }
 
 export const TimelineRegion: React.FC<TimelineRegionProps> = ({
@@ -27,7 +28,8 @@ export const TimelineRegion: React.FC<TimelineRegionProps> = ({
   onUpdate,
   onSelect,
   onSplit,
-  isSelected
+  isSelected,
+  onChopSample
 }) => {
   const [isDragging, setIsDragging] = useState(false);
   const [isTrimming, setIsTrimming] = useState<'left' | 'right' | null>(null);
@@ -232,6 +234,7 @@ export const TimelineRegion: React.FC<TimelineRegionProps> = ({
       onColorChange={(_, color) => onUpdate(region.id, { color })}
       onExport={() => console.log('Export region:', region.id)}
       onRename={() => console.log('Rename region:', region.id)}
+      onChopSample={onChopSample ? () => onChopSample(region.id) : undefined}
     >
       <div
         ref={regionRef}

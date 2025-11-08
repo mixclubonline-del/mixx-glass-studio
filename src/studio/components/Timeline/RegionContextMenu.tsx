@@ -27,6 +27,7 @@ interface RegionContextMenuProps {
   onExport: (regionId: string) => void;
   onColorChange: (regionId: string, color: string) => void;
   onRename: (regionId: string) => void;
+  onChopSample?: (regionId: string) => void;
 }
 
 export const RegionContextMenu: React.FC<RegionContextMenuProps> = ({
@@ -40,6 +41,7 @@ export const RegionContextMenu: React.FC<RegionContextMenuProps> = ({
   onExport,
   onColorChange,
   onRename,
+  onChopSample,
 }) => {
   const colors = [
     { name: 'Red', value: 'hsl(0, 70%, 50%)' },
@@ -66,6 +68,13 @@ export const RegionContextMenu: React.FC<RegionContextMenuProps> = ({
           <Scissors className="mr-2 h-4 w-4" />
           Split at Playhead (S)
         </ContextMenuItem>
+        
+        {onChopSample && (
+          <ContextMenuItem onClick={() => onChopSample(region.id)}>
+            <Scissors className="mr-2 h-4 w-4" />
+            Chop Sample...
+          </ContextMenuItem>
+        )}
         
         <ContextMenuSeparator />
         

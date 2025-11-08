@@ -7,6 +7,7 @@ import React, { useRef, useEffect, useState } from 'react';
 import { useTimelineStore } from '@/store/timelineStore';
 import { useTracksStore } from '@/store/tracksStore';
 import { usePatternStore } from '@/store/patternStore';
+import { Region } from '@/types/timeline';
 import { TimelineRuler } from './TimelineRuler';
 import { TimelineTrackRow } from './TimelineTrackRow';
 import { ProfessionalTrackHeader } from './ProfessionalTrackHeader';
@@ -23,6 +24,7 @@ import { KeyboardShortcutsHelper } from './KeyboardShortcutsHelper';
 import { PatternBrowser } from './PatternBrowser';
 import { PatternInstance } from './PatternInstance';
 import { PianoRollOverlay } from './PianoRollOverlay';
+import { SampleChopMode } from './SampleChopMode';
 import { useRegionClipboard } from '@/hooks/useRegionClipboard';
 import { useTimelineKeyboardShortcuts } from '@/hooks/useTimelineKeyboardShortcuts';
 import { ZoomIn, ZoomOut, Grid3x3, Plus, Folders, Settings2, ChevronLeft, ChevronRight, Layers, Music2 } from 'lucide-react';
@@ -144,6 +146,7 @@ export const AdvancedTimelineView: React.FC<AdvancedTimelineViewProps> = ({
   const [patternBrowserCollapsed, setPatternBrowserCollapsed] = useState(false);
   const [dropTarget, setDropTarget] = useState<{ trackId: string; time: number } | null>(null);
   const [pianoRollRegionId, setPianoRollRegionId] = useState<string | null>(null);
+  const [chopModeRegion, setChopModeRegion] = useState<{ regionId: string; buffer: AudioBuffer } | null>(null);
   
   // Track control handlers
   const handleMuteToggle = (trackId: string) => {
@@ -307,6 +310,96 @@ export const AdvancedTimelineView: React.FC<AdvancedTimelineViewProps> = ({
   const handleDragOver = (e: React.DragEvent) => {
     e.preventDefault();
     e.dataTransfer.dropEffect = 'copy';
+  };
+  
+  // Handle sample chop mode
+  const handleChopSample = (regionId: string) => {
+    const region = regions.find(r => r.id === regionId);
+    if (!region) return;
+    
+    const buffer = audioBuffers.get(region.trackId);
+    if (!buffer) {
+      toast.error('Audio buffer not loaded');
+      return;
+    }
+    
+    setChopModeRegion({ regionId, buffer });
+  };
+  
+  const handleCreateSlices = (slicePoints: number[]) => {
+    if (!chopModeRegion) return;
+    
+    const region = regions.find(r => r.id === chopModeRegion.regionId);
+    if (!region) return;
+    
+    // Remove original region
+    removeRegion(region.id);
+    
+    // Create new regions for each slice
+    slicePoints.forEach((sliceTime, index) => {
+      const nextSliceTime = slicePoints[index + 1] || region.duration;
+      const sliceDuration = nextSliceTime - sliceTime;
+      
+      if (sliceDuration > 0.01) { // Minimum 10ms slice
+        const newRegion: Region = {
+          ...region,
+          id: `${region.id}-slice-${index}`,
+          name: `${region.name} [${index + 1}]`,
+          startTime: region.startTime + sliceTime,
+          duration: sliceDuration,
+          bufferOffset: region.bufferOffset + sliceTime,
+          bufferDuration: sliceDuration,
+        };
+        
+        addRegion(newRegion);
+      }
+    });
+    
+    toast.success(`Created ${slicePoints.length} slices`);
+  };
+  
+  const handleConvertSlicesToPattern = (slicePoints: number[]) => {
+    if (!chopModeRegion) return;
+    
+    const region = regions.find(r => r.id === chopModeRegion.regionId);
+    if (!region) return;
+    
+    // Create slices as regions first
+    const sliceRegionIds: string[] = [];
+    
+    slicePoints.forEach((sliceTime, index) => {
+      const nextSliceTime = slicePoints[index + 1] || region.duration;
+      const sliceDuration = nextSliceTime - sliceTime;
+      
+      if (sliceDuration > 0.01) {
+        const newRegion: Region = {
+          ...region,
+          id: `${region.id}-slice-${index}`,
+          name: `${region.name} [${index + 1}]`,
+          startTime: region.startTime + sliceTime,
+          duration: sliceDuration,
+          bufferOffset: region.bufferOffset + sliceTime,
+          bufferDuration: sliceDuration,
+        };
+        
+        addRegion(newRegion);
+        sliceRegionIds.push(newRegion.id);
+      }
+    });
+    
+    // Remove original region
+    removeRegion(region.id);
+    
+    // Create pattern from slices
+    const pattern = createPatternFromSelection(
+      `${region.name} Chops`,
+      'drums',
+      sliceRegionIds
+    );
+    
+    if (pattern) {
+      toast.success(`Created pattern with ${slicePoints.length} slices`);
+    }
   };
   
   const totalWidth = Math.max(3000, currentTime * zoom + 1000);
@@ -643,6 +736,7 @@ export const AdvancedTimelineView: React.FC<AdvancedTimelineViewProps> = ({
                     onSelectRegion={handleSelectRegion}
                     onSplitRegion={handleSplitRegion}
                     selectedRegionIds={new Set(selectedRegionIds)}
+                    onChopSample={handleChopSample}
                   />
                 ))}
                 
@@ -704,6 +798,24 @@ export const AdvancedTimelineView: React.FC<AdvancedTimelineViewProps> = ({
           onClose={() => setPianoRollRegionId(null)}
         />
       )}
+
+      {/* Sample Chop Mode Overlay */}
+      {chopModeRegion && (() => {
+        const region = regions.find(r => r.id === chopModeRegion.regionId);
+        if (!region) return null;
+        
+        return (
+          <SampleChopMode
+            region={region}
+            audioBuffer={chopModeRegion.buffer}
+            zoom={zoom}
+            scrollX={scrollX}
+            onClose={() => setChopModeRegion(null)}
+            onCreateSlices={handleCreateSlices}
+            onConvertToPattern={handleConvertSlicesToPattern}
+          />
+        );
+      })()}
 
       {/* Add Track Dialog */}
       <AddTrackDialog

@@ -22,6 +22,7 @@ interface TimelineTrackRowProps {
   onSelectRegion: (id: string, multi?: boolean) => void;
   onSplitRegion: (id: string, splitTime: number) => void;
   selectedRegionIds: Set<string>;
+  onChopSample?: (regionId: string) => void;
 }
 
 export const TimelineTrackRow: React.FC<TimelineTrackRowProps> = ({
@@ -34,7 +35,8 @@ export const TimelineTrackRow: React.FC<TimelineTrackRowProps> = ({
   onUpdateRegion,
   onSelectRegion,
   onSplitRegion,
-  selectedRegionIds
+  selectedRegionIds,
+  onChopSample
 }) => {
   const [isHovered, setIsHovered] = React.useState(false);
   
@@ -77,6 +79,7 @@ export const TimelineTrackRow: React.FC<TimelineTrackRowProps> = ({
               onSelect={onSelectRegion}
               onSplit={onSplitRegion}
               isSelected={selectedRegionIds.has(region.id)}
+              onChopSample={onChopSample}
             />
           ))}
           

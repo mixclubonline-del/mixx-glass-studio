@@ -58,6 +58,9 @@ export { PatternInstance } from './PatternInstance';
 export { EightZeroEightPanel } from './EightZeroEightPanel';
 export { PianoRollOverlay } from './PianoRollOverlay';
 
+// Sample Chopping
+export { SampleChopMode } from './SampleChopMode';
+
 // Utilities
 export * from './CursorTools';
 export * from './MultiRegionOperations';
