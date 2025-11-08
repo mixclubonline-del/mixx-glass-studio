@@ -311,9 +311,9 @@
   
   .neon-glow-blue {
     box-shadow: 
-      0 0 5px hsl(var(--neon-blue) / 0.5),
-      0 0 10px hsl(var(--neon-blue) / 0.3),
-      0 0 20px hsl(var(--neon-blue) / 0.2);
+      0 0 5px hsl(var(--neon-blue-500) / 0.5),
+      0 0 10px hsl(var(--neon-blue-500) / 0.3),
+      0 0 20px hsl(var(--neon-blue-500) / 0.2);
   }
   
   .neon-text {
@@ -328,8 +328,8 @@
     background: linear-gradient(
       135deg,
       hsl(var(--prime-500)) 0%,
-      hsl(var(--neon-pink)) 50%,
-      hsl(var(--neon-blue)) 100%
+      hsl(var(--neon-pink-500)) 50%,
+      hsl(var(--neon-blue-500)) 100%
     );
     background-size: 200% 200%;
     animation: gradient-shift 10s ease infinite;
