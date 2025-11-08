@@ -178,6 +178,49 @@ export const BloomHUD: React.FC<BloomHUDProps> = ({
 
   const handleMouseUpGlobal = () => {
     if (isDragging) {
+      // Snap to edge logic
+      const snapThreshold = 80; // pixels from edge to trigger snap
+      const container = containerRef.current;
+      
+      if (container) {
+        const rect = container.getBoundingClientRect();
+        const centerX = rect.left + rect.width / 2;
+        const centerY = rect.top + rect.height / 2;
+        
+        const windowWidth = window.innerWidth;
+        const windowHeight = window.innerHeight;
+        
+        // Calculate distances to edges
+        const distToLeft = centerX;
+        const distToRight = windowWidth - centerX;
+        const distToTop = centerY;
+        const distToBottom = windowHeight - centerY;
+        
+        // Find nearest edge
+        const minDist = Math.min(distToLeft, distToRight, distToTop, distToBottom);
+        
+        let newPosition = { ...position };
+        
+        if (minDist < snapThreshold) {
+          // Snap to nearest edge
+          if (minDist === distToLeft) {
+            // Snap to left edge
+            newPosition.x = 20;
+          } else if (minDist === distToRight) {
+            // Snap to right edge
+            newPosition.x = windowWidth - rect.width - 20;
+          } else if (minDist === distToTop) {
+            // Snap to top edge
+            newPosition.y = 20;
+          } else if (minDist === distToBottom) {
+            // Snap to bottom edge
+            newPosition.y = windowHeight - rect.height - 20;
+          }
+          
+          setPosition(newPosition);
+        }
+      }
+      
       setTimeout(() => setIsDragging(false), 50);
     }
   };
@@ -203,7 +246,8 @@ export const BloomHUD: React.FC<BloomHUDProps> = ({
         height: primaryRing * 2.5,
         transform: `translate(${position.x}px, ${position.y}px)`,
         cursor: isDragging ? 'grabbing' : 'default',
-        userSelect: 'none'
+        userSelect: 'none',
+        transition: isDragging ? 'none' : 'transform 0.4s cubic-bezier(0.68, -0.55, 0.265, 1.55)'
       }}
     >
       {/* Orbital rings */}
