@@ -85,3 +85,38 @@ export const TRAP_COLOR_PALETTES: Record<ColorPalette, string> = {
   fx: 'hsl(45 90% 60%)',        // Gold for FX
   custom: 'hsl(0 0% 50%)',      // Neutral gray
 };
+
+/**
+ * Pattern System (FL Studio-style workflow)
+ */
+
+export interface Pattern {
+  id: string;
+  name: string;
+  color: string;
+  category: ColorPalette;
+  
+  // Pattern contents
+  regionIds: string[]; // References to regions in this pattern
+  
+  // Metadata
+  duration: number; // Default duration for pattern instances
+  createdAt: number;
+  variants: number; // Number of unique variants created
+}
+
+export interface PatternInstance {
+  id: string;
+  patternId: string; // Reference to base pattern
+  trackId: string;
+  startTime: number;
+  duration: number; // Can override pattern default
+  
+  // Customization
+  unique: boolean; // If true, edits don't affect other instances
+  muted: boolean;
+  color?: string; // Override pattern color
+}
+
+// Timeline mode
+export type TimelineMode = 'audio' | 'pattern';

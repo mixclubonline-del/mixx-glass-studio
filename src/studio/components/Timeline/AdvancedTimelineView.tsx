@@ -6,6 +6,7 @@
 import React, { useRef, useEffect, useState } from 'react';
 import { useTimelineStore } from '@/store/timelineStore';
 import { useTracksStore } from '@/store/tracksStore';
+import { usePatternStore } from '@/store/patternStore';
 import { TimelineRuler } from './TimelineRuler';
 import { TimelineTrackRow } from './TimelineTrackRow';
 import { ProfessionalTrackHeader } from './ProfessionalTrackHeader';
@@ -19,9 +20,11 @@ import { CrossfadeRenderer } from './CrossfadeRenderer';
 import { ArrangeBrowserPanel } from './ArrangeBrowserPanel';
 import { RippleEditIndicator } from './RippleEditIndicator';
 import { KeyboardShortcutsHelper } from './KeyboardShortcutsHelper';
+import { PatternBrowser } from './PatternBrowser';
+import { PatternInstance } from './PatternInstance';
 import { useRegionClipboard } from '@/hooks/useRegionClipboard';
 import { useTimelineKeyboardShortcuts } from '@/hooks/useTimelineKeyboardShortcuts';
-import { ZoomIn, ZoomOut, Grid3x3, Plus, Folders, Settings2, ChevronLeft, ChevronRight } from 'lucide-react';
+import { ZoomIn, ZoomOut, Grid3x3, Plus, Folders, Settings2, ChevronLeft, ChevronRight, Layers, Music2 } from 'lucide-react';
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -31,8 +34,8 @@ import {
 } from '@/components/ui/dropdown-menu';
 import { Button } from '@/components/ui/button';
 import { cn } from '@/lib/utils';
-import mixxclubLogo from '@/assets/mixxclub-logo.png';
-import { HEADER_HEIGHT, RULER_HEIGHT, TRACK_HEIGHT, TRACK_LIST_WIDTH, TRACK_LIST_COLLAPSED, SPACING } from '@/lib/layout-constants';
+import { toast } from 'sonner';
+import { HEADER_HEIGHT, RULER_HEIGHT, TRACK_HEIGHT, TRACK_LIST_WIDTH, TRACK_LIST_COLLAPSED, PANEL_WIDTH_SM, SPACING } from '@/lib/layout-constants';
 
 // Dynamic hip-hop encouragement messages based on session time
 const getHipHopEncouragement = (minutes: number): string => {
@@ -126,6 +129,19 @@ export const AdvancedTimelineView: React.FC<AdvancedTimelineViewProps> = ({
     setAddTrackDialogOpen,
     addTrackDialogOpen,
   } = useTracksStore();
+  
+  // Pattern store
+  const {
+    patterns,
+    patternInstances,
+    timelineMode,
+    setTimelineMode,
+    addPatternInstance,
+    createPatternFromSelection,
+  } = usePatternStore();
+  
+  const [patternBrowserCollapsed, setPatternBrowserCollapsed] = useState(false);
+  const [dropTarget, setDropTarget] = useState<{ trackId: string; time: number } | null>(null);
   
   // Track control handlers
   const handleMuteToggle = (trackId: string) => {
@@ -249,6 +265,48 @@ export const AdvancedTimelineView: React.FC<AdvancedTimelineViewProps> = ({
     }
   };
   
+  // Handle pattern drop on timeline
+  const handleTimelineDrop = (e: React.DragEvent) => {
+    e.preventDefault();
+    
+    const patternId = e.dataTransfer.getData('patternId');
+    if (!patternId) return;
+    
+    const pattern = patterns.find(p => p.id === patternId);
+    if (!pattern) return;
+    
+    const rect = contentRef.current?.getBoundingClientRect();
+    if (!rect) return;
+    
+    const x = e.clientX - rect.left + scrollX;
+    const time = x / zoom;
+    
+    const y = e.clientY - rect.top;
+    const trackIndex = Math.floor(y / TRACK_HEIGHT);
+    const track = tracks[trackIndex];
+    
+    if (!track) return;
+    
+    // Create pattern instance
+    const instance = {
+      id: `instance-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`,
+      patternId: pattern.id,
+      trackId: track.id,
+      startTime: time,
+      duration: pattern.duration,
+      unique: false,
+      muted: false,
+    };
+    
+    addPatternInstance(instance);
+    toast.success(`Pattern "${pattern.name}" added to ${track.name}`);
+  };
+  
+  const handleDragOver = (e: React.DragEvent) => {
+    e.preventDefault();
+    e.dataTransfer.dropEffect = 'copy';
+  };
+  
   const totalWidth = Math.max(3000, currentTime * zoom + 1000);
 
   // Save browser collapsed state to localStorage
@@ -338,6 +396,30 @@ export const AdvancedTimelineView: React.FC<AdvancedTimelineViewProps> = ({
       >
         {/* Left section - Tools */}
         <div className="flex items-center gap-2">
+          {/* Timeline Mode Toggle */}
+          <div className="flex gap-1 p-1 rounded glass-medium border border-border/30">
+            <Button
+              size="sm"
+              variant={timelineMode === 'audio' ? 'secondary' : 'ghost'}
+              onClick={() => setTimelineMode('audio')}
+              className="h-7 px-3"
+            >
+              <Music2 className="h-3 w-3 mr-1" />
+              Audio
+            </Button>
+            <Button
+              size="sm"
+              variant={timelineMode === 'pattern' ? 'secondary' : 'ghost'}
+              onClick={() => setTimelineMode('pattern')}
+              className="h-7 px-3"
+            >
+              <Layers className="h-3 w-3 mr-1" />
+              Pattern
+            </Button>
+          </div>
+          
+          <div className="w-px h-6 bg-border/50" />
+          
           <TimelineToolbar />
         </div>
         
@@ -379,6 +461,32 @@ export const AdvancedTimelineView: React.FC<AdvancedTimelineViewProps> = ({
         
       {/* Main Timeline Area - Sidebar + Content */}
       <div className="flex-1 flex overflow-hidden">
+        {/* Pattern Browser - Left side in pattern mode */}
+        {timelineMode === 'pattern' && !patternBrowserCollapsed && (
+          <div 
+            className="flex-shrink-0"
+            style={{ width: `${PANEL_WIDTH_SM}px` }}
+          >
+            <PatternBrowser />
+          </div>
+        )}
+        
+        {timelineMode === 'pattern' && patternBrowserCollapsed && (
+          <div 
+            className="flex-shrink-0 glass-light border-r border-gradient flex items-start justify-center pt-2"
+            style={{ width: `${TRACK_LIST_COLLAPSED}px` }}
+          >
+            <Button
+              size="sm"
+              variant="ghost"
+              onClick={() => setPatternBrowserCollapsed(false)}
+              className="h-8 w-8 p-0"
+            >
+              <ChevronRight size={16} />
+            </Button>
+          </div>
+        )}
+        
         {/* Left Track List Sidebar - STANDARD WIDTH */}
         {!trackListCollapsed && (
           <div 
@@ -489,6 +597,8 @@ export const AdvancedTimelineView: React.FC<AdvancedTimelineViewProps> = ({
                 className="relative"
                 style={{ width: `${totalWidth}px` }}
                 onClick={handleTimelineClick}
+                onDrop={handleTimelineDrop}
+                onDragOver={handleDragOver}
               >
                 {/* Grid overlay */}
                 <GridOverlay
@@ -533,6 +643,34 @@ export const AdvancedTimelineView: React.FC<AdvancedTimelineViewProps> = ({
                     selectedRegionIds={new Set(selectedRegionIds)}
                   />
                 ))}
+                
+                {/* Pattern Instances - Only in pattern mode */}
+                {timelineMode === 'pattern' && tracks.map((track, trackIndex) => {
+                  const trackPatterns = patternInstances.filter(p => p.trackId === track.id);
+                  
+                  return trackPatterns.map((instance) => (
+                    <div
+                      key={instance.id}
+                      className="absolute"
+                      style={{
+                        top: trackIndex * TRACK_HEIGHT,
+                        left: 0,
+                        right: 0,
+                        height: TRACK_HEIGHT,
+                        pointerEvents: 'none',
+                      }}
+                    >
+                      <PatternInstance
+                        instance={instance}
+                        zoom={zoom}
+                        scrollX={scrollX}
+                        trackHeight={TRACK_HEIGHT}
+                        isSelected={selectedRegionIds.includes(instance.id)}
+                        onSelect={handleSelectRegion}
+                      />
+                    </div>
+                  ));
+                })}
                 
                 {tracks.length === 0 && (
                   <div className="absolute inset-0 flex items-center justify-center">

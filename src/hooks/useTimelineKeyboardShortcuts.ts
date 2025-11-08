@@ -5,6 +5,7 @@
 import { useEffect } from 'react';
 import { useTimelineStore } from '@/store/timelineStore';
 import { useTracksStore } from '@/store/tracksStore';
+import { usePatternStore } from '@/store/patternStore';
 import { toast } from 'sonner';
 
 export const useTimelineKeyboardShortcuts = (
@@ -33,6 +34,10 @@ export const useTimelineKeyboardShortcuts = (
     duplicateRegion,
     clearRegionSelection
   } = useTracksStore();
+  
+  const {
+    createPatternFromSelection
+  } = usePatternStore();
 
   useEffect(() => {
     const handleKeyDown = (e: KeyboardEvent) => {
@@ -246,6 +251,21 @@ export const useTimelineKeyboardShortcuts = (
         e.preventDefault();
         // Would set loop end at current time
         toast.info('Set loop out point');
+        return;
+      }
+
+      // Cmd/Ctrl+B - Create pattern from selection
+      if (cmdCtrl && e.key === 'b') {
+        e.preventDefault();
+        if (selectedRegionIds.length === 0) {
+          toast.error('Select regions to create pattern');
+          return;
+        }
+        const patternName = `Pattern ${Date.now()}`;
+        const pattern = createPatternFromSelection(patternName, 'drums', selectedRegionIds);
+        if (pattern) {
+          toast.success(`Pattern "${pattern.name}" created from ${selectedRegionIds.length} region(s)`);
+        }
         return;
       }
 

@@ -50,6 +50,10 @@ export { TimelineTooltip } from './TimelineTooltip';
 export { TimelineOnboarding } from './TimelineOnboarding';
 export { TimelineStatusBar } from './TimelineStatusBar';
 
+// Pattern System (FL Studio-style)
+export { PatternBrowser } from './PatternBrowser';
+export { PatternInstance } from './PatternInstance';
+
 // Utilities
 export * from './CursorTools';
 export * from './MultiRegionOperations';
