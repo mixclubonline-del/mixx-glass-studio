@@ -24,6 +24,8 @@ import {
 import { useTransport, useProject } from '@/contexts/ProjectContext';
 import { useViewStore, ViewType } from '@/store/viewStore';
 import { IceFireFader } from '../Controls/IceFireFader';
+import { Input } from '@/components/ui/input';
+import { useState, useEffect } from 'react';
 
 interface CentralCommandHubProps {
   onImport: () => void;
@@ -36,9 +38,36 @@ export const CentralCommandHub = ({
   onTogglePluginBrowser,
   onToggleAIAssistant 
 }: CentralCommandHubProps) => {
-  const { masterVolume, setMasterVolume } = useProject();
-  const { transport, play, pause, stop, toggleRecord, prevBar, nextBar } = useTransport();
+  const { masterVolume, setMasterVolume, bpm, setBpm, timeSignature, getBarPosition } = useProject();
+  const { transport, play, pause, stop, toggleRecord, prevBar, nextBar, toggleLoop } = useTransport();
   const { currentView, setView } = useViewStore();
+  
+  // BPM editing
+  const [isEditingBpm, setIsEditingBpm] = useState(false);
+  const [bpmInput, setBpmInput] = useState(bpm.toString());
+  
+  // Update bpmInput when bpm changes externally
+  useEffect(() => {
+    if (!isEditingBpm) {
+      setBpmInput(bpm.toString());
+    }
+  }, [bpm, isEditingBpm]);
+  
+  const handleBpmSubmit = () => {
+    const newBpm = parseFloat(bpmInput);
+    if (!isNaN(newBpm) && newBpm >= 20 && newBpm <= 300) {
+      setBpm(newBpm);
+    } else {
+      setBpmInput(bpm.toString());
+    }
+    setIsEditingBpm(false);
+  };
+  
+  // Get current position
+  const position = getBarPosition();
+  const formatPosition = () => {
+    return `${position.bar}.${position.beat}.${position.tick.toString().padStart(3, '0')}`;
+  };
   
   const views: { id: ViewType; label: string; icon: React.ReactNode }[] = [
     { id: 'arrange', label: 'Arrange', icon: <Layout size={18} /> },
@@ -49,8 +78,61 @@ export const CentralCommandHub = ({
   return (
     <div className="glass-ultra border-gradient px-6 py-3 rounded-lg shadow-[var(--shadow-float)]">
       <div className="flex items-center justify-between gap-6">
-        {/* LEFT: Utilities */}
-        <div className="flex items-center gap-2">
+        {/* LEFT: Project Info & Utilities */}
+        <div className="flex items-center gap-3">
+          {/* Time Display */}
+          <div className="flex flex-col items-center gap-0.5 min-w-[90px]">
+            <span className="text-[10px] text-muted-foreground font-medium">POSITION</span>
+            <span className="text-sm font-mono text-foreground tabular-nums">
+              {formatPosition()}
+            </span>
+          </div>
+          
+          <div className="w-px h-10 bg-border/50" />
+          
+          {/* BPM Display/Editor */}
+          <div className="flex flex-col items-center gap-0.5 min-w-[60px]">
+            <span className="text-[10px] text-muted-foreground font-medium">BPM</span>
+            {isEditingBpm ? (
+              <Input
+                type="number"
+                value={bpmInput}
+                onChange={(e) => setBpmInput(e.target.value)}
+                onBlur={handleBpmSubmit}
+                onKeyDown={(e) => {
+                  if (e.key === 'Enter') handleBpmSubmit();
+                  if (e.key === 'Escape') {
+                    setBpmInput(bpm.toString());
+                    setIsEditingBpm(false);
+                  }
+                }}
+                className="h-6 w-16 text-sm font-mono text-center p-0 bg-muted/50"
+                autoFocus
+              />
+            ) : (
+              <button
+                onClick={() => setIsEditingBpm(true)}
+                className="text-sm font-mono text-foreground hover:text-primary transition-colors tabular-nums"
+                title="Click to edit tempo"
+              >
+                {bpm.toFixed(1)}
+              </button>
+            )}
+          </div>
+          
+          <div className="w-px h-10 bg-border/50" />
+          
+          {/* Time Signature */}
+          <div className="flex flex-col items-center gap-0.5 min-w-[40px]">
+            <span className="text-[10px] text-muted-foreground font-medium">TIME</span>
+            <span className="text-sm font-mono text-foreground tabular-nums">
+              {timeSignature.numerator}/{timeSignature.denominator}
+            </span>
+          </div>
+          
+          <div className="w-px h-10 bg-border/50" />
+          
+          {/* Import & Plugins */}
           <Button
             variant="outline"
             size="sm"
@@ -140,6 +222,19 @@ export const CentralCommandHub = ({
             title="Record (Shift+Space)"
           >
             <Circle className={`h-4 w-4 ${transport.isRecording ? 'fill-current' : ''}`} />
+          </Button>
+          
+          <div className="w-px h-8 bg-border/50 mx-1" />
+          
+          {/* Loop Toggle */}
+          <Button
+            variant={transport.loopEnabled ? 'default' : 'ghost'}
+            size="icon"
+            onClick={toggleLoop}
+            className={`h-9 w-9 ${transport.loopEnabled ? 'bg-primary/80 shadow-[var(--glow-medium)]' : 'hover:bg-muted'}`}
+            title="Toggle Loop (L)"
+          >
+            <span className="text-xs font-bold">⟲</span>
           </Button>
         </div>
         

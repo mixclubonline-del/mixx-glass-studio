@@ -52,9 +52,7 @@ const IndexContent = () => {
   const [selectedSlotForPlugin, setSelectedSlotForPlugin] = useState<number>(1);
   const [openPluginWindows, setOpenPluginWindows] = useState<Map<string, { trackId: string; slotNumber: number; pluginId: string }>>(new Map());
   const [selectedTrackId, setSelectedTrackId] = useState<string | null>(null);
-  const [transportFloating, setTransportFloating] = useState(false);
-  const [transportCollapsed, setTransportCollapsed] = useState(false);
-  const [transportCovered, setTransportCovered] = useState(false);
+  // Transport is now permanently docked - no toggle states needed
   const [detectedBPM, setDetectedBPM] = useState<number | null>(null);
   const [detectedKey, setDetectedKey] = useState<string | null>(null);
   const { toast } = useToast();
@@ -831,48 +829,22 @@ const IndexContent = () => {
           </div>
         </ViewContainer>
         
-        {/* Central Command Hub - Bottom Transport with Bloom */}
-        {!transportCollapsed && (
-          <ContextualBloomWrapper
-            config={{
-              triggerZone: 'bottom',
-              className: transportFloating 
-                ? "fixed bottom-4 left-1/2 -translate-x-1/2 z-50 min-w-[900px]" 
-                : "w-full",
-              preferenceKey: 'transport'
-            }}
-          >
-            <div className={transportCovered ? "opacity-60 hover:opacity-100 transition-opacity" : ""}>
-              <CentralCommandHub
-                onImport={handleImport}
-                onTogglePluginBrowser={() => togglePanel('browser')}
-                onToggleAIAssistant={() => setShowAIAssistant(!showAIAssistant)}
-              />
-            </div>
-          </ContextualBloomWrapper>
-        )}
+        {/* Central Command Hub - Permanently docked at bottom with Bloom */}
+        <ContextualBloomWrapper
+          config={{
+            triggerZone: 'bottom',
+            className: "fixed bottom-4 left-1/2 -translate-x-1/2 z-50 w-[95%] max-w-[1400px]",
+            preferenceKey: 'transport'
+          }}
+        >
+          <CentralCommandHub
+            onImport={handleImport}
+            onTogglePluginBrowser={() => togglePanel('browser')}
+            onToggleAIAssistant={() => setShowAIAssistant(!showAIAssistant)}
+          />
+        </ContextualBloomWrapper>
         
-        {/* Transport Toggle Buttons */}
-        <div className="fixed bottom-4 left-4 flex gap-2 z-40">
-          <Button
-            variant="outline"
-            size="sm"
-            onClick={() => setTransportCollapsed(!transportCollapsed)}
-            title={transportCollapsed ? "Show Transport" : "Hide Transport"}
-          >
-            {transportCollapsed ? "Show Transport" : "Hide Transport"}
-          </Button>
-          {!transportCollapsed && (
-            <Button
-              variant="outline"
-              size="sm"
-              onClick={() => setTransportFloating(!transportFloating)}
-              title={transportFloating ? "Dock Transport" : "Float Transport"}
-            >
-              {transportFloating ? "Dock" : "Float"}
-            </Button>
-          )}
-        </div>
+        {/* Transport is now permanently visible - no toggle buttons needed */}
       </div>
       
       {/* Plugin Browser */}
