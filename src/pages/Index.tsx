@@ -9,8 +9,8 @@ import {
   TransportControls,
   AIAssistantPanel
 } from "@/studio/components";
+import { AudioTestLoader } from "@/studio/components/Audio";
 import { CentralCommandHub } from "@/studio/components/Navigation/CentralCommandHub";
-import { ProjectProvider } from "@/contexts/ProjectContext";
 import { PluginBrowser } from "@/studio/components/Plugins/PluginBrowser";
 import { PluginWindowManager } from "@/studio/components/Plugins/PluginWindowManager";
 import { useKeyboardShortcuts } from "@/hooks/useKeyboardShortcuts";
@@ -796,6 +796,11 @@ const IndexContent = () => {
               className="flex flex-col overflow-y-auto"
               style={{ gap: `${SPACING.sm}px` }}
             >
+              {/* Audio Test Loader - Quick test component */}
+              <div className="w-96">
+                <AudioTestLoader />
+              </div>
+              
               {/* Beast Mode Panel */}
               <BeastModePanel />
               
@@ -945,11 +950,7 @@ const IndexContent = () => {
   );
 };
 
-// Wrap with ProjectProvider
+// Main Index component - now wrapped by ProjectProvider in App.tsx
 export default function Index() {
-  return (
-    <ProjectProvider>
-      <IndexContent />
-    </ProjectProvider>
-  );
+  return <IndexContent />;
 }

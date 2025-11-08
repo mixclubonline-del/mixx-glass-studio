@@ -5,3 +5,4 @@ export { AudioToMIDI, type MIDINote } from './AudioToMIDI';
 export { VoiceIsolation } from './VoiceIsolation';
 export { SpectralEditor } from './SpectralEditor';
 export { RestorationPresets } from './RestorationPresets';
+export { AudioTestLoader } from './AudioTestLoader';
