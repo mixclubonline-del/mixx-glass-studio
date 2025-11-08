@@ -6,19 +6,112 @@
 
 @layer base {
   :root {
-    /* Mixx Club Prime Color Palette */
-    --prime-500: 275 100% 65%; /* Deep purple glow #7d46ff */
-    --neon-blue: 191 100% 50%; /* Accent edges #00c2ff */
-    --neon-pink: 314 100% 65%; /* Warm counterbalance #ff4fd8 */
+    /* ========== PRIME PURPLE SCALE ========== */
+    --prime-50: 275 100% 97%;   /* Lightest hint */
+    --prime-100: 275 100% 95%;  /* Very light */
+    --prime-200: 275 100% 85%;  /* Light */
+    --prime-300: 275 100% 75%;  /* Medium light */
+    --prime-400: 275 100% 70%;  /* Medium */
+    --prime-500: 275 100% 65%;  /* Base - Deep purple glow #7d46ff */
+    --prime-600: 275 100% 55%;  /* Medium dark */
+    --prime-700: 275 90% 45%;   /* Dark */
+    --prime-800: 275 80% 35%;   /* Very dark */
+    --prime-900: 275 70% 25%;   /* Darkest */
     
-    /* Temperature Gradient (Ice to Fire) */
-    --ice-deep: 191 100% 40%; /* Deep freeze */
-    --ice-cold: 191 100% 50%; /* Neon blue - cold */
-    --ice-warm: 191 80% 60%; /* Warming blue */
-    --prime-purple: 275 100% 65%; /* Prime purple - optimal */
-    --fire-red: 0 100% 60%; /* Fire red - danger */
+    /* ========== NEON BLUE SCALE ========== */
+    --neon-blue-50: 191 100% 97%;
+    --neon-blue-100: 191 100% 90%;
+    --neon-blue-200: 191 100% 80%;
+    --neon-blue-300: 191 100% 70%;
+    --neon-blue-400: 191 100% 60%;
+    --neon-blue-500: 191 100% 50%;  /* Base - Cyan #00c2ff */
+    --neon-blue-600: 191 90% 45%;
+    --neon-blue-700: 191 80% 40%;
+    --neon-blue-800: 191 70% 30%;
+    --neon-blue-900: 191 60% 20%;
     
-    /* Base tokens - Darker for trap aesthetic */
+    /* ========== NEON PINK SCALE ========== */
+    --neon-pink-50: 314 100% 97%;
+    --neon-pink-100: 314 100% 90%;
+    --neon-pink-200: 314 100% 80%;
+    --neon-pink-300: 314 100% 75%;
+    --neon-pink-400: 314 100% 70%;
+    --neon-pink-500: 314 100% 65%;  /* Base - Hot pink #ff4fd8 */
+    --neon-pink-600: 314 90% 55%;
+    --neon-pink-700: 314 80% 45%;
+    --neon-pink-800: 314 70% 35%;
+    --neon-pink-900: 314 60% 25%;
+    
+    /* ========== NEON GREEN SCALE ========== */
+    --neon-green-50: 140 100% 97%;
+    --neon-green-100: 140 100% 90%;
+    --neon-green-200: 140 100% 80%;
+    --neon-green-300: 140 95% 70%;
+    --neon-green-400: 140 90% 60%;
+    --neon-green-500: 140 85% 50%;  /* Base - Bright green */
+    --neon-green-600: 140 80% 45%;
+    --neon-green-700: 140 75% 40%;
+    --neon-green-800: 140 70% 30%;
+    --neon-green-900: 140 60% 20%;
+    
+    /* ========== NEON ORANGE SCALE ========== */
+    --neon-orange-50: 25 100% 97%;
+    --neon-orange-100: 25 100% 90%;
+    --neon-orange-200: 25 100% 80%;
+    --neon-orange-300: 25 100% 70%;
+    --neon-orange-400: 25 100% 65%;
+    --neon-orange-500: 25 100% 60%;  /* Base - Bright orange */
+    --neon-orange-600: 25 95% 55%;
+    --neon-orange-700: 25 90% 50%;
+    --neon-orange-800: 25 80% 40%;
+    --neon-orange-900: 25 70% 30%;
+    
+    /* ========== NEON TEAL SCALE ========== */
+    --neon-teal-50: 175 100% 97%;
+    --neon-teal-100: 175 100% 90%;
+    --neon-teal-200: 175 100% 80%;
+    --neon-teal-300: 175 95% 70%;
+    --neon-teal-400: 175 90% 60%;
+    --neon-teal-500: 175 85% 50%;  /* Base - Bright teal */
+    --neon-teal-600: 175 80% 45%;
+    --neon-teal-700: 175 75% 40%;
+    --neon-teal-800: 175 70% 30%;
+    --neon-teal-900: 175 60% 20%;
+    
+    /* ========== GRAY SCALE ========== */
+    --gray-50: 240 20% 98%;
+    --gray-100: 240 15% 95%;
+    --gray-200: 240 12% 85%;
+    --gray-300: 240 10% 70%;
+    --gray-400: 240 8% 55%;
+    --gray-500: 240 6% 40%;
+    --gray-600: 240 8% 30%;
+    --gray-700: 240 10% 20%;
+    --gray-800: 240 12% 12%;
+    --gray-900: 240 15% 6%;
+    --gray-950: 240 20% 3%;
+    
+    /* ========== TEMPERATURE GRADIENT (Ice to Fire) ========== */
+    --ice-deep: 191 100% 40%;      /* Deep freeze */
+    --ice-cold: 191 100% 50%;      /* Neon blue - cold */
+    --ice-warm: 191 80% 60%;       /* Warming blue */
+    --neutral-cool: 220 50% 60%;   /* Cool neutral */
+    --neutral-warm: 40 50% 60%;    /* Warm neutral */
+    --fire-warm: 25 100% 60%;      /* Warming orange */
+    --fire-hot: 10 100% 60%;       /* Hot orange-red */
+    --fire-red: 0 100% 60%;        /* Fire red - danger */
+    
+    /* ========== SEMANTIC STATUS COLORS ========== */
+    --success: 140 85% 50%;        /* Neon green */
+    --success-foreground: 0 0% 100%;
+    --warning: 45 100% 55%;        /* Bright yellow */
+    --warning-foreground: 240 20% 10%;
+    --info: 200 95% 55%;           /* Bright cyan */
+    --info-foreground: 0 0% 100%;
+    --error: 0 84% 60%;            /* Bright red */
+    --error-foreground: 0 0% 98%;
+    
+    /* ========== BASE TOKENS ========== */
     --background: 240 20% 2%;
     --foreground: 0 0% 98%;
     
@@ -37,11 +130,11 @@
     --muted: 240 5% 15%;
     --muted-foreground: 240 5% 60%;
     
-    --accent: var(--neon-blue);
+    --accent: var(--neon-blue-500);
     --accent-foreground: 0 0% 100%;
     
-    --destructive: 0 84% 60%;
-    --destructive-foreground: 0 0% 98%;
+    --destructive: var(--error);
+    --destructive-foreground: var(--error-foreground);
     
     --border: 240 10% 15%;
     --input: 240 10% 15%;
@@ -49,18 +142,40 @@
     
     --radius: 0.5rem;
     
-    /* Glass effects */
+    /* ========== GLASS EFFECTS ========== */
     --glass-bg: 240 10% 8% / 0.6;
     --glass-border: 0 0% 100% / 0.1;
     --glass-glow: var(--prime-500) / 0.2;
     
-    /* Gradients */
-    --gradient-prime: linear-gradient(135deg, hsl(var(--prime-500)), hsl(var(--neon-pink)));
-    --gradient-glass: linear-gradient(180deg, hsl(240 10% 12% / 0.8), hsl(240 10% 6% / 0.9));
+    --glass-ultra: 240 10% 5% / 0.05;
+    --glass-light: 240 10% 10% / 0.10;
+    --glass-medium: 240 10% 12% / 0.15;
+    --glass-heavy: 240 10% 8% / 0.25;
     
-    /* Shadows */
+    /* Glass tints with color */
+    --glass-prime: 275 100% 65% / 0.08;
+    --glass-blue: 191 100% 50% / 0.08;
+    --glass-pink: 314 100% 65% / 0.08;
+    --glass-green: 140 85% 50% / 0.08;
+    --glass-orange: 25 100% 60% / 0.08;
+    
+    /* ========== GRADIENTS ========== */
+    --gradient-prime: linear-gradient(135deg, hsl(var(--prime-500)), hsl(var(--neon-pink-500)));
+    --gradient-prime-blue: linear-gradient(135deg, hsl(var(--prime-500)), hsl(var(--neon-blue-500)));
+    --gradient-glass: linear-gradient(180deg, hsl(240 10% 12% / 0.8), hsl(240 10% 6% / 0.9));
+    --gradient-fire: linear-gradient(135deg, hsl(var(--fire-red)), hsl(var(--neon-orange-500)));
+    --gradient-ice: linear-gradient(135deg, hsl(var(--neon-blue-500)), hsl(var(--neon-teal-500)));
+    --gradient-cyber: linear-gradient(135deg, hsl(var(--prime-500)), hsl(var(--neon-blue-500)), hsl(var(--neon-pink-500)));
+    --gradient-sunset: linear-gradient(135deg, hsl(var(--neon-pink-500)), hsl(var(--neon-orange-500)), hsl(var(--fire-red)));
+    --gradient-matrix: linear-gradient(180deg, hsl(var(--neon-green-500)), hsl(var(--neon-teal-600)));
+    
+    /* ========== SHADOWS ========== */
     --shadow-glow: 0 0 40px hsl(var(--prime-500) / 0.3);
-    --shadow-neon: 0 0 20px hsl(var(--neon-blue) / 0.4);
+    --shadow-glow-blue: 0 0 40px hsl(var(--neon-blue-500) / 0.3);
+    --shadow-glow-pink: 0 0 40px hsl(var(--neon-pink-500) / 0.3);
+    --shadow-glow-green: 0 0 40px hsl(var(--neon-green-500) / 0.3);
+    --shadow-glow-orange: 0 0 40px hsl(var(--neon-orange-500) / 0.3);
+    --shadow-neon: 0 0 20px hsl(var(--neon-blue-500) / 0.4);
     
     /* Sidebar */
     --sidebar-background: 240 10% 5%;
@@ -72,17 +187,27 @@
     --sidebar-border: 240 10% 15%;
     --sidebar-ring: var(--prime-500);
     
-    /* 2030 Glassmorphism System */
-    --glass-ultra: 240 10% 5% / 0.05;
-    --glass-light: 240 10% 10% / 0.10;
-    --glass-medium: 240 10% 12% / 0.15;
-    --glass-heavy: 240 10% 8% / 0.25;
+    /* ========== GRADIENT BORDERS ========== */
+    --border-gradient-prime: linear-gradient(135deg, 
+      hsl(var(--prime-400) / 0.3) 0%,
+      hsl(var(--neon-blue-400) / 0.2) 50%,
+      hsl(var(--neon-pink-400) / 0.3) 100%
+    );
     
-    /* Gradient borders */
-    --border-gradient-1: linear-gradient(135deg, 
-      hsl(275 100% 70% / 0.3) 0%,
-      hsl(191 100% 60% / 0.2) 50%,
-      hsl(314 100% 70% / 0.3) 100%
+    --border-gradient-cyber: linear-gradient(90deg,
+      hsl(var(--prime-500) / 0.4),
+      hsl(var(--neon-blue-500) / 0.4),
+      hsl(var(--prime-500) / 0.4)
+    );
+    
+    --border-gradient-fire: linear-gradient(135deg,
+      hsl(var(--neon-orange-500) / 0.4),
+      hsl(var(--fire-red) / 0.4)
+    );
+    
+    --border-gradient-ice: linear-gradient(135deg,
+      hsl(var(--neon-blue-500) / 0.4),
+      hsl(var(--neon-teal-500) / 0.4)
     );
     
     /* Multi-layer shadows for depth */
@@ -91,26 +216,56 @@
       0 8px 24px rgba(0, 0, 0, 0.3),
       0 16px 48px rgba(0, 0, 0, 0.2);
     
-    /* Ethereal glow effects */
+    /* ========== GLOW EFFECTS ========== */
     --glow-soft: 0 0 40px hsl(var(--prime-500) / 0.15);
+    --glow-subtle: 0 0 20px hsl(var(--prime-500) / 0.2);
     --glow-medium: 0 0 60px hsl(var(--prime-500) / 0.25);
     --glow-intense: 0 0 80px hsl(var(--prime-500) / 0.4);
+    --glow-extreme: 0 0 100px hsl(var(--prime-500) / 0.5);
     
-    /* Vibrant gradient mesh */
+    /* Color-specific glows */
+    --glow-blue: 0 0 40px hsl(var(--neon-blue-500) / 0.3);
+    --glow-pink: 0 0 40px hsl(var(--neon-pink-500) / 0.3);
+    --glow-green: 0 0 40px hsl(var(--neon-green-500) / 0.3);
+    --glow-orange: 0 0 40px hsl(var(--neon-orange-500) / 0.3);
+    --glow-teal: 0 0 40px hsl(var(--neon-teal-500) / 0.3);
+    
+    /* ========== GRADIENT MESH BACKGROUNDS ========== */
     --gradient-mesh: radial-gradient(
       ellipse at 20% 30%, 
-      hsl(275 100% 65% / 0.15) 0%, 
+      hsl(var(--prime-500) / 0.15) 0%, 
       transparent 50%
     ),
     radial-gradient(
       ellipse at 80% 70%, 
-      hsl(191 100% 50% / 0.12) 0%, 
+      hsl(var(--neon-blue-500) / 0.12) 0%, 
       transparent 50%
     ),
     radial-gradient(
       ellipse at 50% 50%, 
-      hsl(314 100% 65% / 0.08) 0%, 
+      hsl(var(--neon-pink-500) / 0.08) 0%, 
       transparent 70%
+    );
+    
+    --gradient-mesh-vibrant: radial-gradient(
+      ellipse at 10% 20%,
+      hsl(var(--prime-500) / 0.2) 0%,
+      transparent 40%
+    ),
+    radial-gradient(
+      ellipse at 90% 80%,
+      hsl(var(--neon-pink-500) / 0.18) 0%,
+      transparent 40%
+    ),
+    radial-gradient(
+      ellipse at 50% 50%,
+      hsl(var(--neon-blue-500) / 0.15) 0%,
+      transparent 50%
+    ),
+    radial-gradient(
+      ellipse at 30% 70%,
+      hsl(var(--neon-green-500) / 0.1) 0%,
+      transparent 40%
     );
   }
 }
