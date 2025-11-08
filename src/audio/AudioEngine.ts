@@ -33,6 +33,10 @@ export class AudioEngine {
   private isPlaying: boolean;
   private startTime: number;
   private pauseTime: number;
+  private loopCheckInterval: number | null = null;
+  
+  // Error handling
+  private errorHandlers: ((error: Error) => void)[] = [];
   
   // Master effects
   private limiter: DynamicsCompressorNode;
@@ -65,6 +69,15 @@ export class AudioEngine {
     // No offset - audio starts at bar 1
     this.projectStartOffset = 0;
     
+    // Monitor context state changes
+    this.context.addEventListener('statechange', () => {
+      console.log(`🎵 AudioContext state: ${this.context.state}`);
+      
+      if (this.context.state === 'interrupted') {
+        this.handleContextInterruption();
+      }
+    });
+    
     // Create master bus
     this.masterBus = new Bus(this.context, 'master', 'Master', 'master');
     
@@ -84,6 +97,8 @@ export class AudioEngine {
     this.velvetFloor = getVelvetFloorEngine();
     this.velvetFloor.initialize(this.context).then(() => {
       console.log('🎵 VelvetFloor Engine initialized');
+    }).catch(err => {
+      this.handleError(err as Error, 'VelvetFloor initialization');
     });
     
     // Master chain: masterBus -> VelvetFloor -> masterGain -> limiter -> output
@@ -229,80 +244,129 @@ export class AudioEngine {
   }
   
   // Playback with loop support
-  play(fromTime: number = 0) {
+  async play(fromTime: number = 0) {
     if (this.isPlaying) return;
     
-    // Unlock AudioContext on play (browser security requirement)
-    if (this.context.state !== 'running') {
-      this.context.resume().catch(err => {
-        console.error('Failed to resume AudioContext:', err);
-      });
+    // Ensure AudioContext is running
+    const ready = await this.ensureContextRunning();
+    if (!ready) {
+      this.handleError(new Error('Cannot play: AudioContext not running'), 'playback');
+      return;
     }
     
-    // If resuming from pause, use pauseTime, otherwise use fromTime
-    const offset = this.pauseTime > 0 ? this.pauseTime : fromTime;
-    this.startTime = this.context.currentTime - offset;
-    
-    this.tracks.forEach((track) => {
-      if (track.buffer && !track.channelStrip.isMuted()) {
-        this.playTrackSource(track, offset);
+    try {
+      // If resuming from pause, use pauseTime, otherwise use fromTime
+      const offset = this.pauseTime > 0 ? this.pauseTime : fromTime;
+      this.startTime = this.context.currentTime - offset;
+      
+      this.tracks.forEach((track) => {
+        if (track.buffer && !track.channelStrip.isMuted()) {
+          this.playTrackSource(track, offset);
+        }
+      });
+      
+      this.isPlaying = true;
+      
+      // Setup loop monitoring if enabled
+      if (this.loopEnabled && this.loopEnd > this.loopStart) {
+        this.scheduleLoopCheck();
       }
-    });
-    
-    this.isPlaying = true;
-    
-    // Setup loop monitoring if enabled
-    if (this.loopEnabled && this.loopEnd > this.loopStart) {
-      this.scheduleLoopCheck();
+    } catch (err) {
+      this.handleError(err as Error, 'playback start');
     }
   }
   
   private playTrackSource(track: Track, offset: number) {
-    const source = this.context.createBufferSource();
-    source.buffer = track.buffer;
-    source.connect(track.channelStrip.input);
-    
-    // Start from the correct offset position
-    const startOffset = Math.max(0, offset + track.offset);
-    if (startOffset < track.buffer!.duration) {
-      source.start(0, startOffset);
+    try {
+      // Stop existing source gracefully
+      if (track.source && track.sourceState === 'playing') {
+        track.sourceState = 'stopping';
+        try {
+          track.source.stop();
+        } catch (e) {
+          // Source may already be stopped
+        }
+        track.source = null;
+      }
+      
+      // Create new source
+      const source = this.context.createBufferSource();
+      source.buffer = track.buffer;
+      track.sourceState = 'scheduled';
+      
+      // Reliable cleanup on end
+      source.onended = () => {
+        if (track.source === source) {
+          track.source = null;
+          track.sourceState = 'idle';
+        }
+      };
+      
+      source.connect(track.channelStrip.input);
       track.source = source;
       
-      // Auto-stop at end
-      source.onended = () => {
-        track.source = null;
-      };
+      // Sample-accurate start with 1ms lookahead
+      const startOffset = Math.max(0, offset + track.offset);
+      const scheduledTime = this.context.currentTime + 0.001;
+      
+      if (startOffset < track.buffer!.duration) {
+        track.sourceState = 'playing';
+        source.start(scheduledTime, startOffset);
+        
+        // Update timing reference for precision
+        this.startTime = scheduledTime - offset;
+      }
+    } catch (err) {
+      this.handleError(err as Error, `playback track ${track.id}`);
     }
   }
   
   private scheduleLoopCheck() {
     if (!this.isPlaying || !this.loopEnabled) return;
     
-    const checkInterval = setInterval(() => {
+    // Clear existing interval
+    this.clearLoopCheck();
+    
+    this.loopCheckInterval = window.setInterval(() => {
       if (!this.isPlaying) {
-        clearInterval(checkInterval);
+        this.clearLoopCheck();
         return;
       }
       
       const currentTime = this.getCurrentTime();
+      const lookahead = 0.1; // 100ms lookahead for smoother loops
       
       // Check if we've reached loop end
-      if (currentTime >= this.loopEnd) {
-        // Jump back to loop start
+      if (currentTime >= this.loopEnd - lookahead) {
+        // Pre-schedule loop jump for tighter timing
         this.seek(this.loopStart);
       }
-    }, 50); // Check every 50ms
+    }, 20); // Check every 20ms for tighter timing
+  }
+  
+  private clearLoopCheck() {
+    if (this.loopCheckInterval !== null) {
+      clearInterval(this.loopCheckInterval);
+      this.loopCheckInterval = null;
+    }
   }
   
   pause() {
     if (!this.isPlaying) return;
     
+    this.clearLoopCheck();
     this.pauseTime = this.context.currentTime - this.startTime;
     
     this.tracks.forEach((track) => {
-      if (track.source) {
-        track.source.stop();
+      if (track.source && track.sourceState === 'playing') {
+        try {
+          track.sourceState = 'stopping';
+          track.source.stop();
+        } catch (e) {
+          // Source may already be stopped
+        }
         track.source = null;
+        track.sourceState = 'idle';
       }
     });
     
@@ -310,14 +374,20 @@ export class AudioEngine {
   }
   
   stop() {
+    this.clearLoopCheck();
+    
     this.tracks.forEach((track) => {
       if (track.source) {
         try {
-          track.source.stop();
+          if (track.sourceState === 'playing') {
+            track.sourceState = 'stopping';
+            track.source.stop();
+          }
         } catch (e) {
           // Source may already be stopped
         }
         track.source = null;
+        track.sourceState = 'idle';
       }
     });
     
@@ -620,9 +690,100 @@ export class AudioEngine {
   }
   
   dispose() {
+    // Clear loop monitoring
+    this.clearLoopCheck();
+    
+    // Stop playback
     this.stop();
-    this.tracks.forEach(track => track.dispose());
-    this.buses.forEach(bus => bus.dispose());
-    this.velvetFloor.dispose();
+    
+    // Dispose all tracks and clear references
+    this.tracks.forEach(track => {
+      try {
+        track.dispose();
+      } catch (err) {
+        this.handleError(err as Error, 'track disposal');
+      }
+    });
+    this.tracks.clear();
+    
+    // Dispose all buses
+    this.buses.forEach(bus => {
+      try {
+        bus.dispose();
+      } catch (err) {
+        this.handleError(err as Error, 'bus disposal');
+      }
+    });
+    this.buses.clear();
+    
+    // Dispose master chain
+    try {
+      this.masterBus.dispose();
+    } catch (err) {
+      this.handleError(err as Error, 'master bus disposal');
+    }
+    
+    // Dispose VelvetFloor
+    if (this.velvetFloor) {
+      try {
+        this.velvetFloor.dispose();
+      } catch (err) {
+        this.handleError(err as Error, 'VelvetFloor disposal');
+      }
+    }
+    
+    // Disconnect master nodes
+    try {
+      this.masterGainNode.disconnect();
+      this.limiter.disconnect();
+    } catch (e) {
+      // Already disconnected
+    }
+    
+    // Close AudioContext
+    if (this.context.state !== 'closed') {
+      this.context.close().catch(err => {
+        console.error('Error closing AudioContext:', err);
+      });
+    }
+    
+    console.log('🎵 AudioEngine fully disposed');
+  }
+  
+  // Error handling
+  onError(handler: (error: Error) => void) {
+    this.errorHandlers.push(handler);
+  }
+  
+  private handleError(error: Error, context: string) {
+    console.error(`🎵 AudioEngine error [${context}]:`, error);
+    this.errorHandlers.forEach(handler => {
+      try {
+        handler(error);
+      } catch (e) {
+        console.error('Error in error handler:', e);
+      }
+    });
+  }
+  
+  private handleContextInterruption() {
+    console.warn('🎵 AudioContext interrupted, attempting recovery...');
+    if (this.isPlaying) {
+      this.pause();
+    }
+  }
+  
+  private async ensureContextRunning(): Promise<boolean> {
+    if (this.context.state === 'suspended') {
+      try {
+        await this.context.resume();
+        console.log('🎵 AudioContext resumed');
+        return true;
+      } catch (err) {
+        console.error('Failed to resume AudioContext:', err);
+        return false;
+      }
+    }
+    return this.context.state === 'running';
   }
 }

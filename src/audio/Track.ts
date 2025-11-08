@@ -26,6 +26,7 @@ export class Track {
   
   // Playback state
   public source: AudioBufferSourceNode | null;
+  public sourceState: 'idle' | 'scheduled' | 'playing' | 'stopping' = 'idle';
   
   constructor(
     context: AudioContext,
@@ -119,9 +120,15 @@ export class Track {
   }
   
   dispose() {
-    if (this.source) {
-      this.source.stop();
+    if (this.source && this.sourceState === 'playing') {
+      try {
+        this.sourceState = 'stopping';
+        this.source.stop();
+      } catch (e) {
+        // Source may already be stopped
+      }
       this.source = null;
+      this.sourceState = 'idle';
     }
     this.channelStrip.dispose();
   }

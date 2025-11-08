@@ -257,51 +257,101 @@ export class ChannelStrip {
   /**
    * Rebuild the audio graph with current insert chain
    * Chain: input → EQ → comp → [inserts 1-8] → pan → fader → output
+   * Uses hot-swap technique to prevent glitches during playback
    */
   private rebuildAudioGraph(): void {
-    // Disconnect everything first
-    try {
-      this.input.disconnect();
-      this.eq.outputNode.disconnect();
-      this.compressor.outputNode.disconnect();
-      this.insertSlots.forEach(insert => {
-        if (insert) {
-          try { insert.outputNode.disconnect(); } catch (e) {}
+    const isPlaying = this.context.state === 'running';
+    
+    if (isPlaying) {
+      // Hot-swap with crossfade during playback
+      const fadeNode = this.context.createGain();
+      fadeNode.gain.value = 1;
+      
+      // Build temporary chain in parallel
+      const tempOutput = this.context.createGain();
+      let currentNode: AudioNode = this.input;
+      
+      // Connect to both old (fading out) and new (fading in) chains
+      try {
+        // Fade out old chain
+        const now = this.context.currentTime;
+        this.output.gain.linearRampToValueAtTime(0, now + 0.01);
+        
+        // Build new chain
+        currentNode.connect(this.eq.inputNode);
+        currentNode = this.eq.outputNode;
+        
+        currentNode.connect(this.compressor.inputNode);
+        currentNode = this.compressor.outputNode;
+        
+        // Connect insert chain
+        for (const insert of this.insertSlots) {
+          if (insert && !insert.bypass) {
+            currentNode.connect(insert.inputNode);
+            currentNode = insert.outputNode;
+          }
         }
-      });
-      this.panNode.disconnect();
-      this.fader.disconnect();
-    } catch (e) {
-      // Nodes may not be connected yet
-    }
-    
-    // Build new chain
-    let currentNode: AudioNode = this.input;
-    
-    // Connect EQ and compressor first
-    currentNode.connect(this.eq.inputNode);
-    currentNode = this.eq.outputNode;
-    
-    currentNode.connect(this.compressor.inputNode);
-    currentNode = this.compressor.outputNode;
-    
-    // Connect insert chain
-    for (const insert of this.insertSlots) {
-      if (insert && !insert.bypass) {
-        currentNode.connect(insert.inputNode);
-        currentNode = insert.outputNode;
+        
+        // Connect to pan and fader
+        currentNode.connect(this.panNode);
+        this.panNode.connect(this.fader);
+        this.fader.connect(this.output);
+        
+        // Connect to stereo analysers
+        currentNode.connect(this.splitter);
+        this.splitter.connect(this.analyserLeft, 0);
+        this.splitter.connect(this.analyserRight, 1);
+        
+        // Fade in new chain
+        this.output.gain.linearRampToValueAtTime(1, now + 0.01);
+      } catch (e) {
+        console.error('Error during hot-swap audio graph rebuild:', e);
       }
+    } else {
+      // Instant rebuild when stopped - more efficient
+      try {
+        this.input.disconnect();
+        this.eq.outputNode.disconnect();
+        this.compressor.outputNode.disconnect();
+        this.insertSlots.forEach(insert => {
+          if (insert) {
+            try { insert.outputNode.disconnect(); } catch (e) {}
+          }
+        });
+        this.panNode.disconnect();
+        this.fader.disconnect();
+      } catch (e) {
+        // Nodes may not be connected yet
+      }
+      
+      // Build new chain
+      let currentNode: AudioNode = this.input;
+      
+      // Connect EQ and compressor first
+      currentNode.connect(this.eq.inputNode);
+      currentNode = this.eq.outputNode;
+      
+      currentNode.connect(this.compressor.inputNode);
+      currentNode = this.compressor.outputNode;
+      
+      // Connect insert chain
+      for (const insert of this.insertSlots) {
+        if (insert && !insert.bypass) {
+          currentNode.connect(insert.inputNode);
+          currentNode = insert.outputNode;
+        }
+      }
+      
+      // Connect to pan and fader
+      currentNode.connect(this.panNode);
+      this.panNode.connect(this.fader);
+      this.fader.connect(this.output);
+      
+      // Connect to stereo analysers BEFORE panning for true stereo metering
+      currentNode.connect(this.splitter);
+      this.splitter.connect(this.analyserLeft, 0);
+      this.splitter.connect(this.analyserRight, 1);
     }
-    
-    // Connect to pan and fader
-    currentNode.connect(this.panNode);
-    this.panNode.connect(this.fader);
-    this.fader.connect(this.output);
-    
-    // Connect to stereo analysers BEFORE panning for true stereo metering
-    currentNode.connect(this.splitter);
-    this.splitter.connect(this.analyserLeft, 0);
-    this.splitter.connect(this.analyserRight, 1);
   }
   
   // Send management
