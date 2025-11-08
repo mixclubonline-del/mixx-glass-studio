@@ -1,0 +1,90 @@
+/**
+ * Production Tools Menu - Quick access to all production features
+ */
+
+import React from 'react';
+import { Button } from '@/components/ui/button';
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuSeparator,
+  DropdownMenuTrigger,
+  DropdownMenuLabel,
+} from '@/components/ui/dropdown-menu';
+import {
+  Wrench,
+  Piano,
+  Grid3x3,
+  Waves,
+  Clock,
+  Layers,
+  GitBranch,
+  Music2,
+  Gauge,
+} from 'lucide-react';
+import { useViewStore } from '@/store/viewStore';
+
+export const ProductionToolsMenu: React.FC = () => {
+  const { togglePanel } = useViewStore();
+
+  return (
+    <DropdownMenu>
+      <DropdownMenuTrigger asChild>
+        <Button variant="outline" size="sm" className="gap-2">
+          <Wrench className="h-4 w-4" />
+          <span>Tools</span>
+        </Button>
+      </DropdownMenuTrigger>
+      <DropdownMenuContent align="start" className="w-56 bg-background border-border">
+        <DropdownMenuLabel>MIDI & Production</DropdownMenuLabel>
+        <DropdownMenuItem onClick={() => togglePanel('pianoRoll')}>
+          <Piano className="h-4 w-4 mr-2" />
+          Piano Roll Editor
+          <span className="ml-auto text-xs text-muted-foreground">P</span>
+        </DropdownMenuItem>
+        <DropdownMenuItem onClick={() => togglePanel('stepSequencer')}>
+          <Grid3x3 className="h-4 w-4 mr-2" />
+          Step Sequencer
+          <span className="ml-auto text-xs text-muted-foreground">S</span>
+        </DropdownMenuItem>
+        
+        <DropdownMenuSeparator />
+        <DropdownMenuLabel>Audio Processing</DropdownMenuLabel>
+        <DropdownMenuItem onClick={() => togglePanel('grooveEngine')}>
+          <Waves className="h-4 w-4 mr-2" />
+          Groove Engine
+          <span className="ml-auto text-xs text-muted-foreground">G</span>
+        </DropdownMenuItem>
+        <DropdownMenuItem onClick={() => togglePanel('timeStretch')}>
+          <Clock className="h-4 w-4 mr-2" />
+          Time Stretch & Pitch
+          <span className="ml-auto text-xs text-muted-foreground">T</span>
+        </DropdownMenuItem>
+        <DropdownMenuItem onClick={() => togglePanel('comping')}>
+          <Layers className="h-4 w-4 mr-2" />
+          Comping Manager
+          <span className="ml-auto text-xs text-muted-foreground">C</span>
+        </DropdownMenuItem>
+        
+        <DropdownMenuSeparator />
+        <DropdownMenuLabel>Mixing & Routing</DropdownMenuLabel>
+        <DropdownMenuItem onClick={() => togglePanel('routing')}>
+          <GitBranch className="h-4 w-4 mr-2" />
+          Routing Matrix
+          <span className="ml-auto text-xs text-muted-foreground">R</span>
+        </DropdownMenuItem>
+        <DropdownMenuItem onClick={() => togglePanel('automation')}>
+          <Music2 className="h-4 w-4 mr-2" />
+          Advanced Automation
+          <span className="ml-auto text-xs text-muted-foreground">A</span>
+        </DropdownMenuItem>
+        <DropdownMenuItem onClick={() => togglePanel('metering')}>
+          <Gauge className="h-4 w-4 mr-2" />
+          Metering & Analysis
+          <span className="ml-auto text-xs text-muted-foreground">M</span>
+        </DropdownMenuItem>
+      </DropdownMenuContent>
+    </DropdownMenu>
+  );
+};

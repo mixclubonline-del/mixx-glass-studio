@@ -67,5 +67,6 @@ export { TimeStretchDialog } from './TimeStretchDialog';
 export { CompingManager } from './CompingManager';
 
 // Utilities
-export * from './CursorTools';
-export * from './MultiRegionOperations';
+export type { CursorTool, ToolHandlers } from './CursorTools';
+export { CursorToolManager, cursorToolManager } from './CursorTools';
+export { MultiRegionOperations } from './MultiRegionOperations';

@@ -4,7 +4,7 @@
 
 import { create } from 'zustand';
 
-export type ViewType = 'arrange' | 'mix' | 'edit' | 'ai-studio' | 'producer-lab';
+export type ViewType = 'arrange' | 'mix' | 'edit' | 'ai-studio' | 'producer-lab' | 'master';
 
 interface ViewState {
   currentView: ViewType;
@@ -18,6 +18,12 @@ interface ViewState {
     metering: boolean;
     inspector: boolean;
     toolbar: boolean;
+    pianoRoll: boolean;
+    stepSequencer: boolean;
+    grooveEngine: boolean;
+    timeStretch: boolean;
+    comping: boolean;
+    routing: boolean;
   };
   analyzerMode: 'spectrum' | 'phase' | 'waveform';
   
@@ -43,6 +49,12 @@ export const useViewStore = create<ViewState>((set, get) => ({
     metering: false,
     inspector: false,
     toolbar: true,
+    pianoRoll: false,
+    stepSequencer: false,
+    grooveEngine: false,
+    timeStretch: false,
+    comping: false,
+    routing: false,
   },
   analyzerMode: 'spectrum',
   
@@ -78,6 +90,12 @@ export const useViewStore = create<ViewState>((set, get) => ({
         metering: false,
         inspector: false,
         toolbar: false,
+        pianoRoll: false,
+        stepSequencer: false,
+        grooveEngine: false,
+        timeStretch: false,
+        comping: false,
+        routing: false,
       },
     });
     localStorage.setItem('viewStore:panels', JSON.stringify(get().isPanelOpen));

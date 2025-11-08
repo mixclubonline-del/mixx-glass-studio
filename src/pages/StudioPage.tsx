@@ -5,6 +5,8 @@ import { useState } from "react";
 import { useViewStore } from "@/store/viewStore";
 import { ProjectProvider, useProject, useTransport } from "@/contexts/ProjectContext";
 import { useGlobalKeyboardShortcuts } from "@/hooks/useGlobalKeyboardShortcuts";
+import { Button } from "@/components/ui/button";
+import { X } from "lucide-react";
 import { EffectsRack } from "../studio/components/EffectsRack";
 import { TransportControls } from "../studio/components/TransportControls";
 import { MixxAIStudio } from "../studio/components/AI/MixxAIStudio";
@@ -16,10 +18,19 @@ import { CreativeHeader } from "../studio/components/Navigation/CreativeHeader";
 import { FloatingBeastMode } from "../studio/components/AI/FloatingBeastMode";
 import { CollapsibleMeteringPanel } from "../studio/components/Metering/CollapsibleMeteringPanel";
 import { AdvancedTimelineView } from "../studio/components/Timeline/AdvancedTimelineView";
+import { ProductionToolsMenu } from "../studio/components/Navigation/ProductionToolsMenu";
+import { MasteringPanel } from "../studio/components/Metering/MasteringPanel";
+import { EnhancedPianoRoll } from "../studio/components/Timeline/EnhancedPianoRoll";
+import { StepSequencer } from "../studio/components/Producer/StepSequencer";
+import { GrooveEngine } from "../studio/components/Producer/GrooveEngine";
+import { AdvancedAutomationPanel } from "../studio/components/Automation/AdvancedAutomationPanel";
+import { TimeStretchDialog } from "../studio/components/Timeline/TimeStretchDialog";
+import { CompingManager } from "../studio/components/Timeline/CompingManager";
+import { AdvancedRoutingMatrix } from "../studio/components/Mixer/AdvancedRoutingMatrix";
 
 // Inner component that uses ProjectContext
 function StudioPageContent() {
-  const { currentView } = useViewStore();
+  const { currentView, isPanelOpen } = useViewStore();
   const { audioEngine } = useProject();
   const { transport } = useTransport();
   const [duration, setDuration] = useState(180);
@@ -70,8 +81,11 @@ function StudioPageContent() {
         {/* Transport Controls */}
         <UnifiedTransportBar />
         
-        {/* View Switcher */}
-        <ViewSwitcher />
+        {/* View Switcher + Tools Menu */}
+        <div className="flex items-center justify-between">
+          <ViewSwitcher />
+          <ProductionToolsMenu />
+        </div>
       </div>
 
       {/* View Content - Fills remaining space */}
@@ -99,6 +113,16 @@ function StudioPageContent() {
               <p>Waveform editor coming soon...</p>
             </div>
           </div>
+        ) : currentView === 'master' ? (
+          <div className="h-full overflow-auto p-6">
+            <div className="max-w-4xl mx-auto space-y-6">
+              <div className="text-center mb-8">
+                <h2 className="text-3xl font-bold mb-2">Mastering Suite</h2>
+                <p className="text-muted-foreground">Professional mastering tools for final polish</p>
+              </div>
+              <MasteringPanel />
+            </div>
+          </div>
         ) : null}
       </ViewContainer>
 
@@ -107,6 +131,96 @@ function StudioPageContent() {
       
       {/* Floating Beast Mode Panel - Bottom right */}
       <FloatingBeastMode />
+      
+      {/* Production Tool Panels */}
+      {isPanelOpen.pianoRoll && (
+        <div className="fixed inset-0 z-50 bg-black/80 flex items-center justify-center p-4">
+          <div className="w-full max-w-7xl h-[90vh]">
+            <EnhancedPianoRoll 
+              regionId="region-1"
+              onClose={() => useViewStore.getState().togglePanel('pianoRoll')}
+              onSave={(notes) => {
+                console.log('Saved notes:', notes);
+                useViewStore.getState().togglePanel('pianoRoll');
+              }}
+            />
+          </div>
+        </div>
+      )}
+      
+      {isPanelOpen.stepSequencer && (
+        <div className="fixed inset-0 z-50 bg-black/80 flex items-center justify-center p-4">
+          <div className="w-full max-w-4xl">
+            <div className="bg-background rounded-lg border border-border shadow-2xl overflow-hidden">
+              <div className="flex items-center justify-between px-4 py-3 border-b border-border/30">
+                <h2 className="font-semibold">Step Sequencer</h2>
+                <Button size="sm" variant="ghost" onClick={() => useViewStore.getState().togglePanel('stepSequencer')}>
+                  <X className="h-4 w-4" />
+                </Button>
+              </div>
+              <StepSequencer 
+                trackId="track-1"
+                onTrigger={(step, velocity, pan, pitch) => {
+                  console.log('Step triggered:', { step, velocity, pan, pitch });
+                }}
+              />
+            </div>
+          </div>
+        </div>
+      )}
+      
+      {isPanelOpen.grooveEngine && (
+        <div className="fixed inset-0 z-50 bg-black/80 flex items-center justify-center p-4">
+          <div className="w-full max-w-2xl">
+            <GrooveEngine 
+              onApply={(groove) => {
+                console.log('Applying groove:', groove);
+                useViewStore.getState().togglePanel('grooveEngine');
+              }} 
+            />
+          </div>
+        </div>
+      )}
+      
+      {isPanelOpen.automation && (
+        <div className="fixed inset-0 z-50 bg-black/80 flex items-center justify-center p-4">
+          <div className="w-full max-w-4xl">
+            <AdvancedAutomationPanel 
+              trackId="track-1"
+              parameter="volume"
+              onClose={() => useViewStore.getState().togglePanel('automation')} 
+            />
+          </div>
+        </div>
+      )}
+      
+      {isPanelOpen.comping && (
+        <div className="fixed inset-0 z-50 bg-black/80 flex items-center justify-center p-4">
+          <div className="w-full max-w-5xl">
+            <CompingManager 
+              trackId="track-1"
+              onClose={() => useViewStore.getState().togglePanel('comping')} 
+            />
+          </div>
+        </div>
+      )}
+      
+      {isPanelOpen.routing && (
+        <AdvancedRoutingMatrix
+          tracks={[
+            { id: 'track-1', name: 'Vocals', type: 'audio' },
+            { id: 'track-2', name: 'Drums', type: 'audio' },
+            { id: 'track-3', name: 'Bass', type: 'audio' },
+            { id: 'track-4', name: 'Synth', type: 'midi' },
+          ]}
+          buses={[
+            { id: 'bus-1', name: 'Reverb' },
+            { id: 'bus-2', name: 'Delay' },
+            { id: 'bus-3', name: 'Parallel Comp' },
+          ]}
+          onClose={() => useViewStore.getState().togglePanel('routing')}
+        />
+      )}
     </div>
   );
 }
