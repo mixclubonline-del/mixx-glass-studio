@@ -94,14 +94,18 @@ export const BloomHUD: React.FC<BloomHUDProps> = ({
   };
 
   const handleCoreClick = () => {
-    setIsMenuOpen(prev => !prev);
-    if (isMenuOpen) {
-      setTimeout(() => setMenuPath(['main']), 300);
+    if (!isDragging) {
+      setIsMenuOpen(prev => !prev);
+      if (isMenuOpen) {
+        setTimeout(() => setMenuPath(['main']), 300);
+      }
     }
   };
 
   const handleBackClick = () => {
-    setMenuPath(prev => prev.slice(0, -1));
+    if (!isDragging) {
+      setMenuPath(prev => prev.slice(0, -1));
+    }
   };
 
   const handleMouseEnter = (e: React.MouseEvent, description: string | undefined, index: number) => {
@@ -151,7 +155,9 @@ export const BloomHUD: React.FC<BloomHUDProps> = ({
   const isSubMenu = menuPath.length > 1;
 
   const handleMouseDown = (e: React.MouseEvent) => {
-    if (!isMenuOpen && e.target === e.currentTarget) {
+    // Only start dragging if clicking on the orb itself, not on menu items
+    if (e.target === e.currentTarget || e.currentTarget.classList.contains('bloom-central-orb')) {
+      e.stopPropagation();
       setIsDragging(true);
       dragStartRef.current = {
         x: e.clientX - position.x,
@@ -162,6 +168,7 @@ export const BloomHUD: React.FC<BloomHUDProps> = ({
 
   const handleMouseMoveGlobal = (e: MouseEvent) => {
     if (isDragging) {
+      e.preventDefault();
       setPosition({
         x: e.clientX - dragStartRef.current.x,
         y: e.clientY - dragStartRef.current.y
@@ -170,7 +177,9 @@ export const BloomHUD: React.FC<BloomHUDProps> = ({
   };
 
   const handleMouseUpGlobal = () => {
-    setIsDragging(false);
+    if (isDragging) {
+      setTimeout(() => setIsDragging(false), 50);
+    }
   };
 
   useEffect(() => {
@@ -193,7 +202,8 @@ export const BloomHUD: React.FC<BloomHUDProps> = ({
         width: primaryRing * 2.5, 
         height: primaryRing * 2.5,
         transform: `translate(${position.x}px, ${position.y}px)`,
-        cursor: isDragging ? 'grabbing' : isMenuOpen ? 'default' : 'grab'
+        cursor: isDragging ? 'grabbing' : 'default',
+        userSelect: 'none'
       }}
     >
       {/* Orbital rings */}
@@ -206,6 +216,7 @@ export const BloomHUD: React.FC<BloomHUDProps> = ({
         onClick={isSubMenu ? handleBackClick : handleCoreClick}
         onMouseDown={handleMouseDown}
         icon={isSubMenu ? <ChevronLeft className="w-6 h-6" /> : undefined}
+        isDragging={isDragging}
       />
 
       {/* Menu items */}

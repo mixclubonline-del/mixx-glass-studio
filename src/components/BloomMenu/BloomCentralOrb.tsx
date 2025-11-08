@@ -11,6 +11,7 @@ interface BloomCentralOrbProps {
   onClick: () => void;
   onMouseDown: (e: React.MouseEvent) => void;
   icon?: React.ReactNode;
+  isDragging?: boolean;
 }
 
 export const BloomCentralOrb: React.FC<BloomCentralOrbProps> = ({
@@ -18,7 +19,8 @@ export const BloomCentralOrb: React.FC<BloomCentralOrbProps> = ({
   isSubMenu,
   onClick,
   onMouseDown,
-  icon
+  icon,
+  isDragging = false
 }) => {
   return (
     <div className="relative">
@@ -50,24 +52,29 @@ export const BloomCentralOrb: React.FC<BloomCentralOrbProps> = ({
       {/* Main orb */}
       <button
         className={cn(
-          "relative w-16 h-16 rounded-full",
+          "bloom-central-orb relative w-16 h-16 rounded-full",
           "glass-ultra border border-primary/20",
           "flex items-center justify-center",
-          "cursor-grab active:cursor-grabbing",
           "group",
           isOpen && "bloom-orb-open",
-          isSubMenu && "bloom-orb-submenu"
+          isSubMenu && "bloom-orb-submenu",
+          isDragging && "cursor-grabbing",
+          !isDragging && "cursor-grab"
         )}
         style={{
-          transition: 'transform 0.3s cubic-bezier(0.68, -0.55, 0.265, 1.55), border-color 0.3s ease'
+          transition: isDragging ? 'none' : 'transform 0.3s cubic-bezier(0.68, -0.55, 0.265, 1.55), border-color 0.3s ease'
         }}
         onMouseEnter={(e) => {
-          e.currentTarget.style.transform = 'scale(1.05)';
-          e.currentTarget.style.borderColor = 'hsl(var(--primary) / 0.3)';
+          if (!isDragging) {
+            e.currentTarget.style.transform = 'scale(1.05)';
+            e.currentTarget.style.borderColor = 'hsl(var(--primary) / 0.3)';
+          }
         }}
         onMouseLeave={(e) => {
-          e.currentTarget.style.transform = 'scale(1)';
-          e.currentTarget.style.borderColor = 'hsl(var(--primary) / 0.2)';
+          if (!isDragging) {
+            e.currentTarget.style.transform = 'scale(1)';
+            e.currentTarget.style.borderColor = 'hsl(var(--primary) / 0.2)';
+          }
         }}
         onClick={onClick}
         onMouseDown={onMouseDown}
