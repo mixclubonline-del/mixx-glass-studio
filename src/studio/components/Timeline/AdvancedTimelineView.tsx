@@ -39,6 +39,7 @@ import { Button } from '@/components/ui/button';
 import { cn } from '@/lib/utils';
 import { toast } from 'sonner';
 import { HEADER_HEIGHT, RULER_HEIGHT, TRACK_HEIGHT, TRACK_LIST_WIDTH, TRACK_LIST_COLLAPSED, PANEL_WIDTH_SM, SPACING } from '@/lib/layout-constants';
+import { useViewStore } from '@/store/viewStore';
 
 // Dynamic hip-hop encouragement messages based on session time
 const getHipHopEncouragement = (minutes: number): string => {
@@ -72,6 +73,8 @@ export const AdvancedTimelineView: React.FC<AdvancedTimelineViewProps> = ({
   const containerRef = useRef<HTMLDivElement>(null);
   const contentRef = useRef<HTMLDivElement>(null);
   const [browserCollapsed, setBrowserCollapsed] = useState(false); // Default to expanded
+  
+  const { showTimelineRuler } = useViewStore();
   
   const [trackListCollapsed, setTrackListCollapsed] = useState(() => {
     const saved = localStorage.getItem('trackListCollapsed');
@@ -599,20 +602,33 @@ export const AdvancedTimelineView: React.FC<AdvancedTimelineViewProps> = ({
               boxShadow: 'inset 1px 0 0 rgba(255, 255, 255, 0.1)'
             }}
           >
-            {/* Sidebar Header - MATCHES RULER HEIGHT */}
-            <div 
-              className="flex items-center justify-end px-4 glass-ultra border-b border-gradient"
-              style={{ height: `${RULER_HEIGHT}px` }}
-            >
-              <Button
-                size="sm"
-                variant="ghost"
-                onClick={() => setTrackListCollapsed(true)}
-                className="h-8 w-8 p-0 micro-interact chromatic-hover"
+            {/* Sidebar Header - MATCHES RULER HEIGHT OR HIDDEN */}
+            {showTimelineRuler ? (
+              <div 
+                className="flex items-center justify-end px-4 glass-ultra border-b border-gradient"
+                style={{ height: `${RULER_HEIGHT}px` }}
               >
-                <ChevronLeft size={16} />
-              </Button>
-            </div>
+                <Button
+                  size="sm"
+                  variant="ghost"
+                  onClick={() => setTrackListCollapsed(true)}
+                  className="h-8 w-8 p-0 micro-interact chromatic-hover"
+                >
+                  <ChevronLeft size={16} />
+                </Button>
+              </div>
+            ) : (
+              <div className="flex items-center justify-end px-4 glass-ultra border-b border-gradient py-2">
+                <Button
+                  size="sm"
+                  variant="ghost"
+                  onClick={() => setTrackListCollapsed(true)}
+                  className="h-8 w-8 p-0 micro-interact chromatic-hover"
+                >
+                  <ChevronLeft size={16} />
+                </Button>
+              </div>
+            )}
             
             {/* Track List */}
             <div className="flex-1 overflow-y-auto">
@@ -660,23 +676,24 @@ export const AdvancedTimelineView: React.FC<AdvancedTimelineViewProps> = ({
         )}
         
         {/* Timeline area */}
-        {/* Timeline area */}
         <div className="flex-1 flex flex-col overflow-hidden min-w-0">
-            {/* Timeline ruler - STANDARD HEIGHT */}
-            <div 
-              className="relative glass-light border-b border-gradient"
-              style={{ 
-                height: `${RULER_HEIGHT}px`,
-                backdropFilter: 'blur(40px) saturate(180%)'
-              }}
-            >
-              <TimelineRuler
-                width={containerRef.current?.clientWidth || 800}
-                height={RULER_HEIGHT}
-                bpm={120}
-                onSeek={onSeek}
-              />
-            </div>
+            {/* Timeline ruler - OPTIONAL */}
+            {showTimelineRuler && (
+              <div 
+                className="relative glass-light border-b border-gradient"
+                style={{ 
+                  height: `${RULER_HEIGHT}px`,
+                  backdropFilter: 'blur(40px) saturate(180%)'
+                }}
+              >
+                <TimelineRuler
+                  width={containerRef.current?.clientWidth || 800}
+                  height={RULER_HEIGHT}
+                  bpm={120}
+                  onSeek={onSeek}
+                />
+              </div>
+            )}
             
             {/* Scrollable timeline content */}
             <div 

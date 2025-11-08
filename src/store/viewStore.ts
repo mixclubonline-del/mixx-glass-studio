@@ -33,6 +33,7 @@ interface ViewState {
   };
   analyzerMode: 'spectrum' | 'phase' | 'waveform';
   exportDialogOpen: boolean;
+  showTimelineRuler: boolean;
   
   // Actions
   setView: (view: ViewType) => void;
@@ -43,6 +44,7 @@ interface ViewState {
   collapseAll: () => void;
   restorePanels: () => void;
   setExportDialogOpen: (open: boolean) => void;
+  toggleTimelineRuler: () => void;
 }
 
 export const useViewStore = create<ViewState>((set, get) => ({
@@ -72,6 +74,7 @@ export const useViewStore = create<ViewState>((set, get) => ({
   },
   analyzerMode: 'spectrum',
   exportDialogOpen: false,
+  showTimelineRuler: false,
   
   setView: (view) => set({ currentView: view }),
   
@@ -130,4 +133,6 @@ export const useViewStore = create<ViewState>((set, get) => ({
   },
   
   setExportDialogOpen: (open) => set({ exportDialogOpen: open }),
+  
+  toggleTimelineRuler: () => set((state) => ({ showTimelineRuler: !state.showTimelineRuler })),
 }));
