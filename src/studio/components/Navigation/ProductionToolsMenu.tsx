@@ -27,6 +27,7 @@ import {
   Volume2,
   Mic,
   FileMusic,
+  AudioWaveform,
 } from 'lucide-react';
 import { useViewStore } from '@/store/viewStore';
 
@@ -115,6 +116,10 @@ export const ProductionToolsMenu: React.FC = () => {
         <DropdownMenuItem onClick={() => togglePanel('audioToMIDI')}>
           <FileMusic className="h-4 w-4 mr-2" />
           Audio to MIDI
+        </DropdownMenuItem>
+        <DropdownMenuItem onClick={() => togglePanel('voiceIsolation')}>
+          <AudioWaveform className="h-4 w-4 mr-2" />
+          Voice Isolation
         </DropdownMenuItem>
       </DropdownMenuContent>
     </DropdownMenu>
