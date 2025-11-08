@@ -78,7 +78,7 @@ export const AdvancedTimelineView: React.FC<AdvancedTimelineViewProps> = ({
   
   const [trackListCollapsed, setTrackListCollapsed] = useState(() => {
     const saved = localStorage.getItem('trackListCollapsed');
-    return saved === 'false'; // Default to expanded
+    return saved === 'true'; // Default to collapsed
   });
   
   // Track session time for dynamic encouragement
@@ -587,94 +587,6 @@ export const AdvancedTimelineView: React.FC<AdvancedTimelineViewProps> = ({
           </div>
         )}
         
-        {/* Left Track List Sidebar - STANDARD WIDTH */}
-        {!trackListCollapsed && (
-          <div 
-            className="flex-shrink-0 border-r border-gradient flex flex-col"
-            style={{ 
-              width: `${TRACK_LIST_WIDTH}px`,
-              background: `
-                radial-gradient(circle at 20% 50%, hsl(275 100% 65% / 0.03) 0%, transparent 50%),
-                var(--gradient-mesh),
-                linear-gradient(135deg, hsl(var(--glass-medium)), hsl(var(--glass-ultra)))
-              `,
-              backdropFilter: 'blur(80px) saturate(220%)',
-              boxShadow: 'inset 1px 0 0 rgba(255, 255, 255, 0.1)'
-            }}
-          >
-            {/* Sidebar Header - MATCHES RULER HEIGHT OR HIDDEN */}
-            {showTimelineRuler ? (
-              <div 
-                className="flex items-center justify-end px-4 glass-ultra border-b border-gradient"
-                style={{ height: `${RULER_HEIGHT}px` }}
-              >
-                <Button
-                  size="sm"
-                  variant="ghost"
-                  onClick={() => setTrackListCollapsed(true)}
-                  className="h-8 w-8 p-0 micro-interact chromatic-hover"
-                >
-                  <ChevronLeft size={16} />
-                </Button>
-              </div>
-            ) : (
-              <div className="flex items-center justify-end px-4 glass-ultra border-b border-gradient py-2">
-                <Button
-                  size="sm"
-                  variant="ghost"
-                  onClick={() => setTrackListCollapsed(true)}
-                  className="h-8 w-8 p-0 micro-interact chromatic-hover"
-                >
-                  <ChevronLeft size={16} />
-                </Button>
-              </div>
-            )}
-            
-            {/* Track List */}
-            <div className="flex-1 overflow-y-auto">
-              {tracks.map((track) => (
-                <ProfessionalTrackHeader
-                  key={track.id}
-                  id={track.id}
-                  name={track.name}
-                  color={track.color}
-                  muted={track.muted}
-                  solo={track.solo}
-                  recordArmed={track.recordArmed}
-                  locked={track.locked}
-                  isSelected={selectedTrackId === track.id}
-                  height={TRACK_HEIGHT}
-                  onSelect={handleSelectTrack}
-                  onMuteToggle={handleMuteToggle}
-                  onSoloToggle={handleSoloToggle}
-                  onRecordArmToggle={handleRecordArmToggle}
-                  onLockToggle={handleLockToggle}
-                />
-              ))}
-            </div>
-          </div>
-        )}
-        
-        {/* Collapsed Track List Toggle Button - STANDARD COLLAPSED WIDTH */}
-        {trackListCollapsed && (
-          <div 
-            className="flex-shrink-0 glass-light border-r border-gradient flex items-start justify-center pt-2"
-            style={{ 
-              width: `${TRACK_LIST_COLLAPSED}px`,
-              backdropFilter: 'blur(60px) saturate(200%)'
-            }}
-          >
-            <Button
-              size="sm"
-              variant="ghost"
-              onClick={() => setTrackListCollapsed(false)}
-              className="h-8 w-8 p-0 micro-interact chromatic-hover"
-            >
-              <ChevronRight size={16} />
-            </Button>
-          </div>
-        )}
-        
         {/* Timeline area */}
         <div className="flex-1 flex flex-col overflow-hidden min-w-0">
             {/* Timeline ruler - OPTIONAL */}
@@ -798,6 +710,94 @@ export const AdvancedTimelineView: React.FC<AdvancedTimelineViewProps> = ({
               </div>
             </div>
           </div>
+
+          {/* Right Track List Sidebar - STANDARD WIDTH */}
+          {!trackListCollapsed && (
+            <div 
+              className="flex-shrink-0 border-l border-gradient flex flex-col"
+              style={{ 
+                width: `${TRACK_LIST_WIDTH}px`,
+                background: `
+                  radial-gradient(circle at 80% 50%, hsl(275 100% 65% / 0.03) 0%, transparent 50%),
+                  var(--gradient-mesh),
+                  linear-gradient(135deg, hsl(var(--glass-medium)), hsl(var(--glass-ultra)))
+                `,
+                backdropFilter: 'blur(80px) saturate(220%)',
+                boxShadow: 'inset -1px 0 0 rgba(255, 255, 255, 0.1)'
+              }}
+            >
+              {/* Sidebar Header - MATCHES RULER HEIGHT OR HIDDEN */}
+              {showTimelineRuler ? (
+                <div 
+                  className="flex items-center justify-start px-4 glass-ultra border-b border-gradient"
+                  style={{ height: `${RULER_HEIGHT}px` }}
+                >
+                  <Button
+                    size="sm"
+                    variant="ghost"
+                    onClick={() => setTrackListCollapsed(true)}
+                    className="h-8 w-8 p-0 micro-interact chromatic-hover"
+                  >
+                    <ChevronRight size={16} />
+                  </Button>
+                </div>
+              ) : (
+                <div className="flex items-center justify-start px-4 glass-ultra border-b border-gradient py-2">
+                  <Button
+                    size="sm"
+                    variant="ghost"
+                    onClick={() => setTrackListCollapsed(true)}
+                    className="h-8 w-8 p-0 micro-interact chromatic-hover"
+                  >
+                    <ChevronRight size={16} />
+                  </Button>
+                </div>
+              )}
+              
+              {/* Track List */}
+              <div className="flex-1 overflow-y-auto">
+                {tracks.map((track) => (
+                  <ProfessionalTrackHeader
+                    key={track.id}
+                    id={track.id}
+                    name={track.name}
+                    color={track.color}
+                    muted={track.muted}
+                    solo={track.solo}
+                    recordArmed={track.recordArmed}
+                    locked={track.locked}
+                    isSelected={selectedTrackId === track.id}
+                    height={TRACK_HEIGHT}
+                    onSelect={handleSelectTrack}
+                    onMuteToggle={handleMuteToggle}
+                    onSoloToggle={handleSoloToggle}
+                    onRecordArmToggle={handleRecordArmToggle}
+                    onLockToggle={handleLockToggle}
+                  />
+                ))}
+              </div>
+            </div>
+          )}
+          
+          {/* Collapsed Track List Toggle Button - STANDARD COLLAPSED WIDTH */}
+          {trackListCollapsed && (
+            <div 
+              className="flex-shrink-0 glass-light border-l border-gradient flex items-start justify-center pt-2"
+              style={{ 
+                width: `${TRACK_LIST_COLLAPSED}px`,
+                backdropFilter: 'blur(60px) saturate(200%)'
+              }}
+            >
+              <Button
+                size="sm"
+                variant="ghost"
+                onClick={() => setTrackListCollapsed(false)}
+                className="h-8 w-8 p-0 micro-interact chromatic-hover"
+              >
+                <ChevronLeft size={16} />
+              </Button>
+            </div>
+          )}
 
           {/* Right Browser Panel */}
           <ArrangeBrowserPanel
