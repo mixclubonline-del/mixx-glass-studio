@@ -9,7 +9,6 @@ import { cn } from '@/lib/utils';
 import { BloomOrbitalRings } from './BloomOrbitalRings';
 import { BloomCentralOrb } from './BloomCentralOrb';
 import { BloomMenuItem } from './BloomMenuItem';
-import { BloomConnectionLine } from './BloomConnectionLine';
 
 export interface BloomHUDProps {
   size?: 'small' | 'medium' | 'large';
@@ -199,29 +198,6 @@ export const BloomHUD: React.FC<BloomHUDProps> = ({
     >
       {/* Orbital rings */}
       <BloomOrbitalRings isOpen={isMenuOpen} rings={rings} />
-
-      {/* Connection lines */}
-      {isMenuOpen && currentMenu && (
-        <svg className="absolute inset-0 pointer-events-none" style={{ width: '100%', height: '100%' }}>
-          <g transform={`translate(${primaryRing * 1.25}, ${primaryRing * 1.25})`}>
-            {currentMenu.items.map((item, index) => {
-              const angle = (index / currentMenu.items.length) * 2 * Math.PI - Math.PI / 2;
-              const x = Math.cos(angle) * primaryRing;
-              const y = Math.sin(angle) * primaryRing;
-              return (
-                <BloomConnectionLine
-                  key={`line-${index}`}
-                  x={x}
-                  y={y}
-                  angle={(angle * 180) / Math.PI}
-                  index={index}
-                  isHovered={hoveredIndex === index}
-                />
-              );
-            })}
-          </g>
-        </svg>
-      )}
 
       {/* Central orb */}
       <BloomCentralOrb

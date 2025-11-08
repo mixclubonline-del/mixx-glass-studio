@@ -682,17 +682,17 @@
 
 /* Orbital Rings */
 .bloom-orbital-ring {
-  animation: bloom-ring-pulse 3s ease-in-out infinite;
+  animation: bloom-ring-pulse 4s ease-in-out infinite;
 }
 
 @keyframes bloom-ring-pulse {
   0%, 100% {
-    opacity: 0.3;
-    stroke-width: 1;
+    opacity: 0.15;
+    stroke-width: 0.5;
   }
   50% {
-    opacity: 0.6;
-    stroke-width: 1.5;
+    opacity: 0.3;
+    stroke-width: 0.8;
   }
 }
 
@@ -755,47 +755,48 @@
 .bloom-item-glass-compact {
   @apply relative w-14 h-14 rounded-full;
   @apply flex items-center justify-center;
-  backdrop-filter: blur(16px);
+  backdrop-filter: blur(12px);
   background: linear-gradient(135deg, 
-    hsl(var(--background) / 0.4), 
-    hsl(var(--background) / 0.1));
-  border: 1px solid hsl(var(--border) / 0.3);
+    hsl(var(--background) / 0.5), 
+    hsl(var(--background) / 0.2));
+  border: 0.5px solid hsl(var(--border) / 0.2);
   transition: all 0.4s cubic-bezier(0.4, 0, 0.2, 1);
 }
 
 .bloom-menu-item-orbital:hover .bloom-item-glass-compact {
-  transform: scale(1.15);
-  backdrop-filter: blur(20px);
+  transform: scale(1.1);
+  backdrop-filter: blur(16px);
+  border: 0.5px solid hsl(var(--border) / 0.4);
   box-shadow: 
-    0 0 30px hsl(var(--zone-color, var(--primary)) / 0.5),
-    inset 0 0 20px hsl(var(--zone-color, var(--primary)) / 0.1);
+    0 0 20px hsl(var(--zone-color, var(--primary)) / 0.25),
+    inset 0 0 15px hsl(var(--zone-color, var(--primary)) / 0.05);
 }
 
 .bloom-item-border-glow {
   @apply absolute inset-0 rounded-full opacity-0;
   transition: opacity 0.4s ease-out;
   z-index: -1;
-  filter: blur(8px);
+  filter: blur(6px);
 }
 
 .bloom-menu-item-orbital:hover .bloom-item-border-glow {
-  opacity: 0.6;
+  opacity: 0.3;
 }
 
 .bloom-item-icon-orbital {
   @apply relative z-10 text-foreground;
-  filter: drop-shadow(0 0 4px hsl(var(--zone-color, var(--primary)) / 0.6));
+  filter: drop-shadow(0 0 2px hsl(var(--zone-color, var(--primary)) / 0.3));
   transition: all 0.3s ease-out;
 }
 
 .bloom-menu-item-orbital:hover .bloom-item-icon-orbital {
-  transform: scale(1.1);
-  filter: drop-shadow(0 0 8px hsl(var(--zone-color, var(--primary)) / 1));
+  transform: scale(1.05);
+  filter: drop-shadow(0 0 4px hsl(var(--zone-color, var(--primary)) / 0.5));
 }
 
 .bloom-item-text-orbital {
   @apply text-2xl font-bold text-foreground;
-  filter: drop-shadow(0 0 4px hsl(var(--zone-color, var(--primary)) / 0.6));
+  filter: drop-shadow(0 0 2px hsl(var(--zone-color, var(--primary)) / 0.3));
 }
 
 .bloom-item-inner-glow {

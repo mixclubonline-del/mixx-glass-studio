@@ -43,30 +43,13 @@ export const BloomOrbitalRings: React.FC<BloomOrbitalRingsProps> = ({ isOpen, ri
             r={radius}
             fill="none"
             stroke="url(#ringGradient)"
-            strokeWidth="1"
+            strokeWidth="0.5"
             className="bloom-orbital-ring"
             style={{
-              animationDelay: `${index * 0.15}s`,
-              filter: 'drop-shadow(0 0 10px hsl(var(--primary) / 0.3))'
+              animationDelay: `${index * 0.2}s`,
+              filter: 'drop-shadow(0 0 4px hsl(var(--primary) / 0.15))'
             }}
           />
-          {/* Rotating nodes on rings */}
-          {[0, 90, 180, 270].map((angle) => (
-            <circle
-              key={`node-${index}-${angle}`}
-              cx="50%"
-              cy="50%"
-              r="3"
-              fill={getZoneColor(angle)}
-              className="bloom-ring-node"
-              style={{
-                transform: `rotate(${angle}deg) translateX(${radius}px)`,
-                transformOrigin: '50% 50%',
-                animationDelay: `${(index * 0.15) + (angle / 360)}s`,
-                filter: `drop-shadow(0 0 4px ${getZoneColor(angle)})`
-              }}
-            />
-          ))}
         </g>
       ))}
     </svg>
