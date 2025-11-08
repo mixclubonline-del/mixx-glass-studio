@@ -136,7 +136,7 @@ function StudioPageContent() {
       
       {/* Production Tool Panels */}
       {isPanelOpen.pianoRoll && (
-        <div className="fixed inset-0 z-50 bg-black/80 flex items-center justify-center p-4">
+        <div className="fixed inset-0 z-50 bg-background/95 backdrop-blur-md flex items-center justify-center p-4">
           <div className="w-full max-w-7xl h-[90vh]">
             <EnhancedPianoRoll 
               regionId="region-1"
@@ -151,7 +151,7 @@ function StudioPageContent() {
       )}
       
       {isPanelOpen.stepSequencer && (
-        <div className="fixed inset-0 z-50 bg-black/80 flex items-center justify-center p-4">
+        <div className="fixed inset-0 z-50 bg-background/95 backdrop-blur-md flex items-center justify-center p-4">
           <div className="w-full max-w-4xl">
             <div className="bg-background rounded-lg border border-border shadow-2xl overflow-hidden">
               <div className="flex items-center justify-between px-4 py-3 border-b border-border/30">
@@ -172,7 +172,7 @@ function StudioPageContent() {
       )}
       
       {isPanelOpen.grooveEngine && (
-        <div className="fixed inset-0 z-50 bg-black/80 flex items-center justify-center p-4">
+        <div className="fixed inset-0 z-50 bg-background/95 backdrop-blur-md flex items-center justify-center p-4">
           <div className="w-full max-w-2xl">
             <GrooveEngine 
               onApply={(groove) => {
@@ -185,7 +185,7 @@ function StudioPageContent() {
       )}
       
       {isPanelOpen.automation && (
-        <div className="fixed inset-0 z-50 bg-black/80 flex items-center justify-center p-4">
+        <div className="fixed inset-0 z-50 bg-background/95 backdrop-blur-md flex items-center justify-center p-4">
           <div className="w-full max-w-4xl">
             <AdvancedAutomationPanel 
               trackId="track-1"
@@ -197,7 +197,7 @@ function StudioPageContent() {
       )}
       
       {isPanelOpen.comping && (
-        <div className="fixed inset-0 z-50 bg-black/80 flex items-center justify-center p-4">
+        <div className="fixed inset-0 z-50 bg-background/95 backdrop-blur-md flex items-center justify-center p-4">
           <div className="w-full max-w-5xl">
             <CompingManager 
               trackId="track-1"
@@ -233,7 +233,7 @@ function StudioPageContent() {
 
       {/* Audio Processing Panels */}
       {isPanelOpen.stemSeparation && (
-        <div className="fixed inset-0 z-50 bg-black/80 flex items-center justify-center p-4">
+        <div className="fixed inset-0 z-50 bg-background/95 backdrop-blur-md flex items-center justify-center p-4">
           <div className="w-full max-w-2xl">
             <div className="bg-background rounded-lg border border-border shadow-2xl overflow-hidden">
               <div className="flex items-center justify-between px-4 py-3 border-b border-border/30">
@@ -249,7 +249,7 @@ function StudioPageContent() {
       )}
 
       {isPanelOpen.audioRestoration && (
-        <div className="fixed inset-0 z-50 bg-black/80 flex items-center justify-center p-4">
+        <div className="fixed inset-0 z-50 bg-background/95 backdrop-blur-md flex items-center justify-center p-4">
           <div className="w-full max-w-2xl">
             <div className="bg-background rounded-lg border border-border shadow-2xl overflow-hidden">
               <div className="flex items-center justify-between px-4 py-3 border-b border-border/30">
@@ -265,7 +265,7 @@ function StudioPageContent() {
       )}
 
       {isPanelOpen.advancedPitch && (
-        <div className="fixed inset-0 z-50 bg-black/80 flex items-center justify-center p-4">
+        <div className="fixed inset-0 z-50 bg-background/95 backdrop-blur-md flex items-center justify-center p-4">
           <div className="w-full max-w-2xl">
             <div className="bg-background rounded-lg border border-border shadow-2xl overflow-hidden">
               <div className="flex items-center justify-between px-4 py-3 border-b border-border/30">
@@ -281,7 +281,7 @@ function StudioPageContent() {
       )}
 
       {isPanelOpen.audioToMIDI && (
-        <div className="fixed inset-0 z-50 bg-black/80 flex items-center justify-center p-4">
+        <div className="fixed inset-0 z-50 bg-background/95 backdrop-blur-md flex items-center justify-center p-4">
           <div className="w-full max-w-2xl">
             <div className="bg-background rounded-lg border border-border shadow-2xl overflow-hidden">
               <div className="flex items-center justify-between px-4 py-3 border-b border-border/30">
@@ -301,7 +301,7 @@ function StudioPageContent() {
       )}
 
       {isPanelOpen.voiceIsolation && (
-        <div className="fixed inset-0 z-50 bg-black/80 flex items-center justify-center p-4">
+        <div className="fixed inset-0 z-50 bg-background/95 backdrop-blur-md flex items-center justify-center p-4">
           <div className="w-full max-w-2xl">
             <div className="bg-background rounded-lg border border-border shadow-2xl overflow-hidden">
               <div className="flex items-center justify-between px-4 py-3 border-b border-border/30">
@@ -317,7 +317,7 @@ function StudioPageContent() {
       )}
 
       {isPanelOpen.spectralEditor && (
-        <div className="fixed inset-0 z-50 bg-black/80 flex items-center justify-center p-4">
+        <div className="fixed inset-0 z-50 bg-background/95 backdrop-blur-md flex items-center justify-center p-4">
           <div className="w-full max-w-5xl">
             <div className="bg-background rounded-lg border border-border shadow-2xl overflow-hidden">
               <div className="flex items-center justify-between px-4 py-3 border-b border-border/30">
