@@ -456,7 +456,7 @@ export const AdvancedTimelineView: React.FC<AdvancedTimelineViewProps> = ({
       <RippleEditIndicator active={rippleEdit} />
       
       {/* Background ambience */}
-      <div className="absolute inset-0 -z-10 overflow-hidden pointer-events-none">
+      <div className="absolute inset-0 z-0 overflow-hidden pointer-events-none">
         <div 
           className="absolute top-1/3 left-1/4 w-[500px] h-[500px] rounded-full"
           style={{
@@ -477,7 +477,7 @@ export const AdvancedTimelineView: React.FC<AdvancedTimelineViewProps> = ({
       
       {/* Main background with gradient mesh */}
       <div 
-        className="absolute inset-0 -z-20"
+        className="absolute inset-0 z-0 pointer-events-none"
         style={{
           background: `
             var(--gradient-mesh),
