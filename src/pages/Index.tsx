@@ -148,10 +148,16 @@ const IndexContent = () => {
   // No metering loop needed - meters read directly from AnalyserNodes with their own RAF loops
 
   const handleImport = () => {
+    console.log('Import clicked - opening file picker');
+    // Ensure no dialogs are accidentally open
+    useViewStore.getState().setExportDialogOpen(false);
+    useTracksStore.getState().setAddTrackDialogOpen(false);
+    
     fileInputRef.current?.click();
   };
 
   const handleFileSelect = (e: React.ChangeEvent<HTMLInputElement> | { target: { files: File[] } }) => {
+    console.log('Files selected for import');
     const files = (e as any).target.files as FileList | File[];
     if (files && (files as any).length) {
       Array.from(files as any).forEach((file: File) => handleLoadTrack(file));
