@@ -24,7 +24,8 @@ export const BloomOrbitalRings: React.FC<BloomOrbitalRingsProps> = ({ isOpen, ri
         width: '100%',
         height: '100%',
         opacity: isOpen ? 1 : 0,
-        transition: 'opacity 0.6s ease-out'
+        transform: isOpen ? 'scale(1)' : 'scale(0.8)',
+        transition: 'opacity 0.6s cubic-bezier(0.68, -0.55, 0.265, 1.55), transform 0.6s cubic-bezier(0.68, -0.55, 0.265, 1.55)'
       }}
     >
       <defs>

@@ -682,17 +682,20 @@
 
 /* Orbital Rings */
 .bloom-orbital-ring {
-  animation: bloom-ring-pulse 4s ease-in-out infinite;
+  animation: bloom-ring-pulse 4s cubic-bezier(0.4, 0, 0.6, 1) infinite;
+  transition: opacity 0.6s cubic-bezier(0.68, -0.55, 0.265, 1.55);
 }
 
 @keyframes bloom-ring-pulse {
   0%, 100% {
     opacity: 0.15;
     stroke-width: 0.5;
+    transform: scale(1);
   }
   50% {
     opacity: 0.3;
     stroke-width: 0.8;
+    transform: scale(1.02);
   }
 }
 
@@ -711,15 +714,21 @@
 
 /* Central Orb */
 .bloom-orb-open {
-  animation: bloom-orb-activate 0.6s ease-out;
+  animation: bloom-orb-activate 0.8s cubic-bezier(0.68, -0.55, 0.265, 1.55);
 }
 
 @keyframes bloom-orb-activate {
   0% {
-    transform: scale(1);
+    transform: scale(1) rotate(0deg);
   }
-  40% {
-    transform: scale(1.2) rotate(180deg);
+  30% {
+    transform: scale(0.85) rotate(90deg);
+  }
+  60% {
+    transform: scale(1.15) rotate(270deg);
+  }
+  80% {
+    transform: scale(1.05) rotate(340deg);
   }
   100% {
     transform: scale(1.1) rotate(360deg);
@@ -733,7 +742,7 @@
 /* Menu Items - Orbital Style */
 .bloom-menu-item-orbital {
   @apply absolute;
-  animation: bloom-orbital-item-enter 0.7s cubic-bezier(0.34, 1.56, 0.64, 1) forwards;
+  animation: bloom-orbital-item-enter 0.8s cubic-bezier(0.68, -0.55, 0.265, 1.55) forwards;
   opacity: 0;
   z-index: 10;
 }
@@ -741,10 +750,16 @@
 @keyframes bloom-orbital-item-enter {
   0% {
     opacity: 0;
-    transform: scale(0) rotate(-180deg);
+    transform: scale(0) rotate(-90deg);
   }
-  60% {
-    transform: scale(1.15) rotate(10deg);
+  50% {
+    opacity: 1;
+  }
+  70% {
+    transform: scale(1.12) rotate(5deg);
+  }
+  85% {
+    transform: scale(0.98) rotate(-2deg);
   }
   100% {
     opacity: 1;
@@ -760,7 +775,7 @@
     hsl(var(--background) / 0.5), 
     hsl(var(--background) / 0.2));
   border: 0.5px solid hsl(var(--border) / 0.2);
-  transition: all 0.4s cubic-bezier(0.4, 0, 0.2, 1);
+  transition: all 0.5s cubic-bezier(0.68, -0.55, 0.265, 1.55);
 }
 
 .bloom-menu-item-orbital:hover .bloom-item-glass-compact {

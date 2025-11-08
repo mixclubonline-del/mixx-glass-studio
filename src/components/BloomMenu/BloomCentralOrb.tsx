@@ -23,19 +23,29 @@ export const BloomCentralOrb: React.FC<BloomCentralOrbProps> = ({
   return (
     <div className="relative">
       {/* Outer glow rings */}
-      <div className={cn(
-        "absolute inset-0 rounded-full blur-lg transition-all duration-700",
-        "bg-gradient-radial from-primary/15 via-accent/10 to-transparent",
-        isOpen && "scale-130 opacity-100",
-        !isOpen && "scale-100 opacity-40"
-      )} />
+      <div 
+        className={cn(
+          "absolute inset-0 rounded-full blur-lg",
+          "bg-gradient-radial from-primary/15 via-accent/10 to-transparent"
+        )}
+        style={{
+          opacity: isOpen ? 1 : 0.4,
+          transform: isOpen ? 'scale(1.3)' : 'scale(1)',
+          transition: 'all 0.7s cubic-bezier(0.68, -0.55, 0.265, 1.55)'
+        }}
+      />
       
-      <div className={cn(
-        "absolute inset-0 rounded-full blur-md transition-all duration-500",
-        "bg-gradient-radial from-primary/20 via-accent/15 to-transparent",
-        isOpen && "scale-115 opacity-80",
-        !isOpen && "scale-100 opacity-30"
-      )} />
+      <div 
+        className={cn(
+          "absolute inset-0 rounded-full blur-md",
+          "bg-gradient-radial from-primary/20 via-accent/15 to-transparent"
+        )}
+        style={{
+          opacity: isOpen ? 0.8 : 0.3,
+          transform: isOpen ? 'scale(1.15)' : 'scale(1)',
+          transition: 'all 0.5s cubic-bezier(0.68, -0.55, 0.265, 1.55)'
+        }}
+      />
 
       {/* Main orb */}
       <button
@@ -43,12 +53,22 @@ export const BloomCentralOrb: React.FC<BloomCentralOrbProps> = ({
           "relative w-16 h-16 rounded-full",
           "glass-ultra border border-primary/20",
           "flex items-center justify-center",
-          "transition-all duration-600 cursor-grab active:cursor-grabbing",
-          "hover:scale-105 hover:border-primary/30",
+          "cursor-grab active:cursor-grabbing",
           "group",
           isOpen && "bloom-orb-open",
           isSubMenu && "bloom-orb-submenu"
         )}
+        style={{
+          transition: 'transform 0.3s cubic-bezier(0.68, -0.55, 0.265, 1.55), border-color 0.3s ease'
+        }}
+        onMouseEnter={(e) => {
+          e.currentTarget.style.transform = 'scale(1.05)';
+          e.currentTarget.style.borderColor = 'hsl(var(--primary) / 0.3)';
+        }}
+        onMouseLeave={(e) => {
+          e.currentTarget.style.transform = 'scale(1)';
+          e.currentTarget.style.borderColor = 'hsl(var(--primary) / 0.2)';
+        }}
         onClick={onClick}
         onMouseDown={onMouseDown}
       >
