@@ -14,6 +14,7 @@ import { Download, AlertCircle, CheckCircle2, Layers } from 'lucide-react';
 import { useToast } from '@/hooks/use-toast';
 import { LUFSCalculator } from '@/audio/metering/LUFSCalculator';
 import { useTracksStore } from '@/store/tracksStore';
+import { ExportPresetManager, ExportPreset } from './ExportPresetManager';
 
 interface ExportDialogProps {
   open: boolean;
@@ -439,6 +440,15 @@ export const ExportDialog: React.FC<ExportDialogProps> = ({ open, onOpenChange, 
     URL.revokeObjectURL(url);
   };
 
+  const handleLoadPreset = (preset: ExportPreset) => {
+    setFormat(preset.format);
+    setSampleRate(preset.sampleRate);
+    setBitDepth(preset.bitDepth);
+    setEnableDithering(preset.enableDithering);
+    setEnableNormalization(preset.enableNormalization);
+    setTargetLUFS(preset.targetLUFS);
+  };
+
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
       <DialogContent className="max-w-3xl bg-background/95 backdrop-blur border-border/50">
@@ -463,6 +473,19 @@ export const ExportDialog: React.FC<ExportDialogProps> = ({ open, onOpenChange, 
           </TabsList>
 
           <TabsContent value="master" className="space-y-6 py-4">
+          {/* Preset Manager */}
+          <ExportPresetManager
+            currentSettings={{
+              format,
+              sampleRate,
+              bitDepth,
+              enableDithering,
+              enableNormalization,
+              targetLUFS,
+            }}
+            onLoadPreset={handleLoadPreset}
+          />
+
           {/* Format Selection */}
           <div className="space-y-2">
             <Label>Format</Label>
