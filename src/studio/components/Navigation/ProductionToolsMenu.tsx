@@ -26,6 +26,7 @@ import {
   Sparkles,
   Volume2,
   Mic,
+  FileMusic,
 } from 'lucide-react';
 import { useViewStore } from '@/store/viewStore';
 
@@ -110,6 +111,10 @@ export const ProductionToolsMenu: React.FC = () => {
         <DropdownMenuItem onClick={() => togglePanel('advancedPitch')}>
           <Mic className="h-4 w-4 mr-2" />
           Pitch Correction
+        </DropdownMenuItem>
+        <DropdownMenuItem onClick={() => togglePanel('audioToMIDI')}>
+          <FileMusic className="h-4 w-4 mr-2" />
+          Audio to MIDI
         </DropdownMenuItem>
       </DropdownMenuContent>
     </DropdownMenu>

@@ -27,6 +27,7 @@ interface ViewState {
     stemSeparation: boolean;
     audioRestoration: boolean;
     advancedPitch: boolean;
+    audioToMIDI: boolean;
   };
   analyzerMode: 'spectrum' | 'phase' | 'waveform';
   exportDialogOpen: boolean;
@@ -63,6 +64,7 @@ export const useViewStore = create<ViewState>((set, get) => ({
     stemSeparation: false,
     audioRestoration: false,
     advancedPitch: false,
+    audioToMIDI: false,
   },
   analyzerMode: 'spectrum',
   exportDialogOpen: false,
@@ -108,6 +110,7 @@ export const useViewStore = create<ViewState>((set, get) => ({
         stemSeparation: false,
         audioRestoration: false,
         advancedPitch: false,
+        audioToMIDI: false,
       },
     });
     localStorage.setItem('viewStore:panels', JSON.stringify(get().isPanelOpen));
