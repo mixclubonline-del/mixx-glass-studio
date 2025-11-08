@@ -249,26 +249,43 @@ export class AudioEngine {
 
   // Playback with loop support
   async play(fromTime: number = 0) {
-    if (this.isPlaying) return;
+    if (this.isPlaying) {
+      console.log("🎵 Already playing, ignoring play() call");
+      return;
+    }
+
+    console.log(`🎵 Transport: play() called at time ${fromTime}`);
+    console.log(`🎵 AudioContext state before resume: ${this.context.state}`);
 
     // Ensure AudioContext is running
     const ready = await this.ensureContextRunning();
     if (!ready) {
+      console.error("🎵 Failed to start playback: AudioContext not running");
       this.handleError(new Error("Cannot play: AudioContext not running"), "playback");
       return;
     }
+
+    console.log(`🎵 AudioContext state after resume: ${this.context.state}`);
+    console.log(`🎵 Number of tracks: ${this.tracks.size}`);
 
     try {
       // If resuming from pause, use pauseTime, otherwise use fromTime
       const offset = this.pauseTime > 0 ? this.pauseTime : fromTime;
       this.startTime = this.context.currentTime - offset;
 
+      let playingCount = 0;
       this.tracks.forEach((track) => {
-        if (track.buffer && !track.channelStrip.isMuted()) {
+        const hasBuffer = !!track.buffer;
+        const isMuted = track.channelStrip.isMuted();
+        console.log(`🎵 Track ${track.id}: buffer=${hasBuffer}, muted=${isMuted}`);
+        
+        if (hasBuffer && !isMuted) {
           this.playTrackSource(track, offset);
+          playingCount++;
         }
       });
 
+      console.log(`🎵 Started playback for ${playingCount} tracks`);
       this.isPlaying = true;
 
       // Setup loop monitoring if enabled
@@ -780,14 +797,16 @@ export class AudioEngine {
   private async ensureContextRunning(): Promise<boolean> {
     if (this.context.state === "suspended") {
       try {
+        console.log("🎵 Resuming suspended AudioContext...");
         await this.context.resume();
-        console.log("🎵 AudioContext resumed");
+        console.log(`🎵 AudioContext resumed successfully, state: ${this.context.state}`);
         return true;
       } catch (err) {
-        console.error("Failed to resume AudioContext:", err);
+        console.error("🎵 Failed to resume AudioContext:", err);
         return false;
       }
     }
+    console.log(`🎵 AudioContext already ${this.context.state}`);
     return this.context.state === "running";
   }
 }

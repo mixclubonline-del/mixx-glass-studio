@@ -78,8 +78,9 @@ export const ProjectProvider: React.FC<{ children: React.ReactNode }> = ({ child
   }, [audioEngine]);
   
   // Transport controls
-  const play = useCallback((fromTime?: number) => {
-    audioEngine.play(fromTime);
+  const play = useCallback(async (fromTime?: number) => {
+    console.log("🎵 ProjectContext: play() called");
+    await audioEngine.play(fromTime);
     setTransport(prev => ({ ...prev, isPlaying: true }));
   }, [audioEngine]);
   
