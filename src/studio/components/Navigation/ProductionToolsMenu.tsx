@@ -23,6 +23,9 @@ import {
   Music2,
   Gauge,
   Download,
+  Sparkles,
+  Volume2,
+  Mic,
 } from 'lucide-react';
 import { useViewStore } from '@/store/viewStore';
 
@@ -92,6 +95,21 @@ export const ProductionToolsMenu: React.FC = () => {
           <Download className="h-4 w-4 mr-2" />
           Export Mix
           <span className="ml-auto text-xs text-muted-foreground">E</span>
+        </DropdownMenuItem>
+
+        <DropdownMenuSeparator />
+        <DropdownMenuLabel>Advanced Audio</DropdownMenuLabel>
+        <DropdownMenuItem onClick={() => togglePanel('stemSeparation')}>
+          <Sparkles className="h-4 w-4 mr-2" />
+          Stem Separation
+        </DropdownMenuItem>
+        <DropdownMenuItem onClick={() => togglePanel('audioRestoration')}>
+          <Volume2 className="h-4 w-4 mr-2" />
+          Audio Restoration
+        </DropdownMenuItem>
+        <DropdownMenuItem onClick={() => togglePanel('advancedPitch')}>
+          <Mic className="h-4 w-4 mr-2" />
+          Pitch Correction
         </DropdownMenuItem>
       </DropdownMenuContent>
     </DropdownMenu>

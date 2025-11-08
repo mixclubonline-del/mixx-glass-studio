@@ -24,6 +24,9 @@ interface ViewState {
     timeStretch: boolean;
     comping: boolean;
     routing: boolean;
+    stemSeparation: boolean;
+    audioRestoration: boolean;
+    advancedPitch: boolean;
   };
   analyzerMode: 'spectrum' | 'phase' | 'waveform';
   exportDialogOpen: boolean;
@@ -57,6 +60,9 @@ export const useViewStore = create<ViewState>((set, get) => ({
     timeStretch: false,
     comping: false,
     routing: false,
+    stemSeparation: false,
+    audioRestoration: false,
+    advancedPitch: false,
   },
   analyzerMode: 'spectrum',
   exportDialogOpen: false,
@@ -99,6 +105,9 @@ export const useViewStore = create<ViewState>((set, get) => ({
         timeStretch: false,
         comping: false,
         routing: false,
+        stemSeparation: false,
+        audioRestoration: false,
+        advancedPitch: false,
       },
     });
     localStorage.setItem('viewStore:panels', JSON.stringify(get().isPanelOpen));

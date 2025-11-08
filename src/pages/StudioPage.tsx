@@ -28,6 +28,7 @@ import { TimeStretchDialog } from "../studio/components/Timeline/TimeStretchDial
 import { CompingManager } from "../studio/components/Timeline/CompingManager";
 import { AdvancedRoutingMatrix } from "../studio/components/Mixer/AdvancedRoutingMatrix";
 import { ExportDialog } from "../studio/components/Export";
+import { StemSeparation, AudioRestoration, AdvancedPitchCorrection } from "../studio/components/Audio";
 
 // Inner component that uses ProjectContext
 function StudioPageContent() {
@@ -229,6 +230,55 @@ function StudioPageContent() {
         onOpenChange={setExportDialogOpen}
         audioEngine={audioEngine}
       />
+
+      {/* Audio Processing Panels */}
+      {isPanelOpen.stemSeparation && (
+        <div className="fixed inset-0 z-50 bg-black/80 flex items-center justify-center p-4">
+          <div className="w-full max-w-2xl">
+            <div className="bg-background rounded-lg border border-border shadow-2xl overflow-hidden">
+              <div className="flex items-center justify-between px-4 py-3 border-b border-border/30">
+                <h2 className="font-semibold">Stem Separation</h2>
+                <Button size="sm" variant="ghost" onClick={() => useViewStore.getState().togglePanel('stemSeparation')}>
+                  <X className="h-4 w-4" />
+                </Button>
+              </div>
+              <StemSeparation />
+            </div>
+          </div>
+        </div>
+      )}
+
+      {isPanelOpen.audioRestoration && (
+        <div className="fixed inset-0 z-50 bg-black/80 flex items-center justify-center p-4">
+          <div className="w-full max-w-2xl">
+            <div className="bg-background rounded-lg border border-border shadow-2xl overflow-hidden">
+              <div className="flex items-center justify-between px-4 py-3 border-b border-border/30">
+                <h2 className="font-semibold">Audio Restoration</h2>
+                <Button size="sm" variant="ghost" onClick={() => useViewStore.getState().togglePanel('audioRestoration')}>
+                  <X className="h-4 w-4" />
+                </Button>
+              </div>
+              <AudioRestoration />
+            </div>
+          </div>
+        </div>
+      )}
+
+      {isPanelOpen.advancedPitch && (
+        <div className="fixed inset-0 z-50 bg-black/80 flex items-center justify-center p-4">
+          <div className="w-full max-w-2xl">
+            <div className="bg-background rounded-lg border border-border shadow-2xl overflow-hidden">
+              <div className="flex items-center justify-between px-4 py-3 border-b border-border/30">
+                <h2 className="font-semibold">Advanced Pitch Correction</h2>
+                <Button size="sm" variant="ghost" onClick={() => useViewStore.getState().togglePanel('advancedPitch')}>
+                  <X className="h-4 w-4" />
+                </Button>
+              </div>
+              <AdvancedPitchCorrection />
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 }
