@@ -17,3 +17,4 @@ export { InsertRack } from './InsertRack';
 export { SendKnobSimple } from './SendKnobSimple';
 export { BusManager } from './BusManager';
 export { MixerSidePanels } from './MixerSidePanels';
+export { HybridMixerArrangeView } from './HybridMixerArrangeView';

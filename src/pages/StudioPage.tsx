@@ -20,6 +20,7 @@ import { CollapsibleMeteringPanel } from "../studio/components/Metering/Collapsi
 import { AdvancedTimelineView } from "../studio/components/Timeline/AdvancedTimelineView";
 import { ProductionToolsMenu } from "../studio/components/Navigation/ProductionToolsMenu";
 import { MasteringPanel } from "../studio/components/Metering/MasteringPanel";
+import { HybridMixerArrangeView } from "../studio/components/Mixer/HybridMixerArrangeView";
 import { EnhancedPianoRoll } from "../studio/components/Timeline/EnhancedPianoRoll";
 import { StepSequencer } from "../studio/components/Producer/StepSequencer";
 import { GrooveEngine } from "../studio/components/Producer/GrooveEngine";
@@ -102,12 +103,43 @@ function StudioPageContent() {
         ) : currentView === 'producer-lab' ? (
           <ProducerLab />
         ) : currentView === 'mix' ? (
-          <div className="h-full flex items-center justify-center bg-background/50">
-            <div className="text-center text-muted-foreground py-12">
-              <h2 className="text-2xl font-bold mb-2">Mixer View</h2>
-              <p>Dedicated mixer console coming soon...</p>
-            </div>
-          </div>
+          <HybridMixerArrangeView
+            audioBuffers={new Map()}
+            onSeek={handleSeek}
+            engineRef={undefined}
+            onVolumeChange={(id, volume) => {
+              console.log('Volume change:', id, volume);
+            }}
+            onPanChange={(id, pan) => {
+              console.log('Pan change:', id, pan);
+            }}
+            onMuteToggle={(id) => {
+              console.log('Mute toggle:', id);
+            }}
+            onSoloToggle={(id) => {
+              console.log('Solo toggle:', id);
+            }}
+            onExport={handleExport}
+            isExporting={false}
+            onLoadPlugin={(trackId, slotNumber, pluginId) => {
+              console.log('Load plugin:', trackId, slotNumber, pluginId);
+            }}
+            onUnloadPlugin={(trackId, slotNumber) => {
+              console.log('Unload plugin:', trackId, slotNumber);
+            }}
+            onBypassPlugin={(trackId, slotNumber, bypass) => {
+              console.log('Bypass plugin:', trackId, slotNumber, bypass);
+            }}
+            onSendChange={(trackId, busId, amount) => {
+              console.log('Send change:', trackId, busId, amount);
+            }}
+            onCreateBus={(name, color, type) => {
+              console.log('Create bus:', name, color, type);
+            }}
+            onOpenPluginWindow={(trackId, slotNumber, pluginId) => {
+              console.log('Open plugin window:', trackId, slotNumber, pluginId);
+            }}
+          />
         ) : currentView === 'edit' ? (
           <div className="h-full flex items-center justify-center bg-background/50">
             <div className="text-center text-muted-foreground py-12">

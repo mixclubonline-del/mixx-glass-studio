@@ -4,9 +4,11 @@
 
 import { useEffect } from 'react';
 import { useTransport } from '@/contexts/ProjectContext';
+import { useViewStore } from '@/store/viewStore';
 
 export const useGlobalKeyboardShortcuts = () => {
   const { transport, play, pause, stop, toggleLoop, toggleRecord, prevBar, nextBar } = useTransport();
+  const { setView } = useViewStore();
   
   useEffect(() => {
     const handleKeyDown = (e: KeyboardEvent) => {
@@ -72,9 +74,24 @@ export const useGlobalKeyboardShortcuts = () => {
         }
         return;
       }
+      
+      // View switching shortcuts
+      // M: Toggle to Mix Console (hybrid view)
+      if (e.code === 'KeyM' && !cmdOrCtrl) {
+        e.preventDefault();
+        setView('mix');
+        return;
+      }
+      
+      // A: Toggle to Arrange view
+      if (e.code === 'KeyA' && !cmdOrCtrl) {
+        e.preventDefault();
+        setView('arrange');
+        return;
+      }
     };
     
     window.addEventListener('keydown', handleKeyDown);
     return () => window.removeEventListener('keydown', handleKeyDown);
-  }, [transport, play, pause, stop, toggleLoop, toggleRecord, prevBar, nextBar]);
+  }, [transport, play, pause, stop, toggleLoop, toggleRecord, prevBar, nextBar, setView]);
 };
