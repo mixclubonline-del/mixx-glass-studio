@@ -25,10 +25,13 @@ export const CHANNEL_WIDTH_DEFAULT = 90; // Default channel width
 export const CHANNEL_WIDTH_MAX = 120; // Maximum channel width
 export const MASTER_CHANNEL_WIDTH = 176; // Master channel fixed width
 
-// Track Heights
-export const TRACK_HEIGHT = 100; // Standard track height in timeline
-export const TRACK_HEIGHT_MIN = 60; // Minimum track height
-export const TRACK_HEIGHT_MAX = 200; // Maximum track height
+// Track Heights - Compact for trap/rap workflow
+export const TRACK_HEIGHT = 48; // Standard track height (compact for seeing more tracks)
+export const TRACK_HEIGHT_MINI = 32; // Mini view for dense arrangements
+export const TRACK_HEIGHT_MIDI = 64; // MIDI/Pattern view
+export const TRACK_HEIGHT_MAXI = 96; // Maximum detail view
+export const TRACK_HEIGHT_MIN = 32; // Minimum track height
+export const TRACK_HEIGHT_MAX = 128; // Maximum track height
 
 // Spacing Scale (4px grid system)
 export const SPACING = {

@@ -121,7 +121,7 @@ export function GridOverlay({ width, height, bpm, timeSignature = [4, 4] }: Grid
       }
     }
     
-    // Draw bar lines with multi-layer depth and chromatic aberration
+    // Draw bar lines with multi-layer depth and STRONG 4/8-bar emphasis (trap loop points)
     for (let i = startIndex; i <= endIndex; i++) {
       const time = i * subdivisionInterval;
       const x = (time * zoom) - scrollX;
@@ -130,34 +130,85 @@ export function GridOverlay({ width, height, bpm, timeSignature = [4, 4] }: Grid
         const isBar = Math.abs(time % secondsPerBar) < 0.001;
         
         if (isBar) {
-          // Base line (wide, subtle)
-          ctx.strokeStyle = 'rgba(255, 255, 255, 0.05)';
-          ctx.lineWidth = 6;
-          ctx.shadowBlur = 0;
-          ctx.beginPath();
-          ctx.moveTo(x, 0);
-          ctx.lineTo(x, height);
-          ctx.stroke();
+          const barNumber = Math.round(time / secondsPerBar);
+          const is4BarMark = barNumber % 4 === 0;
+          const is8BarMark = barNumber % 8 === 0;
           
-          // Main line with depth
-          ctx.strokeStyle = 'rgba(255, 255, 255, 0.2)';
-          ctx.lineWidth = 3;
-          ctx.shadowBlur = 12;
-          ctx.shadowColor = primaryHsl;
-          ctx.beginPath();
-          ctx.moveTo(x, 0);
-          ctx.lineTo(x, height);
-          ctx.stroke();
-          
-          // Primary color accent at top
-          ctx.strokeStyle = primaryHsl;
-          ctx.lineWidth = 3;
-          ctx.shadowBlur = 8;
-          ctx.shadowColor = primaryHsl;
-          ctx.beginPath();
-          ctx.moveTo(x, 0);
-          ctx.lineTo(x, Math.min(30, height));
-          ctx.stroke();
+          if (is8BarMark) {
+            // 8-bar marks - ULTRA PROMINENT (trap phrases)
+            ctx.strokeStyle = 'rgba(255, 50, 180, 0.15)';
+            ctx.lineWidth = 8;
+            ctx.shadowBlur = 0;
+            ctx.beginPath();
+            ctx.moveTo(x, 0);
+            ctx.lineTo(x, height);
+            ctx.stroke();
+            
+            ctx.strokeStyle = 'rgba(255, 50, 180, 0.4)';
+            ctx.lineWidth = 4;
+            ctx.shadowBlur = 20;
+            ctx.shadowColor = 'rgba(255, 50, 180, 0.6)';
+            ctx.beginPath();
+            ctx.moveTo(x, 0);
+            ctx.lineTo(x, height);
+            ctx.stroke();
+            
+            // Neon accent
+            ctx.strokeStyle = 'hsl(320 100% 60%)';
+            ctx.lineWidth = 2;
+            ctx.shadowBlur = 12;
+            ctx.shadowColor = 'hsl(320 100% 60%)';
+            ctx.beginPath();
+            ctx.moveTo(x, 0);
+            ctx.lineTo(x, Math.min(40, height));
+            ctx.stroke();
+          } else if (is4BarMark) {
+            // 4-bar marks - VERY PROMINENT (trap loops)
+            ctx.strokeStyle = 'rgba(100, 150, 255, 0.12)';
+            ctx.lineWidth = 6;
+            ctx.shadowBlur = 0;
+            ctx.beginPath();
+            ctx.moveTo(x, 0);
+            ctx.lineTo(x, height);
+            ctx.stroke();
+            
+            ctx.strokeStyle = 'rgba(100, 150, 255, 0.3)';
+            ctx.lineWidth = 3;
+            ctx.shadowBlur = 16;
+            ctx.shadowColor = 'rgba(100, 150, 255, 0.4)';
+            ctx.beginPath();
+            ctx.moveTo(x, 0);
+            ctx.lineTo(x, height);
+            ctx.stroke();
+            
+            // Cyan accent
+            ctx.strokeStyle = primaryHsl;
+            ctx.lineWidth = 2;
+            ctx.shadowBlur = 8;
+            ctx.shadowColor = primaryHsl;
+            ctx.beginPath();
+            ctx.moveTo(x, 0);
+            ctx.lineTo(x, Math.min(30, height));
+            ctx.stroke();
+          } else {
+            // Regular bar lines - subtle
+            ctx.strokeStyle = 'rgba(255, 255, 255, 0.05)';
+            ctx.lineWidth = 4;
+            ctx.shadowBlur = 0;
+            ctx.beginPath();
+            ctx.moveTo(x, 0);
+            ctx.lineTo(x, height);
+            ctx.stroke();
+            
+            ctx.strokeStyle = 'rgba(255, 255, 255, 0.15)';
+            ctx.lineWidth = 2;
+            ctx.shadowBlur = 8;
+            ctx.shadowColor = 'rgba(255, 255, 255, 0.1)';
+            ctx.beginPath();
+            ctx.moveTo(x, 0);
+            ctx.lineTo(x, height);
+            ctx.stroke();
+          }
         }
       }
     }

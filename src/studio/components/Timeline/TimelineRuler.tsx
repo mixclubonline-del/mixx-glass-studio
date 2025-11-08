@@ -60,39 +60,65 @@ export function TimelineRuler({ width, height, bpm, onSeek }: TimelineRulerProps
       const x = (barTime * zoom) - scrollX;
       
       if (x >= 0 && x <= width) {
-        // Bar line
-        ctx.strokeStyle = 'hsl(0, 0%, 40%)';
-        ctx.lineWidth = 1;
+        const barNumber = bar + 1;
+        const is4BarMark = barNumber % 4 === 0;
+        const is8BarMark = barNumber % 8 === 0;
+        
+        // Bar line with emphasis on 4/8-bar marks
+        if (is8BarMark) {
+          ctx.strokeStyle = 'hsl(320, 100%, 50%)';
+          ctx.lineWidth = 3;
+        } else if (is4BarMark) {
+          ctx.strokeStyle = 'hsl(191, 100%, 50%)';
+          ctx.lineWidth = 2;
+        } else {
+          ctx.strokeStyle = 'hsl(0, 0%, 40%)';
+          ctx.lineWidth = 1;
+        }
         ctx.beginPath();
         ctx.moveTo(x, height * 0.3);
         ctx.lineTo(x, height);
         ctx.stroke();
         
-        // Bar number with gradient (start at 1, not 0)
-        const gradient = ctx.createLinearGradient(x, 0, x + 50, 0);
-        gradient.addColorStop(0, 'hsl(275 100% 70%)');
-        gradient.addColorStop(1, 'hsl(191 100% 60%)');
-        ctx.fillStyle = gradient;
-        ctx.fillText(`${bar + 1}`, x + 4, height / 2);
+        // Bar number with emphasis on 4/8-bar marks
+        let fontSize = '11px';
+        let fontWeight = '';
+        if (is8BarMark) {
+          fontSize = '14px';
+          fontWeight = 'bold ';
+          ctx.fillStyle = 'hsl(320 100% 70%)';
+          ctx.shadowBlur = 4;
+          ctx.shadowColor = 'hsl(320 100% 60%)';
+        } else if (is4BarMark) {
+          fontSize = '12px';
+          fontWeight = 'bold ';
+          ctx.fillStyle = 'hsl(191 100% 60%)';
+          ctx.shadowBlur = 2;
+          ctx.shadowColor = 'hsl(191 100% 60%)';
+        } else {
+          const gradient = ctx.createLinearGradient(x, 0, x + 50, 0);
+          gradient.addColorStop(0, 'hsl(275 100% 70%)');
+          gradient.addColorStop(1, 'hsl(191 100% 60%)');
+          ctx.fillStyle = gradient;
+          ctx.shadowBlur = 0;
+        }
+        ctx.font = `${fontWeight}${fontSize} Inter`;
+        ctx.fillText(`${barNumber}`, x + 4, height / 2);
+        ctx.shadowBlur = 0;
+        ctx.font = '11px Inter';
         
-        // Beat subdivisions (show beats 2, 3, 4)
+        // Beat subdivisions (show beats 2, 3, 4) - dimmed
         for (let beat = 1; beat < 4; beat++) {
           const beatTime = barTime + (beat * secondsPerBeat);
           const beatX = (beatTime * zoom) - scrollX;
           
           if (beatX >= 0 && beatX <= width) {
-            ctx.strokeStyle = 'hsl(0, 0%, 20%)';
+            ctx.strokeStyle = 'hsl(0, 0%, 15%)';
             ctx.lineWidth = 1;
             ctx.beginPath();
-            ctx.moveTo(beatX, height * 0.5);
+            ctx.moveTo(beatX, height * 0.6);
             ctx.lineTo(beatX, height);
             ctx.stroke();
-            
-            // Show beat numbers for clarity
-            ctx.fillStyle = 'hsl(0, 0%, 40%)';
-            ctx.font = '9px Inter';
-            ctx.fillText(`${beat + 1}`, beatX + 2, height * 0.7);
-            ctx.font = '11px Inter';
           }
         }
       }

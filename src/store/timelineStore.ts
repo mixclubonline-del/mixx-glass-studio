@@ -3,7 +3,7 @@
  */
 
 import { create } from 'zustand';
-import { GridResolution, ViewMode } from '@/types/timeline';
+import { GridResolution, ViewMode, TrackHeightPreset } from '@/types/timeline';
 
 interface TimelineState {
   // Playback
@@ -40,6 +40,9 @@ interface TimelineState {
   autoScrollEnabled: boolean;
   centerPlayhead: boolean;
   
+  // Track display
+  trackHeightPreset: TrackHeightPreset;
+  
   // Actions
   setCurrentTime: (time: number) => void;
   setDuration: (duration: number) => void;
@@ -64,6 +67,7 @@ interface TimelineState {
   setScrollMode: (mode: 'continuous' | 'page' | 'none') => void;
   setAutoScrollEnabled: (enabled: boolean) => void;
   setCenterPlayhead: (center: boolean) => void;
+  setTrackHeightPreset: (preset: TrackHeightPreset) => void;
 }
 
 export const useTimelineStore = create<TimelineState>((set) => ({
@@ -95,6 +99,8 @@ export const useTimelineStore = create<TimelineState>((set) => ({
   scrollMode: 'continuous',
   autoScrollEnabled: true,
   centerPlayhead: true,
+  
+  trackHeightPreset: 'compact',
   
   // Actions
   setCurrentTime: (time) => set({ currentTime: time }),
@@ -131,4 +137,5 @@ export const useTimelineStore = create<TimelineState>((set) => ({
   setScrollMode: (mode) => set({ scrollMode: mode }),
   setAutoScrollEnabled: (enabled) => set({ autoScrollEnabled: enabled }),
   setCenterPlayhead: (center) => set({ centerPlayhead: center }),
+  setTrackHeightPreset: (preset) => set({ trackHeightPreset: preset }),
 }));

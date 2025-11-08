@@ -70,3 +70,18 @@ export interface TimelineTrack {
 export type GridResolution = '1/4' | '1/8' | '1/16' | '1/32' | '1/64' | '1/4T' | '1/8T' | '1/16T';
 export type ViewMode = 'bars' | 'seconds';
 export type CurveType = 'linear' | 'exponential' | 'logarithmic' | 'scurve';
+
+// Track height presets for different workflows
+export type TrackHeightPreset = 'mini' | 'compact' | 'midi' | 'maxi';
+
+// Trap/Hip-hop color palettes
+export type ColorPalette = 'drums' | '808s' | 'melody' | 'vocals' | 'fx' | 'custom';
+
+export const TRAP_COLOR_PALETTES: Record<ColorPalette, string> = {
+  drums: 'hsl(0 85% 60%)',      // Hot red for drums
+  '808s': 'hsl(280 90% 65%)',   // Deep purple for bass
+  melody: 'hsl(191 85% 55%)',   // Cyan for melodies
+  vocals: 'hsl(140 75% 55%)',   // Green for vocals
+  fx: 'hsl(45 90% 60%)',        // Gold for FX
+  custom: 'hsl(0 0% 50%)',      // Neutral gray
+};

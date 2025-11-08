@@ -18,8 +18,8 @@
     --prime-purple: 275 100% 65%; /* Prime purple - optimal */
     --fire-red: 0 100% 60%; /* Fire red - danger */
     
-    /* Base tokens */
-    --background: 240 10% 3.9%;
+    /* Base tokens - Darker for trap aesthetic */
+    --background: 240 20% 2%;
     --foreground: 0 0% 98%;
     
     --card: 240 10% 5%;
