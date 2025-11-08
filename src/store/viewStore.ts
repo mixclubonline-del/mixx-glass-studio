@@ -26,6 +26,7 @@ interface ViewState {
     routing: boolean;
   };
   analyzerMode: 'spectrum' | 'phase' | 'waveform';
+  exportDialogOpen: boolean;
   
   // Actions
   setView: (view: ViewType) => void;
@@ -35,6 +36,7 @@ interface ViewState {
   closeAllPlugins: () => void;
   collapseAll: () => void;
   restorePanels: () => void;
+  setExportDialogOpen: (open: boolean) => void;
 }
 
 export const useViewStore = create<ViewState>((set, get) => ({
@@ -57,6 +59,7 @@ export const useViewStore = create<ViewState>((set, get) => ({
     routing: false,
   },
   analyzerMode: 'spectrum',
+  exportDialogOpen: false,
   
   setView: (view) => set({ currentView: view }),
   
@@ -107,4 +110,6 @@ export const useViewStore = create<ViewState>((set, get) => ({
       set({ isPanelOpen: JSON.parse(saved) });
     }
   },
+  
+  setExportDialogOpen: (open) => set({ exportDialogOpen: open }),
 }));

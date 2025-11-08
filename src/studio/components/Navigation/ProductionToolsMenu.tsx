@@ -22,11 +22,12 @@ import {
   GitBranch,
   Music2,
   Gauge,
+  Download,
 } from 'lucide-react';
 import { useViewStore } from '@/store/viewStore';
 
 export const ProductionToolsMenu: React.FC = () => {
-  const { togglePanel } = useViewStore();
+  const { togglePanel, setExportDialogOpen } = useViewStore();
 
   return (
     <DropdownMenu>
@@ -83,6 +84,14 @@ export const ProductionToolsMenu: React.FC = () => {
           <Gauge className="h-4 w-4 mr-2" />
           Metering & Analysis
           <span className="ml-auto text-xs text-muted-foreground">M</span>
+        </DropdownMenuItem>
+        
+        <DropdownMenuSeparator />
+        <DropdownMenuLabel>Export</DropdownMenuLabel>
+        <DropdownMenuItem onClick={() => setExportDialogOpen(true)}>
+          <Download className="h-4 w-4 mr-2" />
+          Export Mix
+          <span className="ml-auto text-xs text-muted-foreground">E</span>
         </DropdownMenuItem>
       </DropdownMenuContent>
     </DropdownMenu>

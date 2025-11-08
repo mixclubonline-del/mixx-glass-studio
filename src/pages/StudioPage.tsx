@@ -27,10 +27,11 @@ import { AdvancedAutomationPanel } from "../studio/components/Automation/Advance
 import { TimeStretchDialog } from "../studio/components/Timeline/TimeStretchDialog";
 import { CompingManager } from "../studio/components/Timeline/CompingManager";
 import { AdvancedRoutingMatrix } from "../studio/components/Mixer/AdvancedRoutingMatrix";
+import { ExportDialog } from "../studio/components/Export";
 
 // Inner component that uses ProjectContext
 function StudioPageContent() {
-  const { currentView, isPanelOpen } = useViewStore();
+  const { currentView, isPanelOpen, exportDialogOpen, setExportDialogOpen } = useViewStore();
   const { audioEngine } = useProject();
   const { transport } = useTransport();
   const [duration, setDuration] = useState(180);
@@ -221,6 +222,13 @@ function StudioPageContent() {
           onClose={() => useViewStore.getState().togglePanel('routing')}
         />
       )}
+      
+      {/* Export Dialog */}
+      <ExportDialog 
+        open={exportDialogOpen} 
+        onOpenChange={setExportDialogOpen}
+        audioEngine={audioEngine}
+      />
     </div>
   );
 }
