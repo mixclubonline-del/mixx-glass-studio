@@ -1,45 +1,23 @@
 [package]
-name = "app"
+name = "mixx-glass-studio"
 version = "0.1.0"
-description = "A Tauri App"
-authors = ["you"]
-license = ""
-repository = ""
+description = "Mixx Club Studio - Quantum Audio Engine"
+authors = ["Mixx Club"]
+license = "MIT"
+repository = "https://github.com/mixxclub/mixx-glass-studio"
 edition = "2021"
-rust-version = "1.77.2"
 
 # See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
 
-[lib]
-name = "app_lib"
-crate-type = ["staticlib", "cdylib", "rlib"]
-
 [build-dependencies]
-tauri-build = { version = "2.5.1", features = [] }
+tauri-build = { version = "2.0", features = [] }
 
 [dependencies]
 serde_json = "1.0"
 serde = { version = "1.0", features = ["derive"] }
-log = "0.4"
-tauri = { version = "2.9", features = [] }
-tauri-plugin-log = { version = "2.0", features = ["colored"] }
-tokio = { version = "1.35", features = ["full"] }
+tauri = { version = "2.0", features = [] }
+tokio = { version = "1.0", features = ["full"] }
+once_cell = "1.21"
 
-# Audio I/O and processing
-cpal = "0.16"
-crossbeam-channel = "0.5"
-
-# DSP and analysis
-ndarray = "0.15"
-ndarray-stats = "0.5"
-num-complex = "0.4"
-rustfft = "6.1"
-parking_lot = "0.12"
-hound = "3.5"  # WAV file support
-
-# Resampling
-rubato = "0.14"
-
-# Tracing
-tracing = "0.1"
-tracing-subscriber = { version = "0.3", features = ["env-filter"] }
+# Quantum Engine Dependencies (minimal for now)
+num-traits = "0.2"

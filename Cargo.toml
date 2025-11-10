@@ -1,0 +1,54 @@
+[package]
+name = "mixx-glass-studio-core"
+version = "0.1.0"
+edition = "2021"
+description = "Mixx Club Studio - Rust Core Engine with Five Pillars Doctrine"
+authors = ["Mixx Club"]
+
+[lib]
+name = "mixx_core"
+crate-type = ["cdylib", "rlib"]
+
+[dependencies]
+# Audio I/O and Processing
+cpal = "0.15"
+hound = "3.5"
+rubato = "0.14"
+
+# SIMD and Performance
+portaudio-rs = "0.3"
+simd = "0.2"
+wide = "0.7"
+
+# Concurrency and Lock-Free
+crossbeam-channel = "0.5"
+crossbeam-queue = "0.3"
+lockfree = "0.5"
+
+# Serialization for C++ bindings
+serde = { version = "1.0", features = ["derive"] }
+serde_json = "1.0"
+
+# Error handling
+thiserror = "1.0"
+anyhow = "1.0"
+
+# Math and DSP
+nalgebra = "0.32"
+num-traits = "0.2"
+num-complex = "0.4"
+
+# Logging
+log = "0.4"
+env_logger = "0.10"
+
+# C++ FFI
+libc = "0.2"
+
+[build-dependencies]
+cbindgen = "0.26"
+
+[features]
+default = ["simd"]
+simd = []
+juce-bindings = []
