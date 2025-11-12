@@ -1,0 +1,7 @@
+project_id = "wmknrjygiwznctcclabl"
+
+[functions.analyze-music-context]
+verify_jwt = false
+
+[functions.suggest-mixxtune-settings]
+verify_jwt = false
