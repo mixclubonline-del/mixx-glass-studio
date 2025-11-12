@@ -18,7 +18,7 @@ import { BloomHUD } from './components/BloomHUD/BloomHUD';
 import { useArrange, ArrangeClip, ClipId } from "./hooks/useArrange";
 import { ArrangeWindow } from "./components/ArrangeWindow";
 import ImportModal from './components/ImportModal';
-import Mixer from './components/mixer/Mixer';
+import FlowConsole from './components/mixer/Mixer';
 import PrimeBrainInterface from './components/PrimeBrainInterface';
 import { getMixxFXEngine, initializeMixxFXEngine } from './audio/MixxFXEngine';
 import { buildMasterChain } from './audio/masterChain';
@@ -30,7 +30,28 @@ import PluginBrowser from './components/PluginBrowser';
 import { IAudioEngine } from './types/audio-graph';
 import { getHushSystem } from './audio/HushSystem';
 import AIHub from './components/AIHub/AIHub'; // Import AIHub
+import { TRACK_COLOR_SWATCH } from './utils/ALS';
+import StemSeparationIntegration from './audio/StemSeparationIntegration';
+import StemSeparationModal from './components/modals/StemSeparationModal';
 
+
+const DEFAULT_STEM_SELECTION = ['Vocals', 'Drums', 'Bass', 'Other Instruments'] as const;
+const DEFAULT_CANONICAL_STEMS = ['vocals', 'drums', 'bass', 'other'] as const;
+
+const STEM_NAME_TO_CANONICAL: Record<string, string> = {
+  vocals: 'vocals',
+  'lead vocals': 'vocals',
+  'backing vocals': 'vocals',
+  drums: 'drums',
+  bass: 'bass',
+  guitar: 'guitar',
+  piano: 'piano',
+  synths: 'other',
+  strings: 'other',
+  'other instruments': 'other',
+  'sound fx': 'other',
+  other: 'other',
+};
 
 export interface TrackData {
   id: string;
@@ -68,6 +89,12 @@ export interface MixerSettings {
 export interface TrackAnalysisData {
     level: number;
     transient: boolean;
+    rms?: number;
+    peak?: number;
+    crestFactor?: number;
+    spectralTilt?: number;
+    automationActive?: boolean;
+    automationTargets?: string[];
 }
 interface MasterNodes {
   input: BiquadFilterNode;
@@ -103,14 +130,87 @@ export type FxWindowConfig = Omit<PluginConfig, 'engineInstance'> & {
     params: any;
     onChange: (param: string, value: any) => void;
     engineInstance: IAudioEngine;
+    color?: string;
 };
 
 export type FxWindowId = PluginId;
 
 
+type TrackGroup = TrackData['group'];
+type TrackColorKey = TrackData['trackColor'];
+
+const GROUP_COLOR_DEFAULTS: Record<TrackGroup, TrackColorKey> = {
+  Vocals: 'magenta',
+  Harmony: 'purple',
+  Adlibs: 'purple',
+  Bass: 'green',
+  Drums: 'blue',
+  Instruments: 'cyan',
+};
+
+const GROUP_WAVEFORM_DEFAULTS: Record<TrackGroup, TrackData['waveformType']> = {
+  Vocals: 'varied',
+  Harmony: 'varied',
+  Adlibs: 'varied',
+  Bass: 'bass',
+  Drums: 'dense',
+  Instruments: 'varied',
+};
+
+interface ImportProfileKeyword {
+  keywords: string[];
+  group: TrackGroup;
+  color?: TrackColorKey;
+  label: string;
+}
+
+const IMPORT_KEYWORD_PROFILES: ImportProfileKeyword[] = [
+  { keywords: ['vocal', 'vox', 'lead', 'singer'], group: 'Vocals', color: 'magenta', label: 'VOCALS' },
+  { keywords: ['bgv', 'harm', 'choir', 'stack'], group: 'Harmony', color: 'purple', label: 'HARMONY' },
+  { keywords: ['adlib', 'ad-lib', 'fx', 'shout'], group: 'Adlibs', color: 'purple', label: 'ADLIBS' },
+  { keywords: ['drum', 'kick', 'snare', 'hat', 'percussion'], group: 'Drums', color: 'blue', label: 'DRUMS' },
+  { keywords: ['bass', '808', 'sub'], group: 'Bass', color: 'green', label: 'BASS' },
+  { keywords: ['gtr', 'guitar', 'keys', 'piano', 'synth', 'pad', 'string'], group: 'Instruments', color: 'cyan', label: 'INSTRUMENT' },
+];
+
+const stripFileExtension = (name: string) => name.replace(/\.[^/.]+$/, '');
+
+const deriveTrackImportProfile = (
+  fileName: string,
+  existingTracks: TrackData[]
+): {
+  group: TrackGroup;
+  color: TrackColorKey;
+  trackName: string;
+  waveformType: TrackData['waveformType'];
+} => {
+  const baseName = stripFileExtension(fileName).trim();
+  const normalized = baseName.toLowerCase();
+
+  const matchedProfile = IMPORT_KEYWORD_PROFILES.find((profile) =>
+    profile.keywords.some((keyword) => normalized.includes(keyword))
+  );
+
+  const group = matchedProfile?.group ?? 'Instruments';
+  const color = matchedProfile?.color ?? GROUP_COLOR_DEFAULTS[group];
+  const waveformType = GROUP_WAVEFORM_DEFAULTS[group];
+
+  const sameGroupCount = existingTracks.filter((track) => track.group === group).length;
+  const label = matchedProfile?.label ?? baseName.toUpperCase();
+  const suffix = sameGroupCount > 0 ? ` ${sameGroupCount + 1}` : '';
+  const trackName = `${label}${suffix}`;
+
+  return { group, color, trackName, waveformType };
+};
+
 const App: React.FC = () => {
   // --- STATE MANAGEMENT ---
   const [tracks, setTracks] = useState<TrackData[]>([{ id: 'track-1', trackName: 'AUDIO 1', trackColor: 'cyan', waveformType: 'varied', group: 'Vocals' }]);
+  const stemIntegrationRef = useRef<StemSeparationIntegration | null>(null);
+  const tracksRef = useRef<TrackData[]>(tracks);
+  const [isStemModalOpen, setIsStemModalOpen] = useState(false);
+  const [pendingStemRequest, setPendingStemRequest] = useState<{ buffer: AudioBuffer; fileName: string; originalTrackId: string } | null>(null);
+  const [lastStemSelection, setLastStemSelection] = useState<string[]>([...DEFAULT_STEM_SELECTION]);
   const [audioBuffers, setAudioBuffers] = useState<Record<string, AudioBuffer>>({});
   const [isPlaying, setIsPlaying] = useState(false);
   const [currentTime, setCurrentTime] = useState(0);
@@ -118,6 +218,10 @@ const App: React.FC = () => {
   const [bpm, setBpm] = useState(120);
   const audioContextRef = useRef<AudioContext | null>(null);
   const trackNodesRef = useRef<{ [key: string]: AudioNodes }>({});
+  useEffect(() => {
+    tracksRef.current = tracks;
+  }, [tracks]);
+
   const fxNodesRef = useRef<{[key: string]: FxNode}>({}); // This will manage instances of ALL plugins
   const masterNodesRef = useRef<MasterNodes | null>(null);
   const animationFrameRef = useRef<number | null>(null);
@@ -321,131 +425,244 @@ const App: React.FC = () => {
   
   const handleRewind = () => handleSeek(Math.max(0, currentTime - 5));
   const handleFastForward = () => handleSeek(Math.min(projectDuration, currentTime + 5));
-  const handleToggleLoop = () => setIsLooping(!isLooping);
 
-  const startBackgroundStemSeparation = (originalTrackId: string, buffer: AudioBuffer, bufferId: string, fileName: string) => {
-      setTimeout(() => {
-        const stemsToCreate = ['Vocals', 'Drums', 'Bass', 'Other'];
-        const newTracks: TrackData[] = [];
-        const newClips: ArrangeClip[] = [];
-        const newSettings: { [key: string]: MixerSettings } = {};
-        const trackColors: TrackData['trackColor'][] = ['magenta', 'blue', 'green', 'purple'];
+  const deriveAllowedStemKeys = useCallback((selection: string[]) => {
+    const normalized = new Set<string>();
+    selection.forEach((label) => {
+      const canonical = STEM_NAME_TO_CANONICAL[label.toLowerCase()] ?? null;
+      if (canonical) {
+        normalized.add(canonical);
+      }
+    });
+    if (!normalized.size) {
+      DEFAULT_CANONICAL_STEMS.forEach((stem) => normalized.add(stem));
+    }
+    return Array.from(normalized);
+  }, []);
 
-        stemsToCreate.forEach((stemName, index) => {
-            const newTrackId = `track-stem-${Date.now()}-${stemName.toLowerCase().replace(/\s/g, '-')}`;
-            const color = trackColors[index % trackColors.length];
-            const newTrack: TrackData = {
-                id: newTrackId,
-                trackName: `${fileName} - ${stemName.toUpperCase()}`,
-                trackColor: color,
-                waveformType: 'varied',
-                group: 'Instruments',
-            };
-            newTracks.push(newTrack);
+  const executeStemSeparation = useCallback(
+    async (request: { buffer: AudioBuffer; fileName: string; originalTrackId: string }, allowedStemKeys: string[]) => {
+      const integration = stemIntegrationRef.current;
+      if (!integration) {
+        console.warn('[STEMS] Integration not ready, skipping stem separation.');
+        setImportMessage(null);
+        setTracks((prev) =>
+          prev.map((track) =>
+            track.id === request.originalTrackId ? { ...track, isProcessing: false } : track
+          )
+        );
+        return;
+      }
 
-            const newClip: ArrangeClip = {
-                id: `clip-stem-${Date.now()}-${stemName.toLowerCase().replace(/\s/g, '-')}`,
-                trackId: newTrackId,
-                name: stemName.toUpperCase(),
-                color: color === 'cyan' ? '#06b6d4' : color === 'magenta' ? '#d946ef' : color === 'blue' ? '#3b82f6' : color === 'green' ? '#22c55e' : color === 'purple' ? '#8b5cf6' : '#8b5cf6',
-                start: 0,
-                duration: buffer.duration,
-                originalDuration: buffer.duration,
-                timeStretchRate: 1.0,
-                sourceStart: 0,
-                // FIX: Corrected variable name from `newBufferId` to `bufferId`
-                bufferId: bufferId
-            };
-            newClips.push(newClip);
-            newSettings[newTrackId] = { volume: 0.75, pan: 0, isMuted: false };
-        });
+      const canonicalAllowed = allowedStemKeys.length ? allowedStemKeys : Array.from(DEFAULT_CANONICAL_STEMS);
+      try {
+        const originalIndex = tracksRef.current.findIndex((track) => track.id === request.originalTrackId);
+        setImportMessage('Prime Brain is analyzing stems...');
+        const separationResult = await integration.importAudioWithStemSeparation(
+          request.buffer,
+          request.fileName,
+          Math.max(0, originalIndex) + 1,
+          0,
+          true,
+          canonicalAllowed
+        );
 
-        // Update the original track to no longer be processing
-        setTracks(prev => {
-            const originalTrackIndex = prev.findIndex(t => t.id === originalTrackId);
-            if (originalTrackIndex === -1) return prev; 
-            
-            const updatedTracks = [...prev];
-            updatedTracks[originalTrackIndex] = { ...updatedTracks[originalTrackIndex], isProcessing: false };
-            updatedTracks.splice(originalTrackIndex + 1, 0, ...newTracks); // Insert stems below original
-            return updatedTracks;
-        });
+        if (!separationResult.success) {
+          setTracks((prev) =>
+            prev.map((track) =>
+              track.id === request.originalTrackId ? { ...track, isProcessing: false } : track
+            )
+          );
+          return;
+        }
 
-        // Mute original track and add settings for new stems
-        setMixerSettings(prev => ({
-            ...prev,
-            [originalTrackId]: { ...prev[originalTrackId], isMuted: true },
-            ...newSettings,
+        setAudioBuffers((prev) => ({
+          ...prev,
+          ...separationResult.newBuffers,
         }));
 
-        setClips(prev => [...prev, ...newClips]);
-        
-        console.log(`%c[INTELLIGENT INGESTION] Background processing complete. Created ${newTracks.length} stem tracks.`, "color: #06b6d4; font-weight: bold;");
-        setImportMessage(null);
-      }, 3500); // 3.5 second simulation
-  };
+        setTracks((prev) => {
+          const index = prev.findIndex((track) => track.id === request.originalTrackId);
+          if (index === -1) return prev;
+          const updated = [...prev];
+          updated[index] = { ...updated[index], isProcessing: false };
+          updated.splice(index + 1, 0, ...separationResult.newTracks);
+          tracksRef.current = updated;
+          return updated;
+        });
+
+        setMixerSettings((prev) => {
+          const next = { ...prev, ...separationResult.mixerSettings };
+          next[request.originalTrackId] = {
+            ...(next[request.originalTrackId] ?? { volume: 0.75, pan: 0, isMuted: false }),
+            isMuted: true,
+          };
+          return next;
+        });
+
+        setInserts((prev) => {
+          const updated = { ...prev };
+          separationResult.newTracks.forEach((track) => {
+            if (!updated[track.id]) {
+              updated[track.id] = [];
+            }
+          });
+          return updated;
+        });
+
+        setClips((prev) => [...prev, ...separationResult.newClips]);
+
+        console.log(`[STEMS] Created ${separationResult.newTracks.length} stem tracks from ${request.fileName}.`);
+        setTimeout(() => setImportMessage(null), 1200);
+      } catch (error) {
+        console.error('[STEMS] separation error:', error);
+        setTracks((prev) =>
+          prev.map((track) =>
+            track.id === request.originalTrackId ? { ...track, isProcessing: false } : track
+          )
+        );
+        setImportMessage('Stem separation failed');
+        setTimeout(() => setImportMessage(null), 3000);
+      }
+    },
+    [setAudioBuffers, setClips, setImportMessage, setInserts, setMixerSettings, setTracks]
+  );
+
+  const handleStemModalConfirm = useCallback(
+    (selection: string[]) => {
+      setIsStemModalOpen(false);
+      const request = pendingStemRequest;
+      setPendingStemRequest(null);
+      if (!request) {
+        return;
+      }
+      setLastStemSelection(selection);
+      const allowedKeys = deriveAllowedStemKeys(selection);
+      void executeStemSeparation(request, allowedKeys);
+    },
+    [deriveAllowedStemKeys, executeStemSeparation, pendingStemRequest]
+  );
+
+  const handleStemModalCancel = useCallback(() => {
+    setIsStemModalOpen(false);
+    const request = pendingStemRequest;
+    if (!request) {
+      return;
+    }
+    setPendingStemRequest(null);
+    setImportMessage(null);
+    setTracks((prev) =>
+      prev.map((track) =>
+        track.id === request.originalTrackId ? { ...track, isProcessing: false } : track
+      )
+    );
+  }, [pendingStemRequest, setImportMessage, setTracks]);
+
+  const handleToggleLoop = () => setIsLooping(!isLooping);
+
+  const startBackgroundStemSeparation = useCallback(
+    (originalTrackId: string, buffer: AudioBuffer, fileName: string) => {
+      setPendingStemRequest({ buffer, fileName, originalTrackId });
+      setIsStemModalOpen(true);
+      setImportMessage(null);
+    },
+    []
+  );
 
 
-  const handleFileImport = async (buffer: AudioBuffer, fileName: string) => {
-      if (!audioContextRef.current) return;
-      
-      setImportMessage('Applying Velvet Sonics...');
+  const handleFileImport = async (
+    buffer: AudioBuffer,
+    fileName: string,
+    options: { resetSession?: boolean } = {}
+  ) => {
+    if (!audioContextRef.current) return;
+    const { resetSession = false } = options;
 
-      const velvetProcessor = new VelvetProcessor(audioContextRef.current);
-      const processedBuffer = await velvetProcessor.processAudioBuffer(buffer, {
-          profile: { // Direct definition of a MasteringProfile for 'streaming'
-            name: 'Streaming Standard',
-            targetLUFS: -14,
-            velvetFloor: { depth: 70, translation: 'deep', warmth: 60 },
-            harmonicLattice: { character: 'warm', presence: 75, airiness: 70 },
-            phaseWeave: { width: 80, monoCompatibility: 90 }
-          }
-      });
-      
-      const newBufferId = `buffer-import-${Date.now()}`;
-      
-      console.log("%c[DAW CORE] New audio imported. Resetting project and starting intelligent ingestion.", "color: orange; font-weight: bold;");
-      
-      // Clear ALL existing state for a fresh project
+    const displayName = stripFileExtension(fileName);
+    setImportMessage(`Applying Velvet Sonics: ${displayName}`);
+
+    const velvetProcessor = new VelvetProcessor(audioContextRef.current);
+    const processedBuffer = await velvetProcessor.processAudioBuffer(buffer, {
+      profile: {
+        name: 'Streaming Standard',
+        targetLUFS: -14,
+        velvetFloor: { depth: 70, translation: 'deep', warmth: 60 },
+        harmonicLattice: { character: 'warm', presence: 75, airiness: 70 },
+        phaseWeave: { width: 80, monoCompatibility: 90 },
+      },
+    });
+
+    const timestamp = Date.now();
+    const newBufferId = `buffer-import-${timestamp}`;
+    const existingTracks = resetSession ? [] : tracksRef.current;
+    const profile = deriveTrackImportProfile(displayName, existingTracks);
+
+    if (resetSession) {
+      console.log(
+        '%c[DAW CORE] New audio batch detected. Resetting project and starting ingestion.',
+        'color: orange; font-weight: bold;'
+      );
       setAudioBuffers({ [newBufferId]: processedBuffer });
-      setTracks([]); // Clear tracks
-      setClips([]); // Clear clips
-      setMixerSettings({}); // Clear mixer settings
-      setInserts({}); // Clear inserts
-      setAutomationData({}); // Clear automation
-      setVisibleAutomationLanes({}); // Clear visible lanes
-      setFxBypassState({}); // Clear FX bypass state
+      setClips([]);
+      setMixerSettings({});
+      setInserts({});
+      setAutomationData({});
+      setVisibleAutomationLanes({});
+      setFxBypassState({});
+      setSoloedTracks(new Set<string>());
+      setArmedTracks(new Set<string>());
+    } else {
+      setAudioBuffers((prev) => ({ ...prev, [newBufferId]: processedBuffer }));
+    }
 
-      const newTrackId = `track-import-${Date.now()}`;
-      const newTrackColor = 'cyan' as TrackData['trackColor'];
-      const newTrack: TrackData = {
-          id: newTrackId,
-          trackName: fileName.toUpperCase(),
-          trackColor: newTrackColor,
-          waveformType: 'varied',
-          group: 'Instruments',
-          isProcessing: true, // Indicate background stem separation
-      };
-      const newClip: ArrangeClip = {
-          id: `clip-import-${Date.now()}`,
-          trackId: newTrackId,
-          name: 'FULL MIX',
-          color: '#06b6d4',
-          start: 0,
-          duration: processedBuffer.duration,
-          originalDuration: processedBuffer.duration,
-          timeStretchRate: 1.0,
-          sourceStart: 0,
-          bufferId: newBufferId
-      };
-      
-      setTracks([newTrack]);
+    const newTrackId = `track-import-${timestamp}`;
+    const newTrack: TrackData = {
+      id: newTrackId,
+      trackName: profile.trackName,
+      trackColor: profile.color,
+      waveformType: profile.waveformType,
+      group: profile.group,
+      isProcessing: true,
+    };
+
+    const newClip: ArrangeClip = {
+      id: `clip-import-${timestamp}`,
+      trackId: newTrackId,
+      name: 'FULL MIX',
+      color: TRACK_COLOR_SWATCH[profile.color].base,
+      start: 0,
+      duration: processedBuffer.duration,
+      originalDuration: processedBuffer.duration,
+      timeStretchRate: 1.0,
+      sourceStart: 0,
+      bufferId: newBufferId,
+    };
+
+    if (resetSession) {
+      const initialTracks = [newTrack];
+      setTracks(initialTracks);
+      tracksRef.current = initialTracks;
       setClips([newClip]);
       setMixerSettings({ [newTrackId]: { volume: 0.75, pan: 0, isMuted: false } });
-      setInserts({ [newTrackId]: [] }); // Initialize inserts for new track
-      
-      setImportMessage('Prime Brain is analyzing stems...');
-      startBackgroundStemSeparation(newTrackId, processedBuffer, newBufferId, fileName);
+      setInserts({ [newTrackId]: [] });
+    } else {
+      setTracks((prev) => {
+        const updated = [...prev, newTrack];
+        tracksRef.current = updated;
+        return updated;
+      });
+      setClips((prev) => [...prev, newClip]);
+      setMixerSettings((prev) => ({
+        ...prev,
+        [newTrackId]: { volume: 0.75, pan: 0, isMuted: false },
+      }));
+      setInserts((prev) => ({ ...prev, [newTrackId]: [] }));
+    }
+
+    setSelectedTrackId(newTrackId);
+
+    setImportMessage('Prime Brain is analyzing stems...');
+    void startBackgroundStemSeparation(newTrackId, processedBuffer, displayName);
   };
   
   const handleSaveProject = async () => {
@@ -522,49 +739,84 @@ const App: React.FC = () => {
   };
 
   const handleFileLoad = async (event: React.ChangeEvent<HTMLInputElement>) => {
-      const file = event.target.files?.[0];
-      if (!file || !audioContextRef.current) return;
-      
-      setImportMessage(fileInputContext === 'import' ? 'Decoding Audio...' : 'Loading Project...');
-      try {
-          if (fileInputContext === 'import') {
-              const arrayBuffer = await file.arrayBuffer();
-              const decodedBuffer = await audioContextRef.current.decodeAudioData(arrayBuffer);
-              const fileName = file.name.replace(/\.[^/.]+$/, "");
-              handleFileImport(decodedBuffer, fileName);
-              setImportMessage(null); // Clear message on successful import
-          } else if (fileInputContext === 'load') {
-              if (!file.name.toLowerCase().endsWith('.json')) {
-                  throw new Error("Invalid file type: Please select a .json project file.");
-              }
-              const fileContent = await file.text();
-              const projectState = JSON.parse(fileContent);
-              handleProjectLoad(projectState);
-              setImportMessage(null); // Clear message on successful load
+    const files = event.target.files;
+    if (!files || files.length === 0 || !audioContextRef.current) return;
+
+    try {
+      if (fileInputContext === 'import') {
+        const fileArray = Array.from(files);
+        const total = fileArray.length;
+        const audioPattern = /\.(wav|aiff|aif|mp3|flac|ogg|m4a|aac)$/i;
+        let shouldReset = true;
+        let processedCount = 0;
+
+        for (let index = 0; index < fileArray.length; index += 1) {
+          const file = fileArray[index];
+          const isAudioFile = file.type.startsWith('audio') || audioPattern.test(file.name);
+          if (!isAudioFile) {
+            console.warn(`[INGESTION] Skipping non-audio file: ${file.name}`);
+            continue;
           }
-      } catch (error) {
-          console.error("Error handling file:", error);
-          let errorMessage = 'Error processing file.';
-          if (error instanceof Error) {
-              errorMessage = error.message;
-          } else if (typeof error === 'string') {
-              errorMessage = error;
+
+          const displayName = stripFileExtension(file.name);
+          setImportMessage(`Decoding ${displayName} (${index + 1}/${total})...`);
+
+          try {
+            const arrayBuffer = await file.arrayBuffer();
+            const decodedBuffer = await audioContextRef.current.decodeAudioData(arrayBuffer);
+            await handleFileImport(decodedBuffer, displayName, { resetSession: shouldReset });
+            shouldReset = false;
+            processedCount += 1;
+          } catch (fileError) {
+            console.error(`[INGESTION] Failed to import ${file.name}`, fileError);
+            setImportMessage(`Failed to import ${displayName}`);
+            setTimeout(() => setImportMessage(null), 4000);
           }
-          setImportMessage(errorMessage);
+        }
+
+        if (processedCount === 0) {
+          setImportMessage('No audio files were imported.');
           setTimeout(() => setImportMessage(null), 3000);
-      } finally {
-          if (event.target) event.target.value = '';
+        }
+      } else if (fileInputContext === 'load') {
+        const file = files[0];
+        if (!file.name.toLowerCase().endsWith('.json')) {
+          throw new Error('Invalid file type: Please select a .json project file.');
+        }
+        setImportMessage('Loading Project...');
+        const fileContent = await file.text();
+        const projectState = JSON.parse(fileContent);
+        handleProjectLoad(projectState);
+        setImportMessage(null);
       }
+    } catch (error) {
+      console.error('Error handling file:', error);
+      let errorMessage = 'Error processing file.';
+      if (error instanceof Error) {
+        errorMessage = error.message;
+      } else if (typeof error === 'string') {
+        errorMessage = error;
+      }
+      setImportMessage(errorMessage);
+      setTimeout(() => setImportMessage(null), 3000);
+    } finally {
+      if (event.target) event.target.value = '';
+    }
   };
 
   const handlePlayPause = useCallback(() => {
-    setIsPlaying(prevIsPlaying => {
+    setIsPlaying((prevIsPlaying) => {
       const newIsPlaying = !prevIsPlaying;
-      if (audioContextRef.current) {
+      const ctx = audioContextRef.current;
+      if (ctx && (ctx.state as string) !== 'closed') {
         if (newIsPlaying) {
-          audioContextRef.current.resume();
+          ctx.resume().catch((error) => {
+            console.warn('[AUDIO] Failed to resume context:', error);
+          });
         } else {
-          audioContextRef.current.suspend();
+          ctx.suspend().catch((error) => {
+            console.warn('[AUDIO] Failed to suspend context:', error);
+          });
         }
       }
       return newIsPlaying;
@@ -1041,6 +1293,14 @@ const App: React.FC = () => {
           initialPluginRegistry.forEach(plugin => (initialState[plugin.id] = false));
           return initialState;
         });
+        if (!stemIntegrationRef.current) {
+          const integration = new StemSeparationIntegration(createdCtx);
+          integration.onProgress((message, percent) => {
+            const suffix = typeof percent === 'number' ? ` (${Math.round(percent)}%)` : '';
+            setImportMessage(`${message}${suffix}`);
+          });
+          stemIntegrationRef.current = integration;
+        }
     };
     setupAudio();
 
@@ -1377,8 +1637,11 @@ const App: React.FC = () => {
             cancelAnimationFrame(animationFrameRef.current);
             animationFrameRef.current = null;
         }
-        if (audioContextRef.current) {
-            audioContextRef.current.suspend(); // Suspend context when stopped
+        const ctx = audioContextRef.current;
+        if (ctx && (ctx.state as string) !== 'closed') {
+            ctx.suspend().catch((error) => {
+                console.warn('[AUDIO] Failed to suspend context:', error);
+            });
         }
     }, []);
 
@@ -1474,8 +1737,6 @@ const App: React.FC = () => {
     useEffect(() => { mixerSettingsRef.current = mixerSettings; }, [mixerSettings]);
     const automationDataRef = useRef(automationData);
     useEffect(() => { automationDataRef.current = automationData; }, [automationData]);
-    const tracksRef = useRef(tracks);
-    useEffect(() => { tracksRef.current = tracks; }, [tracks]);
     const insertsRef = useRef(inserts);
     useEffect(() => { insertsRef.current = inserts; }, [inserts]);
 
@@ -1505,7 +1766,7 @@ const App: React.FC = () => {
 
     useEffect(() => {
         const ctx = audioContextRef.current;
-        if (!ctx || (isPlaying && armedTracks.size > 0)) return; // Analysis loop is controlled by recording state if armed
+        if (!ctx || ctx.state === 'closed' || (isPlaying && armedTracks.size > 0)) return; // Analysis loop is controlled by recording state if armed
 
         const analysisLoop = () => {
             if (!isPlayingRef.current) {
@@ -1606,17 +1867,29 @@ const App: React.FC = () => {
             lastUpdateTimeRef.current = ctx.currentTime;
             scheduleClips(currentTime); // Schedule clips at current time
             if (!animationFrameRef.current) {
-              ctx.resume(); // Ensure context is running when play starts
+              if (ctx.state === 'suspended') {
+                ctx.resume().catch((error) => {
+                  console.warn('[AUDIO] Failed to resume context:', error);
+                });
+              }
               animationFrameRef.current = requestAnimationFrame(analysisLoop);
             }
         } else {
             stopPlayback();
-            ctx.suspend(); // Suspend context when stopped to save resources
+            if ((ctx.state as string) !== 'closed') {
+              ctx.suspend().catch((error) => {
+                console.warn('[AUDIO] Failed to suspend context:', error);
+              });
+            }
         }
 
         return () => {
             stopPlayback();
-            ctx.suspend();
+            if ((ctx.state as string) !== 'closed') {
+              ctx.suspend().catch((error) => {
+                console.warn('[AUDIO] Failed to suspend context:', error);
+              });
+            }
         };
     }, [isPlaying, scheduleClips, stopPlayback, getAutomationValue, armedTracks]);
 
@@ -1769,7 +2042,7 @@ const App: React.FC = () => {
                 />
             </div>
              <div className={`absolute inset-0 w-full h-full transition-all duration-700 ease-in-out ${viewMode === 'mixer' ? 'opacity-100 transform-none' : 'opacity-0 transform scale-110 translate-z-50'}`}>
-                <Mixer 
+                <FlowConsole 
                     tracks={tracks}
                     mixerSettings={mixerSettings}
                     trackAnalysis={trackAnalysis}
@@ -1837,6 +2110,13 @@ const App: React.FC = () => {
                 onAddTrack={handleAddTrack}
             />
         )}
+        {isStemModalOpen && pendingStemRequest && (
+            <StemSeparationModal
+                initialSelection={lastStemSelection}
+                onClose={handleStemModalCancel}
+                onSeparate={handleStemModalConfirm}
+            />
+        )}
         {importMessage && <ImportModal message={importMessage} />}
         {contextMenu && (
             <TrackContextMenu
@@ -1879,7 +2159,7 @@ const App: React.FC = () => {
             inserts={inserts}
           />
         )}
-        <input type="file" ref={fileInputRef} className="hidden" onChange={handleFileLoad} accept=".json,audio/*"/>
+        <input type="file" ref={fileInputRef} className="hidden" onChange={handleFileLoad} accept=".json,audio/*" multiple />
 
         {isAIHubOpen && (
             <AIHub
