@@ -9,6 +9,7 @@
 
 import React, { memo } from "react";
 import { motion } from "framer-motion";
+import type { MixerBusId } from "../../App";
 import { hexToRgba } from "../../utils/ALS";
 import {
   MIXER_STRIP_WIDTH,
@@ -18,7 +19,7 @@ import {
 } from "./mixerConstants";
 
 export interface FlowBusStripProps {
-  busId: string;
+  busId: MixerBusId;
   name: string;
   members: string[];
   alsIntensity: number;
@@ -27,7 +28,7 @@ export interface FlowBusStripProps {
   alsGlow: string;
   alsHaloColor?: string;
   alsGlowStrength?: number;
-  onSelectBus?: (busId: string) => void;
+  onSelectBus?: (busId: MixerBusId) => void;
   isActive?: boolean;
 }
 
@@ -56,8 +57,8 @@ const FlowBusStrip: React.FC<FlowBusStripProps> = memo(
 
     return (
       <motion.div
-        className={`flex flex-col items-center bg-gradient-to-b from-white/8 via-white/0 to-white/8 border border-white/12 rounded-xl backdrop-blur-xl shadow-[0_4px_18px_rgba(15,15,25,0.35)] overflow-hidden cursor-pointer transition-all ${
-          isActive ? "border-white/25 shadow-[0_0_28px_rgba(232,121,249,0.4)]" : ""
+        className={`flex flex-col items-center bg-glass-surface border border-glass-border rounded-xl backdrop-blur-2xl shadow-[0_18px_60px_rgba(4,12,26,0.48)] overflow-hidden cursor-pointer transition-all text-ink ${
+          isActive ? "border-cyan-300/70 shadow-[0_0_34px_rgba(56,189,248,0.45)]" : ""
         }`}
         style={stripWidth}
         onClick={() => onSelectBus?.(busId)}
@@ -65,13 +66,13 @@ const FlowBusStrip: React.FC<FlowBusStripProps> = memo(
         animate={{ opacity: 1, scale: isActive ? 1.03 : 1 }}
         transition={{ duration: 0.25, ease: "easeOut" }}
       >
-        <div className="w-full px-2 pt-2 text-[0.55rem] uppercase tracking-[0.35em] text-white/80 flex items-center justify-between">
+        <div className="w-full px-2 pt-2 text-[0.55rem] uppercase tracking-[0.35em] text-ink flex items-center justify-between">
           <span>{name}</span>
-          <span className="text-white/40">{members.length}</span>
+          <span className="text-ink/50">{members.length}</span>
         </div>
 
         <motion.div
-          className="w-10 h-10 rounded-full border border-white/15 flex items-center justify-center text-[0.5rem] uppercase tracking-[0.3em] text-white/70 mt-2"
+          className="w-10 h-10 rounded-full border border-glass-border flex items-center justify-center text-[0.5rem] uppercase tracking-[0.3em] text-ink mt-2"
           style={{
             boxShadow: `0 0 20px ${hexToRgba(glowSource, glowAlpha)}`,
             background: `radial-gradient(circle, ${hexToRgba(
@@ -86,7 +87,7 @@ const FlowBusStrip: React.FC<FlowBusStripProps> = memo(
         </motion.div>
 
         <div className="flex-1 w-full px-2 pt-3 flex flex-col justify-between gap-2">
-          <div className="h-1 rounded-full bg-black/30 overflow-hidden relative">
+          <div className="h-1 rounded-full bg-[rgba(9,18,36,0.6)] overflow-hidden relative">
             <motion.div
               className="absolute inset-y-0 left-0 rounded-full"
               style={{
@@ -109,7 +110,7 @@ const FlowBusStrip: React.FC<FlowBusStripProps> = memo(
             {members.slice(0, 4).map((memberId) => (
               <motion.span
                 key={memberId}
-                className="w-full h-5 rounded-md border border-white/15 bg-white/5 text-[0.45rem] uppercase tracking-[0.25em] text-white/60 flex items-center justify-center"
+                className="w-full h-5 rounded-md border border-glass-border bg-[rgba(6,14,28,0.78)] text-[0.45rem] uppercase tracking-[0.25em] text-ink flex items-center justify-center"
                 animate={{
                   opacity: [0.5, 1, 0.5],
                 }}
@@ -123,7 +124,7 @@ const FlowBusStrip: React.FC<FlowBusStripProps> = memo(
               </motion.span>
             ))}
             {members.length > 4 && (
-              <span className="w-full h-5 rounded-md border border-white/15 bg-white/10 text-[0.45rem] uppercase tracking-[0.25em] text-white/60 flex items-center justify-center">
+              <span className="w-full h-5 rounded-md border border-glass-border bg-[rgba(6,14,28,0.78)] text-[0.45rem] uppercase tracking-[0.25em] text-ink/70 flex items-center justify-center">
                 +{members.length - 4}
               </span>
             )}
@@ -131,7 +132,7 @@ const FlowBusStrip: React.FC<FlowBusStripProps> = memo(
         </div>
 
         <div className="w-full px-2 pb-3">
-          <div className="h-1 rounded-full bg-black/30 overflow-hidden relative">
+          <div className="h-1 rounded-full bg-[rgba(9,18,36,0.6)] overflow-hidden relative">
             <motion.div
               className="absolute inset-y-0 left-0 rounded-full"
               style={{
@@ -159,7 +160,7 @@ const FlowBusStrip: React.FC<FlowBusStripProps> = memo(
               />
             ))}
             {members.length > 4 && (
-              <span className="text-[0.45rem] uppercase tracking-[0.3em] text-white/40">
+              <span className="text-[0.45rem] uppercase tracking-[0.3em] text-ink/55">
                 +{members.length - 4}
               </span>
             )}

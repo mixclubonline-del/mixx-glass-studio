@@ -25,6 +25,18 @@ const config: Config = {
         ring: "hsl(var(--ring))",
         background: "hsl(var(--background))",
         foreground: "hsl(var(--foreground))",
+        ink: {
+          DEFAULT: "#e6f0ff",
+          soft: "#c7d9ff",
+          muted: "#94aed7",
+          inverted: "#091326",
+        },
+        glass: {
+          surface: "rgba(9,18,36,0.82)",
+          soft: "rgba(12,24,46,0.68)",
+          border: "rgba(102,140,198,0.45)",
+          mist: "rgba(87,124,189,0.22)",
+        },
         primary: {
           DEFAULT: "hsl(var(--primary))",
           foreground: "hsl(var(--primary-foreground))",

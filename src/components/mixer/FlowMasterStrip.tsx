@@ -45,7 +45,7 @@ const FlowMasterStrip: React.FC<FlowMasterStripProps> = ({
 
   return (
     <motion.div
-      className="relative flex flex-col bg-gradient-to-b from-white/10 via-white/0 to-white/10 border border-white/18 rounded-2xl backdrop-blur-2xl shadow-[0_6px_24px_rgba(15,15,25,0.45)] overflow-hidden"
+      className="relative flex flex-col bg-glass-surface border border-glass-border rounded-2xl backdrop-blur-2xl shadow-[0_28px_80px_rgba(4,12,26,0.55)] overflow-hidden text-ink"
       style={{
         height: `${stageHeight}px`,
         width: `${MIXER_STRIP_WIDTH}px`,
@@ -56,7 +56,7 @@ const FlowMasterStrip: React.FC<FlowMasterStripProps> = ({
       animate={{ opacity: 1, scale: 1 }}
       transition={{ duration: 0.35, ease: 'easeOut' }}
     >
-      <div className="relative flex-shrink-0 h-18 border-b border-white/12">
+      <div className="relative flex-shrink-0 h-18 border-b border-glass-border/70">
         <motion.div
           className="absolute inset-0"
           style={{
@@ -71,8 +71,8 @@ const FlowMasterStrip: React.FC<FlowMasterStripProps> = ({
 
         <div className="relative z-10 px-3 pt-3 flex flex-col gap-1">
           <div className="flex items-center justify-between">
-            <span className="text-[0.55rem] uppercase tracking-[0.35em] text-white/85">Master</span>
-            <span className="text-[0.45rem] uppercase tracking-[0.4em] text-white/45">Flow</span>
+            <span className="text-[0.55rem] uppercase tracking-[0.35em] text-ink">Master</span>
+            <span className="text-[0.45rem] uppercase tracking-[0.4em] text-ink/60">Flow</span>
           </div>
           <div className="flex items-center gap-2">
             {[
@@ -83,7 +83,7 @@ const FlowMasterStrip: React.FC<FlowMasterStripProps> = ({
             ].map((label) => (
               <motion.span
                 key={label}
-                className="px-2 py-1 rounded-full border border-white/15 text-[0.45rem] uppercase tracking-[0.3em] text-white/60"
+                className="px-2 py-1 rounded-full border border-glass-border text-[0.45rem] uppercase tracking-[0.3em] text-ink/70 bg-[rgba(14,32,62,0.65)]"
                 animate={{ opacity: [0.6, 1, 0.6] }}
                 transition={{ duration: 2.4, repeat: Infinity, ease: 'easeInOut' }}
               >
@@ -121,9 +121,9 @@ const FlowMasterStrip: React.FC<FlowMasterStripProps> = ({
             value={balance}
             onChange={onBalanceChange}
             label="Balance"
-            colorClass="bg-white/30 border-white/40"
+            colorClass="bg-[rgba(16,50,95,0.6)] border-cyan-300/50"
           />
-          <div className="h-1 bg-black/35 rounded-full overflow-hidden relative">
+          <div className="h-1 bg-[rgba(9,18,36,0.6)] rounded-full overflow-hidden relative">
             <motion.div
               className="absolute inset-y-0 left-0 rounded-full"
               style={{

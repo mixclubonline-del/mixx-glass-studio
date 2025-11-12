@@ -1,5 +1,3 @@
-
-
 import React, { useState, useRef, createRef, useCallback, useEffect, useMemo } from 'react';
 import FXWindow from './components/FXWindow';
 import FXRack from './components/FXRack';
@@ -14,7 +12,10 @@ import { analyzeVelvetCurve, FourAnchors, MusicalContext, calculateVelvetScore, 
 import TrackContextMenu from './components/TrackContextMenu';
 import RenameTrackModal from './components/RenameTrackModal';
 import ChangeColorModal from './components/ChangeColorModal';
-import { BloomHUD } from './components/BloomHUD/BloomHUD';
+import { BloomDock } from './components/BloomHUD/BloomDock';
+import { BloomFloatingHub, BloomFloatingMenu } from './components/BloomHUD/BloomFloatingHub';
+import type { BloomFloatingMenuItem } from './components/BloomHUD/BloomFloatingHub';
+import { SaveIcon, LoadIcon, SparklesIcon, SquaresPlusIcon, MixerIcon, PlusCircleIcon, StarIcon, SplitIcon, MergeIcon, RefreshIcon, BrainIcon, AutomationIcon, ChatIcon, ImageIcon, MicrophoneIcon, LoopIcon, CopyIcon, BulbIcon } from './components/icons';
 import { useArrange, ArrangeClip, ClipId } from "./hooks/useArrange";
 import { ArrangeWindow } from "./components/ArrangeWindow";
 import ImportModal from './components/ImportModal';
@@ -30,9 +31,58 @@ import PluginBrowser from './components/PluginBrowser';
 import { IAudioEngine } from './types/audio-graph';
 import { getHushSystem } from './audio/HushSystem';
 import AIHub from './components/AIHub/AIHub'; // Import AIHub
-import { TRACK_COLOR_SWATCH } from './utils/ALS';
+import {
+  PrimeBrainSnapshotInputs,
+  PrimeBrainBloomEvent,
+  PrimeBrainCommandLog,
+  PrimeBrainGuidance,
+  PrimeBrainAIFlag,
+} from './ai/PrimeBrainSnapshot';
+import { usePrimeBrainExporter } from './ai/usePrimeBrainExporter';
+import {
+  TRACK_COLOR_SWATCH,
+  derivePulsePalette,
+  deriveTrackALSFeedback,
+  deriveBusALSColors,
+  deriveActionPulse,
+} from './utils/ALS';
+import type { PulsePalette, ALSActionPulse } from './utils/ALS';
+import {
+  loadPluginFavorites,
+  loadPluginPresets,
+  PluginPreset,
+  removePluginPreset,
+  savePluginFavorites,
+  savePluginPresets,
+  upsertPluginPreset,
+} from './utils/pluginState';
+import { appendHistoryNote } from './state/ingestHistory';
+import IngestQueueManager, {
+  IngestJobSnapshot,
+  IngestJobControls,
+  IngestRuntimeJob,
+  IngestJobOutcome,
+  PersistedIngestSnapshot,
+} from './ingest/IngestQueueManager';
 import StemSeparationIntegration from './audio/StemSeparationIntegration';
 import StemSeparationModal from './components/modals/StemSeparationModal';
+import TrackCapsule from './components/TrackCapsule';
+import PianoRollPanel from './components/piano/PianoRollPanel';
+import { ingestHistoryStore, IngestHistoryEntry } from './state/ingestHistory';
+import { publishAlsSignal, publishBloomSignal, publishIngestSignal } from './state/flowSignals';
+import {
+  TrackUIState,
+  TrackContextMode,
+  DEFAULT_TRACK_CONTEXT,
+  DEFAULT_TRACK_LANE_HEIGHT,
+  COLLAPSED_TRACK_LANE_HEIGHT,
+  MIN_TRACK_LANE_HEIGHT,
+  MAX_TRACK_LANE_HEIGHT,
+} from './types/tracks';
+import { BloomActionMeta } from './types/bloom';
+import type { MidiNote } from './types/midi';
+import type { TrapPattern, TrapScale, GrooveTemplate } from "./types/pianoRoll";
+import { usePianoRoll } from './hooks/usePianoRoll';
 
 
 const DEFAULT_STEM_SELECTION = ['Vocals', 'Drums', 'Bass', 'Other Instruments'] as const;
@@ -51,6 +101,203 @@ const STEM_NAME_TO_CANONICAL: Record<string, string> = {
   'other instruments': 'other',
   'sound fx': 'other',
   other: 'other',
+};
+
+const STEM_COLOR_BY_KEY: Record<string, TrackData['trackColor']> = {
+  vocals: 'magenta',
+  drums: 'blue',
+  bass: 'green',
+  guitar: 'purple',
+  piano: 'purple',
+  synths: 'cyan',
+  strings: 'cyan',
+  other: 'cyan',
+};
+
+const INSERT_COLOR_BY_PLUGIN: Record<string, TrackData['trackColor']> = {
+  'velvet-curve': 'magenta',
+  'harmonic-lattice': 'purple',
+  'mixx-verb': 'cyan',
+  'mixx-delay': 'blue',
+  'mixx-limiter': 'green',
+  'mixx-clip': 'magenta',
+  'mixx-fx': 'cyan',
+  'time-warp': 'purple',
+};
+const CURATED_INSERT_IDS: FxWindowId[] = [
+  'velvet-curve',
+  'harmonic-lattice',
+  'mixx-verb',
+  'mixx-delay',
+  'mixx-limiter',
+  'mixx-clip',
+  'mixx-fx',
+];
+const FALLBACK_PLUGIN_NAMES: Record<FxWindowId, string> = {
+  'velvet-curve': 'Velvet Curve',
+  'harmonic-lattice': 'Harmonic Lattice',
+  'mixx-verb': 'Mixx Verb',
+  'mixx-delay': 'Mixx Delay',
+  'mixx-limiter': 'Mixx Limiter',
+  'mixx-clip': 'Mixx Clip',
+  'mixx-fx': 'Mixx FX',
+  'time-warp': 'Time Warp',
+};
+
+const VIEWPORT_PADDING = 32;
+const DOCK_SIZE = { width: 420, height: 132 };
+const HUB_SIZE = { width: 220, height: 220 };
+const HUB_HORIZONTAL_GAP = 48;
+const HUB_VERTICAL_GAP = 24;
+const DOCK_STORAGE_KEY = 'mixxclub:bloom-dock:v2';
+const HUB_STORAGE_KEY = 'mixxclub:bloom-floating:v2';
+
+type Point = { x: number; y: number };
+type BloomContext =
+  | 'arrange'
+  | 'record'
+  | 'mix'
+  | 'master'
+  | 'ai'
+  | 'ingest'
+  | 'idle';
+
+const computeDockDefaultPosition = (): Point => {
+  if (typeof window === 'undefined') {
+    return { x: VIEWPORT_PADDING, y: 640 };
+  }
+  const maxAvailableX = window.innerWidth - DOCK_SIZE.width - VIEWPORT_PADDING;
+  const x =
+    maxAvailableX >= VIEWPORT_PADDING
+      ? VIEWPORT_PADDING
+      : Math.max(VIEWPORT_PADDING, maxAvailableX);
+  const y = Math.max(
+    VIEWPORT_PADDING,
+    window.innerHeight - DOCK_SIZE.height - VIEWPORT_PADDING
+  );
+  return { x, y };
+};
+
+const computeHubDefaultPosition = (dockPosition?: Point): Point => {
+  if (typeof window === 'undefined') {
+    const fallbackDock = dockPosition ?? { x: VIEWPORT_PADDING, y: 640 };
+    return {
+      x: fallbackDock.x + DOCK_SIZE.width + HUB_HORIZONTAL_GAP,
+      y: Math.max(
+        VIEWPORT_PADDING,
+        fallbackDock.y - HUB_SIZE.height + HUB_VERTICAL_GAP
+      ),
+    };
+  }
+  const baseDock = dockPosition ?? computeDockDefaultPosition();
+  const candidateX = baseDock.x + DOCK_SIZE.width + HUB_HORIZONTAL_GAP;
+  const maxX = window.innerWidth - HUB_SIZE.width - VIEWPORT_PADDING;
+  const x = Math.max(
+    VIEWPORT_PADDING,
+    Math.min(candidateX, maxX)
+  );
+
+  const dockBottom = Math.min(
+    window.innerHeight - VIEWPORT_PADDING,
+    baseDock.y + DOCK_SIZE.height
+  );
+  const candidateY = dockBottom - HUB_SIZE.height - HUB_VERTICAL_GAP;
+  const maxY = window.innerHeight - HUB_SIZE.height - VIEWPORT_PADDING;
+  const y = Math.max(
+    VIEWPORT_PADDING,
+    Math.min(candidateY, maxY)
+  );
+  return { x, y };
+};
+
+const clampDockPosition = (raw: Point): Point => {
+  if (typeof window === 'undefined') {
+    return raw;
+  }
+  const maxX = Math.max(
+    VIEWPORT_PADDING,
+    window.innerWidth - DOCK_SIZE.width - VIEWPORT_PADDING
+  );
+  const maxY = Math.max(
+    VIEWPORT_PADDING,
+    window.innerHeight - DOCK_SIZE.height - VIEWPORT_PADDING
+  );
+  return {
+    x: Math.min(Math.max(VIEWPORT_PADDING, raw.x), maxX),
+    y: Math.min(Math.max(VIEWPORT_PADDING, raw.y), maxY),
+  };
+};
+
+const clampHubPosition = (raw: Point): Point => {
+  if (typeof window === 'undefined') {
+    return raw;
+  }
+  const maxX = Math.max(
+    VIEWPORT_PADDING,
+    window.innerWidth - HUB_SIZE.width - VIEWPORT_PADDING
+  );
+  const maxY = Math.max(
+    VIEWPORT_PADDING,
+    window.innerHeight - HUB_SIZE.height - VIEWPORT_PADDING
+  );
+  return {
+    x: Math.min(Math.max(VIEWPORT_PADDING, raw.x), maxX),
+    y: Math.min(Math.max(VIEWPORT_PADDING, raw.y), maxY),
+  };
+};
+
+const BLOOM_CONTEXT_LABELS: Record<BloomContext, string> = {
+  arrange: 'Arrange Bloom',
+  record: 'Record Bloom',
+  mix: 'Mix Bloom',
+  master: 'Master Bloom',
+  ai: 'Prime Bloom',
+  ingest: 'Ingest Bloom',
+  idle: 'Bloom HUD',
+};
+
+const BLOOM_CONTEXT_ACCENTS: Record<BloomContext, string> = {
+  arrange: '#d6b1ff',
+  record: '#ff7b8a',
+  mix: '#7ad0ff',
+  master: '#f5a34c',
+  ai: '#f472d0',
+  ingest: '#38d9a9',
+  idle: '#94a3b8',
+};
+
+type StemKey = keyof typeof STEM_COLOR_BY_KEY;
+
+const STEM_MESSAGE_MATCHERS: Array<{ key: StemKey; keywords: string[] }> = [
+  { key: 'vocals', keywords: ['vocal', 'vox', 'singer', 'lead'] },
+  { key: 'drums', keywords: ['drum', 'beat', 'percussion', 'kick', 'snare'] },
+  { key: 'bass', keywords: ['bass', 'low end'] },
+  { key: 'guitar', keywords: ['guitar', 'gtr'] },
+  { key: 'piano', keywords: ['piano', 'keys', 'keyboard'] },
+  { key: 'synths', keywords: ['synth', 'pad', 'lead', 'arp'] },
+  { key: 'strings', keywords: ['string', 'violin', 'cello'] },
+  {
+    key: 'other',
+    keywords: [
+      'processing',
+      'preparing',
+      'separating',
+      'generating',
+      'import',
+      'mixdown',
+      'render',
+      'fallback',
+    ],
+  },
+];
+
+type PendingStemRequest = {
+  buffer: AudioBuffer;
+  fileName: string;
+  originalTrackId: string;
+  jobId: string;
+  resolve?: () => void;
+  reject?: (error: Error) => void;
 };
 
 export interface TrackData {
@@ -93,6 +340,7 @@ export interface TrackAnalysisData {
     peak?: number;
     crestFactor?: number;
     spectralTilt?: number;
+    lowBandEnergy?: number;
     automationActive?: boolean;
     automationTargets?: string[];
 }
@@ -164,6 +412,40 @@ interface ImportProfileKeyword {
   label: string;
 }
 
+interface ImportProgressEntry {
+  id: string;
+  label: string;
+  type: 'file' | 'stem';
+  percent: number;
+  color?: string;
+  parentId?: string;
+}
+
+interface PersistedProjectState {
+  tracks?: TrackData[];
+  clips?: any[];
+  mixerSettings?: Record<string, MixerSettings>;
+  inserts?: Record<string, FxWindowId[]>;
+  masterVolume?: number | string;
+  masterBalance?: number | string;
+  isLooping?: boolean;
+  bpm?: number | string;
+  ppsValue?: number | string;
+  scrollX?: number | string;
+  audioBuffers?: Record<string, any>;
+  automationData?: Record<string, any>;
+  visibleAutomationLanes?: Record<string, any>;
+  musicalContext?: MusicalContext;
+  fxBypassState?: Record<string, boolean>;
+  bloomPosition?: { x: number; y: number };
+  floatingBloomPosition?: { x: number; y: number };
+  ingestSnapshot?: PersistedIngestSnapshot;
+  ingestHistoryEntries?: IngestHistoryEntry[];
+  followPlayhead?: boolean;
+  pianoRollSketches?: Record<string, MidiNote[]>;
+  pianoRollZoom?: { scrollX: number; zoomX: number; zoomY: number };
+}
+
 const IMPORT_KEYWORD_PROFILES: ImportProfileKeyword[] = [
   { keywords: ['vocal', 'vox', 'lead', 'singer'], group: 'Vocals', color: 'magenta', label: 'VOCALS' },
   { keywords: ['bgv', 'harm', 'choir', 'stack'], group: 'Harmony', color: 'purple', label: 'HARMONY' },
@@ -171,6 +453,84 @@ const IMPORT_KEYWORD_PROFILES: ImportProfileKeyword[] = [
   { keywords: ['drum', 'kick', 'snare', 'hat', 'percussion'], group: 'Drums', color: 'blue', label: 'DRUMS' },
   { keywords: ['bass', '808', 'sub'], group: 'Bass', color: 'green', label: 'BASS' },
   { keywords: ['gtr', 'guitar', 'keys', 'piano', 'synth', 'pad', 'string'], group: 'Instruments', color: 'cyan', label: 'INSTRUMENT' },
+];
+
+const TRAP_SCALES: TrapScale[] = [
+  {
+    name: "C Minor Pentatonic",
+    root: 48,
+    intervals: [0, 3, 5, 7, 10],
+    type: "minor-pentatonic",
+  },
+  {
+    name: "F Harmonic Minor",
+    root: 53,
+    intervals: [0, 2, 3, 6, 7, 10, 11],
+    type: "harmonic-minor",
+  },
+  {
+    name: "D Phrygian",
+    root: 50,
+    intervals: [0, 1, 3, 5, 7, 8, 10],
+    type: "phrygian",
+  },
+];
+
+const TRAP_PATTERNS: TrapPattern[] = [
+  {
+    id: "808-anchor",
+    name: "808 Anchor",
+    type: "808",
+    pattern: [0, 4, 8, 12],
+    velocity: 110,
+    swing: 22,
+    quantization: "1/16",
+    genre: "trap",
+    description: "Quarter-note 808 foundation with late swing.",
+  },
+  {
+    id: "hihat-16",
+    name: "Hi-Hat Skitter",
+    type: "hihat",
+    pattern: [0, 2, 4, 6, 8, 10, 12, 14],
+    velocity: 84,
+    swing: 28,
+    quantization: "1/16",
+    genre: "trap",
+    description: "Sixteenth-note skitter with humanized swing.",
+  },
+  {
+    id: "snare-off",
+    name: "Snare Offbeat",
+    type: "snare",
+    pattern: [4, 12],
+    velocity: 118,
+    swing: 15,
+    quantization: "1/8",
+    genre: "trap",
+    description: "Two-step snare emphasizing the backbeat.",
+  },
+];
+
+const TRAP_GROOVES: GrooveTemplate[] = [
+  {
+    id: "atl-drip",
+    name: "ATL Drip",
+    swing: 32,
+    humanize: 18,
+    timingOffset: [0, 4, -2, 6, 0, 4, -3, 5],
+    velocityVariation: [0, -6, 4, -2, 0, -5, 6, -3],
+    genre: "trap",
+  },
+  {
+    id: "drill-slip",
+    name: "Drill Slip",
+    swing: 14,
+    humanize: 10,
+    timingOffset: [0, -8, 6, -4, 0, -6, 5, -5],
+    velocityVariation: [0, -12, 8, -10, 0, -8, 12, -6],
+    genre: "drill",
+  },
 ];
 
 const stripFileExtension = (name: string) => name.replace(/\.[^/.]+$/, '');
@@ -203,13 +563,324 @@ const deriveTrackImportProfile = (
   return { group, color, trackName, waveformType };
 };
 
+const deriveWarpAnchorsFromNotes = (notes: MidiNote[], clipDuration: number): number[] => {
+  if (!notes.length || clipDuration <= 0) {
+    return [];
+  }
+  const threshold = 1e-3;
+  const anchors = new Set<number>();
+  notes.forEach((note) => {
+    const start = typeof note.start === "number" ? note.start : NaN;
+    if (Number.isNaN(start)) return;
+    const clamped = Math.max(0, Math.min(clipDuration, start));
+    if (clamped <= threshold || clamped >= clipDuration - threshold) {
+      return;
+    }
+    anchors.add(Math.round(clamped * 1000) / 1000);
+  });
+  return Array.from(anchors).sort((a, b) => a - b);
+};
+
+const INITIAL_TRACK: TrackData = {
+  id: 'track-1',
+  trackName: 'AUDIO 1',
+  trackColor: 'cyan',
+  waveformType: 'varied',
+  group: 'Vocals',
+};
+
+const INITIAL_TRACKS: TrackData[] = [INITIAL_TRACK];
+
+export type MixerBusId =
+  | 'velvet-curve'
+  | 'phase-weave'
+  | 'velvet-floor'
+  | 'harmonic-lattice';
+
+export interface ChannelDynamicsSettings {
+  drive: number;
+  release: number;
+  blend: number;
+}
+
+export interface ChannelEQSettings {
+  low: number;
+  mid: number;
+  air: number;
+  tilt: number;
+}
+
+interface MixerBusDefinition {
+  id: MixerBusId;
+  name: string;
+  shortLabel: string;
+  colorKey: TrackColorKey;
+  groups: TrackGroup[];
+}
+
+export interface MixerBusStripData {
+  id: MixerBusId;
+  name: string;
+  members: string[];
+  alsIntensity: number;
+  alsPulse: number;
+  alsColor: string;
+  alsGlow: string;
+  alsHaloColor?: string;
+  alsGlowStrength?: number;
+}
+
+const MIXER_BUS_DEFINITIONS: MixerBusDefinition[] = [
+  {
+    id: 'velvet-curve',
+    name: 'Velvet Curve',
+    shortLabel: 'VC',
+    colorKey: 'magenta',
+    groups: ['Vocals', 'Harmony'],
+  },
+  {
+    id: 'phase-weave',
+    name: 'Phase Weave',
+    shortLabel: 'PW',
+    colorKey: 'blue',
+    groups: ['Drums', 'Adlibs'],
+  },
+  {
+    id: 'velvet-floor',
+    name: 'Velvet Floor',
+    shortLabel: 'VF',
+    colorKey: 'green',
+    groups: ['Bass', 'Drums'],
+  },
+  {
+    id: 'harmonic-lattice',
+    name: 'Harmonic Lattice',
+    shortLabel: 'HL',
+    colorKey: 'purple',
+    groups: ['Instruments', 'Harmony'],
+  },
+];
+
+const clamp01 = (value: number) => Math.min(1, Math.max(0, value));
+
+const createDefaultSendLevels = (
+  track: TrackData
+): Record<MixerBusId, number> => {
+  const levels = {} as Record<MixerBusId, number>;
+  MIXER_BUS_DEFINITIONS.forEach((bus) => {
+    levels[bus.id] = bus.groups.includes(track.group) ? 0.72 : 0;
+  });
+  return levels;
+};
+
+const createDefaultDynamicsSettings = (
+  track: TrackData
+): ChannelDynamicsSettings => {
+  switch (track.group) {
+    case 'Drums':
+      return { drive: 0.68, release: 0.32, blend: 0.6 };
+    case 'Bass':
+      return { drive: 0.62, release: 0.48, blend: 0.52 };
+    case 'Vocals':
+      return { drive: 0.52, release: 0.4, blend: 0.48 };
+    case 'Harmony':
+    case 'Instruments':
+      return { drive: 0.45, release: 0.46, blend: 0.5 };
+    case 'Adlibs':
+      return { drive: 0.5, release: 0.38, blend: 0.55 };
+    default:
+      return { drive: 0.5, release: 0.45, blend: 0.5 };
+  }
+};
+
+const createDefaultEQSettings = (track: TrackData): ChannelEQSettings => {
+  switch (track.group) {
+    case 'Bass':
+      return { low: 0.72, mid: 0.48, air: 0.38, tilt: 0.42 };
+    case 'Drums':
+      return { low: 0.62, mid: 0.55, air: 0.5, tilt: 0.48 };
+    case 'Vocals':
+      return { low: 0.42, mid: 0.54, air: 0.66, tilt: 0.6 };
+    case 'Harmony':
+      return { low: 0.48, mid: 0.5, air: 0.6, tilt: 0.56 };
+    case 'Adlibs':
+      return { low: 0.44, mid: 0.52, air: 0.62, tilt: 0.58 };
+    case 'Instruments':
+    default:
+      return { low: 0.5, mid: 0.5, air: 0.55, tilt: 0.52 };
+  }
+};
+
+interface TrackMeterBuffers {
+  timeDomain: Float32Array;
+  freqDomain: Uint8Array;
+  lastPeak: number;
+  smoothedLevel: number;
+}
+
+interface MasterMeterBuffers extends TrackMeterBuffers {
+  waveform: Uint8Array;
+}
+
+const TRACK_ANALYSER_FFT = 2048;
+const TRACK_ANALYSER_SMOOTHING = 0.64;
+const MASTER_ANALYSER_SMOOTHING = 0.68;
+const MIN_DECIBELS = -100;
+const MAX_DECIBELS = -6;
+
+const createTrackMeterBuffers = (analyser: AnalyserNode): TrackMeterBuffers => ({
+  timeDomain: new Float32Array(analyser.fftSize),
+  freqDomain: new Uint8Array(analyser.frequencyBinCount),
+  lastPeak: 0,
+  smoothedLevel: 0,
+});
+
+const createMasterMeterBuffers = (analyser: AnalyserNode): MasterMeterBuffers => ({
+  ...createTrackMeterBuffers(analyser),
+  waveform: new Uint8Array(analyser.fftSize),
+});
+
+const ensureTrackMeterBuffers = (
+  store: Record<string, TrackMeterBuffers>,
+  trackId: string,
+  analyser: AnalyserNode
+): TrackMeterBuffers => {
+  const existing = store[trackId];
+  if (
+    !existing ||
+    existing.timeDomain.length !== analyser.fftSize ||
+    existing.freqDomain.length !== analyser.frequencyBinCount
+  ) {
+    store[trackId] = createTrackMeterBuffers(analyser);
+    return store[trackId];
+  }
+  if (existing.freqDomain.length !== analyser.frequencyBinCount) {
+    existing.freqDomain = new Uint8Array(analyser.frequencyBinCount);
+  }
+  return existing;
+};
+
+const ensureMasterMeterBuffers = (
+  current: MasterMeterBuffers | null,
+  analyser: AnalyserNode
+): MasterMeterBuffers => {
+  if (
+    !current ||
+    current.timeDomain.length !== analyser.fftSize ||
+    current.freqDomain.length !== analyser.frequencyBinCount ||
+    current.waveform.length !== analyser.fftSize
+  ) {
+    return createMasterMeterBuffers(analyser);
+  }
+  if (current.freqDomain.length !== analyser.frequencyBinCount) {
+    current.freqDomain = new Uint8Array(analyser.frequencyBinCount);
+  }
+  if (current.waveform.length !== analyser.fftSize) {
+    current.waveform = new Uint8Array(analyser.fftSize);
+  }
+  return current;
+};
+
+const computeSpectralTilt = (freqDomain: Uint8Array): number => {
+  const bins = freqDomain.length;
+  if (bins === 0) {
+    return 0;
+  }
+  const split = Math.max(1, Math.floor(bins * 0.32));
+  let lowSum = 0;
+  let highSum = 0;
+  for (let i = 0; i < split; i++) {
+    lowSum += freqDomain[i];
+  }
+  for (let i = bins - split; i < bins; i++) {
+    highSum += freqDomain[i];
+  }
+  const lowAvg = (lowSum / split) / 255;
+  const highAvg = (highSum / split) / 255;
+  const delta = highAvg - lowAvg;
+  return Math.max(-1, Math.min(1, delta));
+};
+
+const measureAnalyser = (
+  analyser: AnalyserNode,
+  buffers: TrackMeterBuffers
+): {
+  rms: number;
+  level: number;
+  peak: number;
+  crestFactor: number;
+  spectralTilt: number;
+  transient: boolean;
+  lowBandEnergy: number;
+} => {
+  if (typeof analyser.getFloatTimeDomainData === 'function') {
+    analyser.getFloatTimeDomainData(
+      buffers.timeDomain as Float32Array<ArrayBuffer>
+    );
+  } else {
+    const byteSamples = new Uint8Array(buffers.timeDomain.length);
+    analyser.getByteTimeDomainData(byteSamples);
+    for (let i = 0; i < buffers.timeDomain.length; i++) {
+      buffers.timeDomain[i] = (byteSamples[i] - 128) / 128;
+    }
+  }
+  analyser.getByteFrequencyData(
+    buffers.freqDomain as Uint8Array<ArrayBuffer>
+  );
+
+  let peak = 0;
+  let sumSquares = 0;
+  const { timeDomain } = buffers;
+  for (let i = 0; i < timeDomain.length; i++) {
+    const sample = timeDomain[i];
+    const absolute = Math.abs(sample);
+    if (absolute > peak) {
+      peak = absolute;
+    }
+    sumSquares += sample * sample;
+  }
+
+  const rms = Math.sqrt(sumSquares / timeDomain.length);
+  const normalizedRms = clamp01(rms * 2.35);
+  const smoothedLevel =
+    buffers.smoothedLevel * 0.68 + normalizedRms * 0.32;
+  buffers.smoothedLevel = smoothedLevel;
+
+  const normalizedPeak = clamp01(peak);
+  const crestFactor = normalizedPeak / Math.max(rms, 1e-5);
+  const spectralTilt = computeSpectralTilt(buffers.freqDomain);
+  const transient =
+    normalizedPeak > buffers.lastPeak * 1.12 &&
+    normalizedPeak - smoothedLevel > 0.12;
+
+  const lowBandBins = Math.max(4, Math.floor(buffers.freqDomain.length * 0.12));
+  let lowBandSum = 0;
+  for (let i = 0; i < lowBandBins; i += 1) {
+    lowBandSum += buffers.freqDomain[i];
+  }
+  const lowBandEnergy = clamp01((lowBandSum / lowBandBins) / 255);
+
+  buffers.lastPeak = normalizedPeak * 0.6 + buffers.lastPeak * 0.4;
+
+  return {
+    rms: normalizedRms,
+    level: smoothedLevel,
+    peak: normalizedPeak,
+    crestFactor,
+    spectralTilt,
+    transient,
+    lowBandEnergy,
+  };
+};
+
 const App: React.FC = () => {
   // --- STATE MANAGEMENT ---
-  const [tracks, setTracks] = useState<TrackData[]>([{ id: 'track-1', trackName: 'AUDIO 1', trackColor: 'cyan', waveformType: 'varied', group: 'Vocals' }]);
+  const [tracks, setTracks] = useState<TrackData[]>(INITIAL_TRACKS);
   const stemIntegrationRef = useRef<StemSeparationIntegration | null>(null);
   const tracksRef = useRef<TrackData[]>(tracks);
+  const clipsRef = useRef<ArrangeClip[]>([]);
   const [isStemModalOpen, setIsStemModalOpen] = useState(false);
-  const [pendingStemRequest, setPendingStemRequest] = useState<{ buffer: AudioBuffer; fileName: string; originalTrackId: string } | null>(null);
+  const [pendingStemRequest, setPendingStemRequest] = useState<PendingStemRequest | null>(null);
   const [lastStemSelection, setLastStemSelection] = useState<string[]>([...DEFAULT_STEM_SELECTION]);
   const [audioBuffers, setAudioBuffers] = useState<Record<string, AudioBuffer>>({});
   const [isPlaying, setIsPlaying] = useState(false);
@@ -222,14 +893,75 @@ const App: React.FC = () => {
     tracksRef.current = tracks;
   }, [tracks]);
 
+  useEffect(() => {
+    setTrackSendLevels((prev) => {
+      let changed = false;
+      const next: Record<string, Record<MixerBusId, number>> = {};
+      tracks.forEach((track) => {
+        if (prev[track.id]) {
+          next[track.id] = prev[track.id];
+        } else {
+          next[track.id] = createDefaultSendLevels(track);
+          changed = true;
+        }
+      });
+      if (Object.keys(prev).length !== tracks.length) {
+        changed = true;
+      }
+      return changed ? next : prev;
+    });
+  }, [tracks]);
+
+  useEffect(() => {
+    setChannelDynamicsSettings((prev) => {
+      let changed = false;
+      const next: Record<string, ChannelDynamicsSettings> = {};
+      tracks.forEach((track) => {
+        if (prev[track.id]) {
+          next[track.id] = prev[track.id];
+        } else {
+          next[track.id] = createDefaultDynamicsSettings(track);
+          changed = true;
+        }
+      });
+      if (Object.keys(prev).length !== tracks.length) {
+        changed = true;
+      }
+      return changed ? next : prev;
+    });
+  }, [tracks]);
+
+  useEffect(() => {
+    setChannelEQSettings((prev) => {
+      let changed = false;
+      const next: Record<string, ChannelEQSettings> = {};
+      tracks.forEach((track) => {
+        if (prev[track.id]) {
+          next[track.id] = prev[track.id];
+        } else {
+          next[track.id] = createDefaultEQSettings(track);
+          changed = true;
+        }
+      });
+      if (Object.keys(prev).length !== tracks.length) {
+        changed = true;
+      }
+      return changed ? next : prev;
+    });
+  }, [tracks]);
+
   const fxNodesRef = useRef<{[key: string]: FxNode}>({}); // This will manage instances of ALL plugins
   const masterNodesRef = useRef<MasterNodes | null>(null);
   const animationFrameRef = useRef<number | null>(null);
   const activeSourcesRef = useRef<{ source: AudioBufferSourceNode, gain: GainNode }[]>([]);
   const lastUpdateTimeRef = useRef<number>(0);
+  const trackMeterBuffersRef = useRef<Record<string, TrackMeterBuffers>>({});
+  const masterMeterBufferRef = useRef<MasterMeterBuffers | null>(null);
   
   const [isAddTrackModalOpen, setIsAddTrackModalModalOpen] = useState(false);
-  const [mixerSettings, setMixerSettings] = useState<{ [key: string]: MixerSettings }>({ 'track-1': { volume: 0.75, pan: 0, isMuted: false } });
+  const [mixerSettings, setMixerSettings] = useState<{ [key: string]: MixerSettings }>({
+    [INITIAL_TRACK.id]: { volume: 0.75, pan: 0, isMuted: false },
+  });
   const [soloedTracks, setSoloedTracks] = useState(new Set<string>());
   const [masterVolume, setMasterVolume] = useState(0.8);
   const [masterBalance, setMasterBalance] = useState(0);
@@ -237,9 +969,240 @@ const App: React.FC = () => {
   const [masterAnalysis, setMasterAnalysis] = useState({ level: 0, transient: false, waveform: new Uint8Array(128) });
   const masterLevelAvg = useRef(0.01);
   const [analysisResult, setAnalysisResult] = useState<FourAnchors | null>(null);
+  const [trackSendLevels, setTrackSendLevels] = useState<Record<string, Record<MixerBusId, number>>>(() => ({
+    [INITIAL_TRACK.id]: createDefaultSendLevels(INITIAL_TRACK),
+  }));
+  const [channelDynamicsSettings, setChannelDynamicsSettings] = useState<Record<string, ChannelDynamicsSettings>>(() => ({
+    [INITIAL_TRACK.id]: createDefaultDynamicsSettings(INITIAL_TRACK),
+  }));
+  const [channelEQSettings, setChannelEQSettings] = useState<Record<string, ChannelEQSettings>>(() => ({
+    [INITIAL_TRACK.id]: createDefaultEQSettings(INITIAL_TRACK),
+  }));
+  const [selectedBusId, setSelectedBusId] = useState<MixerBusId | null>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
   const [importMessage, setImportMessage] = useState<string | null>(null);
-  const [fileInputContext, setFileInputContext] = useState<'import' | 'load'>('import');
+  const [fileInputContext, setFileInputContext] = useState<'import' | 'load' | 'reingest'>('import');
+  const [importProgress, setImportProgress] = useState<ImportProgressEntry[]>([]);
+  const activeStemJobRef = useRef<string | null>(null);
+  const ingestQueueRef = useRef<IngestQueueManager | null>(null);
+  const pendingQueueHydrationRef = useRef<PersistedIngestSnapshot | null>(null);
+  const processImportJobRef = useRef<
+    ((job: IngestRuntimeJob, controls: IngestJobControls) => Promise<void | IngestJobOutcome>) | null
+  >(null);
+  const [ingestSnapshot, setIngestSnapshot] = useState<IngestJobSnapshot>({
+    jobs: [],
+    activeJobId: null,
+    lastUpdated: Date.now(),
+  });
+  useEffect(() => {
+    publishIngestSignal({
+      source: "ingest-queue",
+      snapshot: ingestSnapshot,
+    });
+  }, [ingestSnapshot]);
+  const [ingestHistoryEntries, setIngestHistoryEntries] = useState<IngestHistoryEntry[]>([]);
+  const [recallHighlightClipIds, setRecallHighlightClipIds] = useState<ClipId[]>([]);
+  const recallHighlightTimeoutRef = useRef<number | null>(null);
+  const [pendingReingest, setPendingReingest] = useState<{ clipId: ClipId } | null>(null);
+  const [primeBrainTick, setPrimeBrainTick] = useState(0);
+  const primeBrainSessionIdRef = useRef<string>('');
+  const primeBrainBloomTraceRef = useRef<PrimeBrainBloomEvent[]>([]);
+  const primeBrainRecentActionsRef = useRef<Array<{ action: string; timestamp: string }>>([]);
+  const primeBrainCommandLogRef = useRef<PrimeBrainCommandLog[]>([]);
+  const primeBrainGuidanceRef = useRef<PrimeBrainGuidance>({});
+  const primeBrainAudioMetricsRef = useRef<{
+    latencyMs?: number;
+    cpuLoad: number;
+    dropoutsPerMinute: number;
+    bufferSize?: number;
+    sampleRate?: number;
+    startedAt: number;
+    dropoutCount: number;
+  }>({
+    latencyMs: undefined,
+    cpuLoad: 0,
+    dropoutsPerMinute: 0,
+    bufferSize: undefined,
+    sampleRate: undefined,
+    startedAt: Date.now(),
+    dropoutCount: 0,
+  });
+  if (!primeBrainSessionIdRef.current && typeof window !== 'undefined') {
+    const storedSession =
+      window.sessionStorage.getItem('mixxclub:primebrain-session') ??
+      window.localStorage.getItem('mixxclub:primebrain-session');
+    if (storedSession) {
+      primeBrainSessionIdRef.current = storedSession;
+    } else {
+      const generated =
+        typeof crypto !== 'undefined' && typeof crypto.randomUUID === 'function'
+          ? crypto.randomUUID()
+          : `primebrain-${Date.now()}-${Math.random().toString(36).slice(2, 10)}`;
+      primeBrainSessionIdRef.current = generated;
+      try {
+        window.sessionStorage.setItem('mixxclub:primebrain-session', generated);
+      } catch {
+        // ignore storage errors
+      }
+      try {
+        window.localStorage.setItem('mixxclub:primebrain-session', generated);
+      } catch {
+        // ignore storage errors
+      }
+    }
+  }
+
+  const bumpPrimeBrainTick = useCallback(() => {
+    setPrimeBrainTick((prev) => prev + 1);
+  }, []);
+
+  const logPrimeBrainAction = useCallback(
+    (label: string) => {
+      const entry = { action: label, timestamp: new Date().toISOString() };
+      primeBrainRecentActionsRef.current = [
+        entry,
+        ...primeBrainRecentActionsRef.current.slice(0, 9),
+      ];
+      bumpPrimeBrainTick();
+    },
+    [bumpPrimeBrainTick],
+  );
+
+  const logPrimeBrainBloomEvent = useCallback(
+    (intent: string, name: string, outcome: 'accepted' | 'dismissed' | 'ignored' = 'accepted') => {
+      const event: PrimeBrainBloomEvent = {
+        actionId:
+          typeof crypto !== 'undefined' && typeof crypto.randomUUID === 'function'
+            ? crypto.randomUUID()
+            : `pbloom-${Date.now()}-${Math.random().toString(36).slice(2, 9)}`,
+        name,
+        intent,
+        confidence: 0.6,
+        outcome,
+        triggeredAt: new Date().toISOString(),
+      };
+      primeBrainBloomTraceRef.current = [
+        ...primeBrainBloomTraceRef.current.slice(-23),
+        event,
+      ];
+      bumpPrimeBrainTick();
+    },
+    [bumpPrimeBrainTick],
+  );
+
+  const logPrimeBrainCommand = useCallback(
+    (commandType: string, payload: Record<string, unknown>, accepted = true) => {
+      const command: PrimeBrainCommandLog = {
+        id:
+          typeof crypto !== 'undefined' && typeof crypto.randomUUID === 'function'
+            ? crypto.randomUUID()
+            : `pcmd-${Date.now()}-${Math.random().toString(36).slice(2, 9)}`,
+        commandType,
+        payload,
+        issuedAt: new Date().toISOString(),
+        accepted,
+      };
+      primeBrainCommandLogRef.current = [
+        ...primeBrainCommandLogRef.current.slice(-19),
+        command,
+      ];
+      primeBrainGuidanceRef.current = {
+        ...primeBrainGuidanceRef.current,
+        lastCommand: command,
+      };
+      bumpPrimeBrainTick();
+    },
+    [bumpPrimeBrainTick],
+  );
+
+  const normalizeCommandPayload = useCallback((value: unknown): Record<string, unknown> => {
+    if (value === null || value === undefined) return {};
+    if (Array.isArray(value)) {
+      return { items: value };
+    }
+    if (typeof value === 'object') {
+      return value as Record<string, unknown>;
+    }
+    return { value };
+  }, []);
+  const availableSendPalette = useMemo(
+    () =>
+      MIXER_BUS_DEFINITIONS.map((bus) => {
+        const swatch = TRACK_COLOR_SWATCH[bus.colorKey];
+        return {
+          id: bus.id,
+          name: bus.name,
+          shortLabel: bus.shortLabel,
+          color: swatch.base,
+          glow: swatch.glow,
+        };
+      }),
+    []
+  );
+
+  const busStrips = useMemo<MixerBusStripData[]>(() => {
+    return MIXER_BUS_DEFINITIONS.map((bus) => {
+      let summedIntensity = 0;
+      let summedPulse = 0;
+      let totalWeight = 0;
+      const members: string[] = [];
+
+      tracks.forEach((track) => {
+        const sendAmount = trackSendLevels[track.id]?.[bus.id] ?? 0;
+        if (sendAmount > 0.01) {
+          members.push(track.trackName);
+          totalWeight += sendAmount;
+          const analysis = trackAnalysis[track.id];
+          const settings = mixerSettings[track.id];
+          const feedback = deriveTrackALSFeedback({
+            level: analysis?.level ?? 0,
+            transient: analysis?.transient ?? false,
+            volume: settings?.volume ?? 0.75,
+            color: track.trackColor,
+          });
+          summedIntensity += feedback.intensity * sendAmount;
+          summedPulse += feedback.pulse * sendAmount;
+        }
+      });
+
+      const intensity = totalWeight > 0 ? summedIntensity / totalWeight : 0;
+      const pulse = totalWeight > 0 ? summedPulse / totalWeight : 0;
+      const swatch = TRACK_COLOR_SWATCH[bus.colorKey];
+      const colors = deriveBusALSColors(swatch.base, swatch.glow, intensity);
+
+      return {
+        id: bus.id,
+        name: bus.name,
+        members,
+        alsIntensity: intensity,
+        alsPulse: pulse,
+        alsColor: colors.base,
+        alsGlow: colors.glow,
+        alsHaloColor: colors.halo,
+        alsGlowStrength: clamp01(intensity * 0.85 + pulse * 0.4),
+      };
+    });
+  }, [tracks, trackSendLevels, trackAnalysis, mixerSettings]);
+  
+  const upsertImportProgress = useCallback((entry: ImportProgressEntry) => {
+    setImportProgress((prev) => {
+      const index = prev.findIndex((existing) => existing.id === entry.id);
+      if (index !== -1) {
+        const updated = [...prev];
+        updated[index] = { ...updated[index], ...entry };
+        return updated;
+      }
+      return [...prev, entry];
+    });
+  }, [appendHistoryNote]);
+
+  const removeImportProgressByPrefix = useCallback((prefix: string) => {
+    setImportProgress((prev) => prev.filter((entry) => !entry.id.startsWith(prefix)));
+  }, []);
+
+  const removeImportProgressById = useCallback((id: string) => {
+    setImportProgress((prev) => prev.filter((entry) => entry.id !== id));
+  }, []);
   
   const [contextMenu, setContextMenu] = useState<{ x: number; y: number; trackId: string } | null>(null);
   const [renameModal, setRenameModal] = useState<string | null>(null);
@@ -249,13 +1212,257 @@ const App: React.FC = () => {
   const [activePrimeBrainClipId, setActivePrimeBrainClipId] = useState<ClipId | null>(null);
   const [selectedTrackId, setSelectedTrackId] = useState<string | null>(null);
   const [armedTracks, setArmedTracks] = useState<Set<string>>(new Set());
+  const [trackUiState, setTrackUiState] = useState<Record<string, TrackUIState>>({});
+  const pianoRollBinding = usePianoRoll({
+    bpm,
+    beatsPerBar: 4,
+    patterns: TRAP_PATTERNS,
+    scales: TRAP_SCALES,
+    grooveTemplates: TRAP_GROOVES,
+  });
+  const pianoRollState = pianoRollBinding.state;
+  const setPianoRollState = pianoRollBinding.setState;
+  const loadPianoNotes = pianoRollBinding.loadNotes;
+  const exportPianoNotes = pianoRollBinding.exportNotes;
+  const [pianoRollStore, setPianoRollStore] = useState<Record<string, MidiNote[]>>({});
+  const [isPianoRollOpen, setIsPianoRollOpen] = useState(false);
+  const [pianoRollClipId, setPianoRollClipId] = useState<ClipId | null>(null);
+  const [pianoRollTrackId, setPianoRollTrackId] = useState<string | null>(null);
+  const [activeCapsuleTrackId, setActiveCapsuleTrackId] = useState<string | null>(null);
+  const [followPlayhead, setFollowPlayhead] = useState(true);
+
+  useEffect(() => {
+    setTrackUiState((prev) => {
+      let changed = false;
+      const next: Record<string, TrackUIState> = {};
+      tracks.forEach((track) => {
+        const existing =
+          prev[track.id] ??
+          {
+            context: DEFAULT_TRACK_CONTEXT,
+            laneHeight: DEFAULT_TRACK_LANE_HEIGHT,
+            collapsed: false,
+          };
+        next[track.id] = existing;
+        if (prev[track.id] !== existing) {
+          changed = true;
+        }
+      });
+      if (Object.keys(prev).length !== tracks.length) {
+        changed = true;
+      }
+      return changed ? next : prev;
+    });
+  }, [tracks]);
+
+  useEffect(() => {
+    setTrackUiState((prev) => {
+      let changed = false;
+      const next = { ...prev };
+      tracks.forEach((track) => {
+        const current = next[track.id];
+        if (!current) return;
+        const armed = armedTracks.has(track.id);
+        if (armed && current.context !== "record") {
+          next[track.id] = { ...current, context: "record" };
+          changed = true;
+        } else if (!armed && current.context === "record") {
+          next[track.id] = { ...current, context: DEFAULT_TRACK_CONTEXT };
+          changed = true;
+        }
+      });
+      return changed ? next : prev;
+    });
+  }, [armedTracks, tracks]);
+
+  useEffect(() => {
+    if (
+      activeCapsuleTrackId &&
+      !tracks.some((track) => track.id === activeCapsuleTrackId)
+    ) {
+      setActiveCapsuleTrackId(null);
+    }
+  }, [activeCapsuleTrackId, tracks]);
+
+  const dockDefaultPosition = useMemo(() => computeDockDefaultPosition(), []);
+
+  const initialDockPlacement = useMemo(() => {
+    if (typeof window !== 'undefined') {
+      const stored = window.localStorage.getItem(DOCK_STORAGE_KEY);
+      if (stored) {
+        try {
+          const parsed = JSON.parse(stored);
+          if (parsed && typeof parsed.x === 'number' && typeof parsed.y === 'number') {
+            return { position: clampDockPosition(parsed), custom: true };
+          }
+        } catch (error) {
+          console.warn('[BLOOM] Failed to parse stored dock position:', error);
+        }
+      }
+    }
+    const defaultPosition = clampDockPosition(dockDefaultPosition);
+    return { position: defaultPosition, custom: false };
+  }, [dockDefaultPosition]);
+
+  const initialHubPlacement = useMemo(() => {
+    if (typeof window !== 'undefined') {
+      const stored = window.localStorage.getItem(HUB_STORAGE_KEY);
+      if (stored) {
+        try {
+          const parsed = JSON.parse(stored);
+          if (parsed && typeof parsed.x === 'number' && typeof parsed.y === 'number') {
+            return { position: clampHubPosition(parsed), custom: true };
+          }
+        } catch (error) {
+          console.warn('[BLOOM] Failed to parse stored floating position:', error);
+        }
+      }
+    }
+    return {
+      position: clampHubPosition(
+        computeHubDefaultPosition(initialDockPlacement.position)
+      ),
+      custom: false,
+    };
+  }, [initialDockPlacement.position]);
+
+  const [bloomPosition, setBloomPosition] = useState<Point>(initialDockPlacement.position);
+  const [floatingBloomPosition, setFloatingBloomPosition] = useState<Point>(initialHubPlacement.position);
+  const [hasCustomDockPosition, setHasCustomDockPosition] = useState(initialDockPlacement.custom);
+  const [hasCustomHubPosition, setHasCustomHubPosition] = useState(initialHubPlacement.custom);
+
+  const bloomPositionRef = useRef<Point>(bloomPosition);
+  useEffect(() => {
+    bloomPositionRef.current = bloomPosition;
+  }, [bloomPosition]);
+
+  const floatingBloomPositionRef = useRef<Point>(floatingBloomPosition);
+  useEffect(() => {
+    floatingBloomPositionRef.current = floatingBloomPosition;
+  }, [floatingBloomPosition]);
+
+  const hasCustomDockRef = useRef(hasCustomDockPosition);
+  useEffect(() => {
+    hasCustomDockRef.current = hasCustomDockPosition;
+  }, [hasCustomDockPosition]);
+
+  const hasCustomHubRef = useRef(hasCustomHubPosition);
+  useEffect(() => {
+    hasCustomHubRef.current = hasCustomHubPosition;
+  }, [hasCustomHubPosition]);
+
+  useEffect(() => {
+    if (typeof window === 'undefined') return;
+    try {
+      window.localStorage.setItem(DOCK_STORAGE_KEY, JSON.stringify(bloomPosition));
+    } catch (error) {
+      console.warn('[BLOOM] Failed to persist dock position:', error);
+    }
+  }, [bloomPosition]);
+
+  useEffect(() => {
+    if (typeof window === 'undefined') return;
+    try {
+      window.localStorage.setItem(
+        HUB_STORAGE_KEY,
+        JSON.stringify(floatingBloomPosition)
+      );
+    } catch (error) {
+      console.warn('[BLOOM] Failed to persist floating position:', error);
+    }
+  }, [floatingBloomPosition]);
+
+  const handleManualTimelineScroll = useCallback(() => {
+    setFollowPlayhead((prev) => {
+      if (!prev) return prev;
+      appendHistoryNote({
+        id: `timeline-follow-${Date.now()}`,
+        timestamp: Date.now(),
+        scope: "timeline",
+        message: "Follow paused from manual scroll",
+        accent: TRACK_COLOR_SWATCH.cyan.glow,
+      });
+      return false;
+    });
+  }, []);
+
+  useEffect(() => {
+    if (typeof window === 'undefined') return;
+
+    const handleResize = () => {
+      const dockCustom = hasCustomDockRef.current;
+      const hubCustom = hasCustomHubRef.current;
+
+      const nextDock = dockCustom
+        ? clampDockPosition(bloomPositionRef.current)
+        : computeDockDefaultPosition();
+
+      if (
+        nextDock.x !== bloomPositionRef.current.x ||
+        nextDock.y !== bloomPositionRef.current.y
+      ) {
+        bloomPositionRef.current = nextDock;
+        setBloomPosition(nextDock);
+      }
+
+      const nextHub = hubCustom
+        ? clampHubPosition(floatingBloomPositionRef.current)
+        : computeHubDefaultPosition(nextDock);
+
+      if (
+        nextHub.x !== floatingBloomPositionRef.current.x ||
+        nextHub.y !== floatingBloomPositionRef.current.y
+      ) {
+        floatingBloomPositionRef.current = nextHub;
+        setFloatingBloomPosition(nextHub);
+      }
+    };
+
+    handleResize();
+    window.addEventListener('resize', handleResize);
+    return () => window.removeEventListener('resize', handleResize);
+  }, []);
 
   // --- Dynamic Inserts (Replaces useConnections for routing) ---
-  const [inserts, setInserts] = useState<Record<string, FxWindowId[]>>({ 'track-1': [] }); // trackId -> [pluginId1, pluginId2, ...]
+  const [inserts, setInserts] = useState<Record<string, FxWindowId[]>>({
+    [INITIAL_TRACK.id]: [],
+  }); // trackId -> [pluginId1, pluginId2, ...]
+  const insertsRef = useRef<Record<string, FxWindowId[]>>(inserts);
+  useEffect(() => {
+    insertsRef.current = inserts;
+  }, [inserts]);
   const [isPluginBrowserOpen, setIsPluginBrowserOpen] = useState(false);
   const [trackIdForPluginBrowser, setTrackIdForPluginBrowser] = useState<string | null>(null);
   
   const [fxBypassState, setFxBypassState] = useState<Record<FxWindowId, boolean>>({});
+  const [pluginFavorites, setPluginFavorites] = useState<Record<FxWindowId, boolean>>(
+    () => loadPluginFavorites() as Record<FxWindowId, boolean>
+  );
+  const [pluginPresets, setPluginPresets] = useState<Record<FxWindowId, PluginPreset[]>>(
+    () => loadPluginPresets() as Record<FxWindowId, PluginPreset[]>
+  );
+  const [mixerActionPulse, setMixerActionPulse] = useState<{
+    trackId: string;
+    pulse: ALSActionPulse;
+    message: string;
+  } | null>(null);
+
+  useEffect(() => {
+    savePluginFavorites(pluginFavorites);
+  }, [pluginFavorites]);
+
+  useEffect(() => {
+    savePluginPresets(pluginPresets);
+  }, [pluginPresets]);
+
+  useEffect(() => {
+    if (!mixerActionPulse || typeof window === 'undefined') return;
+    const timeout = window.setTimeout(
+      () => setMixerActionPulse(null),
+      mixerActionPulse.pulse.decayMs
+    );
+    return () => window.clearTimeout(timeout);
+  }, [mixerActionPulse]);
 
   // --- Automation State ---
   // automationData: { [trackId]: { [fxId | 'track']: { [paramName]: AutomationPoint[] } } }
@@ -280,6 +1487,10 @@ const App: React.FC = () => {
   const { clips, setClips, selection, setSelection, clearSelection, ppsAPI, scrollX, setScrollX, moveClip, resizeClip, onSplitAt, setClipsSelect, duplicateClips, updateClipProperties } = useArrange({
     clips: []
   });
+
+  useEffect(() => {
+    clipsRef.current = clips;
+  }, [clips]);
 
   const micSourceNodeRef = useRef<MediaStreamAudioSourceNode | null>(null);
   // FIX: Corrected initialization to null for MediaStream ref
@@ -350,6 +1561,20 @@ const App: React.FC = () => {
   const [pluginRegistry, setPluginRegistry] = useState<PluginConfig[]>([]);
   const engineInstancesRef = useRef<Map<PluginId, IAudioEngine>>(new Map());
 
+  const pluginPaletteMap = useMemo<
+    Record<
+      FxWindowId,
+      { colorKey: TrackColorKey; base: string; glow: string }
+    >
+  >(() => {
+    return pluginRegistry.reduce((acc, plugin) => {
+      const colorKey = INSERT_COLOR_BY_PLUGIN[plugin.id] ?? 'purple';
+      const swatch = TRACK_COLOR_SWATCH[colorKey];
+      acc[plugin.id] = { colorKey, base: swatch.base, glow: swatch.glow };
+      return acc;
+    }, {} as Record<FxWindowId, { colorKey: TrackColorKey; base: string; glow: string }>);
+  }, [pluginRegistry]);
+
 
   // All FX Window configurations based on the registry
   const fxWindows: FxWindowConfig[] = useMemo(() => {
@@ -401,6 +1626,40 @@ const App: React.FC = () => {
     });
   }, [velvetCurveState, harmonicLatticeState, handleVelvetCurveChange, handleMixxFXChange, handleTimeWarpChange, pluginRegistry]);
 
+  // Insert catalog snapshot: what -> expose plugin palette, why -> drive Bloom picker curation, how -> merge registry metadata with ALS colors. (Reduction / Flow / Recall)
+  const pluginInventory = useMemo(() => {
+    const paletteFor = (pluginId: FxWindowId) => {
+      const cached = pluginPaletteMap[pluginId];
+      if (cached) {
+        return cached;
+      }
+      const colorKey = INSERT_COLOR_BY_PLUGIN[pluginId] ?? ('purple' as TrackColorKey);
+      const swatch = TRACK_COLOR_SWATCH[colorKey];
+      return { colorKey, base: swatch.base, glow: swatch.glow };
+    };
+
+    const source =
+      pluginRegistry.length > 0
+        ? pluginRegistry.map((plugin) => ({ id: plugin.id, name: plugin.name }))
+        : Object.entries(FALLBACK_PLUGIN_NAMES).map(([id, name]) => ({
+            id: id as FxWindowId,
+            name,
+          }));
+
+    return source.map(({ id, name }) => {
+      const palette = paletteFor(id);
+      return {
+        id,
+        name,
+        colorKey: palette.colorKey,
+        base: palette.base,
+        glow: palette.glow,
+        isFavorite: !!pluginFavorites[id],
+        isCurated: CURATED_INSERT_IDS.includes(id),
+      };
+    });
+  }, [pluginFavorites, pluginPaletteMap, pluginRegistry]);
+
 
   const [fxVisibility, setFxVisibility] = useState<Record<FxWindowId, boolean>>(() => {
     const initialVisibility: Record<FxWindowId, boolean> = {};
@@ -441,92 +1700,166 @@ const App: React.FC = () => {
   }, []);
 
   const executeStemSeparation = useCallback(
-    async (request: { buffer: AudioBuffer; fileName: string; originalTrackId: string }, allowedStemKeys: string[]) => {
-      const integration = stemIntegrationRef.current;
-      if (!integration) {
-        console.warn('[STEMS] Integration not ready, skipping stem separation.');
-        setImportMessage(null);
-        setTracks((prev) =>
-          prev.map((track) =>
-            track.id === request.originalTrackId ? { ...track, isProcessing: false } : track
-          )
-        );
-        return;
-      }
-
-      const canonicalAllowed = allowedStemKeys.length ? allowedStemKeys : Array.from(DEFAULT_CANONICAL_STEMS);
-      try {
-        const originalIndex = tracksRef.current.findIndex((track) => track.id === request.originalTrackId);
-        setImportMessage('Prime Brain is analyzing stems...');
-        const separationResult = await integration.importAudioWithStemSeparation(
-          request.buffer,
-          request.fileName,
-          Math.max(0, originalIndex) + 1,
-          0,
-          true,
-          canonicalAllowed
-        );
-
-        if (!separationResult.success) {
-          setTracks((prev) =>
-            prev.map((track) =>
-              track.id === request.originalTrackId ? { ...track, isProcessing: false } : track
-            )
-          );
-          return;
-        }
-
-        setAudioBuffers((prev) => ({
-          ...prev,
-          ...separationResult.newBuffers,
-        }));
-
-        setTracks((prev) => {
-          const index = prev.findIndex((track) => track.id === request.originalTrackId);
-          if (index === -1) return prev;
-          const updated = [...prev];
-          updated[index] = { ...updated[index], isProcessing: false };
-          updated.splice(index + 1, 0, ...separationResult.newTracks);
-          tracksRef.current = updated;
-          return updated;
+    async (
+      request: PendingStemRequest,
+      allowedStemKeys: string[],
+      jobIdOverride?: string
+    ) => {
+       const integration = stemIntegrationRef.current;
+       if (!integration) {
+         console.warn('[STEMS] Integration not ready, skipping stem separation.');
+         setImportMessage(null);
+         setTracks((prev) =>
+           prev.map((track) =>
+             track.id === request.originalTrackId ? { ...track, isProcessing: false } : track
+           )
+         );
+         return;
+       }
+ 
+       const canonicalAllowed = allowedStemKeys.length ? allowedStemKeys : Array.from(DEFAULT_CANONICAL_STEMS);
+       const jobId = jobIdOverride ?? request.jobId ?? activeStemJobRef.current ?? '';
+       if (jobId) {
+         activeStemJobRef.current = jobId;
+         upsertImportProgress({ id: jobId, label: `${request.fileName} • Stems`, percent: 60, type: 'file' });
+        ingestQueueRef.current?.reportProgress(jobId, {
+          percent: 60,
+          message: 'Preparing stem lanes…',
         });
-
-        setMixerSettings((prev) => {
-          const next = { ...prev, ...separationResult.mixerSettings };
-          next[request.originalTrackId] = {
-            ...(next[request.originalTrackId] ?? { volume: 0.75, pan: 0, isMuted: false }),
-            isMuted: true,
-          };
-          return next;
-        });
-
-        setInserts((prev) => {
-          const updated = { ...prev };
-          separationResult.newTracks.forEach((track) => {
-            if (!updated[track.id]) {
-              updated[track.id] = [];
-            }
+         canonicalAllowed.forEach((stemKey) => {
+           const colorKey = STEM_COLOR_BY_KEY[stemKey] ?? 'cyan';
+           const accent = TRACK_COLOR_SWATCH[colorKey].glow;
+           upsertImportProgress({
+             id: `${jobId}::${stemKey}`,
+             parentId: jobId,
+             label: `${stemKey.toUpperCase()} LANE`,
+             percent: 5,
+             type: 'stem',
+             color: accent,
+           });
+         });
+       }
+       try {
+         const originalIndex = tracksRef.current.findIndex((track) => track.id === request.originalTrackId);
+         setImportMessage('Prime Brain is analyzing stems...');
+         const separationResult = await integration.importAudioWithStemSeparation(
+           request.buffer,
+           request.fileName,
+           Math.max(0, originalIndex) + 1,
+           0,
+           true,
+           canonicalAllowed
+         );
+ 
+         if (!separationResult.success) {
+           setTracks((prev) =>
+             prev.map((track) =>
+               track.id === request.originalTrackId ? { ...track, isProcessing: false } : track
+             )
+           );
+           if (jobId) {
+             upsertImportProgress({ id: jobId, label: `${request.fileName} • Stems unavailable`, percent: 100, type: 'file', color: '#f87171' });
+             setTimeout(() => {
+               removeImportProgressByPrefix(`${jobId}::`);
+               removeImportProgressById(jobId);
+             }, 1200);
+            ingestQueueRef.current?.reportProgress(jobId, {
+              percent: 100,
+              message: `${request.fileName} • Stems unavailable`,
+              metadata: { stemsCreated: 0 },
+            });
+           }
+          request.resolve?.();
+           return;
+         }
+ 
+         setAudioBuffers((prev) => ({
+           ...prev,
+           ...separationResult.newBuffers,
+         }));
+ 
+         setTracks((prev) => {
+           const index = prev.findIndex((track) => track.id === request.originalTrackId);
+           if (index === -1) return prev;
+           const updated = [...prev];
+           updated[index] = { ...updated[index], isProcessing: false };
+           updated.splice(index + 1, 0, ...separationResult.newTracks);
+           tracksRef.current = updated;
+           return updated;
+         });
+ 
+         setMixerSettings((prev) => {
+           const next = { ...prev, ...separationResult.mixerSettings };
+           next[request.originalTrackId] = {
+             ...(next[request.originalTrackId] ?? { volume: 0.75, pan: 0, isMuted: false }),
+             isMuted: true,
+           };
+           return next;
+         });
+ 
+         setInserts((prev) => {
+           const updated = { ...prev };
+           separationResult.newTracks.forEach((track) => {
+             if (!updated[track.id]) {
+               updated[track.id] = [];
+             }
+           });
+           return updated;
+         });
+ 
+         setClips((prev) => [...prev, ...separationResult.newClips]);
+ 
+         console.log(`[STEMS] Created ${separationResult.newTracks.length} stem tracks from ${request.fileName}.`);
+         setTimeout(() => setImportMessage(null), 1200);
+         if (jobId) {
+           canonicalAllowed.forEach((stemKey) => {
+             upsertImportProgress({
+               id: `${jobId}::${stemKey}`,
+               percent: 100,
+               type: 'stem',
+               label: `${stemKey.toUpperCase()} COMPLETE`,
+             });
+           });
+           upsertImportProgress({ id: jobId, label: `${request.fileName} • Complete`, percent: 100, type: 'file' });
+           setTimeout(() => {
+             removeImportProgressByPrefix(`${jobId}::`);
+             removeImportProgressById(jobId);
+           }, 1500);
+          ingestQueueRef.current?.reportProgress(jobId, {
+            percent: 100,
+            message: `${request.fileName} • Complete`,
+            metadata: { stemsCreated: separationResult.newTracks.length },
           });
-          return updated;
-        });
-
-        setClips((prev) => [...prev, ...separationResult.newClips]);
-
-        console.log(`[STEMS] Created ${separationResult.newTracks.length} stem tracks from ${request.fileName}.`);
-        setTimeout(() => setImportMessage(null), 1200);
-      } catch (error) {
-        console.error('[STEMS] separation error:', error);
-        setTracks((prev) =>
-          prev.map((track) =>
-            track.id === request.originalTrackId ? { ...track, isProcessing: false } : track
-          )
-        );
-        setImportMessage('Stem separation failed');
-        setTimeout(() => setImportMessage(null), 3000);
-      }
-    },
-    [setAudioBuffers, setClips, setImportMessage, setInserts, setMixerSettings, setTracks]
-  );
+           activeStemJobRef.current = null;
+         }
+        request.resolve?.();
+       } catch (error) {
+         console.error('[STEMS] separation error:', error);
+         setTracks((prev) =>
+           prev.map((track) =>
+             track.id === request.originalTrackId ? { ...track, isProcessing: false } : track
+           )
+         );
+         setImportMessage('Stem separation failed');
+         setTimeout(() => setImportMessage(null), 3000);
+         if (jobId) {
+           upsertImportProgress({ id: jobId, label: `${request.fileName} • Failed`, percent: 100, type: 'file', color: '#f87171' });
+           setTimeout(() => {
+             removeImportProgressByPrefix(`${jobId}::`);
+             removeImportProgressById(jobId);
+           }, 2000);
+          ingestQueueRef.current?.reportProgress(jobId, {
+            percent: 100,
+            message: `${request.fileName} • Failed`,
+            metadata: { error: error instanceof Error ? error.message : 'Stem separation failed' },
+          });
+           activeStemJobRef.current = null;
+         }
+        request.reject?.(error instanceof Error ? error : new Error('Stem separation failed'));
+       }
+     },
+     [removeImportProgressById, removeImportProgressByPrefix, setAudioBuffers, setClips, setImportMessage, setInserts, setMixerSettings, setTracks, upsertImportProgress]
+   );
 
   const handleStemModalConfirm = useCallback(
     (selection: string[]) => {
@@ -538,7 +1871,8 @@ const App: React.FC = () => {
       }
       setLastStemSelection(selection);
       const allowedKeys = deriveAllowedStemKeys(selection);
-      void executeStemSeparation(request, allowedKeys);
+      ingestQueueRef.current?.resume(request.jobId);
+      void executeStemSeparation(request, allowedKeys, request.jobId);
     },
     [deriveAllowedStemKeys, executeStemSeparation, pendingStemRequest]
   );
@@ -551,35 +1885,59 @@ const App: React.FC = () => {
     }
     setPendingStemRequest(null);
     setImportMessage(null);
+    ingestQueueRef.current?.cancel(request.jobId);
+    request.reject?.(new Error('Stem separation cancelled by user'));
+    removeImportProgressByPrefix(request.jobId);
+    if (activeStemJobRef.current === request.jobId) {
+      activeStemJobRef.current = null;
+    }
     setTracks((prev) =>
       prev.map((track) =>
         track.id === request.originalTrackId ? { ...track, isProcessing: false } : track
       )
     );
-  }, [pendingStemRequest, setImportMessage, setTracks]);
+  }, [pendingStemRequest, removeImportProgressByPrefix, setImportMessage, setTracks]);
 
   const handleToggleLoop = () => setIsLooping(!isLooping);
 
   const startBackgroundStemSeparation = useCallback(
-    (originalTrackId: string, buffer: AudioBuffer, fileName: string) => {
-      setPendingStemRequest({ buffer, fileName, originalTrackId });
+    (
+      originalTrackId: string,
+      buffer: AudioBuffer,
+      fileName: string,
+      jobId: string,
+      deferred?: { resolve: () => void; reject: (error: Error) => void }
+    ) => {
+      activeStemJobRef.current = jobId;
+      upsertImportProgress({ id: jobId, label: `${fileName} • Stem prep`, percent: 55, type: 'file' });
+      ingestQueueRef.current?.markAwaiting(jobId, 'stem-selection');
+      setPendingStemRequest({
+        buffer,
+        fileName,
+        originalTrackId,
+        jobId,
+        resolve: deferred?.resolve ?? (() => {}),
+        reject: deferred?.reject ?? (() => {}),
+      });
       setIsStemModalOpen(true);
       setImportMessage(null);
     },
-    []
+    [upsertImportProgress]
   );
 
 
   const handleFileImport = async (
+    jobId: string,
     buffer: AudioBuffer,
     fileName: string,
-    options: { resetSession?: boolean } = {}
+    options: { resetSession?: boolean; reingestClipId?: ClipId } = {}
   ) => {
     if (!audioContextRef.current) return;
-    const { resetSession = false } = options;
+    const { resetSession = false, reingestClipId } = options;
 
     const displayName = stripFileExtension(fileName);
     setImportMessage(`Applying Velvet Sonics: ${displayName}`);
+    upsertImportProgress({ id: jobId, label: displayName, percent: 10, type: 'file' });
 
     const velvetProcessor = new VelvetProcessor(audioContextRef.current);
     const processedBuffer = await velvetProcessor.processAudioBuffer(buffer, {
@@ -596,6 +1954,59 @@ const App: React.FC = () => {
     const newBufferId = `buffer-import-${timestamp}`;
     const existingTracks = resetSession ? [] : tracksRef.current;
     const profile = deriveTrackImportProfile(displayName, existingTracks);
+    upsertImportProgress({ id: jobId, label: `${displayName} • Buffering`, percent: 25, type: 'file' });
+
+    if (reingestClipId) {
+      const targetClip = clipsRef.current.find((clip) => clip.id === reingestClipId);
+      if (!targetClip) {
+        throw new Error('Clip not found for re-ingest');
+      }
+
+      const reingestBufferId = `buffer-reingest-${timestamp}`;
+      setAudioBuffers((prev) => ({ ...prev, [reingestBufferId]: processedBuffer }));
+
+      const updatedClip: ArrangeClip = {
+        ...targetClip,
+        bufferId: reingestBufferId,
+        duration: processedBuffer.duration,
+        originalDuration: processedBuffer.duration,
+        timeStretchRate: 1.0,
+        sourceStart: 0,
+        sourceJobId: jobId,
+        sourceFileName: fileName,
+        sourceFingerprint: `${jobId}:${timestamp}`,
+        lastIngestAt: timestamp,
+        selected: true,
+      };
+
+      setClips((prev) =>
+        prev.map((clip) => (clip.id === targetClip.id ? { ...clip, ...updatedClip } : clip))
+      );
+      setTracks((prev) =>
+        prev.map((track) =>
+          track.id === targetClip.trackId ? { ...track, isProcessing: true } : track
+        )
+      );
+      setSelectedTrackId(targetClip.trackId);
+      setRecallHighlightClipIds([targetClip.id]);
+      if (recallHighlightTimeoutRef.current !== null) {
+        window.clearTimeout(recallHighlightTimeoutRef.current);
+      }
+      recallHighlightTimeoutRef.current = window.setTimeout(() => {
+        setRecallHighlightClipIds([]);
+        recallHighlightTimeoutRef.current = null;
+      }, 1800);
+      ingestHistoryStore.record({
+        jobId,
+        clipIds: [targetClip.id],
+        trackIds: [targetClip.trackId],
+        fileName,
+        completedAt: Date.now(),
+        context: 'reingest',
+      });
+      startBackgroundStemSeparation(targetClip.trackId, processedBuffer, fileName, jobId);
+      return;
+    }
 
     if (resetSession) {
       console.log(
@@ -636,6 +2047,13 @@ const App: React.FC = () => {
       timeStretchRate: 1.0,
       sourceStart: 0,
       bufferId: newBufferId,
+      sourceJobId: jobId,
+      sourceFileName: fileName,
+      sourceFingerprint: `${jobId}:${timestamp}`,
+      lastIngestAt: timestamp,
+      groupId: null,
+      isGroupRoot: false,
+      alsEnergy: masterAnalysis?.level ?? 0,
     };
 
     if (resetSession) {
@@ -659,14 +2077,30 @@ const App: React.FC = () => {
       setInserts((prev) => ({ ...prev, [newTrackId]: [] }));
     }
 
+    ingestHistoryStore.record({
+      jobId,
+      clipIds: [newClip.id],
+      trackIds: [newTrackId],
+      fileName,
+      completedAt: Date.now(),
+      context: 'import',
+    });
+
     setSelectedTrackId(newTrackId);
+    upsertImportProgress({ id: jobId, label: `${displayName} • Track seeded`, percent: 45, type: 'file' });
 
     setImportMessage('Prime Brain is analyzing stems...');
-    void startBackgroundStemSeparation(newTrackId, processedBuffer, displayName);
+    await new Promise<void>((resolve, reject) => {
+      startBackgroundStemSeparation(newTrackId, processedBuffer, displayName, jobId, { resolve, reject });
+    });
   };
   
   const handleSaveProject = async () => {
       const serializedBuffers = await serializeAudioBuffers(audioBuffers);
+      const queueSnapshot = ingestQueueRef.current
+        ? ingestQueueRef.current.getSnapshot()
+        : ingestSnapshot;
+      const historySnapshot = ingestHistoryStore.exportAll();
       const projectState = {
           tracks,
           clips,
@@ -683,6 +2117,17 @@ const App: React.FC = () => {
           visibleAutomationLanes,
           musicalContext,
           fxBypassState, // Save FX bypass state
+          bloomPosition,
+          floatingBloomPosition,
+          ingestSnapshot: queueSnapshot,
+          ingestHistoryEntries: historySnapshot,
+          followPlayhead,
+          pianoRollSketches: pianoRollStore,
+          pianoRollZoom: {
+            scrollX: pianoRollState.scrollX,
+            zoomX: pianoRollState.zoomX,
+            zoomY: pianoRollState.zoomY,
+          },
       };
 
       const jsonString = JSON.stringify(projectState, null, 2);
@@ -696,12 +2141,124 @@ const App: React.FC = () => {
       console.log("Project saved.");
   };
 
-  const handleProjectLoad = async (projectState: any) => {
+  const processImportJob = async (
+    job: IngestRuntimeJob,
+    controls: IngestJobControls
+  ): Promise<void | IngestJobOutcome> => {
+    const ctx = audioContextRef.current;
+    if (!ctx) {
+      controls.markFailed('Audio engine not initialized');
+      return { status: 'failed', summary: { error: 'Audio engine not initialized' } };
+    }
+
+    const displayName = stripFileExtension(job.fileName);
+
+    try {
+      if (!job.file) {
+        controls.reportProgress({ message: `Waiting for ${displayName} source file…` });
+        controls.markAwaitingUser('Source file missing after reload. Drop the original file to resume.');
+        upsertImportProgress({
+          id: job.id,
+          label: `${displayName} • Waiting`,
+          percent: 0,
+          type: 'file',
+          color: '#fbbf24',
+        });
+        return;
+      }
+
+      controls.reportProgress({ percent: 5, message: `Decoding ${displayName}` });
+      upsertImportProgress({ id: job.id, label: displayName, percent: 5, type: 'file' });
+      setImportMessage(`Decoding ${displayName}…`);
+
+      const arrayBuffer = await job.file.arrayBuffer();
+      if (controls.isCancelled()) {
+        controls.markCancelled('User cancelled import');
+        removeImportProgressByPrefix(job.id);
+        setImportMessage(null);
+        return { status: 'cancelled' };
+      }
+
+      const decodedBuffer = await ctx.decodeAudioData(arrayBuffer);
+      if (controls.isCancelled()) {
+        controls.markCancelled('User cancelled import');
+        removeImportProgressByPrefix(job.id);
+        setImportMessage(null);
+        return { status: 'cancelled' };
+      }
+
+      controls.reportProgress({ percent: 20, message: `Priming ${displayName}` });
+      await handleFileImport(job.id, decodedBuffer, job.fileName, {
+        resetSession: job.resetSession,
+        reingestClipId: job.metadata?.reingestClipId as ClipId | undefined,
+      });
+      controls.reportProgress({ percent: 100, message: `${displayName} • Complete` });
+      setImportMessage(null);
+      return { status: 'completed', summary: { fileName: job.fileName } };
+    } catch (error) {
+      const message =
+        error instanceof Error ? error.message : 'Failed to import audio';
+      if (controls.isCancelled()) {
+        controls.markCancelled(message);
+        removeImportProgressByPrefix(job.id);
+        setImportMessage(null);
+        return { status: 'cancelled', summary: { error: message } };
+      }
+      controls.markFailed(message);
+      removeImportProgressByPrefix(job.id);
+      setImportMessage(message);
+      setTimeout(() => setImportMessage(null), 3000);
+      return { status: 'failed', summary: { error: message } };
+    }
+  };
+
+  processImportJobRef.current = processImportJob;
+
+  useEffect(() => {
+    if (ingestQueueRef.current) {
+      return;
+    }
+    const manager = new IngestQueueManager({
+      onProcessJob: async (job, controls) => {
+        if (!processImportJobRef.current) {
+          return { status: 'failed', summary: { error: 'Ingest processor not ready' } };
+        }
+        return await processImportJobRef.current(job as IngestRuntimeJob, controls);
+      },
+    });
+    ingestQueueRef.current = manager;
+    const unsubscribe = manager.subscribe(setIngestSnapshot);
+    if (pendingQueueHydrationRef.current) {
+      manager.hydrateFromPersisted(pendingQueueHydrationRef.current);
+      pendingQueueHydrationRef.current = null;
+    }
+    return () => {
+      unsubscribe();
+    };
+  }, [setIngestSnapshot]);
+
+  useEffect(() => {
+    const unsubscribe = ingestHistoryStore.subscribe(setIngestHistoryEntries);
+    return () => {
+      unsubscribe();
+    };
+  }, []);
+
+  useEffect(() => {
+    return () => {
+      if (recallHighlightTimeoutRef.current !== null) {
+        window.clearTimeout(recallHighlightTimeoutRef.current);
+      }
+    };
+  }, []);
+
+  const handleProjectLoad = async (projectState: PersistedProjectState) => {
       if (!audioContextRef.current) return;
       stopPlayback();
       setIsPlaying(false);
 
-      const deserializedBuffers = await deserializeAudioBuffers(projectState.audioBuffers, audioContextRef.current);
+      const serializedBuffers = projectState.audioBuffers ?? {};
+      const deserializedBuffers = await deserializeAudioBuffers(serializedBuffers, audioContextRef.current);
 
       setTracks(projectState.tracks || []);
       // FIX: Ensure numeric properties of clips are correctly parsed as numbers during load
@@ -715,25 +2272,84 @@ const App: React.FC = () => {
           fadeIn: parseFloat(c.fadeIn || 0),
           fadeOut: parseFloat(c.fadeOut || 0),
           gain: parseFloat(c.gain || 1.0),
+          warpAnchors: Array.isArray(c.warpAnchors)
+            ? c.warpAnchors
+                .map((anchor: unknown) => parseFloat(`${anchor || 0}`))
+                .filter((anchor: number) => Number.isFinite(anchor) && anchor >= 0)
+            : [],
       })) || []);
       setMixerSettings(projectState.mixerSettings || {});
       setInserts(projectState.inserts || {}); // Load the inserts state
       // FIX: Ensure masterVolume is parsed as a number
-      setMasterVolume(parseFloat(projectState.masterVolume || 0.8));
+      setMasterVolume(parseFloat(`${projectState.masterVolume ?? 0.8}`));
       // FIX: Ensure masterBalance is parsed as a number
-      setMasterBalance(parseFloat(projectState.masterBalance || 0));
+      setMasterBalance(parseFloat(`${projectState.masterBalance ?? 0}`));
       setIsLooping(projectState.isLooping || false);
       // FIX: Ensure bpm is parsed as a number
-      setBpm(parseFloat(projectState.bpm || 120)); // Load BPM
+      setBpm(parseFloat(`${projectState.bpm ?? 120}`)); // Load BPM
       // FIX: Ensure ppsValue is parsed as a number
-      ppsAPI.set(parseFloat(projectState.ppsValue || 60));
+      ppsAPI.set(parseFloat(`${projectState.ppsValue ?? 60}`));
       // FIX: Ensure scrollX is parsed as a number
-      setScrollX(parseFloat(projectState.scrollX || 0));
+      setScrollX(parseFloat(`${projectState.scrollX ?? 0}`));
       setAudioBuffers(deserializedBuffers);
       setAutomationData(projectState.automationData || {});
       setVisibleAutomationLanes(projectState.visibleAutomationLanes || {});
       setMusicalContext(projectState.musicalContext || { genre: 'Streaming', mood: 'Balanced' });
       setFxBypassState(projectState.fxBypassState || {}); // Load FX bypass state
+      setFollowPlayhead(
+        projectState.followPlayhead === undefined ? true : Boolean(projectState.followPlayhead)
+      );
+      setPianoRollStore(
+        projectState.pianoRollSketches
+          ? Object.fromEntries(
+              Object.entries(projectState.pianoRollSketches).map(([clipId, notes]) => [
+                clipId,
+                Array.isArray(notes)
+                  ? notes.map((note) => ({
+                      ...note,
+                      start: parseFloat(`${note.start ?? 0}`),
+                      duration: parseFloat(`${note.duration ?? 0}`),
+                      pitch: Number(note.pitch ?? 60),
+                      velocity: Number(note.velocity ?? 96),
+                    })) as MidiNote[]
+                  : [],
+              ])
+            )
+          : {}
+      );
+      if (projectState.pianoRollZoom) {
+        setPianoRollState((prev) => ({
+          ...prev,
+          scrollX: parseFloat(`${projectState.pianoRollZoom?.scrollX ?? prev.scrollX}`),
+          zoomX: parseFloat(`${projectState.pianoRollZoom?.zoomX ?? prev.zoomX}`),
+          zoomY: parseFloat(`${projectState.pianoRollZoom?.zoomY ?? prev.zoomY}`),
+        }));
+      }
+      if (
+        projectState.bloomPosition &&
+        typeof projectState.bloomPosition.x === 'number' &&
+        typeof projectState.bloomPosition.y === 'number'
+      ) {
+        setBloomPosition(projectState.bloomPosition);
+      }
+      if (
+        projectState.floatingBloomPosition &&
+        typeof projectState.floatingBloomPosition.x === 'number' &&
+        typeof projectState.floatingBloomPosition.y === 'number'
+      ) {
+        setFloatingBloomPosition(projectState.floatingBloomPosition);
+      }
+      if (Array.isArray(projectState.ingestHistoryEntries)) {
+        ingestHistoryStore.hydrate(projectState.ingestHistoryEntries);
+      }
+      if (projectState.ingestSnapshot) {
+        setIngestSnapshot(projectState.ingestSnapshot);
+        if (ingestQueueRef.current) {
+          ingestQueueRef.current.hydrateFromPersisted(projectState.ingestSnapshot);
+        } else {
+          pendingQueueHydrationRef.current = projectState.ingestSnapshot;
+        }
+      }
       
       console.log("Project loaded.");
   };
@@ -745,38 +2361,77 @@ const App: React.FC = () => {
     try {
       if (fileInputContext === 'import') {
         const fileArray = Array.from(files);
-        const total = fileArray.length;
         const audioPattern = /\.(wav|aiff|aif|mp3|flac|ogg|m4a|aac)$/i;
-        let shouldReset = true;
-        let processedCount = 0;
-
-        for (let index = 0; index < fileArray.length; index += 1) {
-          const file = fileArray[index];
+        const audioFiles = fileArray.filter((file) => {
           const isAudioFile = file.type.startsWith('audio') || audioPattern.test(file.name);
           if (!isAudioFile) {
             console.warn(`[INGESTION] Skipping non-audio file: ${file.name}`);
-            continue;
           }
+          return isAudioFile;
+        });
 
-          const displayName = stripFileExtension(file.name);
-          setImportMessage(`Decoding ${displayName} (${index + 1}/${total})...`);
-
-          try {
-            const arrayBuffer = await file.arrayBuffer();
-            const decodedBuffer = await audioContextRef.current.decodeAudioData(arrayBuffer);
-            await handleFileImport(decodedBuffer, displayName, { resetSession: shouldReset });
-            shouldReset = false;
-            processedCount += 1;
-          } catch (fileError) {
-            console.error(`[INGESTION] Failed to import ${file.name}`, fileError);
-            setImportMessage(`Failed to import ${displayName}`);
-            setTimeout(() => setImportMessage(null), 4000);
-          }
-        }
-
-        if (processedCount === 0) {
+        if (audioFiles.length === 0) {
           setImportMessage('No audio files were imported.');
           setTimeout(() => setImportMessage(null), 3000);
+          return;
+        }
+
+        const manager = ingestQueueRef.current;
+        if (!manager) {
+          throw new Error('Ingest queue manager is not available.');
+        }
+
+        const resumableJobs = new Map<string, string>();
+        manager.getSnapshot().jobs.forEach((job) => {
+          const metadata = job.metadata as { resumeRequired?: boolean } | undefined;
+          if (metadata?.resumeRequired && job.status === 'awaiting-user') {
+            resumableJobs.set(job.fileName, job.id);
+          }
+        });
+
+        let resetSessionForNext = true;
+        let resumedCount = 0;
+        let enqueuedCount = 0;
+
+        audioFiles.forEach((file, index) => {
+          const resumableId = resumableJobs.get(file.name);
+          if (resumableId) {
+            const resumed = manager.supplyFile(resumableId, file);
+            if (resumed) {
+              resumedCount += 1;
+              resumableJobs.delete(file.name);
+            } else {
+              console.warn(`[INGESTION] Failed to resume job ${resumableId} for ${file.name}.`);
+            }
+            return;
+          }
+
+          manager.enqueue({
+            file,
+            fileName: file.name,
+            resetSession: resetSessionForNext,
+            metadata: { order: index + 1, total: audioFiles.length },
+          });
+          resetSessionForNext = false;
+          enqueuedCount += 1;
+        });
+
+        const statusMessages: string[] = [];
+        if (enqueuedCount > 0) {
+          statusMessages.push(
+            enqueuedCount === 1 ? 'Queued 1 file for import.' : `Queued ${enqueuedCount} files for import.`
+          );
+        }
+        if (resumedCount > 0) {
+          statusMessages.push(
+            resumedCount === 1
+              ? 'Resumed 1 paused ingest job.'
+              : `Resumed ${resumedCount} paused ingest jobs.`
+          );
+        }
+        if (statusMessages.length > 0) {
+          setImportMessage(statusMessages.join(' '));
+          setTimeout(() => setImportMessage(null), 2500);
         }
       } else if (fileInputContext === 'load') {
         const file = files[0];
@@ -786,8 +2441,29 @@ const App: React.FC = () => {
         setImportMessage('Loading Project...');
         const fileContent = await file.text();
         const projectState = JSON.parse(fileContent);
-        handleProjectLoad(projectState);
+        handleProjectLoad(projectState as PersistedProjectState);
         setImportMessage(null);
+      } else if (fileInputContext === 'reingest') {
+        const file = files[0];
+        const manager = ingestQueueRef.current;
+        if (!manager) {
+          throw new Error('Ingest queue manager is not available.');
+        }
+        if (!pendingReingest) {
+          setImportMessage('No clip selected for re-ingest.');
+          setTimeout(() => setImportMessage(null), 2500);
+          return;
+        }
+        manager.enqueue({
+          file,
+          fileName: file.name,
+          resetSession: false,
+          metadata: { reingestClipId: pendingReingest.clipId },
+        });
+        setPendingReingest(null);
+        setFileInputContext('import');
+        setImportMessage(`Queued re-ingest for ${file.name}`);
+        setTimeout(() => setImportMessage(null), 2000);
       }
     } catch (error) {
       console.error('Error handling file:', error);
@@ -823,9 +2499,207 @@ const App: React.FC = () => {
     });
   }, []);
 
-  const isAnyTrackArmed = armedTracks.size > 0; // Define isAnyTrackArmed here
+  const splitAutomationAt = useCallback(
+    (clipId: ClipId, time: number) => {
+      setAutomationData((prev) => {
+        const updated = { ...prev };
+        const clipToSplit = clips.find((clip) => clip.id === clipId);
+        if (clipToSplit && updated[clipToSplit.trackId]) {
+          for (const fxId in updated[clipToSplit.trackId]) {
+            for (const paramName in updated[clipToSplit.trackId][fxId]) {
+              const points = updated[clipToSplit.trackId][fxId][paramName];
+              if (points) {
+                const newPoints: AutomationPoint[] = [];
+                let splitValue = 0;
+                const nextPointIndex = points.findIndex((p) => p.time > time);
+                if (nextPointIndex === 0) {
+                  splitValue = points[0].value;
+                } else if (nextPointIndex === -1) {
+                  splitValue = points[points.length - 1].value;
+                } else {
+                  const prevPoint = points[nextPointIndex - 1];
+                  const nextPoint = points[nextPointIndex];
+                  const timeDiff = nextPoint.time - prevPoint.time;
+                  const factor = timeDiff !== 0 ? (time - prevPoint.time) / timeDiff : 0;
+                  splitValue = prevPoint.value + factor * (nextPoint.value - prevPoint.value);
+                }
 
-  const handleBloomAction = (action: string, payload?: any) => {
+                const firstPartPoints = points.filter((p) => p.time < time);
+                const secondPartPoints = points.filter((p) => p.time > time);
+
+                if (firstPartPoints.length > 0 || secondPartPoints.length > 0) {
+                  newPoints.push(
+                    ...firstPartPoints,
+                    { time, value: splitValue },
+                    { time, value: splitValue },
+                    ...secondPartPoints
+                  );
+                }
+                updated[clipToSplit.trackId][fxId][paramName] = newPoints.sort(
+                  (a, b) => a.time - b.time
+                );
+              }
+            }
+          }
+        }
+        return updated;
+      });
+    },
+    [clips]
+  );
+
+  const handleSplitSelectionAt = useCallback(
+    (time?: number) => {
+      const splitTime = time ?? currentTime;
+      const targets = clips.filter(
+        (clip) =>
+          clip.selected && splitTime > clip.start && splitTime < clip.start + clip.duration
+      );
+      if (!targets.length) {
+        console.log('[ARRANGE] No clips intersect playhead for split.');
+        return;
+      }
+      targets.forEach((clip) => {
+        onSplitAt(clip.id, splitTime);
+        splitAutomationAt(clip.id, splitTime);
+      });
+    },
+    [clips, currentTime, onSplitAt, splitAutomationAt]
+  );
+
+  const handleConsolidateSelection = useCallback(() => {
+    setClips((prev) => {
+      const selected = prev.filter((clip) => clip.selected);
+      if (selected.length < 2) return prev;
+
+      const grouped = new Map<string, ArrangeClip[]>();
+      selected.forEach((clip) => {
+        const bucket = grouped.get(clip.trackId) ?? [];
+        bucket.push(clip);
+        grouped.set(clip.trackId, bucket);
+      });
+
+      if (grouped.size === 0) return prev;
+
+      let updated = prev.filter((clip) => !clip.selected);
+      const now = Date.now();
+
+      grouped.forEach((groupClips, trackId) => {
+        const sorted = groupClips.slice().sort((a, b) => a.start - b.start);
+        const start = sorted[0].start;
+        const end = sorted.reduce((max, clip) => Math.max(max, clip.start + clip.duration), start);
+        const reference = sorted[0];
+        updated.push({
+          ...reference,
+          id: `clip-consolidated-${now}-${Math.random().toString(36).slice(2, 9)}`,
+          start,
+          duration: end - start,
+          originalDuration: end - start,
+          timeStretchRate: 1.0,
+          sourceStart: reference.sourceStart,
+          bufferId: reference.bufferId,
+          fadeIn: reference.fadeIn ?? 0,
+          fadeOut: reference.fadeOut ?? 0,
+          selected: true,
+          groupId: reference.groupId ?? `group-${now.toString(36)}`,
+          isGroupRoot: true,
+          lastIngestAt: reference.lastIngestAt ?? null,
+          sourceJobId: reference.sourceJobId ?? null,
+          sourceFileName: reference.sourceFileName ?? null,
+          sourceFingerprint: reference.sourceFingerprint ?? null,
+        });
+      });
+
+      return updated.sort((a, b) => a.start - b.start);
+    });
+  }, [setClips]);
+
+  const handleRecallLastImport = useCallback(() => {
+    const latest = ingestHistoryEntries[0];
+    if (!latest) {
+      setImportMessage('No ingest history yet.');
+      setTimeout(() => setImportMessage(null), 2000);
+      return;
+    }
+    const targetClipIds = latest.clipIds;
+    if (!targetClipIds.length) return;
+
+    setClips((prev) =>
+      prev.map((clip) => ({
+        ...clip,
+        selected: targetClipIds.includes(clip.id),
+      }))
+    );
+    setRecallHighlightClipIds(targetClipIds);
+    if (recallHighlightTimeoutRef.current !== null) {
+      window.clearTimeout(recallHighlightTimeoutRef.current);
+    }
+    recallHighlightTimeoutRef.current = window.setTimeout(() => {
+      setRecallHighlightClipIds([]);
+      recallHighlightTimeoutRef.current = null;
+    }, 1800);
+    setImportMessage(`Recalled ${latest.fileName}`);
+    setTimeout(() => setImportMessage(null), 2000);
+  }, [ingestHistoryEntries, setClips, setImportMessage]);
+
+  const handleReingestClip = useCallback(
+    (clipId?: ClipId) => {
+      if (!clipId) return;
+      const clip = clips.find((entry) => entry.id === clipId);
+      if (!clip) {
+        setImportMessage('Clip not found for re-ingest.');
+        setTimeout(() => setImportMessage(null), 2000);
+        return;
+      }
+      setPendingReingest({ clipId });
+      setFileInputContext('reingest');
+      setImportMessage(`Select new audio for ${clip.name}.`);
+      setTimeout(() => setImportMessage(null), 2500);
+      fileInputRef.current?.click();
+    },
+    [clips, setFileInputContext, setImportMessage]
+  );
+
+  const isAnyTrackArmed = armedTracks.size > 0; // Define isAnyTrackArmed here
+  const selectedClips = useMemo(() => clips.filter((clip) => clip.selected), [clips]);
+  const selectedClipIds = useMemo(() => selectedClips.map((clip) => clip.id), [selectedClips]);
+  const handleBloomPositionChange = useCallback((position: { x: number; y: number }) => {
+    const clamped = clampDockPosition(position);
+    bloomPositionRef.current = clamped;
+    setBloomPosition(clamped);
+    if (!hasCustomDockRef.current) {
+      setHasCustomDockPosition(true);
+      hasCustomDockRef.current = true;
+    }
+    if (!hasCustomHubRef.current) {
+      const linkedHub = computeHubDefaultPosition(clamped);
+      floatingBloomPositionRef.current = linkedHub;
+      setFloatingBloomPosition(linkedHub);
+    }
+  }, []);
+
+  const canSplitSelection = selectedClips.some(
+    (clip) => currentTime > clip.start && currentTime < clip.start + clip.duration
+  );
+  const canConsolidateSelection = selectedClips.length > 1;
+  const canReingestSelection = selectedClips.length === 1 && Boolean(selectedClips[0].sourceJobId);
+  const canRecallLastImport = ingestHistoryEntries.length > 0;
+
+  type BloomActionMeta = {
+    source?: "bloom-dock" | "bloom-floating" | "prime-brain" | "system";
+    context?: Record<string, unknown>;
+  };
+
+  const handleBloomAction = (
+    action: string,
+    payload?: any,
+    meta?: BloomActionMeta
+  ) => {
+      publishBloomSignal({
+        source: meta?.source ?? "system",
+        action,
+        payload: meta?.context ? { data: payload, context: meta.context } : payload,
+      });
       switch (action) {
           case 'addTrack':
               setIsAddTrackModalModalOpen(true);
@@ -898,47 +2772,7 @@ const App: React.FC = () => {
               break;
           case 'splitClipAtPlayhead':
               onSplitAt(payload as ClipId, currentTime);
-              // Also split automation data
-              setAutomationData(prev => {
-                const updated = { ...prev };
-                const clipToSplit = clips.find(c => c.id === payload);
-                if (clipToSplit && updated[clipToSplit.trackId]) {
-                  for (const fxId in updated[clipToSplit.trackId]) {
-                    for (const paramName in updated[clipToSplit.trackId][fxId]) {
-                      const points = updated[clipToSplit.trackId][fxId][paramName];
-                      if (points) {
-                        const newPoints: AutomationPoint[] = [];
-                        let splitValue = 0; // Value at the split point
-                        
-                        // Determine value at split point for two new points
-                        const nextPointIndex = points.findIndex(p => p.time > currentTime);
-                        if (nextPointIndex === 0) {
-                            splitValue = points[0].value;
-                        } else if (nextPointIndex === -1) {
-                            splitValue = points[points.length - 1].value;
-                        } else {
-                            const prevPoint = points[nextPointIndex - 1];
-                            const nextPoint = points[nextPointIndex];
-                            const timeDiff = nextPoint.time - prevPoint.time;
-                            const factor = (currentTime - prevPoint.time) / timeDiff;
-                            splitValue = prevPoint.value + factor * (nextPoint.value - prevPoint.value);
-                        }
-
-                        // Filter points, add new points at split time
-                        const firstPartPoints = points.filter(p => p.time < currentTime);
-                        const secondPartPoints = points.filter(p => p.time > currentTime);
-                        
-                        // Add split points for each new clip, ensuring value continuity
-                        if (firstPartPoints.length > 0 || secondPartPoints.length > 0) {
-                           newPoints.push(...firstPartPoints, { time: currentTime, value: splitValue }, { time: currentTime, value: splitValue }, ...secondPartPoints);
-                        }
-                        updated[clipToSplit.trackId][fxId][paramName] = newPoints.sort((a,b) => a.time - b.time);
-                      }
-                    }
-                  }
-                }
-                return updated;
-              });
+              splitAutomationAt(payload as ClipId, currentTime);
               break;
           case 'duplicateClips':
               duplicateClips(payload as ClipId[]);
@@ -979,6 +2813,31 @@ const App: React.FC = () => {
           case 'openAIHub':
               setIsAIHubOpen(true);
               break;
+          case 'toggleFollowPlayhead':
+              setFollowPlayhead((prev) => {
+                const next = !prev;
+                appendHistoryNote({
+                  id: `timeline-follow-${Date.now()}`,
+                  timestamp: Date.now(),
+                  scope: "timeline",
+                  message: next ? 'Follow playhead enabled' : 'Follow playhead paused',
+                  accent: TRACK_COLOR_SWATCH.cyan.glow,
+                });
+                return next;
+              });
+              break;
+          case 'splitSelection':
+              handleSplitSelectionAt((payload as { time?: number } | undefined)?.time);
+              break;
+          case 'consolidateSelection':
+              handleConsolidateSelection();
+              break;
+          case 'recallLastImport':
+              handleRecallLastImport();
+              break;
+          case 'reingestClip':
+              handleReingestClip(payload as ClipId | undefined);
+              break;
           default:
               console.warn(`Unknown Bloom HUD action: ${action}`);
       }
@@ -998,6 +2857,25 @@ const App: React.FC = () => {
       ...prev,
       [newTrackData.id]: []
     }));
+    setTrackSendLevels(prev => ({
+      ...prev,
+      [newTrackData.id]: createDefaultSendLevels(newTrackData),
+    }));
+    setChannelDynamicsSettings(prev => ({
+      ...prev,
+      [newTrackData.id]: createDefaultDynamicsSettings(newTrackData),
+    }));
+    setChannelEQSettings(prev => ({
+      ...prev,
+      [newTrackData.id]: createDefaultEQSettings(newTrackData),
+    }));
+    setSelectedBusId((prev) => {
+      if (prev) return prev;
+      const defaultBus = MIXER_BUS_DEFINITIONS.find((bus) =>
+        bus.groups.includes(newTrackData.group)
+      );
+      return defaultBus?.id ?? null;
+    });
     setSelectedTrackId(newTrackData.id); // UX improvement: select the new track
     setIsAddTrackModalModalOpen(false);
   }, []);
@@ -1025,6 +2903,73 @@ const App: React.FC = () => {
     [handleMixerChange]
   );
 
+  const resolveTrackDefaults = useCallback(
+    (trackId: string): TrackData =>
+      tracksRef.current.find((track) => track.id === trackId) ?? INITIAL_TRACK,
+    []
+  );
+
+  const handleSendLevelChange = useCallback(
+    (trackId: string, busId: string, value: number) => {
+      const typedBus = busId as MixerBusId;
+      setTrackSendLevels((prev) => {
+        const existing = prev[trackId] ?? createDefaultSendLevels(resolveTrackDefaults(trackId));
+        return {
+          ...prev,
+          [trackId]: {
+            ...existing,
+            [typedBus]: clamp01(value),
+          },
+        };
+      });
+    },
+    [resolveTrackDefaults]
+  );
+
+  const handleDynamicsSettingsChange = useCallback(
+    (trackId: string, patch: Partial<ChannelDynamicsSettings>) => {
+      setChannelDynamicsSettings((prev) => {
+        const current = prev[trackId] ?? createDefaultDynamicsSettings(resolveTrackDefaults(trackId));
+        const sanitized = Object.entries(patch).reduce(
+          (acc, [key, val]) => {
+            if (typeof val === 'number') {
+              acc[key as keyof ChannelDynamicsSettings] = clamp01(val);
+            }
+            return acc;
+          },
+          {} as Partial<ChannelDynamicsSettings>
+        );
+        return {
+          ...prev,
+          [trackId]: { ...current, ...sanitized },
+        };
+      });
+    },
+    [resolveTrackDefaults]
+  );
+
+  const handleEQSettingsChange = useCallback(
+    (trackId: string, patch: Partial<ChannelEQSettings>) => {
+      setChannelEQSettings((prev) => {
+        const current = prev[trackId] ?? createDefaultEQSettings(resolveTrackDefaults(trackId));
+        const sanitized = Object.entries(patch).reduce(
+          (acc, [key, val]) => {
+            if (typeof val === 'number') {
+              acc[key as keyof ChannelEQSettings] = clamp01(val);
+            }
+            return acc;
+          },
+          {} as Partial<ChannelEQSettings>
+        );
+        return {
+          ...prev,
+          [trackId]: { ...current, ...sanitized },
+        };
+      });
+    },
+    [resolveTrackDefaults]
+  );
+
   const handleToggleSolo = (trackId: string) => {
     setSoloedTracks(prev => {
         const newSet = new Set(prev);
@@ -1049,16 +2994,324 @@ const App: React.FC = () => {
     });
   }
 
+  const handleTrackContextChange = useCallback(
+    (trackId: string, nextContext: TrackContextMode) => {
+      let didUpdate = false;
+      setTrackUiState((prev) => {
+        const current =
+          prev[trackId] ??
+          {
+            context: DEFAULT_TRACK_CONTEXT,
+            laneHeight: DEFAULT_TRACK_LANE_HEIGHT,
+            collapsed: false,
+          };
+        if (current.context === nextContext) {
+          return prev;
+        }
+        didUpdate = true;
+        return {
+          ...prev,
+          [trackId]: { ...current, context: nextContext },
+        };
+      });
+      if (didUpdate) {
+        publishAlsSignal({
+          source: "arrange",
+          meta: { trackId, context: nextContext },
+        });
+      }
+    },
+    []
+  );
+
+  const handleToggleTrackCollapse = useCallback((trackId: string) => {
+    setTrackUiState((prev) => {
+      const current = prev[trackId];
+      if (!current) return prev;
+      const collapsed = !current.collapsed;
+      return {
+        ...prev,
+        [trackId]: { ...current, collapsed },
+      };
+    });
+  }, []);
+
+  const persistCurrentPianoRoll = useCallback((): MidiNote[] => {
+    if (!pianoRollClipId) return [];
+    const exported = exportPianoNotes();
+    setPianoRollStore((prev) => {
+      if (!exported.length) {
+        if (!prev[pianoRollClipId]) {
+          return prev;
+        }
+        const next = { ...prev };
+        delete next[pianoRollClipId];
+        return next;
+      }
+      return {
+        ...prev,
+        [pianoRollClipId]: exported,
+      };
+    });
+    return exported;
+  }, [exportPianoNotes, pianoRollClipId]);
+
+  const applyWarpAnchorsToClip = useCallback(
+    (
+      clipId: ClipId | null,
+      notes: MidiNote[],
+      origin: "commit" | "warp" | "export"
+    ) => {
+      if (!clipId) {
+        return { anchors: [] as number[], clip: null as ArrangeClip | null };
+      }
+      const clip = clipsRef.current.find((entry) => entry.id === clipId) ?? null;
+      if (!clip) {
+        return { anchors: [] as number[], clip: null };
+      }
+      const anchors = deriveWarpAnchorsFromNotes(notes, clip.duration);
+      setClips((prev) =>
+        prev.map((entry) =>
+          entry.id === clipId ? { ...entry, warpAnchors: anchors } : entry
+        )
+      );
+      const track = resolveTrackDefaults(clip.trackId);
+      const swatch = TRACK_COLOR_SWATCH[track.trackColor];
+      const anchorCount = anchors.length;
+      const noteCount = notes.length;
+      let message: string;
+      switch (origin) {
+        case "warp":
+          message = anchorCount
+            ? `Warp anchors refreshed (${anchorCount})`
+            : "Warp anchors cleared";
+          break;
+        case "export":
+          message = noteCount
+            ? `MIDI blueprint exported (${noteCount} notes)`
+            : "No MIDI notes to export from this clip";
+          break;
+        default:
+          message = anchorCount
+            ? `Piano Roll locked • ${noteCount} notes, ${anchorCount} warp pins`
+            : `Piano Roll locked • ${noteCount} notes`;
+      }
+      appendHistoryNote({
+        id: `piano-roll-${origin}-${Date.now()}`,
+        timestamp: Date.now(),
+        scope: "timeline",
+        message,
+        accent: swatch.glow,
+      });
+      const bloomAction =
+        origin === "warp"
+          ? "pianoRollWarpAnchors"
+          : origin === "export"
+          ? "pianoRollExportMidi"
+          : "pianoRollCommit";
+      publishBloomSignal({
+        source: "system",
+        action: bloomAction,
+        payload: {
+          clipId,
+          trackId: clip.trackId,
+          origin,
+          noteCount,
+          warpAnchorCount: anchorCount,
+        },
+      });
+      publishAlsSignal({
+        source: "arrange",
+        meta: {
+          trackId: clip.trackId,
+          clipId,
+          origin,
+          pianoRoll: {
+            noteCount,
+            warpAnchors: anchors,
+          },
+        },
+      });
+      return { anchors, clip };
+    },
+    [appendHistoryNote, publishAlsSignal, publishBloomSignal, resolveTrackDefaults, setClips]
+  );
+
+  const handleOpenPianoRoll = useCallback(
+    (targetClip: ArrangeClip) => {
+      persistCurrentPianoRoll();
+      const trackMatch =
+        tracks.find((entry) => entry.id === targetClip.trackId) ?? null;
+      const swatch = TRACK_COLOR_SWATCH[trackMatch?.trackColor ?? "cyan"];
+      const storedNotes = pianoRollStore[targetClip.id] ?? [];
+      loadPianoNotes(storedNotes, swatch.base);
+      setPianoRollState((prev) => ({
+        ...prev,
+        playheadPosition: 0,
+        scrollX: 0,
+      }));
+      setSelectedTrackId(targetClip.trackId);
+      handleTrackContextChange(targetClip.trackId, "edit");
+      appendHistoryNote({
+        id: `timeline-pr-${Date.now()}`,
+        timestamp: Date.now(),
+        scope: "timeline",
+        message: `Piano Roll view engaged for ${targetClip.name}`,
+        accent: swatch.glow,
+      });
+      publishBloomSignal({
+        source: "system",
+        action: "openPianoRoll",
+        payload: { clipId: targetClip.id, trackId: targetClip.trackId },
+      });
+      setPianoRollTrackId(targetClip.trackId);
+      setPianoRollClipId(targetClip.id);
+      setIsPianoRollOpen(true);
+    },
+    [
+      appendHistoryNote,
+      handleTrackContextChange,
+      loadPianoNotes,
+      persistCurrentPianoRoll,
+      pianoRollStore,
+      publishBloomSignal,
+      setPianoRollState,
+      tracks,
+    ]
+  );
+
+  const handleClosePianoRoll = useCallback(() => {
+    persistCurrentPianoRoll();
+    if (pianoRollTrackId) {
+      handleTrackContextChange(pianoRollTrackId, DEFAULT_TRACK_CONTEXT);
+    }
+    setIsPianoRollOpen(false);
+    setPianoRollClipId(null);
+    setPianoRollTrackId(null);
+  }, [handleTrackContextChange, persistCurrentPianoRoll, pianoRollTrackId]);
+
+  const handleCommitPianoRoll = useCallback(() => {
+    const notes = persistCurrentPianoRoll();
+    applyWarpAnchorsToClip(pianoRollClipId, notes, "commit");
+  }, [applyWarpAnchorsToClip, persistCurrentPianoRoll, pianoRollClipId]);
+
+  const handleApplyWarpAnchors = useCallback(() => {
+    const notes = persistCurrentPianoRoll();
+    applyWarpAnchorsToClip(pianoRollClipId, notes, "warp");
+  }, [applyWarpAnchorsToClip, persistCurrentPianoRoll, pianoRollClipId]);
+
+  const handleExportPianoRollMidi = useCallback(() => {
+    const notes = persistCurrentPianoRoll();
+    const { clip } = applyWarpAnchorsToClip(pianoRollClipId, notes, "export");
+    if (!clip || !notes.length) {
+      return;
+    }
+    try {
+      const payload = {
+        clipId: clip.id,
+        trackId: clip.trackId,
+        trackName: resolveTrackDefaults(clip.trackId).trackName,
+        notes,
+      };
+      const json = JSON.stringify(payload, null, 2);
+      const blob = new Blob([json], { type: "application/json" });
+      const url = URL.createObjectURL(blob);
+      const anchor = document.createElement("a");
+      anchor.href = url;
+      anchor.download = `${clip.name.replace(/\s+/g, "_")}-piano-roll.json`;
+      anchor.click();
+      URL.revokeObjectURL(url);
+    } catch (error) {
+      console.warn("[PIANO ROLL] Failed to export MIDI sketch:", error);
+    }
+  }, [applyWarpAnchorsToClip, persistCurrentPianoRoll, pianoRollClipId, resolveTrackDefaults]);
+
+  const activePianoClip = useMemo(
+    () =>
+      pianoRollClipId
+        ? clips.find((clip) => clip.id === pianoRollClipId) ?? null
+        : null,
+    [clips, pianoRollClipId]
+  );
+
+  const activePianoTrack = useMemo(
+    () =>
+      pianoRollTrackId
+        ? tracks.find((track) => track.id === pianoRollTrackId) ?? null
+        : null,
+    [tracks, pianoRollTrackId]
+  );
+
+  useEffect(() => {
+    if (viewMode !== "arrange" && isPianoRollOpen) {
+      handleClosePianoRoll();
+    }
+  }, [handleClosePianoRoll, isPianoRollOpen, viewMode]);
+
+  const handleResizeTrack = useCallback((trackId: string, height: number) => {
+    const clamped = Math.max(
+      MIN_TRACK_LANE_HEIGHT,
+      Math.min(MAX_TRACK_LANE_HEIGHT, height)
+    );
+    setTrackUiState((prev) => {
+      const current = prev[trackId];
+      if (!current) return prev;
+      if (Math.abs(current.laneHeight - clamped) < 1) {
+        return prev;
+      }
+      return {
+        ...prev,
+        [trackId]: { ...current, laneHeight: clamped, collapsed: false },
+      };
+    });
+  }, []);
+
+  const handleOpenTrackCapsule = useCallback((trackId: string) => {
+    setActiveCapsuleTrackId(trackId);
+    publishAlsSignal({
+      source: "arrange",
+      meta: { trackId, capsule: "open" },
+    });
+  }, []);
+
+  const handleCloseTrackCapsule = useCallback(() => {
+    setActiveCapsuleTrackId(null);
+  }, []);
+
   const handleContextMenu = (e: React.MouseEvent, trackId: string) => {
     e.preventDefault();
     setContextMenu({ x: e.clientX, y: e.clientY, trackId });
   };
 
   const handleDeleteTrack = (trackId: string) => {
+    const removedClipIds = clipsRef.current
+      .filter((clip) => clip.trackId === trackId)
+      .map((clip) => clip.id);
+    if (removedClipIds.length) {
+      setPianoRollStore((prev) => {
+        const next = { ...prev };
+        removedClipIds.forEach((clipId) => {
+          delete next[clipId];
+        });
+        return next;
+      });
+    }
     setTracks(prev => prev.filter(t => t.id !== trackId));
     setClips(prev => prev.filter(c => c.trackId !== trackId));
     setMixerSettings(prev => { const { [trackId]: _, ...rest } = prev; return rest; });
     setInserts(prev => { const { [trackId]: _, ...rest } = prev; return rest; });
+    setTrackSendLevels(prev => {
+      const { [trackId]: _, ...rest } = prev;
+      return rest;
+    });
+    setChannelDynamicsSettings(prev => {
+      const { [trackId]: _, ...rest } = prev;
+      return rest;
+    });
+    setChannelEQSettings(prev => {
+      const { [trackId]: _, ...rest } = prev;
+      return rest;
+    });
     setAutomationData(prev => { const { [trackId]: _, ...rest } = prev; return rest; });
     setVisibleAutomationLanes(prev => { const { [trackId]: _, ...rest } = prev; return rest; });
     setSoloedTracks(prev => { const newSet = new Set(prev); newSet.delete(trackId); return newSet; });
@@ -1077,6 +3330,179 @@ const App: React.FC = () => {
     setChangeColorModal(null);
   };
   
+  const rebuildTrackRouting = useCallback((trackId: string) => {
+    const ctx = audioContextRef.current;
+    const master = masterNodesRef.current;
+    if (!ctx || !master) return;
+
+    const trackNodes = trackNodesRef.current[trackId];
+    if (!trackNodes) return;
+
+    try {
+      trackNodes.input.disconnect();
+      trackNodes.gain.disconnect();
+      trackNodes.panner.disconnect();
+      trackNodes.analyser.disconnect();
+    } catch (error) {
+      console.warn(`[AUDIO] Failed to disconnect nodes for track ${trackId}`, error);
+    }
+
+    trackNodes.input.connect(trackNodes.gain);
+    trackNodes.gain.connect(trackNodes.panner);
+
+    let currentOutput: AudioNode = trackNodes.panner;
+    const trackInserts = insertsRef.current[trackId] || [];
+    trackInserts.forEach((fxId) => {
+      const fxNode = fxNodesRef.current[fxId];
+      if (fxNode) {
+        try {
+          currentOutput.connect(fxNode.input);
+          currentOutput = fxNode.output;
+        } catch (error) {
+          console.warn(`[AUDIO] Failed to connect FX ${fxId} for track ${trackId}`, error);
+        }
+      }
+    });
+
+    currentOutput.connect(trackNodes.analyser);
+    currentOutput.connect(master.input);
+  }, []);
+
+  const resolvePluginMeta = useCallback(
+    (pluginId: FxWindowId) => {
+      const registryEntry = pluginRegistry.find((plugin) => plugin.id === pluginId);
+      const palette = pluginPaletteMap[pluginId];
+      return {
+        name: registryEntry?.name ?? pluginId,
+        palette:
+          palette ?? {
+            colorKey: 'purple' as TrackColorKey,
+            base: TRACK_COLOR_SWATCH.purple.base,
+            glow: TRACK_COLOR_SWATCH.purple.glow,
+          },
+      };
+    },
+    [pluginPaletteMap, pluginRegistry]
+  );
+
+  const emitMixerAction = useCallback(
+    (trackId: string | null, action: string, pluginId: FxWindowId, energy = 0.6) => {
+      const meta = resolvePluginMeta(pluginId);
+      const palette = derivePulsePalette(meta.palette.colorKey, energy, energy * 0.75);
+      const pulse = deriveActionPulse(palette, energy);
+      if (trackId) {
+        setMixerActionPulse({
+          trackId,
+          pulse,
+          message: `${action} • ${meta.name}`,
+        });
+      }
+      appendHistoryNote({
+        id: `mixer-${pluginId}-${Date.now()}`,
+        timestamp: Date.now(),
+        scope: 'mixer',
+        message: `${action} • ${meta.name}`,
+        accent: palette.accent,
+      });
+    },
+    [resolvePluginMeta]
+  );
+
+  const snapshotPluginParams = useCallback(
+    (pluginId: FxWindowId): Record<string, number> => {
+      const engine = engineInstancesRef.current.get(pluginId);
+      if (!engine) return {};
+      const names = engine.getParameterNames();
+      if (!names || names.length === 0) {
+        const windowConfig = fxWindows.find((fx) => fx.id === pluginId);
+        if (windowConfig && windowConfig.params && typeof windowConfig.params === 'object') {
+          return Object.entries(windowConfig.params).reduce<Record<string, number>>(
+            (acc, [key, value]) => {
+              if (typeof value === 'number') acc[key] = value;
+              return acc;
+            },
+            {}
+          );
+        }
+        return {};
+      }
+
+      return names.reduce<Record<string, number>>((acc, paramName) => {
+        acc[paramName] = engine.getParameter(paramName);
+        return acc;
+      }, {});
+    },
+    [fxWindows]
+  );
+
+  const applyPluginParams = useCallback(
+    (pluginId: FxWindowId, params: Record<string, number>) => {
+      const engine = engineInstancesRef.current.get(pluginId);
+      if (!engine) return;
+      Object.entries(params).forEach(([param, value]) => {
+        engine.setParameter(param, value);
+      });
+
+      switch (pluginId) {
+        case 'velvet-curve':
+          setVelvetCurveState(getVelvetCurveEngine().getState());
+          break;
+        case 'harmonic-lattice':
+          setHarmonicLatticeState(getHarmonicLattice().getHarmonicLatticeState());
+          break;
+        case 'mixx-fx':
+          // Mixx FX updates directly via engine; nothing additional needed
+          break;
+        default:
+          break;
+      }
+    },
+    []
+  );
+
+  const handleTogglePluginFavorite = useCallback((pluginId: FxWindowId) => {
+    setPluginFavorites((prev) => {
+      const next = { ...prev, [pluginId]: !prev[pluginId] };
+      if (!next[pluginId]) {
+        delete next[pluginId];
+      }
+      return { ...next };
+    });
+  }, []);
+
+  const handleSavePluginPreset = useCallback(
+    (pluginId: FxWindowId, label: string, trackContext?: string) => {
+      const params = snapshotPluginParams(pluginId);
+      if (!Object.keys(params).length) {
+        console.warn(`[PRESET] No parameters captured for plugin ${pluginId}.`);
+        return;
+      }
+      const preset: PluginPreset = {
+        id: `${pluginId}-${Date.now()}`,
+        label,
+        params,
+        savedAt: new Date().toISOString(),
+        trackContext,
+      };
+      setPluginPresets((prev) => upsertPluginPreset(prev, pluginId, preset));
+    },
+    [snapshotPluginParams]
+  );
+
+  const handleLoadPluginPreset = useCallback(
+    (pluginId: FxWindowId, presetId: string) => {
+      const bank = pluginPresets[pluginId] ?? [];
+      const preset = bank.find((entry) => entry.id === presetId);
+      if (!preset) return;
+      applyPluginParams(pluginId, preset.params);
+    },
+    [applyPluginParams, pluginPresets]
+  );
+
+  const handleDeletePluginPreset = useCallback((pluginId: FxWindowId, presetId: string) => {
+    setPluginPresets((prev) => removePluginPreset(prev, pluginId, presetId));
+  }, []);
+
   // --- Dynamic Plugin Management ---
   const handleAddPlugin = useCallback((trackId: string, pluginId: FxWindowId) => {
     setInserts(prev => {
@@ -1093,61 +3519,82 @@ const App: React.FC = () => {
     }));
     setIsPluginBrowserOpen(false);
     setTrackIdForPluginBrowser(null);
-  }, []);
+    emitMixerAction(trackId, 'Insert Added', pluginId, 0.72);
+  }, [emitMixerAction]);
 
   const handleRemovePlugin = useCallback((trackId: string, index: number) => {
+    let removedPluginId: FxWindowId | undefined;
     setInserts(prev => {
       const currentInserts = prev[trackId] || [];
-      const removedPluginId = currentInserts[index];
+      removedPluginId = currentInserts[index];
+      if (!removedPluginId) {
+        return prev;
+      }
       const updatedInserts = currentInserts.filter((_, i) => i !== index);
-      
-      // Clear automation data for the removed plugin
-      setAutomationData(autoPrev => {
-        const updatedAutomation = { ...autoPrev };
-        if (updatedAutomation[trackId] && removedPluginId) {
-          const { [removedPluginId]: _, ...restFxAutomation } = updatedAutomation[trackId];
-          updatedAutomation[trackId] = restFxAutomation;
-        }
-        return updatedAutomation;
-      });
-
-      // Clear visible automation lane if it belonged to the removed plugin
-      setVisibleAutomationLanes(visiblePrev => {
-        const updatedVisible = { ...visiblePrev };
-        if (updatedVisible[trackId]?.fxId === removedPluginId) {
-          updatedVisible[trackId] = null;
-        }
-        return updatedVisible;
-      });
-
-      // Reset bypass state for the removed plugin
-      setFxBypassState(bypassPrev => {
-        const updatedBypass = { ...bypassPrev };
-        if (removedPluginId) {
-          const { [removedPluginId]: _, ...restBypassState } = updatedBypass;
-          return restBypassState;
-        }
-        return bypassPrev;
-      });
-
       return {
         ...prev,
         [trackId]: updatedInserts,
       };
     });
-  }, []);
+
+    if (!removedPluginId) {
+      return;
+    }
+
+    setAutomationData(autoPrev => {
+      const updatedAutomation = { ...autoPrev };
+      if (updatedAutomation[trackId]) {
+        const { [removedPluginId!]: _, ...restFxAutomation } = updatedAutomation[trackId];
+        updatedAutomation[trackId] = restFxAutomation;
+      }
+      return updatedAutomation;
+    });
+
+    setVisibleAutomationLanes(visiblePrev => {
+      const updatedVisible = { ...visiblePrev };
+      if (updatedVisible[trackId]?.fxId === removedPluginId) {
+        updatedVisible[trackId] = null;
+      }
+      return updatedVisible;
+    });
+
+    setFxBypassState(bypassPrev => {
+      const updatedBypass = { ...bypassPrev };
+      const { [removedPluginId!]: _, ...restBypassState } = updatedBypass;
+      return restBypassState;
+    });
+
+    emitMixerAction(trackId, 'Insert Removed', removedPluginId, 0.55);
+  }, [emitMixerAction]);
 
   const handleMovePlugin = useCallback((trackId: string, fromIndex: number, toIndex: number) => {
+    let movedPluginId: FxWindowId | undefined;
     setInserts(prev => {
       const currentInserts = prev[trackId] || [];
-      const [moved] = currentInserts.splice(fromIndex, 1);
-      currentInserts.splice(toIndex, 0, moved);
+      if (fromIndex < 0 || fromIndex >= currentInserts.length) {
+        return prev;
+      }
+      const updated = [...currentInserts];
+      const [moved] = updated.splice(fromIndex, 1);
+      if (!moved) {
+        return prev;
+      }
+      movedPluginId = moved;
+      updated.splice(toIndex, 0, moved);
       return {
         ...prev,
-        [trackId]: [...currentInserts], // Create new array for state update
+        [trackId]: updated,
       };
     });
-  }, []);
+
+    if (movedPluginId) {
+      emitMixerAction(trackId, 'Insert Moved', movedPluginId, 0.48);
+    }
+  }, [emitMixerAction]);
+
+  useEffect(() => {
+    tracks.forEach(track => rebuildTrackRouting(track.id));
+  }, [inserts, tracks, rebuildTrackRouting]);
 
     // --- Automation Handlers ---
   const handleToggleAutomationLane = useCallback((trackId: string, fxId: string, paramName: string) => {
@@ -1243,6 +3690,8 @@ const App: React.FC = () => {
         fxNodesRef.current = {};
         engineInstancesRef.current.clear();
         masterNodesRef.current = null;
+        trackMeterBuffersRef.current = {};
+        masterMeterBufferRef.current = null;
         audioContextRef.current = createdCtx;
         ctx = createdCtx;
 
@@ -1263,6 +3712,15 @@ const App: React.FC = () => {
 
         masterNodesRef.current = buildMasterChain(createdCtx);
         masterNodesRef.current.output.connect(createdCtx.destination);
+        const masterAnalyser = masterNodesRef.current.analyser;
+        masterAnalyser.fftSize = TRACK_ANALYSER_FFT;
+        masterAnalyser.smoothingTimeConstant = MASTER_ANALYSER_SMOOTHING;
+        masterAnalyser.minDecibels = MIN_DECIBELS;
+        masterAnalyser.maxDecibels = MAX_DECIBELS;
+        masterMeterBufferRef.current = ensureMasterMeterBuffers(
+          masterMeterBufferRef.current,
+          masterAnalyser
+        );
         console.log("Master Chain built and connected to destination.");
         
         const initialPluginRegistry = getPluginRegistry(createdCtx);
@@ -1298,6 +3756,37 @@ const App: React.FC = () => {
           integration.onProgress((message, percent) => {
             const suffix = typeof percent === 'number' ? ` (${Math.round(percent)}%)` : '';
             setImportMessage(`${message}${suffix}`);
+            const jobId = activeStemJobRef.current;
+            if (!jobId) {
+              return;
+            }
+            ingestQueueRef.current?.reportProgress(jobId, {
+              percent: typeof percent === 'number' ? percent : undefined,
+              message,
+            });
+            const normalizedMessage = message.toLowerCase();
+            const match = STEM_MESSAGE_MATCHERS.find((matcher) =>
+              matcher.keywords.some((keyword) => normalizedMessage.includes(keyword))
+            );
+            if (match) {
+              const colorKey = STEM_COLOR_BY_KEY[match.key] ?? 'cyan';
+              const accent = TRACK_COLOR_SWATCH[colorKey].glow;
+              upsertImportProgress({
+                id: `${jobId}::${match.key}`,
+                parentId: jobId,
+                label: `${match.key.toUpperCase()} LANE`,
+                percent: typeof percent === 'number' ? percent : 0,
+                type: 'stem',
+                color: accent,
+              });
+            } else {
+              upsertImportProgress({
+                id: jobId,
+                label: message,
+                percent: typeof percent === 'number' ? percent : 0,
+                type: 'file',
+              });
+            }
           });
           stemIntegrationRef.current = integration;
         }
@@ -1347,6 +3836,8 @@ const App: React.FC = () => {
         engineInstancesRef.current.clear();
 
         masterNodesRef.current = null;
+        masterMeterBufferRef.current = null;
+        trackMeterBuffersRef.current = {};
         hushProcessorNodeRef.current = null;
         micSourceNodeRef.current = null;
 
@@ -1356,7 +3847,7 @@ const App: React.FC = () => {
             contextToClose.close().catch(() => {});
         }
     };
-  }, []);
+  }, [upsertImportProgress]);
 
 
   // Set clock for beat-locked LFOs
@@ -1398,6 +3889,19 @@ const App: React.FC = () => {
             // Initial connection will be handled by the main routing useEffect
             // Nodes are created, but connections established later
         }
+
+        const analyser = trackNodesRef.current[track.id]?.analyser;
+        if (analyser) {
+          analyser.fftSize = TRACK_ANALYSER_FFT;
+          analyser.smoothingTimeConstant = TRACK_ANALYSER_SMOOTHING;
+          analyser.minDecibels = MIN_DECIBELS;
+          analyser.maxDecibels = MAX_DECIBELS;
+          trackMeterBuffersRef.current[track.id] = ensureTrackMeterBuffers(
+            trackMeterBuffersRef.current,
+            track.id,
+            analyser
+          );
+        }
     });
 
     // Destroy nodes for removed tracks
@@ -1412,6 +3916,7 @@ const App: React.FC = () => {
               nodes.analyser.disconnect();
             } catch (e) { console.warn(`Error disconnecting nodes for track ${id}:`, e); }
             delete trackNodesRef.current[id];
+            delete trackMeterBuffersRef.current[id];
             console.log(`%c[AUDIO] Disposed nodes for track: ${id}`, "color: grey");
         }
     });
@@ -1482,9 +3987,21 @@ const App: React.FC = () => {
     }, [pluginRegistry, audioContextRef.current]);
 
     // Update FX bypass state
-    const onToggleBypass = useCallback((fxId: FxWindowId) => {
-      setFxBypassState(prev => ({ ...prev, [fxId]: !prev[fxId] }));
-    }, []);
+    const handleToggleBypass = useCallback((fxId: FxWindowId, trackId?: string) => {
+      let nextBypassState = false;
+      setFxBypassState(prev => {
+        const previous = prev[fxId] ?? false;
+        nextBypassState = !previous;
+        return { ...prev, [fxId]: nextBypassState };
+      });
+
+      emitMixerAction(
+        trackId ?? null,
+        nextBypassState ? 'Insert Bypassed' : 'Insert Engaged',
+        fxId,
+        nextBypassState ? 0.4 : 0.6
+      );
+    }, [emitMixerAction]);
 
     useEffect(() => {
         Object.entries(fxBypassState).forEach(([id, isBypassed]) => {
@@ -1539,33 +4056,33 @@ const App: React.FC = () => {
             });
         }
 
-        // Route each track's signal
-        tracks.forEach(track => {
-            const trackNodes = trackNodesRef.current[track.id];
-            if (!trackNodes) return;
+    // Route each track's signal
+    tracks.forEach(track => {
+        const trackNodes = trackNodesRef.current[track.id];
+        if (!trackNodes) return;
 
-            // Internal chain: Input -> Gain -> Panner
-            trackNodes.input.connect(trackNodes.gain);
-            trackNodes.gain.connect(trackNodes.panner);
+        // Internal chain: Input -> Gain -> Panner
+        trackNodes.input.connect(trackNodes.gain);
+        trackNodes.gain.connect(trackNodes.panner);
 
-            let currentOutput: AudioNode = trackNodes.panner;
-            const trackInserts = inserts[track.id] || [];
+        let currentOutput: AudioNode = trackNodes.panner;
+        const trackInserts = insertsRef.current[track.id] || [];
 
-            // Inserts chain
-            trackInserts.forEach(fxId => {
-                const fxNode = fxNodesRef.current[fxId];
-                if (fxNode) {
-                    currentOutput.connect(fxNode.input);
-                    currentOutput = fxNode.output;
-                }
-            });
-
-            // Post-inserts: connect to analyser for monitoring and then to master
-            currentOutput.connect(trackNodes.analyser);
-            currentOutput.connect(masterInput);
+        // Inserts chain
+        trackInserts.forEach(fxId => {
+            const fxNode = fxNodesRef.current[fxId];
+            if (fxNode) {
+                currentOutput.connect(fxNode.input);
+                currentOutput = fxNode.output;
+            }
         });
 
-    }, [inserts, tracks, fxBypassState, armedTracks, pluginRegistry]);
+        // Post-inserts: connect to analyser for monitoring and then to master
+        currentOutput.connect(trackNodes.analyser);
+        currentOutput.connect(masterInput);
+    });
+
+}, [tracks, armedTracks, pluginRegistry]);
 
     // Manage Microphone Stream
     useEffect(() => {
@@ -1737,8 +4254,6 @@ const App: React.FC = () => {
     useEffect(() => { mixerSettingsRef.current = mixerSettings; }, [mixerSettings]);
     const automationDataRef = useRef(automationData);
     useEffect(() => { automationDataRef.current = automationData; }, [automationData]);
-    const insertsRef = useRef(inserts);
-    useEffect(() => { insertsRef.current = inserts; }, [inserts]);
 
 
     const getAutomationValue = useCallback((trackId: string, fxId: string, paramName: string, time: number): number | null => {
@@ -1766,7 +4281,7 @@ const App: React.FC = () => {
 
     useEffect(() => {
         const ctx = audioContextRef.current;
-        if (!ctx || ctx.state === 'closed' || (isPlaying && armedTracks.size > 0)) return; // Analysis loop is controlled by recording state if armed
+        if (!ctx || ctx.state === 'closed') return;
 
         const analysisLoop = () => {
             if (!isPlayingRef.current) {
@@ -1777,50 +4292,76 @@ const App: React.FC = () => {
             const now = ctx.currentTime;
             const delta = now - lastUpdateTimeRef.current;
             lastUpdateTimeRef.current = now;
-            
+
             let newTime = currentTimeRef.current + delta;
-            
+
             if (newTime >= projectDurationRef.current) {
                 if (isLoopingRef.current) {
                     const timeOver = newTime - projectDurationRef.current;
                     newTime = timeOver % projectDurationRef.current;
-                    
+
                     console.log(`%c[DAW CORE] Project Loop Wrap. New Time: ${newTime.toFixed(2)}`, "color: cyan; font-weight: bold;");
-                    
+
                     lastUpdateTimeRef.current = now - timeOver;
                     scheduleClips(newTime); // Reschedule clips for gapless loop
                 } else {
-                     setIsPlaying(false);
-                     setCurrentTime(projectDurationRef.current);
-                     return;
+                    setIsPlaying(false);
+                    setCurrentTime(projectDurationRef.current);
+                    return;
                 }
             }
             setCurrentTime(newTime);
-            
-            const newTrackAnalysis: { [key: string]: TrackAnalysisData } = {};
-            let masterLevelSum = 0;
-            const waveformData = new Uint8Array(masterNodesRef.current!.analyser.frequencyBinCount);
-            
-            tracksRef.current.forEach(track => { // Use tracksRef to prevent stale closure
+
+            const nextTrackAnalysis: { [key: string]: TrackAnalysisData } = {};
+
+            tracksRef.current.forEach((track) => {
                 const analyser = trackNodesRef.current[track.id]?.analyser;
+                const automationDescriptor = automationDataRef.current[track.id];
+                const automationTargets = automationDescriptor
+                    ? Object.entries(automationDescriptor).flatMap(([scope, params]) =>
+                        Object.keys(params).map((paramName) => `${scope}:${paramName}`)
+                      )
+                    : [];
+
                 if (analyser) {
-                    const dataArray = new Uint8Array(analyser.frequencyBinCount);
-                    analyser.getByteTimeDomainData(dataArray);
-                    const level = dataArray.reduce((sum, val) => sum + Math.abs(val - 128), 0) / dataArray.length / 128;
-                    newTrackAnalysis[track.id] = { level, transient: false };
-                    masterLevelSum += level;
+                    const buffers = ensureTrackMeterBuffers(trackMeterBuffersRef.current, track.id, analyser);
+                    const metrics = measureAnalyser(analyser, buffers);
+
+                    nextTrackAnalysis[track.id] = {
+                        level: metrics.level,
+                        transient: metrics.transient,
+                        rms: metrics.rms,
+                        peak: metrics.peak,
+                        crestFactor: metrics.crestFactor,
+                        spectralTilt: metrics.spectralTilt,
+                        lowBandEnergy: metrics.lowBandEnergy,
+                        automationActive: automationTargets.length > 0,
+                        automationTargets,
+                    };
+                } else {
+                    nextTrackAnalysis[track.id] = {
+                        level: 0,
+                        transient: false,
+                        rms: 0,
+                        peak: 0,
+                        crestFactor: 1,
+                        spectralTilt: 0,
+                        lowBandEnergy: 0,
+                        automationActive: automationTargets.length > 0,
+                        automationTargets,
+                    };
                 }
 
                 const nodes = trackNodesRef.current[track.id];
                 const settings = mixerSettingsRef.current[track.id];
-                if (!nodes || !settings) return;
+                if (!nodes || !settings) {
+                    return;
+                }
 
                 const hasSolo = soloedTracksRef.current.size > 0;
                 const isSoloed = soloedTracksRef.current.has(track.id);
                 const isMuted = settings.isMuted || (hasSolo && !isSoloed);
 
-                // --- Apply Automation Data ---
-                // Volume Automation
                 let targetVolume = 0;
                 if (!isMuted) {
                     const automationValue = getAutomationValue(track.id, 'track', 'volume', newTime);
@@ -1828,67 +4369,77 @@ const App: React.FC = () => {
                 }
                 nodes.gain.gain.setTargetAtTime(targetVolume, ctx.currentTime, 0.01);
 
-                // Pan Automation
                 const panAutomationValue = getAutomationValue(track.id, 'track', 'pan', newTime);
                 const targetPan = panAutomationValue !== null ? panAutomationValue : settings.pan;
                 nodes.panner.pan.setTargetAtTime(targetPan, ctx.currentTime, 0.01);
-                
-                // FX Parameter Automation
+
                 const trackInserts = insertsRef.current[track.id] || [];
-                trackInserts.forEach(fxId => {
-                  const engineInstance = engineInstancesRef.current.get(fxId);
-                  if (engineInstance && automationDataRef.current[track.id]?.[fxId]) {
-                    const fxAutomation = automationDataRef.current[track.id][fxId];
-                    for (const paramName in fxAutomation) {
-                        const paramValue = getAutomationValue(track.id, fxId, paramName, newTime);
-                        if (paramValue !== null) {
-                            if (engineInstance.setParameter) {
+                trackInserts.forEach((fxId) => {
+                    const engineInstance = engineInstancesRef.current.get(fxId);
+                    if (engineInstance && automationDataRef.current[track.id]?.[fxId]) {
+                        const fxAutomation = automationDataRef.current[track.id][fxId];
+                        for (const paramName in fxAutomation) {
+                            const paramValue = getAutomationValue(track.id, fxId, paramName, newTime);
+                            if (paramValue !== null && engineInstance.setParameter) {
                                 engineInstance.setParameter(paramName, paramValue);
                             }
                         }
                     }
-                  }
                 });
             });
-            
-            masterNodesRef.current!.analyser.getByteTimeDomainData(waveformData);
-            const masterLevel = masterLevelSum / (tracksRef.current.length || 1); // Use tracksRef
-            masterLevelAvg.current = masterLevelAvg.current * 0.9 + masterLevel * 0.1;
 
-            const isTransient = masterLevel > masterLevelAvg.current + 0.2; // Simple transient detection
+            const masterAnalyser = masterNodesRef.current?.analyser ?? null;
+            if (masterAnalyser) {
+                const masterBuffers = ensureMasterMeterBuffers(masterMeterBufferRef.current, masterAnalyser);
+                masterMeterBufferRef.current = masterBuffers;
+                const masterMetrics = measureAnalyser(masterAnalyser, masterBuffers);
+                masterAnalyser.getByteTimeDomainData(
+                  masterBuffers.waveform as Uint8Array<ArrayBuffer>
+                );
+                const waveformData = Uint8Array.from(masterBuffers.waveform);
 
-            setTrackAnalysis(newTrackAnalysis);
-            setMasterAnalysis({ level: masterLevelAvg.current, transient: isTransient, waveform: waveformData });
+                masterLevelAvg.current = clamp01(
+                  masterLevelAvg.current * 0.75 + masterMetrics.level * 0.25
+                );
+
+                setMasterAnalysis({
+                    level: masterLevelAvg.current,
+                    transient: masterMetrics.transient,
+                    waveform: waveformData,
+                });
+            }
+
+            setTrackAnalysis(nextTrackAnalysis);
 
             animationFrameRef.current = requestAnimationFrame(analysisLoop);
         };
-        
+
         if (isPlaying) {
             lastUpdateTimeRef.current = ctx.currentTime;
             scheduleClips(currentTime); // Schedule clips at current time
             if (!animationFrameRef.current) {
-              if (ctx.state === 'suspended') {
-                ctx.resume().catch((error) => {
-                  console.warn('[AUDIO] Failed to resume context:', error);
-                });
-              }
-              animationFrameRef.current = requestAnimationFrame(analysisLoop);
+                if (ctx.state === 'suspended') {
+                    ctx.resume().catch((error) => {
+                        console.warn('[AUDIO] Failed to resume context:', error);
+                    });
+                }
+                animationFrameRef.current = requestAnimationFrame(analysisLoop);
             }
         } else {
             stopPlayback();
             if ((ctx.state as string) !== 'closed') {
-              ctx.suspend().catch((error) => {
-                console.warn('[AUDIO] Failed to suspend context:', error);
-              });
+                ctx.suspend().catch((error) => {
+                    console.warn('[AUDIO] Failed to suspend context:', error);
+                });
             }
         }
 
         return () => {
             stopPlayback();
             if ((ctx.state as string) !== 'closed') {
-              ctx.suspend().catch((error) => {
-                console.warn('[AUDIO] Failed to suspend context:', error);
-              });
+                ctx.suspend().catch((error) => {
+                    console.warn('[AUDIO] Failed to suspend context:', error);
+                });
             }
         };
     }, [isPlaying, scheduleClips, stopPlayback, getAutomationValue, armedTracks]);
@@ -1917,7 +4468,7 @@ const App: React.FC = () => {
           currentTime={currentTime}
           onClose={() => setFxVisibility(prev => ({ ...prev, [fw.id]: false }))}
           isBypassed={fxBypassState[fw.id]}
-          onToggleBypass={onToggleBypass}
+          onToggleBypass={(fxId) => handleToggleBypass(fxId, connectedTrackId)}
           connectedColor={connectedColor}
           onOpenPluginSettings={handleOpenPluginSettings}
         >
@@ -1938,7 +4489,7 @@ const App: React.FC = () => {
         </FXWindow>
       ) : null;
     });
-  }, [fxWindows, fxVisibility, isPlaying, currentTime, fxBypassState, inserts, tracks, automationData, handleAddAutomationPoint, handleUpdateAutomationPoint, handleDeleteAutomationPoint, selectedTrackId, setFxVisibility, onToggleBypass, handleOpenPluginSettings]);
+  }, [fxWindows, fxVisibility, isPlaying, currentTime, fxBypassState, inserts, tracks, automationData, handleAddAutomationPoint, handleUpdateAutomationPoint, handleDeleteAutomationPoint, selectedTrackId, setFxVisibility, handleToggleBypass, handleOpenPluginSettings]);
 
     const activeClip = useMemo(() => {
         if (!activePrimeBrainClipId) return null;
@@ -1949,8 +4500,8 @@ const App: React.FC = () => {
       const level = isPlaying ? masterAnalysis.level : 0;
       const intensity = Math.min(1, level * 2.5);
       const hue = 220 + intensity * 60; // From blue (220) to magenta (280)
-      const saturation = 40 + intensity * 30;
-      const lightness = 15 + intensity * 10;
+      const saturation = 60 + intensity * 20;
+      const lightness = 70 + intensity * 8;
       return {
           '--bg-glow-color': `hsl(${hue}, ${saturation}%, ${lightness}%)`
       } as React.CSSProperties;
@@ -1984,9 +4535,473 @@ const App: React.FC = () => {
     } as React.CSSProperties;
 }, [masterAnalysis.level, isPlaying, analysisResult]);
 
+  const mixerPulseAgent = useMemo<PulsePalette | null>(() => {
+    if (!tracks.length) {
+      return null;
+    }
+
+    let dominantColor: TrackColorKey = 'cyan';
+    let dominantIntensity = 0;
+    let pulseTotal = 0;
+    let counted = 0;
+
+    tracks.forEach((track) => {
+      const analysis = trackAnalysis[track.id];
+      const settings = mixerSettings[track.id];
+      if (!analysis && !settings) {
+        return;
+      }
+
+      const feedback = deriveTrackALSFeedback({
+        level: analysis?.level ?? 0,
+        transient: analysis?.transient ?? false,
+        volume: settings?.volume ?? 0.75,
+        color: track.trackColor,
+      });
+
+      const weightedIntensity = feedback.intensity * ((settings?.isMuted ?? false) ? 0.25 : 1);
+      if (weightedIntensity > dominantIntensity) {
+        dominantIntensity = weightedIntensity;
+        dominantColor = track.trackColor;
+      }
+
+      pulseTotal += feedback.pulse;
+      counted += 1;
+    });
+
+    if (!counted) {
+      return null;
+    }
+
+    const averagePulse = pulseTotal / counted;
+    return derivePulsePalette(dominantColor, dominantIntensity, averagePulse);
+  }, [mixerSettings, trackAnalysis, tracks]);
+
+  const bloomPulseAgent = useMemo<PulsePalette>(() => {
+    if (importMessage) {
+      return derivePulsePalette('magenta', 0.85, 0.55);
+    }
+
+    if (isHushActive) {
+      return derivePulsePalette('green', 0.7, 0.62);
+    }
+
+    if (mixerPulseAgent) {
+      return {
+        ...mixerPulseAgent,
+        pulseStrength: Math.max(mixerPulseAgent.pulseStrength, isPlaying ? 0.45 : 0.25),
+      };
+    }
+
+    const fallbackColor: TrackColorKey = isPlaying ? 'cyan' : 'purple';
+    const fallbackIntensity = isPlaying ? 0.55 : 0.3;
+    const fallbackPulse = isPlaying ? 0.48 : 0.22;
+    return derivePulsePalette(fallbackColor, fallbackIntensity, fallbackPulse);
+  }, [importMessage, isHushActive, isPlaying, mixerPulseAgent]);
+
+  const ingestJobs = ingestSnapshot.jobs;
+
+  const bloomContext = useMemo<BloomContext>(() => {
+    const ingestActive =
+      importProgress.length > 0 ||
+      ingestJobs.some((job) => ['processing', 'awaiting-user', 'pending'].includes(job.status));
+
+    if (ingestActive) return 'ingest';
+    if (isAIHubOpen) return 'ai';
+    if (isAnyTrackArmed || isHushActive) return 'record';
+    if (viewMode === 'mixer') return 'mix';
+    if (analysisResult) return 'master';
+    if (viewMode === 'arrange') return 'arrange';
+    return 'idle';
+  }, [
+    analysisResult,
+    importProgress,
+    ingestJobs,
+    isAIHubOpen,
+    isAnyTrackArmed,
+    isHushActive,
+    viewMode,
+  ]);
+
+  const bloomLabel = useMemo(() => BLOOM_CONTEXT_LABELS[bloomContext], [bloomContext]);
+  const bloomAccent = useMemo(() => BLOOM_CONTEXT_ACCENTS[bloomContext], [bloomContext]);
+
+  const bloomFloatingMenu = useMemo<Record<string, BloomFloatingMenu>>(() => {
+    const accent = BLOOM_CONTEXT_ACCENTS[bloomContext];
+    const meta = { source: 'bloom-floating' as const, context: { bloomContext } };
+
+    const attachAccent = (items: BloomFloatingMenuItem[]): BloomFloatingMenuItem[] =>
+      items.map((item) => ({
+        ...item,
+        accentColor: item.accentColor ?? accent,
+      }));
+
+    const buildSimpleMenu = (items: BloomFloatingMenuItem[]): Record<string, BloomFloatingMenu> => ({
+      main: { items: attachAccent(items) },
+    });
+
+    const buildIngestMenus = (): Record<string, BloomFloatingMenu> => {
+      const fileEntries = importProgress.filter((entry) => entry.type === 'file');
+      const stemEntries = importProgress.filter((entry) => entry.type === 'stem');
+      const activeQueueJobs = ingestJobs.filter((job) =>
+        ['processing', 'awaiting-user', 'pending'].includes(job.status)
+      );
+      const queuePercent =
+        activeQueueJobs.length > 0
+          ? activeQueueJobs.reduce((sum, job) => sum + (job.progressPercent ?? 0), 0) /
+            activeQueueJobs.length
+          : null;
+
+      const threads = fileEntries.map((entry) => {
+        const segments = entry.label.split('•').map((segment) => segment.trim()).filter(Boolean);
+        const displayLabel = segments[0] ?? entry.label;
+        const phaseDescriptor =
+          segments.length > 1 ? segments.slice(1).join(' • ') : 'Pipeline shaping through ALS.';
+        const stems = stemEntries.filter((stem) => stem.parentId === entry.id);
+        const threadAccent =
+          entry.color ??
+          stems[stems.length - 1]?.color ??
+          bloomPulseAgent.glow ??
+          BLOOM_CONTEXT_ACCENTS.ingest;
+        return { entry, stems, displayLabel, phaseDescriptor, accentColor: threadAccent };
+      });
+
+      const ingestAccent =
+        threads.length > 0
+          ? threads[threads.length - 1].accentColor
+          : bloomPulseAgent.glow ?? BLOOM_CONTEXT_ACCENTS.ingest;
+
+      const pipelineItems: BloomFloatingMenuItem[] = [
+        ...threads.map((thread) => ({
+          name: thread.displayLabel,
+          subMenu: `ingest/thread/${thread.entry.id}`,
+          description: thread.phaseDescriptor,
+          accentColor: thread.accentColor,
+          progressPercent: thread.entry.percent,
+        })),
+        ...activeQueueJobs.map((job) => ({
+          name: `Queue • ${stripFileExtension(job.fileName)}`,
+          description:
+            job.status === 'awaiting-user'
+              ? 'Awaiting stem selection.'
+              : job.progressMessage ?? `Status: ${job.status}`,
+          disabled: true,
+          accentColor: ingestAccent,
+          progressPercent: job.progressPercent ?? undefined,
+        })),
+      ];
+
+      if (!pipelineItems.length) {
+        pipelineItems.push({
+          name: 'Pipeline Idle',
+          description: 'No active imports or stem passes.',
+          disabled: true,
+          accentColor: ingestAccent,
+        });
+      }
+
+      const dynamicThreadMenus: Record<string, BloomFloatingMenu> = {};
+      threads.forEach((thread) => {
+        const submenuKey = `ingest/thread/${thread.entry.id}`;
+        const items =
+          thread.stems.length > 0
+            ? thread.stems.map((stem) => ({
+                name: stem.label,
+                description: 'Stem lane energy pulsing in ALS.',
+                disabled: true,
+                accentColor: stem.color ?? thread.accentColor,
+                progressPercent: stem.percent,
+              }))
+            : [
+                {
+                  name: 'Awaiting stem lanes',
+                  description: thread.phaseDescriptor,
+                  disabled: true,
+                  accentColor: thread.accentColor,
+                },
+              ];
+        dynamicThreadMenus[submenuKey] = {
+          parent: 'ingest/pipeline',
+          items,
+        };
+      });
+
+      const mainItems = attachAccent([
+        {
+          name: 'Pipeline',
+          subMenu: 'ingest/pipeline',
+          description: 'Active import threads and queue load.',
+          accentColor: ingestAccent,
+          progressPercent: queuePercent ?? undefined,
+        },
+        {
+          name: 'Add Sources',
+          description: 'Ingest more stems or references.',
+          action: () => handleBloomAction('importAudio', undefined, meta),
+        },
+        {
+          name: 'Recall Last Import',
+          description: 'Jump to the previous ingest pass.',
+          action: () => handleBloomAction('recallLastImport', undefined, meta),
+          disabled: !canRecallLastImport,
+        },
+        {
+          name: 'Prime Assist',
+          description: 'Send the mix to Prime Brain for guidance.',
+          accentColor: BLOOM_CONTEXT_ACCENTS.ai,
+          action: () => handleBloomAction('openAIHub', undefined, meta),
+        },
+      ]);
+
+      return {
+        main: { items: mainItems },
+        'ingest/pipeline': {
+          parent: 'main',
+          items: attachAccent(pipelineItems),
+        },
+        ...dynamicThreadMenus,
+      };
+    };
+
+    switch (bloomContext) {
+      case 'arrange': {
+        const arrangeItems: BloomFloatingMenuItem[] = [
+          {
+            name: 'Add Track',
+            description: 'Drop a fresh lane into the timeline.',
+            action: () => handleBloomAction('addTrack', undefined, meta),
+          },
+          {
+            name: 'Duplicate Clips',
+            description: 'Echo the current selection forward.',
+            action: () => handleBloomAction('duplicateClips', selectedClipIds, meta),
+            disabled: selectedClipIds.length === 0,
+            accentColor: '#f6cfff',
+          },
+          {
+            name: 'Split at Playhead',
+            description: 'Slice the selection along the playhead.',
+            action: () => handleBloomAction('splitSelection', { time: currentTime }, meta),
+            disabled: !canSplitSelection,
+            progressPercent: canSplitSelection ? 72 : 18,
+            accentColor: '#9dd6ff',
+          },
+          {
+            name: 'Consolidate',
+            description: 'Fuse highlighted clips into a single flow.',
+            action: () => handleBloomAction('consolidateSelection', undefined, meta),
+            disabled: !canConsolidateSelection,
+            accentColor: '#c6a2ff',
+          },
+          {
+            name: followPlayhead ? 'Follow On' : 'Follow Off',
+            description: followPlayhead
+              ? 'Timeline glides with the playhead.'
+              : 'Manual navigation engaged.',
+            action: () => handleBloomAction('toggleFollowPlayhead', undefined, meta),
+            progressPercent: followPlayhead ? 95 : 24,
+            accentColor: '#8be4ff',
+          },
+          {
+            name: 'Recall Last Import',
+            description: 'Highlight the most recent ingest clip.',
+            action: () => handleBloomAction('recallLastImport', undefined, meta),
+            disabled: !canRecallLastImport,
+            accentColor: '#7fffd4',
+          },
+        ];
+        return buildSimpleMenu(arrangeItems);
+      }
+      case 'record': {
+        const recordItems: BloomFloatingMenuItem[] = [
+          {
+            name: isHushActive ? 'HUSH Active' : 'Arm HUSH',
+            description: isHushActive
+              ? 'Noise gate guarding every armed lane.'
+              : 'Enable HUSH before the next take.',
+            action: () => handleBloomAction('toggleHush', undefined, meta),
+            disabled: !isAnyTrackArmed,
+            progressPercent: isHushActive ? 88 : 20,
+            accentColor: '#ff9fbf',
+          },
+          {
+            name: 'New Take Lane',
+            description: 'Spin up a dedicated track for this pass.',
+            action: () => handleBloomAction('addTrack', undefined, meta),
+            accentColor: '#ffb86b',
+          },
+          {
+            name: followPlayhead ? 'Follow On' : 'Follow Off',
+            description: followPlayhead
+              ? 'Transport is synced to the playhead.'
+              : 'Manual ride—tap again to follow.',
+            action: () => handleBloomAction('toggleFollowPlayhead', undefined, meta),
+            progressPercent: followPlayhead ? 90 : 30,
+            accentColor: '#ffd478',
+          },
+          {
+            name: 'Save Session',
+            description: 'Commit this performance to memory.',
+            action: () => handleBloomAction('saveProject', undefined, meta),
+            accentColor: '#ffa9ec',
+          },
+          {
+            name: 'Prime Brain Assist',
+            description: 'Run a quick master analysis while recording.',
+            action: () => handleBloomAction('analyzeMaster', undefined, meta),
+            accentColor: BLOOM_CONTEXT_ACCENTS.ai,
+          },
+        ];
+        return buildSimpleMenu(recordItems);
+      }
+      case 'mix': {
+        const mixItems: BloomFloatingMenuItem[] = [
+          {
+            name: 'Reset Mix',
+            description: 'Return faders and pans to neutral.',
+            action: () => handleBloomAction('resetMix', undefined, meta),
+            accentColor: '#7ad0ff',
+          },
+          {
+            name: 'Analyze Master',
+            description: 'Prime Brain listens to the bus.',
+            action: () => handleBloomAction('analyzeMaster', undefined, meta),
+            accentColor: '#9cd3ff',
+          },
+          {
+            name: 'Save Snapshot',
+            description: 'Capture this mix state.',
+            action: () => handleBloomAction('saveProject', undefined, meta),
+            accentColor: '#68f2c8',
+          },
+          {
+            name: 'Import Reference',
+            description: 'Drop in a new reference stem.',
+            action: () => handleBloomAction('importAudio', undefined, meta),
+            accentColor: '#59e6ff',
+          },
+        ];
+        return buildSimpleMenu(mixItems);
+      }
+      case 'master': {
+        const masterItems: BloomFloatingMenuItem[] = [
+          {
+            name: 'Prime Brain',
+            description: 'Deep dive Velvet anchors.',
+            action: () => handleBloomAction('analyzeMaster', undefined, meta),
+            accentColor: '#f5a34c',
+          },
+          {
+            name: 'Recall Last Import',
+            description: 'Spot the latest reference on the timeline.',
+            action: () => handleBloomAction('recallLastImport', undefined, meta),
+            disabled: !canRecallLastImport,
+            accentColor: '#ffd27f',
+          },
+          {
+            name: 'Open AI Hub',
+            description: 'Dial up Prime Brain guidance.',
+            action: () => handleBloomAction('openAIHub', undefined, meta),
+            accentColor: BLOOM_CONTEXT_ACCENTS.ai,
+          },
+          {
+            name: 'Save Master State',
+            description: 'Freeze this mastering stage.',
+            action: () => handleBloomAction('saveProject', undefined, meta),
+            accentColor: '#f7b973',
+          },
+        ];
+        return buildSimpleMenu(masterItems);
+      }
+      case 'ai': {
+        const aiItems: BloomFloatingMenuItem[] = [
+          {
+            name: 'Launch Prime Brain',
+            description: 'Open the AI Hub sidecar.',
+            action: () => handleBloomAction('openAIHub', undefined, meta),
+            accentColor: BLOOM_CONTEXT_ACCENTS.ai,
+          },
+          {
+            name: 'Stem Intake',
+            description: 'Feed a mix for stem separation.',
+            action: () => handleBloomAction('importAudio', undefined, meta),
+            accentColor: '#ff9ecd',
+          },
+          {
+            name: 'Analyze Master',
+            description: 'Request instant anchor analysis.',
+            action: () => handleBloomAction('analyzeMaster', undefined, meta),
+            accentColor: '#c2a3ff',
+          },
+          {
+            name: 'Save Session',
+            description: 'Store current AI-enhanced state.',
+            action: () => handleBloomAction('saveProject', undefined, meta),
+            accentColor: '#9af2ff',
+          },
+        ];
+        return buildSimpleMenu(aiItems);
+      }
+      case 'ingest':
+        return buildIngestMenus();
+      default: {
+        const idleItems: BloomFloatingMenuItem[] = [
+          {
+            name: 'Add Track',
+            description: 'Start arranging with a new lane.',
+            action: () => handleBloomAction('addTrack', undefined, meta),
+          },
+          {
+            name: 'Import Source',
+            description: 'Bring new audio into the flow.',
+            action: () => handleBloomAction('importAudio', undefined, meta),
+          },
+          {
+            name: 'Open AI Hub',
+            description: 'Consult Prime Brain.',
+            action: () => handleBloomAction('openAIHub', undefined, meta),
+            accentColor: BLOOM_CONTEXT_ACCENTS.ai,
+          },
+          {
+            name: 'Reset Mix',
+            description: 'Neutralize mixers and buses.',
+            action: () => handleBloomAction('resetMix', undefined, meta),
+            accentColor: '#82d0ff',
+          },
+        ];
+        return buildSimpleMenu(idleItems);
+      }
+    }
+  }, [
+    bloomContext,
+    bloomPulseAgent,
+    handleBloomAction,
+    importProgress,
+    ingestJobs,
+    isAIHubOpen,
+    isAnyTrackArmed,
+    isHushActive,
+    selectedClipIds,
+    canSplitSelection,
+    canConsolidateSelection,
+    canRecallLastImport,
+    currentTime,
+    followPlayhead,
+  ]);
+
+  const handleFloatingBloomPositionChange = useCallback((position: { x: number; y: number }) => {
+    const clamped = clampHubPosition(position);
+    floatingBloomPositionRef.current = clamped;
+    setFloatingBloomPosition(clamped);
+    if (!hasCustomHubRef.current) {
+      setHasCustomHubPosition(true);
+      hasCustomHubRef.current = true;
+    }
+  }, []);
 
   return (
-    <div className="w-screen h-screen bg-[#03040B] text-white flex flex-col overflow-hidden" style={backgroundGlowStyle}>
+    <div className="relative w-screen h-screen text-ink flex flex-col overflow-hidden" style={backgroundGlowStyle}>
+        <div className="pointer-events-none absolute inset-0 bg-gradient-to-br from-[rgba(48,92,178,0.45)] via-[rgba(19,37,74,0.4)] to-transparent blur-[110px] opacity-80"></div>
         <Header 
             analysisResult={analysisResult}
             hushFeedback={hushFeedback}
@@ -1994,52 +5009,63 @@ const App: React.FC = () => {
         />
         <main className="flex-grow relative" style={{ top: '80px', perspective: '1000px', transformStyle: 'preserve-3d' }}>
             <div className={`w-full h-full transition-all duration-700 ease-in-out absolute inset-0 ${viewMode === 'arrange' ? 'opacity-100 transform-none' : 'opacity-0 transform scale-90 -translate-z-50'}`}>
-                 <ArrangeWindow
-                    height={window.innerHeight - 80}
-                    tracks={tracks}
-                    clips={clips}
-                    setClips={setClips}
-                    isPlaying={isPlaying}
-                    currentTime={currentTime}
-                    onSeek={handleSeek}
-                    bpm={bpm}
-                    beatsPerBar={4}
-                    pixelsPerSecond={ppsAPI.value}
-                    ppsAPI={ppsAPI}
-                    scrollX={scrollX}
-                    setScrollX={setScrollX}
-                    selection={selection}
-                    setSelection={setSelection}
-                    clearSelection={clearSelection}
-                    onSplitAt={onSplitAt}
-                    selectedTrackId={selectedTrackId}
-                    onSelectTrack={setSelectedTrackId}
-                    armedTracks={armedTracks}
-                    onToggleArm={handleToggleArm}
-                    mixerSettings={mixerSettings}
-                    onMixerChange={handleMixerChange}
-                    soloedTracks={soloedTracks}
-                    onToggleSolo={handleToggleSolo}
-                    masterAnalysis={masterAnalysis}
-                    automationData={automationData}
-                    visibleAutomationLanes={visibleAutomationLanes}
-                    onAddAutomationPoint={handleAddAutomationPoint}
-                    onUpdateAutomationPoint={handleUpdateAutomationPoint}
-                    onDeleteAutomationPoint={handleDeleteAutomationPoint}
-                    onUpdateClipProperties={updateClipProperties}
-                    inserts={inserts}
-                    fxWindows={fxWindows}
-                    onAddPlugin={handleAddPlugin}
-                    onRemovePlugin={handleRemovePlugin}
-                    onMovePlugin={handleMovePlugin}
-                    onOpenPluginBrowser={(trackId: string) => { setTrackIdForPluginBrowser(trackId); setIsPluginBrowserOpen(true); }}
-                    onOpenPluginSettings={handleOpenPluginSettings}
-                    automationParamMenu={automationParamMenu}
-                    onOpenAutomationParamMenu={(x, y, trackId) => setAutomationParamMenu({ x, y, trackId })}
-                    onCloseAutomationParamMenu={() => setAutomationParamMenu(null)}
-                    onToggleAutomationLaneWithParam={handleToggleAutomationLane}
-                    style={arrangeBorderGlowStyle}
-                />
+              <ArrangeWindow
+                height={typeof window !== 'undefined' ? window.innerHeight - 80 : 760}
+                tracks={tracks}
+                clips={clips}
+                setClips={setClips}
+                isPlaying={isPlaying}
+                currentTime={currentTime}
+                onSeek={handleSeek}
+                bpm={bpm}
+                beatsPerBar={4}
+                pixelsPerSecond={ppsAPI.value}
+                ppsAPI={ppsAPI}
+                scrollX={scrollX}
+                setScrollX={setScrollX}
+                selection={selection}
+                setSelection={setSelection}
+                clearSelection={clearSelection}
+                onSplitAt={onSplitAt}
+                selectedTrackId={selectedTrackId}
+                onSelectTrack={setSelectedTrackId}
+                armedTracks={armedTracks}
+                onToggleArm={handleToggleArm}
+                mixerSettings={mixerSettings}
+                onMixerChange={handleMixerChange}
+                soloedTracks={soloedTracks}
+                onToggleSolo={handleToggleSolo}
+                masterAnalysis={masterAnalysis}
+                automationData={automationData}
+                visibleAutomationLanes={visibleAutomationLanes}
+                onAddAutomationPoint={handleAddAutomationPoint}
+                onUpdateAutomationPoint={handleUpdateAutomationPoint}
+                onDeleteAutomationPoint={handleDeleteAutomationPoint}
+                onUpdateClipProperties={updateClipProperties}
+                inserts={inserts}
+                fxWindows={fxWindows}
+                onAddPlugin={handleAddPlugin}
+                onRemovePlugin={handleRemovePlugin}
+                onMovePlugin={handleMovePlugin}
+                onOpenPluginBrowser={(trackId: string) => { setTrackIdForPluginBrowser(trackId); setIsPluginBrowserOpen(true); }}
+                onOpenPluginSettings={handleOpenPluginSettings}
+                automationParamMenu={automationParamMenu}
+                onOpenAutomationParamMenu={(x, y, trackId) => setAutomationParamMenu({ x, y, trackId })}
+                onCloseAutomationParamMenu={() => setAutomationParamMenu(null)}
+                onToggleAutomationLaneWithParam={handleToggleAutomationLane}
+                style={arrangeBorderGlowStyle}
+                trackAnalysis={trackAnalysis}
+                highlightClipIds={recallHighlightClipIds}
+                followPlayhead={followPlayhead}
+                onManualScroll={handleManualTimelineScroll}
+                trackUiState={trackUiState}
+                onToggleTrackCollapse={handleToggleTrackCollapse}
+                onResizeTrack={handleResizeTrack}
+                onRequestTrackCapsule={handleOpenTrackCapsule}
+                onSetTrackContext={handleTrackContextChange}
+                onOpenPianoRoll={handleOpenPianoRoll}
+                audioBuffers={audioBuffers}
+              />
             </div>
              <div className={`absolute inset-0 w-full h-full transition-all duration-700 ease-in-out ${viewMode === 'mixer' ? 'opacity-100 transform-none' : 'opacity-0 transform scale-110 translate-z-50'}`}>
                 <FlowConsole 
@@ -2066,43 +5092,78 @@ const App: React.FC = () => {
                     onMovePlugin={handleMovePlugin}
                     onOpenPluginBrowser={(trackId: string) => { setTrackIdForPluginBrowser(trackId); setIsPluginBrowserOpen(true); }}
                     onOpenPluginSettings={handleOpenPluginSettings}
+                    fxBypassState={fxBypassState}
+                    onToggleBypass={handleToggleBypass}
+                    availableSends={availableSendPalette}
+                    trackSendLevels={trackSendLevels}
+                    onSendLevelChange={handleSendLevelChange}
+                    buses={busStrips}
+                    selectedBusId={selectedBusId}
+                    onSelectBus={(busId) =>
+                      setSelectedBusId((prev) => {
+                        const typed = busId as MixerBusId;
+                        return prev === typed ? null : typed;
+                      })
+                    }
+                    dynamicsSettings={channelDynamicsSettings}
+                    eqSettings={channelEQSettings}
+                    onDynamicsChange={handleDynamicsSettingsChange}
+                    onEQChange={handleEQSettingsChange}
+                    pluginInventory={pluginInventory}
+                    pluginFavorites={pluginFavorites}
+                    onTogglePluginFavorite={handleTogglePluginFavorite}
+                    pluginPresets={pluginPresets}
+                    onSavePluginPreset={handleSavePluginPreset}
+                    onLoadPluginPreset={handleLoadPluginPreset}
+                    onDeletePluginPreset={handleDeletePluginPreset}
+                    mixerActionPulse={mixerActionPulse}
                 />
             </div>
 
             <FXRack 
               onOpenPluginSettings={handleOpenPluginSettings}
               fxBypassState={fxBypassState}
-              onToggleBypass={onToggleBypass}
+              onToggleBypass={(fxId) => handleToggleBypass(fxId)}
             >
               {renderFxWindows}
             </FXRack>
         </main>
         
-        <div className="fixed bottom-4 left-1/2 -translate-x-1/2 z-40">
-            <BloomHUD 
-                isPlaying={isPlaying}
-                isLooping={isLooping}
-                onPlayPause={handlePlayPause}
-                onRewind={handleRewind}
-                onFastForward={handleFastForward}
-                onToggleLoop={handleToggleLoop}
-                masterAnalysis={masterAnalysis}
-                selectedClips={clips.filter(c => c.selected)}
-                onAction={handleBloomAction}
-                isAnyTrackArmed={isAnyTrackArmed}
-                isHushActive={isHushActive}
-                fxWindows={fxWindows}
-                fxVisibility={fxVisibility}
-                onToggleFxVisibility={handleToggleFxVisibility}
-                tracks={tracks}
-                selectedTrackId={selectedTrackId}
-                viewMode={viewMode}
-                onToggleViewMode={() => setViewMode(prev => prev === 'arrange' ? 'mixer' : 'arrange')}
-                musicalContext={musicalContext}
-                onContextChange={handleContextChange}
-                onOpenAIHub={() => setIsAIHubOpen(true)}
-            />
-        </div>
+        <BloomFloatingHub
+            menuConfig={bloomFloatingMenu}
+            alsPulseAgent={bloomPulseAgent}
+            position={floatingBloomPosition}
+            onPositionChange={handleFloatingBloomPositionChange}
+        />
+
+        <BloomDock 
+            position={bloomPosition}
+            onPositionChange={handleBloomPositionChange}
+            alsPulseAgent={bloomPulseAgent}
+            isPlaying={isPlaying}
+            isLooping={isLooping}
+            onPlayPause={handlePlayPause}
+            onRewind={handleRewind}
+            onFastForward={handleFastForward}
+            onToggleLoop={handleToggleLoop}
+            masterAnalysis={masterAnalysis}
+            selectedClips={selectedClips}
+            onAction={handleBloomAction}
+            isAnyTrackArmed={isAnyTrackArmed}
+            isHushActive={isHushActive}
+            fxWindows={fxWindows}
+            fxVisibility={fxVisibility}
+            onToggleFxVisibility={handleToggleFxVisibility}
+            selectedTrackId={selectedTrackId}
+            viewMode={viewMode}
+            onToggleViewMode={() => setViewMode(prev => prev === 'arrange' ? 'mixer' : 'arrange')}
+            onOpenAIHub={() => setIsAIHubOpen(true)}
+            currentTime={currentTime}
+            canRecallLastImport={ingestHistoryEntries.length > 0}
+            followPlayhead={followPlayhead}
+            contextLabel={bloomLabel}
+            contextAccent={bloomAccent}
+        />
 
         {isAddTrackModalOpen && (
             <AddTrackModal
@@ -2157,9 +5218,12 @@ const App: React.FC = () => {
             onAddPlugin={handleAddPlugin}
             fxWindows={fxWindows}
             inserts={inserts}
+            inventory={pluginInventory}
+            favorites={pluginFavorites}
+            onToggleFavorite={handleTogglePluginFavorite}
           />
         )}
-        <input type="file" ref={fileInputRef} className="hidden" onChange={handleFileLoad} accept=".json,audio/*" multiple />
+        <input type="file" ref={fileInputRef} className="hidden" onChange={handleFileLoad} accept=".json,audio/*" multiple aria-label="Load audio or project file" />
 
         {isAIHubOpen && (
             <AIHub
@@ -2170,8 +5234,26 @@ const App: React.FC = () => {
                 selectedTrackId={selectedTrackId}
             />
         )}
+        <PianoRollPanel
+          isOpen={isPianoRollOpen}
+          clip={activePianoClip}
+          track={activePianoTrack}
+          binding={pianoRollBinding}
+          bpm={bpm}
+          beatsPerBar={4}
+          onClose={handleClosePianoRoll}
+          onCommit={handleCommitPianoRoll}
+          currentTime={currentTime}
+          followPlayhead={followPlayhead}
+          analysis={
+            activePianoTrack ? trackAnalysis[activePianoTrack.id] : undefined
+          }
+          onWarpAnchors={handleApplyWarpAnchors}
+          onExportMidi={handleExportPianoRollMidi}
+        />
     </div>
   );
 };
 
 export default App;
+

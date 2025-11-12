@@ -2,12 +2,31 @@
 import React, { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { ArrangeClip as ClipModel, useArrange, ClipId } from "../hooks/useArrange";
 import { ArrangeClip } from "./ArrangeClip";
-import { secondsPerBar, secondsPerBeat } from "../utils/time";
-import { TrackData, MixerSettings, AutomationPoint, FxWindowId, FxWindowConfig } from "../App";
+import { quantizeSeconds, secondsPerBar, secondsPerBeat } from "../utils/time";
+import { TrackData, MixerSettings, AutomationPoint, FxWindowId, FxWindowConfig, TrackAnalysisData } from "../App";
 import ArrangeTrackHeader from "./ArrangeTrackHeader";
 import AutomationLane from "./AutomationLane";
+import { deriveTrackALSFeedback, TrackALSFeedback, hexToRgba } from "../utils/ALS";
+import {
+  TrackUIState,
+  TrackContextMode,
+  DEFAULT_TRACK_LANE_HEIGHT,
+  COLLAPSED_TRACK_LANE_HEIGHT,
+} from "../types/tracks";
 
 type DragKind = "move" | "resize-left" | "resize-right" | "fade-in" | "fade-out" | "gain";
+
+type DragState = {
+  kind: DragKind;
+  primaryId: ClipId;
+  startX: number;
+  startY: number;
+  clipIds: ClipId[];
+  originalClips: ClipModel[];
+  ripple: boolean;
+  duplicate?: boolean;
+  hasDuplicated?: boolean;
+};
 
 type Props = {
   height: number;
@@ -57,12 +76,43 @@ type Props = {
   onCloseAutomationParamMenu: () => void;
   onToggleAutomationLaneWithParam: (trackId: string, fxId: string, paramName: string) => void;
   style?: React.CSSProperties; // New prop for dynamic styling from App.tsx
+  trackAnalysis: Record<string, TrackAnalysisData>;
+  highlightClipIds?: ClipId[];
+  followPlayhead: boolean;
+  onManualScroll?: () => void;
+  trackUiState: Record<string, TrackUIState>;
+  onToggleTrackCollapse: (trackId: string) => void;
+  onResizeTrack: (trackId: string, height: number) => void;
+  onRequestTrackCapsule: (trackId: string) => void;
+  onSetTrackContext: (trackId: string, context: TrackContextMode) => void;
+  onOpenPianoRoll: (clip: ClipModel) => void;
+  audioBuffers: Record<string, AudioBuffer | undefined>;
 };
 
-const CLIP_LANE_H = 80;
-const AUTOMATION_LANE_H = 60;
+const BASE_CLIP_LANE_H = DEFAULT_TRACK_LANE_HEIGHT;
+const AUTOMATION_LANE_H = 68;
 const RULER_H = 24;
-const TRACK_HEADER_WIDTH = 200;
+const TRACK_HEADER_WIDTH = 240;
+
+const deriveAdaptiveDivision = (
+  pixelsPerSecond: number,
+  bpm: number,
+  masterLevel: number
+) => {
+  const beatWidthPx = secondsPerBeat(bpm) * pixelsPerSecond;
+  let division: number;
+  if (beatWidthPx > 480) division = 32;
+  else if (beatWidthPx > 300) division = 16;
+  else if (beatWidthPx > 160) division = 8;
+  else if (beatWidthPx > 90) division = 4;
+  else division = 4;
+
+  if (masterLevel > 0.65 && division < 64) {
+    division *= 2;
+  }
+
+  return Math.min(64, Math.max(4, division));
+};
 
 export const ArrangeWindow: React.FC<Props> = (props) => {
   const {
@@ -75,15 +125,109 @@ export const ArrangeWindow: React.FC<Props> = (props) => {
     onUpdateAutomationPoint, onDeleteAutomationPoint, onUpdateClipProperties,
     inserts, fxWindows, onAddPlugin, onRemovePlugin, onMovePlugin, onOpenPluginBrowser, onOpenPluginSettings,
     automationParamMenu, onOpenAutomationParamMenu, onCloseAutomationParamMenu, onToggleAutomationLaneWithParam,
-    style // Destructure the new style prop
+    style, trackAnalysis, highlightClipIds, followPlayhead, onManualScroll,
+    trackUiState = {}, onToggleTrackCollapse, onResizeTrack, onRequestTrackCapsule, onSetTrackContext,
+    onOpenPianoRoll,
+    audioBuffers = {},
   } = props;
 
   const timelineViewportRef = useRef<HTMLDivElement>(null);
   const projectDuration = useMemo(() => clips.reduce((max, clip) => Math.max(max, clip.start + clip.duration), 60), [clips]);
   const contentWidth = useMemo(() => Math.max((projectDuration + 60) * pixelsPerSecond, 4000), [projectDuration, pixelsPerSecond]);
   
-  const [drag, setDrag] = useState<null | { id: string; kind: DragKind; startX: number; startY: number; clip: ClipModel; }>(null);
+  const [drag, setDrag] = useState<DragState | null>(null);
   const [draggingSelection, setDraggingSelection] = useState<null | { startSec: number }>(null);
+  const [snapIndicator, setSnapIndicator] = useState<number | null>(null);
+  const [resizing, setResizing] = useState<null | { trackId: string; startY: number; startHeight: number }>(null);
+
+  const adaptiveDivision = useMemo(
+    () => deriveAdaptiveDivision(pixelsPerSecond, bpm, masterAnalysis?.level ?? 0),
+    [pixelsPerSecond, bpm, masterAnalysis?.level]
+  );
+
+  const snapToGrid = useCallback(
+    (value: number) => quantizeSeconds(Math.max(0, value), bpm, beatsPerBar, "beats", adaptiveDivision),
+    [adaptiveDivision, bpm, beatsPerBar]
+  );
+
+  const laneLayouts = useMemo(() => {
+    let top = 0;
+    return tracks.map((track) => {
+      const ui = trackUiState[track.id] ?? {
+        context: "playback" as TrackContextMode,
+        laneHeight: BASE_CLIP_LANE_H,
+        collapsed: false,
+      };
+      const collapsed = ui.collapsed;
+      const clipHeight = collapsed ? COLLAPSED_TRACK_LANE_HEIGHT : ui.laneHeight ?? BASE_CLIP_LANE_H;
+      const visibleAutomationConfig = collapsed ? null : visibleAutomationLanes[track.id];
+      const isAutomationVisible = !!visibleAutomationConfig;
+      const laneHeight = clipHeight + (isAutomationVisible ? AUTOMATION_LANE_H : 0);
+      const layout = {
+        track,
+        top,
+        laneHeight,
+        clipHeight,
+        isAutomationVisible,
+        uiState: ui,
+        automationConfig: visibleAutomationConfig,
+      };
+      top += laneHeight;
+      return layout;
+    });
+  }, [tracks, visibleAutomationLanes, trackUiState]);
+
+  const totalLaneHeight = useMemo(
+    () => laneLayouts.reduce((sum, layout) => sum + layout.laneHeight, 0),
+    [laneLayouts]
+  );
+
+  const trackLaneLookup = useMemo(() => {
+    const map = new Map<
+      string,
+      {
+        top: number;
+        laneHeight: number;
+        clipHeight: number;
+        isAutomationVisible: boolean;
+        uiState: TrackUIState;
+        automationConfig: { fxId: string; paramName: string } | null;
+      }
+    >();
+    laneLayouts.forEach((layout) => {
+      map.set(layout.track.id, {
+        top: layout.top,
+        laneHeight: layout.laneHeight,
+        clipHeight: layout.clipHeight,
+        isAutomationVisible: layout.isAutomationVisible,
+        uiState: layout.uiState,
+        automationConfig: layout.automationConfig,
+      });
+    });
+    return map;
+  }, [laneLayouts]);
+
+  const alsFeedbackByTrack = useMemo(() => {
+    const map = new Map<string, TrackALSFeedback>();
+    tracks.forEach((track) => {
+      const analysis = trackAnalysis[track.id];
+      map.set(
+        track.id,
+        deriveTrackALSFeedback({
+          level: analysis?.level ?? 0,
+          transient: analysis?.transient ?? false,
+          volume: mixerSettings[track.id]?.volume ?? 0.75,
+          color: track.trackColor,
+        })
+      );
+    });
+    return map;
+  }, [mixerSettings, trackAnalysis, tracks]);
+
+  const highlightClipIdSet = useMemo(
+    () => new Set(highlightClipIds ?? []),
+    [highlightClipIds]
+  );
 
   const bars = useMemo(() => {
     const spBar = secondsPerBar(bpm, beatsPerBar);
@@ -97,6 +241,21 @@ export const ArrangeWindow: React.FC<Props> = (props) => {
     return Array.from({ length: count }, (_, i) => ({ x: i * spBeat * pixelsPerSecond }));
   }, [bpm, pixelsPerSecond, contentWidth]);
 
+  const microGuides = useMemo(() => {
+    const spBeat = secondsPerBeat(bpm);
+    const primaryDivision = adaptiveDivision;
+    if (primaryDivision <= 4) return [];
+    const stepSec = spBeat / (primaryDivision / 4);
+    const count = Math.ceil(contentWidth / (stepSec * pixelsPerSecond));
+    const primaryStride = Math.max(1, primaryDivision / 4);
+    const guides: { x: number }[] = [];
+    for (let i = 0; i < count; i++) {
+      if (i % primaryStride === 0) continue;
+      guides.push({ x: i * stepSec * pixelsPerSecond });
+    }
+    return guides;
+  }, [adaptiveDivision, bpm, contentWidth, pixelsPerSecond]);
+
   const onWheel = useCallback((e: React.WheelEvent) => {
     if (e.ctrlKey || e.metaKey) {
         e.preventDefault();
@@ -107,12 +266,16 @@ export const ArrangeWindow: React.FC<Props> = (props) => {
         ppsAPI.zoomBy(factor, anchorSec);
     } else {
       const delta = e.deltaY !== 0 ? e.deltaY : e.deltaX;
-      setScrollX((s: number) => Math.max(0, s + delta));
+      if (delta !== 0) {
+        onManualScroll?.();
+        setScrollX((s: number) => Math.max(0, s + delta));
+      }
     }
-  }, [scrollX, pixelsPerSecond, ppsAPI, setScrollX]);
+  }, [scrollX, pixelsPerSecond, ppsAPI, setScrollX, onManualScroll]);
 
   const onBgMouseDown = useCallback((e: React.MouseEvent) => {
     if (e.button !== 0) return;
+    onManualScroll?.();
     clearSelection();
     const rect = timelineViewportRef.current!.getBoundingClientRect();
     const xPx = e.clientX - rect.left + scrollX;
@@ -122,73 +285,200 @@ export const ArrangeWindow: React.FC<Props> = (props) => {
     // FIX: Ensure 'selected' property is explicitly set to boolean false for all clips.
     setClips(prev => prev.map(c => ({...c, selected: false})));
     onSelectTrack(null);
-  }, [scrollX, pixelsPerSecond, setSelection, setClips, onSelectTrack, clearSelection]);
+  }, [scrollX, pixelsPerSecond, setSelection, setClips, onSelectTrack, clearSelection, onManualScroll]);
   
   const onMouseMove = useCallback((e: React.MouseEvent) => {
-    const rect = timelineViewportRef.current!.getBoundingClientRect();
-    
-    if (drag) {
-        const dxPx = e.clientX - drag.startX;
-        const dy = e.clientY - drag.startY;
-        const dxSec = dxPx / pixelsPerSecond;
-        const { clip } = drag;
-        
-        const snap = (time: number) => {
-            const beatSec = 60 / bpm;
-            const subBeatSec = beatSec / 4; // 16th note snapping
-            return Math.round(time / subBeatSec) * subBeatSec;
-        };
+    const rect = timelineViewportRef.current?.getBoundingClientRect();
+    if (!rect) return;
 
-        if (drag.kind === "move") {
-            let yPos = e.clientY - rect.top - RULER_H;
-            let cumulativeHeight = 0;
-            let newTrackIndex = -1;
-            for (let i = 0; i < tracks.length; i++) {
-                const trackHeight = visibleAutomationLanes[tracks[i].id] ? CLIP_LANE_H + AUTOMATION_LANE_H : CLIP_LANE_H;
-                if (yPos >= cumulativeHeight && yPos < cumulativeHeight + trackHeight) {
-                    newTrackIndex = i;
-                    break;
+    if (resizing) {
+      const deltaY = e.clientY - resizing.startY;
+      onResizeTrack(resizing.trackId, resizing.startHeight + deltaY);
+    onResizeTrack(resizing.trackId, resizing.startHeight + deltaY);
+      return;
+    }
+
+    if (drag) {
+      if (drag.duplicate && !drag.hasDuplicated) {
+        const duplicates = drag.originalClips.map((clip) => {
+          const newId = `clip-${Date.now()}-${Math.random().toString(36).slice(2, 9)}`;
+          return { ...clip, id: newId, selected: true };
+        });
+        const newIds = duplicates.map((clip) => clip.id);
+        if (newIds.length) {
+          setClips((prev) => {
+            const base = prev.map((clip) =>
+              drag.clipIds.includes(clip.id) ? { ...clip, selected: false } : clip
+            );
+            return [...base, ...duplicates];
+          });
+          setDrag((prev) =>
+            prev
+              ? {
+                  ...prev,
+                  clipIds: newIds,
+                  originalClips: duplicates.map((clip) => ({ ...clip })),
+                  hasDuplicated: true,
                 }
-                cumulativeHeight += trackHeight;
-            }
-            const targetTrackId = tracks[newTrackIndex]?.id;
-            const newStart = snap(Math.max(0, Number(clip.start) + dxSec));
-            setClips(prev => prev.map(c => c.id === drag.id ? { ...c, start: newStart, trackId: targetTrackId || c.trackId } : c));
-        } else if (drag.kind === "resize-left") {
-// FIX: Explicitly parse clip properties that might be strings at runtime to ensure numeric operations.
-            const newStart = snap(Math.max(0, Number(clip.start) + dxSec));
-            const originalEnd = Number(clip.start) + Number(clip.duration);
-            const newDur = originalEnd - newStart;
-            const startChange = newStart - Number(clip.start);
-            const newSourceStart = Number(clip.sourceStart) + startChange;
-            if (newDur > 0.05 && newSourceStart >= 0) {
-                 setClips(prev => prev.map(c => c.id === drag.id ? { ...c, start: newStart, duration: newDur, sourceStart: newSourceStart } : c));
-            }
-        } else if (drag.kind === "resize-right") {
-            const newDur = snap(Math.max(0.05, Number(clip.duration) + dxSec));
-            setClips(prev => prev.map(c => c.id === drag.id ? { ...c, duration: newDur } : c));
-        } else if (drag.kind === "fade-in") {
-            const newFadeIn = Math.max(0, Math.min(Number(clip.duration) / 2, (Number(clip.fadeIn) || 0) + dxSec));
-            onUpdateClipProperties(clip.id, { fadeIn: newFadeIn });
-        } else if (drag.kind === 'fade-out') {
-            const newFadeOut = Math.max(0, Math.min(Number(clip.duration) / 2, (Number(clip.fadeOut) || 0) - dxSec)); // Dragging left increases fade
-            onUpdateClipProperties(clip.id, { fadeOut: newFadeOut });
-        } else if (drag.kind === 'gain') {
-            const newGain = Math.max(0, Math.min(2.0, (clip.gain ?? 1.0) - dy * 0.01));
-            onUpdateClipProperties(clip.id, { gain: newGain });
+              : prev
+          );
+          setSnapIndicator(duplicates[0].start);
         }
         return;
+      }
+
+      const dxPx = e.clientX - drag.startX;
+      const dy = e.clientY - drag.startY;
+      const dxSec = dxPx / pixelsPerSecond;
+      const rippleActive = drag.ripple || e.altKey;
+      const originalMap = new Map(drag.originalClips.map((clip) => [clip.id, clip]));
+      const selectionSet = new Set(drag.clipIds);
+      const primaryOriginal = originalMap.get(drag.primaryId);
+      if (!primaryOriginal) return;
+
+      let snapValue: number | null = null;
+
+      if (drag.kind === "move") {
+        const hoveredY = e.clientY - rect.top - RULER_H;
+        let targetTrackId = primaryOriginal.trackId;
+        for (const layout of laneLayouts) {
+          if (hoveredY >= layout.top && hoveredY < layout.top + layout.laneHeight) {
+            targetTrackId = layout.track.id;
+            break;
+          }
+        }
+
+        const snappedPrimary = snapToGrid(primaryOriginal.start + dxSec);
+        const deltaSec = snappedPrimary - primaryOriginal.start;
+        snapValue = snappedPrimary;
+
+        if (Math.abs(deltaSec) < 1e-6 && !rippleActive) {
+          setSnapIndicator(snapValue);
+          return;
+        }
+
+        const ripplePlan = new Map<string, { delta: number; selectionEnd: number }>();
+        drag.originalClips.forEach((clip) => {
+          const assignedTrackId = clip.id === drag.primaryId ? targetTrackId : clip.trackId;
+          const clipEnd = clip.start + clip.duration;
+          const existing = ripplePlan.get(assignedTrackId);
+          if (existing) {
+            existing.selectionEnd = Math.max(existing.selectionEnd, clipEnd);
+            existing.delta = deltaSec;
+          } else {
+            ripplePlan.set(assignedTrackId, { delta: deltaSec, selectionEnd: clipEnd });
+          }
+        });
+
+        setClips((prev) => {
+          let next = prev.map((clip) => {
+            if (!selectionSet.has(clip.id)) return clip;
+            const reference = originalMap.get(clip.id)!;
+            const assignedTrackId = reference.id === drag.primaryId ? targetTrackId : reference.trackId;
+            const newStart = Math.max(0, reference.start + deltaSec);
+            if (
+              Math.abs(clip.start - newStart) < 1e-6 &&
+              clip.trackId === assignedTrackId
+            ) {
+              return clip;
+            }
+            return {
+              ...clip,
+              start: newStart,
+              trackId: assignedTrackId,
+            };
+          });
+
+          if (rippleActive && Math.abs(deltaSec) > 1e-6) {
+            next = next.map((clip) => {
+              if (selectionSet.has(clip.id)) return clip;
+              const plan = ripplePlan.get(clip.trackId);
+              if (!plan) return clip;
+              if (clip.start >= plan.selectionEnd - 1e-6) {
+                const shifted = Math.max(0, clip.start + plan.delta);
+                if (Math.abs(shifted - clip.start) > 1e-6) {
+                  return { ...clip, start: shifted };
+                }
+              }
+              return clip;
+            });
+          }
+
+          return next;
+        });
+      } else if (drag.kind === "resize-left") {
+        const reference = primaryOriginal;
+        const newStart = snapToGrid(reference.start + dxSec);
+        const originalEnd = reference.start + reference.duration;
+        const newDuration = originalEnd - newStart;
+        const startChange = newStart - reference.start;
+        const newSourceStart = (reference.sourceStart ?? 0) + startChange;
+        if (newDuration > 0.05 && newSourceStart >= 0) {
+          snapValue = newStart;
+          setClips((prev) =>
+            prev.map((clip) =>
+              clip.id === drag.primaryId
+                ? {
+                    ...clip,
+                    start: newStart,
+                    duration: newDuration,
+                    sourceStart: newSourceStart,
+                  }
+                : clip
+            )
+          );
+        }
+      } else if (drag.kind === "resize-right") {
+        const reference = primaryOriginal;
+        const newEnd = snapToGrid(reference.start + reference.duration + dxSec);
+        const newDuration = Math.max(0.05, newEnd - reference.start);
+        snapValue = reference.start + newDuration;
+        setClips((prev) =>
+          prev.map((clip) =>
+            clip.id === drag.primaryId ? { ...clip, duration: newDuration } : clip
+          )
+        );
+      } else if (drag.kind === "fade-in") {
+        snapValue = null;
+        const currentClip = clips.find((clip) => clip.id === drag.primaryId) ?? primaryOriginal;
+        const newFadeIn = Math.max(
+          0,
+          Math.min(currentClip.duration / 2, (currentClip.fadeIn ?? 0) + dxSec)
+        );
+        onUpdateClipProperties(currentClip.id, { fadeIn: newFadeIn });
+      } else if (drag.kind === "fade-out") {
+        snapValue = null;
+        const currentClip = clips.find((clip) => clip.id === drag.primaryId) ?? primaryOriginal;
+        const newFadeOut = Math.max(
+          0,
+          Math.min(currentClip.duration / 2, (currentClip.fadeOut ?? 0) - dxSec)
+        );
+        onUpdateClipProperties(currentClip.id, { fadeOut: newFadeOut });
+      } else if (drag.kind === "gain") {
+        snapValue = null;
+        const currentClip = clips.find((clip) => clip.id === drag.primaryId) ?? primaryOriginal;
+        const newGain = Math.max(0, Math.min(2.0, (currentClip.gain ?? 1.0) - dy * 0.01));
+        onUpdateClipProperties(currentClip.id, { gain: newGain });
+      }
+
+      setSnapIndicator(snapValue);
+      return;
     }
+
     if (draggingSelection) {
       const xPx = e.clientX - rect.left + scrollX;
       const endSec = xPx / pixelsPerSecond;
       setSelection(draggingSelection.startSec, endSec);
+    } else if (!drag) {
+      setSnapIndicator(null);
     }
-  }, [drag, draggingSelection, scrollX, pixelsPerSecond, setSelection, setClips, tracks, visibleAutomationLanes, bpm, onUpdateClipProperties]);
+  }, [drag, pixelsPerSecond, laneLayouts, snapToGrid, setClips, clips, draggingSelection, scrollX, setSelection, onUpdateClipProperties, resizing, onResizeTrack]);
 
   const onMouseUp = useCallback(() => {
     setDrag(null);
     setDraggingSelection(null);
+    setSnapIndicator(null);
+    setResizing(null);
   }, []);
 
   const onRulerDown = useCallback((e: React.MouseEvent) => {
@@ -227,52 +517,117 @@ export const ArrangeWindow: React.FC<Props> = (props) => {
     '--playhead-color-light': playheadColor?.light,
   } as React.CSSProperties;
 
-  const transientKey = masterAnalysis?.transient ? Date.now() : 0;
-  
-  let trackTop = 0;
+  useEffect(() => {
+    if (!followPlayhead || !isPlaying) return;
+    const viewportNode = timelineViewportRef.current;
+    if (!viewportNode) return;
+    const viewportWidth = viewportNode.clientWidth;
+    if (viewportWidth <= 0) return;
+    const margin = viewportWidth * 0.25;
+    const playheadPx = currentTime * pixelsPerSecond;
+    const leftEdge = scrollX;
+    const rightEdge = scrollX + viewportWidth;
 
+    let targetScroll = scrollX;
+    if (playheadPx > rightEdge - margin) {
+      targetScroll = playheadPx - viewportWidth + margin;
+    } else if (playheadPx < leftEdge + margin) {
+      targetScroll = playheadPx - margin;
+    }
+
+    targetScroll = Math.max(0, targetScroll);
+    if (Math.abs(targetScroll - scrollX) > 1) {
+      setScrollX((prev) => {
+        const next = prev + (targetScroll - prev) * 0.4;
+        return next < 0 ? 0 : next;
+      });
+    }
+  }, [followPlayhead, isPlaying, currentTime, pixelsPerSecond, scrollX, setScrollX]);
+
+  useEffect(() => {
+    if (resizing) {
+      document.body.style.cursor = "row-resize";
+      return () => {
+        document.body.style.cursor = "";
+      };
+    }
+    return undefined;
+  }, [resizing]);
+
+  useEffect(() => {
+    if (!resizing) return;
+    const handleMouseUp = () => {
+      setResizing(null);
+    };
+    window.addEventListener("mouseup", handleMouseUp);
+    return () => {
+      window.removeEventListener("mouseup", handleMouseUp);
+    };
+  }, [resizing]);
+
+  const transientKey = masterAnalysis?.transient ? Date.now() : 0;
+  const playheadX = currentTime * pixelsPerSecond - scrollX;
+  const playheadVisible = playheadX > -80 && playheadX < contentWidth + 80;
   return (
     <div 
-      className="relative w-full rounded-xl border flex bg-black/20"
+      className="relative w-full rounded-3xl border border-glass-border flex bg-glass-surface backdrop-blur-2xl shadow-[0_45px_95px_rgba(4,12,26,0.55)] text-ink"
       style={{ height, ...style }} // Merge the style prop here
       onMouseMove={onMouseMove}
       onMouseUp={onMouseUp}
       onMouseLeave={onMouseUp}
     >
-      <div className="flex-shrink-0 bg-gray-900/30 border-r border-white/10" style={{ width: TRACK_HEADER_WIDTH }}>
-        <div className="h-[24px] border-b border-white/10"></div>
+      <div className="flex-shrink-0 bg-glass-surface-soft border-r border-glass-border backdrop-blur-xl" style={{ width: TRACK_HEADER_WIDTH }}>
+        <div className="h-[24px] border-b border-glass-border"></div>
         <div className="h-[calc(100%_-_24px)] overflow-y-auto">
-            {tracks.map((track) => {
-                const laneHeight = visibleAutomationLanes[track.id] ? CLIP_LANE_H + AUTOMATION_LANE_H : CLIP_LANE_H;
-                return (
-                    <div key={track.id} style={{ height: laneHeight }}>
-                        <ArrangeTrackHeader 
-                            track={track}
-                            selectedTrackId={selectedTrackId}
-                            onSelectTrack={onSelectTrack}
-                            isArmed={armedTracks.has(track.id)}
-                            onToggleArm={onToggleArm}
-                            mixerSettings={mixerSettings[track.id]}
-                            onMixerChange={onMixerChange}
-                            isSoloed={soloedTracks.has(track.id)}
-                            onToggleSolo={onToggleSolo}
-                            isAutomationVisible={!!visibleAutomationLanes[track.id]}
-                            inserts={inserts}
-                            trackColor={track.trackColor}
-                            fxWindows={fxWindows}
-                            onAddPlugin={onAddPlugin}
-                            onRemovePlugin={onRemovePlugin}
-                            onMovePlugin={onMovePlugin}
-                            onOpenPluginBrowser={onOpenPluginBrowser}
-                            onOpenPluginSettings={onOpenPluginSettings}
-                            automationParamMenu={automationParamMenu}
-                            onOpenAutomationParamMenu={onOpenAutomationParamMenu}
-                            onCloseAutomationParamMenu={onCloseAutomationParamMenu}
-                            onToggleAutomationLaneWithParam={onToggleAutomationLaneWithParam} // Pass specific handler
-                        />
-                    </div>
-                );
-            })}
+          {laneLayouts.map(({ track, laneHeight, clipHeight, isAutomationVisible, uiState }) => (
+            <div key={track.id} style={{ height: laneHeight }} className="transition-[height] duration-300 ease-out relative">
+              <ArrangeTrackHeader
+                track={track}
+                uiState={uiState}
+                selectedTrackId={selectedTrackId}
+                onSelectTrack={onSelectTrack}
+                isArmed={armedTracks.has(track.id)}
+                onToggleArm={onToggleArm}
+                mixerSettings={mixerSettings[track.id]}
+                onMixerChange={onMixerChange}
+                isSoloed={soloedTracks.has(track.id)}
+                onToggleSolo={onToggleSolo}
+                isAutomationVisible={isAutomationVisible}
+                inserts={inserts}
+                trackColor={track.trackColor}
+                fxWindows={fxWindows}
+                onAddPlugin={onAddPlugin}
+                onRemovePlugin={onRemovePlugin}
+                onMovePlugin={onMovePlugin}
+                onOpenPluginBrowser={onOpenPluginBrowser}
+                onOpenPluginSettings={onOpenPluginSettings}
+                automationParamMenu={automationParamMenu}
+                onOpenAutomationParamMenu={onOpenAutomationParamMenu}
+                onCloseAutomationParamMenu={onCloseAutomationParamMenu}
+                onToggleAutomationLaneWithParam={onToggleAutomationLaneWithParam}
+                onRequestCapsule={() => onRequestTrackCapsule(track.id)}
+                onContextChange={onSetTrackContext}
+                onToggleCollapse={() => onToggleTrackCollapse(track.id)}
+              />
+              {!uiState.collapsed && (
+                <div
+                  className="absolute left-0 right-0 bottom-0 h-2 cursor-row-resize rounded-b-lg transition-opacity duration-200 hover:opacity-80 opacity-0"
+                  onMouseDown={(e) => {
+                    e.stopPropagation();
+                    e.preventDefault();
+                    setResizing({
+                      trackId: track.id,
+                      startY: e.clientY,
+                      startHeight: clipHeight,
+                    });
+                  }}
+                  style={{
+                    background: `linear-gradient(90deg, ${hexToRgba('#1f2937', 0)} 0%, ${hexToRgba('#38bdf8', 0.55)} 50%, ${hexToRgba('#1f2937', 0)} 100%)`,
+                  }}
+                />
+              )}
+            </div>
+          ))}
         </div>
       </div>
         
@@ -281,12 +636,22 @@ export const ArrangeWindow: React.FC<Props> = (props) => {
         className="relative flex-grow h-full overflow-hidden"
         onWheel={onWheel}
        >
-        <div className="absolute left-0 right-0 top-0 h-[24px] bg-gray-900/50 border-b border-white/10 select-none" onMouseDown={onRulerDown}>
+        <div className="absolute left-0 right-0 top-0 h-[24px] bg-glass-surface-soft border-b border-glass-border select-none backdrop-blur-lg" onMouseDown={onRulerDown}>
             <div className="relative" style={{ width: contentWidth, transform: `translateX(-${scrollX}px)` }}>
-              {beats.map(({x}, i) => (<div key={`beat-${i}`} className="absolute bottom-0 h-2 border-l border-white/10" style={{ left: x }} /> ))}
+              {microGuides.map(({ x }, i) => (
+                <div
+                  key={`micro-${i}`}
+                  className="absolute bottom-0 h-1 border-l"
+                  style={{
+                    left: x,
+                    borderColor: `rgba(255,255,255,${0.05 + (masterAnalysis?.level ?? 0) * 0.15})`,
+                  }}
+                />
+              ))}
+              {beats.map(({x}, i) => (<div key={`beat-${i}`} className="absolute bottom-0 h-2 border-l border-glass-border" style={{ left: x }} /> ))}
               {bars.map(({bar,x}) => (
-                  <div key={`bar-${bar}`} className="absolute top-0 bottom-0 border-l border-white/20" style={{ left: x }}>
-                    <div className="absolute top-1 left-1 text-[10px] text-white/70 font-mono">{bar}</div>
+                  <div key={`bar-${bar}`} className="absolute top-0 bottom-0 border-l border-glass-border/60" style={{ left: x }}>
+                    <div className="absolute top-1 left-1 text-[10px] text-ink/80 font-mono">{bar}</div>
                   </div>
               ))}
               <div className="absolute inset-0 cursor-text" />
@@ -295,38 +660,69 @@ export const ArrangeWindow: React.FC<Props> = (props) => {
 
         <div className="absolute left-0 right-0" style={{ top: RULER_H, bottom: 0 }} onMouseDown={onBgMouseDown}>
             <div className="relative" style={{ width: contentWidth, transform: `translateX(-${scrollX}px)` }}>
-                {tracks.map((t, i) => {
-                    const visibleLaneConfig = visibleAutomationLanes[t.id];
-                    const isAutomationVisible = !!visibleLaneConfig;
-                    const laneHeight = isAutomationVisible ? CLIP_LANE_H + AUTOMATION_LANE_H : CLIP_LANE_H;
-                    const top = trackTop;
-                    trackTop += laneHeight;
+                {laneLayouts.map(({ track, top, laneHeight, clipHeight, isAutomationVisible, uiState, automationConfig }, index) => {
+                  const automationPointsForLane = automationConfig
+                    ? automationData[track.id]?.[automationConfig.fxId]?.[automationConfig.paramName] || []
+                    : [];
+                  const feedback = alsFeedbackByTrack.get(track.id);
 
-                    const automationPointsForLane = visibleLaneConfig ? (automationData[t.id]?.[visibleLaneConfig.fxId]?.[visibleLaneConfig.paramName] || []) : [];
-
-                    return (
-                        <div key={t.id} className="absolute left-0 right-0" style={{ top, height: laneHeight }}>
-                            <div className={`w-full border-b border-white/10 ${i % 2 === 0 ? 'bg-white/[0.03]' : 'bg-transparent'}`} style={{ height: CLIP_LANE_H }} />
-                            {isAutomationVisible && (
-                                <AutomationLane
-                                    trackId={t.id}
-                                    fxId={visibleLaneConfig!.fxId}
-                                    paramName={visibleLaneConfig!.paramName}
-                                    points={automationPointsForLane}
-                                    trackColor={t.trackColor}
-                                    height={AUTOMATION_LANE_H}
-                                    duration={projectDuration}
-                                    pixelsPerSecond={pixelsPerSecond}
-                                    onAddPoint={(point) => onAddAutomationPoint(t.id, visibleLaneConfig!.fxId, visibleLaneConfig!.paramName, point)}
-                                    onUpdatePoint={(idx, point) => onUpdateAutomationPoint(t.id, visibleLaneConfig!.fxId, visibleLaneConfig!.paramName, idx, point)}
-                                    onDeletePoint={(idx) => onDeleteAutomationPoint(t.id, visibleLaneConfig!.fxId, visibleLaneConfig!.paramName, idx)}
-                                />
-                            )}
-                        </div>
-                    );
+                  return (
+                    <div key={track.id} className="absolute left-0 right-0" style={{ top, height: laneHeight }}>
+                      {feedback && (
+                        <div
+                          className="absolute left-0 right-0 top-0 h-[80px] pointer-events-none transition-opacity duration-200"
+                          style={{
+                            background: `linear-gradient(90deg, ${hexToRgba(feedback.glowColor, 0.18)} 0%, transparent 80%)`,
+                            opacity: 0.25 + feedback.intensity * 0.45,
+                            filter: "blur(24px)",
+                          }}
+                        />
+                      )}
+                      <div
+                      className={`relative w-full border-b border-glass-border ${
+                          index % 2 === 0 ? "bg-white/[0.03]" : "bg-transparent"
+                        }`}
+                        style={{ height: clipHeight }}
+                      >
+                        {feedback && (
+                          <div
+                            className="absolute inset-x-0 bottom-0 h-1 pointer-events-none"
+                            style={{
+                              background: `linear-gradient(90deg, transparent 0%, ${hexToRgba(
+                                feedback.glowColor,
+                                0.45
+                              )} 35%, transparent 100%)`,
+                              opacity: 0.3 + feedback.pulse * 0.5,
+                            }}
+                          />
+                        )}
+                      </div>
+                      {isAutomationVisible && automationConfig && !uiState.collapsed && (
+                        <AutomationLane
+                          trackId={track.id}
+                          fxId={automationConfig.fxId}
+                          paramName={automationConfig.paramName}
+                          points={automationPointsForLane}
+                          trackColor={track.trackColor}
+                          height={AUTOMATION_LANE_H}
+                          duration={projectDuration}
+                          pixelsPerSecond={pixelsPerSecond}
+                          onAddPoint={(point) =>
+                            onAddAutomationPoint(track.id, automationConfig.fxId, automationConfig.paramName, point)
+                          }
+                          onUpdatePoint={(idx, point) =>
+                            onUpdateAutomationPoint(track.id, automationConfig.fxId, automationConfig.paramName, idx, point)
+                          }
+                          onDeletePoint={(idx) =>
+                            onDeleteAutomationPoint(track.id, automationConfig.fxId, automationConfig.paramName, idx)
+                          }
+                        />
+                      )}
+                    </div>
+                  );
                 })}
                 
-                {bars.map(({bar,x}) => ( <div key={`grid-bar-${bar}`} className="absolute top-0 bottom-0 border-l border-white/10" style={{ height: trackTop, left: x }} /> ))}
+                {bars.map(({bar,x}) => ( <div key={`grid-bar-${bar}`} className="absolute top-0 bottom-0 border-l border-glass-border/70" style={{ height: totalLaneHeight, left: x }} /> ))}
 
                 {selection && (
                     <div className="absolute top-0 bottom-0 bg-fuchsia-500/10 border-x-2 border-fuchsia-400"
@@ -336,58 +732,153 @@ export const ArrangeWindow: React.FC<Props> = (props) => {
                         }} />
                 )}
 
-                {clips.map((c) => {
-                    const laneIndex = Math.max(0, tracks.findIndex(t => t.id === c.trackId));
-                    let topOffset = 0;
-                    for(let i=0; i < laneIndex; i++) {
-                        const trackHeight = visibleAutomationLanes[tracks[i].id] ? CLIP_LANE_H + AUTOMATION_LANE_H : CLIP_LANE_H;
-                        topOffset += trackHeight;
-                    }
-                    return (
+                {clips.map((clipModel) => {
+                  const laneMeta = trackLaneLookup.get(clipModel.trackId);
+                  const laneTop = (laneMeta?.top ?? 0) + 2;
+                  const clipHeight = laneMeta?.clipHeight ?? BASE_CLIP_LANE_H;
+                  const clipFeedback = alsFeedbackByTrack.get(clipModel.trackId);
+                  return (
                     <ArrangeClip
-                        key={c.id}
-                        clip={c}
-                        laneTop={topOffset + 2} laneHeight={CLIP_LANE_H - 4}
-                        pps={pixelsPerSecond}
-                        onBeginDrag={(kind, startClientX, startClientY) => {
-                            const clip = clips.find(x => x.id === c.id);
-                            if (clip) setDrag({ id: c.id, kind, startX: startClientX, startY: startClientY, clip });
-                        }}
-                        onSelect={(append) => {
-                            // FIX: Ensure 'selected' property is explicitly set to boolean.
-                            if (append) setClips(prev => prev.map(x => x.id === c.id ? { ...x, selected: Boolean(!x.selected) } : x));
-                            else setClips(prev => prev.map(x => ({ ...x, selected: Boolean(x.id === c.id) })));
-                        }}
+                      key={clipModel.id}
+                      clip={clipModel}
+                      laneTop={laneTop}
+                      laneHeight={clipHeight - 4}
+                      pps={pixelsPerSecond}
+                      onOpenPianoRoll={() => onOpenPianoRoll(clipModel)}
+                      audioBuffer={audioBuffers[clipModel.bufferId]}
+                      feedback={clipFeedback}
+                      isRecallTarget={highlightClipIdSet.has(clipModel.id)}
+                      onBeginDrag={(kind, startClientX, startClientY, modifiers) => {
+                        const clip = clips.find((x) => x.id === clipModel.id);
+                        if (!clip) return;
+                        if (!clip.selected) {
+                          setClips((prev) =>
+                            prev.map((x) => ({
+                              ...x,
+                              selected: x.id === clip.id,
+                            }))
+                          );
+                        }
+                        const activeClipIds = clip.selected
+                          ? clips.filter((x) => x.selected).map((x) => x.id)
+                          : [clip.id];
+                        const originalClips = clips
+                          .filter((x) => activeClipIds.includes(x.id))
+                          .map((x) => ({ ...x }));
+                        onSetTrackContext(clip.trackId, "edit");
+                        setDrag({
+                          kind,
+                          primaryId: clip.id,
+                          startX: startClientX,
+                          startY: startClientY,
+                          clipIds: activeClipIds,
+                          originalClips,
+                          ripple: Boolean(modifiers?.altKey),
+                          duplicate: Boolean(modifiers?.metaKey),
+                        });
+                      }}
+                      onSelect={(append) => {
+                        if (append) {
+                          setClips((prev) =>
+                            prev.map((x) =>
+                              x.id === clipModel.id
+                                ? { ...x, selected: !x.selected }
+                                : x
+                            )
+                          );
+                        } else {
+                          setClips((prev) =>
+                            prev.map((x) => ({
+                              ...x,
+                              selected: x.id === clipModel.id,
+                            }))
+                          );
+                        }
+                      }}
                     />
-                    );
+                  );
                 })}
+                {snapIndicator !== null && (
+                  <div
+                    className="absolute top-0 bottom-0 pointer-events-none z-20"
+                    style={{ left: snapIndicator * pixelsPerSecond }}
+                  >
+                    <div
+                      className="absolute top-0 bottom-0 w-px bg-cyan-300/70"
+                      style={{ boxShadow: '0 0 12px rgba(45,212,191,0.35)' }}
+                    />
+                    <div className="absolute -top-3 left-1/2 -translate-x-1/2 text-[9px] uppercase tracking-[0.45em] text-cyan-100/80">
+                      snap
+                    </div>
+                  </div>
+                )}
                  {/* --- Living Playhead --- */}
-                <div className="absolute top-0 bottom-0 pointer-events-none z-20" style={{ left: currentTime * pixelsPerSecond, ...playheadStyle }}>
-                    {/* Aura */}
-                    <div className="absolute top-0 h-full left-1/2 -translate-x-1/2 bg-[var(--playhead-color)] transition-all duration-200" style={{ width: `${10 + glowIntensity * 60}px`, opacity: isPlaying ? 0.2 + glowIntensity * 0.5 : 0, filter: 'blur(15px)' }} />
-                    
-                    {/* Top Marker */}
-                    <div className="absolute top-0 -mt-2.5 left-1/2 -translate-x-1/2 w-0 h-0 border-l-[6px] border-l-transparent border-r-[6px] border-r-transparent border-t-[8px]" style={{ borderTopColor: playheadColor?.light, filter: 'drop-shadow(0 0 5px var(--playhead-color))'}}/>
-                    
-                    {/* Main Line */}
-                    <div className={`w-0.5 h-full bg-[var(--playhead-color)] animate-playhead-breathing`} />
+                {playheadVisible && (
+                  <div
+                    className="absolute top-0 pointer-events-none z-30"
+                    style={{ left: playheadX, height: totalLaneHeight, ...playheadStyle }}
+                  >
+                    <div
+                      className="absolute top-0 w-[120px] h-full transition-all duration-300"
+                      style={{
+                        left: '-60px',
+                        opacity: isPlaying ? 0.7 : 0.4,
+                        background: isPlaying
+                          ? `radial-gradient(circle, ${hexToRgba(playheadColor?.light ?? '#67e8f9', 0.55)} 0%, transparent 70%)`
+                          : `radial-gradient(circle, ${hexToRgba(playheadColor?.color ?? '#06b6d4', 0.4)} 0%, transparent 70%)`,
+                        filter: 'blur(14px)',
+                      }}
+                    />
 
-                    {/* Transient Sparks */}
-                    {masterAnalysis?.transient && isPlaying && Array.from({length: 5}).map((_, i) => {
-                        const angle = Math.random() * Math.PI * 2;
-                        const distance = 20 + Math.random() * 30;
-                        return (
-                           <div 
-                                key={`${transientKey}-${i}`}
-                                className="absolute top-1/2 left-1/2 w-1 h-1 rounded-full bg-white animate-spark-burst"
-                                style={{
-                                    transform: `translate(${Math.cos(angle) * distance}px, ${Math.sin(angle) * distance}px) scale(0)`,
-                                    animationDelay: `${Math.random() * 0.1}s`,
-                                }}
-                            />
-                        )
+                    {isPlaying && (
+                      <div
+                        className="absolute top-0 h-full animate-playhead-trail"
+                        style={{
+                          left: '-70px',
+                          right: '100%',
+                          background: `linear-gradient(90deg, transparent 0%, ${hexToRgba(playheadColor?.light ?? '#67e8f9', 0.5)} 100%)`,
+                          filter: 'blur(12px)',
+                          opacity: 0.6 + glowIntensity * 0.3,
+                        }}
+                      />
+                    )}
+
+                    <div
+                      className="absolute top-0 w-[3px] h-full rounded-sm"
+                      style={{
+                        left: '-1.5px',
+                        background: `linear-gradient(180deg, ${playheadColor?.color ?? '#06b6d4'} 0%, ${hexToRgba(playheadColor?.light ?? '#67e8f9', 0.85)} 100%)`,
+                        boxShadow: isPlaying
+                          ? `0 0 18px ${hexToRgba(playheadColor?.light ?? '#67e8f9', 0.95)}, 0 0 ${42 + glowIntensity * 24}px ${hexToRgba(playheadColor?.color ?? '#06b6d4', 0.5)}`
+                          : `0 0 14px ${hexToRgba(playheadColor?.color ?? '#06b6d4', 0.75)}`,
+                      }}
+                    />
+
+                    <div
+                      className="absolute -top-1 left-0 w-3 h-3 -translate-x-1/2 rounded-full"
+                      style={{
+                        background: playheadColor?.light ?? '#67e8f9',
+                        boxShadow: `0 0 8px ${hexToRgba(playheadColor?.light ?? '#67e8f9', 0.9)}`,
+                        opacity: isPlaying ? 1 : 0.75,
+                      }}
+                    />
+
+                    {masterAnalysis?.transient && isPlaying && Array.from({ length: 5 }).map((_, i) => {
+                      const angle = Math.random() * Math.PI * 2;
+                      const distance = 24 + Math.random() * 32;
+                      return (
+                        <div
+                          key={`${transientKey}-${i}`}
+                          className="absolute top-1/2 left-1/2 w-1 h-1 rounded-full bg-white animate-spark-burst"
+                          style={{
+                            transform: `translate(${Math.cos(angle) * distance}px, ${Math.sin(angle) * distance}px) scale(0)`,
+                            animationDelay: `${Math.random() * 0.12}s`,
+                          }}
+                        />
+                      );
                     })}
-                </div>
+                  </div>
+                )}
             </div>
         </div>
       </div>
