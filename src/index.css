@@ -5,18 +5,41 @@
 :root {
   color-scheme: dark;
   font-family: "Inter", "SF Pro Display", "Segoe UI", system-ui, -apple-system, BlinkMacSystemFont, sans-serif;
-  --bg-glow-color: rgba(99, 102, 241, 0.35);
-  --als-glow-color: rgba(255, 255, 255, 0.45);
+  --bg-gradient-start: #040d1f;
+  --bg-gradient-end: #0d1f3c;
+  --bg-glow-color: rgba(72, 132, 255, 0.32);
+  --bg-mist-color: rgba(16, 28, 54, 0.52);
+  --als-glow-color: rgba(96, 200, 255, 0.65);
+  --glass-surface: rgba(9, 18, 36, 0.82);
+  --glass-surface-soft: rgba(12, 24, 46, 0.68);
+  --glass-border: rgba(102, 140, 198, 0.45);
+  --glass-border-soft: rgba(102, 140, 198, 0.26);
+  --glass-shadow: 0 35px 80px rgba(4, 12, 26, 0.58);
+  --ink-foreground: #e6f0ff;
+  --ink-muted: rgba(196, 210, 240, 0.72);
 }
 
 body {
   margin: 0;
   min-height: 100vh;
-  background-color: #03040B;
-  background-image: radial-gradient(ellipse at top, var(--bg-glow-color), #03040B 70%);
-  transition: background-image 1s ease-out;
-  color: #f8fafc;
+  background: radial-gradient(circle at 25% -5%, rgba(64, 101, 180, 0.4), transparent 55%),
+    radial-gradient(circle at 75% 10%, rgba(32, 72, 150, 0.35), transparent 50%),
+    linear-gradient(130deg, var(--bg-gradient-start), var(--bg-gradient-end));
+  transition: background 1s ease-out;
+  color: var(--ink-foreground);
   overflow: hidden;
+}
+
+body::before {
+  content: "";
+  position: fixed;
+  inset: 0;
+  background: radial-gradient(circle at 45% 15%, var(--bg-glow-color), transparent 60%),
+    radial-gradient(circle at 80% 70%, rgba(46, 94, 180, 0.35), transparent 55%);
+  opacity: 0.7;
+  pointer-events: none;
+  mix-blend-mode: screen;
+  filter: blur(60px);
 }
 
 #root {

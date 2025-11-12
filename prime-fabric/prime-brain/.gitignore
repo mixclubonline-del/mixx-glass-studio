@@ -1,0 +1,12 @@
+node_modules
+dist
+artifacts
+weights
+reports
+.env
+.venv
+__pycache__
+*.pyc
+.hf
+
+

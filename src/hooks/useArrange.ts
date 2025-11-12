@@ -20,9 +20,18 @@ export interface ArrangeClip {
   fadeIn?: number; // seconds
   fadeOut?: number; // seconds
   gain?: number; // linear gain value (1.0 = 0dB)
+  warpAnchors?: number[]; // seconds relative to clip start
   // Prime Brain properties
   originalDuration?: number; // The duration of the clip before any time stretching
   timeStretchRate?: number; // 1.0 is normal, < 1 is slower, > 1 is faster
+  // Grouping & ALS metadata
+  groupId?: string | null;
+  isGroupRoot?: boolean;
+  alsEnergy?: number;
+  sourceJobId?: string | null;
+  sourceFileName?: string | null;
+  sourceFingerprint?: string | null;
+  lastIngestAt?: number | null;
 }
 
 export interface ArrangeState {
@@ -46,6 +55,16 @@ export function useArrange(initial: Partial<{ clips: (Omit<ArrangeClip, 'bufferI
     fadeOut: parseFloat(c.fadeOut?.toString() || '0') as number, // Ensure fadeOut is a number
     originalDuration: parseFloat(c.originalDuration?.toString() || c.duration?.toString() || '0') as number, // Ensure originalDuration is a number
     timeStretchRate: parseFloat(c.timeStretchRate?.toString() || '1.0') as number, // Ensure timeStretchRate is a number
+    groupId: c.groupId ?? null,
+    isGroupRoot: c.isGroupRoot ?? false,
+    alsEnergy: typeof c.alsEnergy === 'number' ? c.alsEnergy : 0,
+    sourceJobId: c.sourceJobId ?? null,
+    sourceFileName: c.sourceFileName ?? null,
+    sourceFingerprint: c.sourceFingerprint ?? null,
+    lastIngestAt: c.lastIngestAt ?? null,
+    warpAnchors: Array.isArray(c.warpAnchors)
+      ? c.warpAnchors.map((anchor) => Number(anchor) || 0).filter((anchor) => anchor >= 0)
+      : [],
   })) ?? []);
   // FIX: Added missing useState hooks for selection, pixelsPerSecond, and scrollX.
   const [selection, setSelectionState] = useState<ArrangeState['selection']>(initial.selection ?? null);
@@ -112,12 +131,21 @@ export function useArrange(initial: Partial<{ clips: (Omit<ArrangeClip, 'bufferI
       const splitPointInClip = splitTime - clipToSplit.start;
       if (splitPointInClip <= 0 || splitPointInClip >= clipToSplit.duration) return prev;
 
+      const anchors = Array.isArray(clipToSplit.warpAnchors)
+        ? clipToSplit.warpAnchors
+        : [];
+      const firstAnchors = anchors.filter((anchor) => anchor < splitPointInClip);
+      const secondAnchors = anchors
+        .filter((anchor) => anchor >= splitPointInClip)
+        .map((anchor) => anchor - splitPointInClip);
+
       const firstPart: ArrangeClip = {
         ...clipToSplit,
         id: `clip-${Date.now()}-a`, // New unique ID
         duration: splitPointInClip,
         selected: true, // Select both new halves
         fadeOut: 0, // Reset fade on split edge
+        warpAnchors: firstAnchors,
       };
       const secondPart: ArrangeClip = {
         ...clipToSplit,
@@ -127,6 +155,7 @@ export function useArrange(initial: Partial<{ clips: (Omit<ArrangeClip, 'bufferI
         sourceStart: clipToSplit.sourceStart + splitPointInClip,
         selected: true, // Select both new halves
         fadeIn: 0, // Reset fade on split edge
+        warpAnchors: secondAnchors,
       };
       return [...prev.filter(c => c.id !== clipToSplit.id), firstPart, secondPart];
     });

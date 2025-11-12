@@ -130,6 +130,19 @@ export const SplitIcon: React.FC<IconProps> = (props) => (
     </svg>
 );
 
+export const MergeIcon: React.FC<IconProps> = (props) => (
+  <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" strokeWidth={1.5} stroke="currentColor" {...props}>
+    <path strokeLinecap="round" strokeLinejoin="round" d="M7.5 5.25h9M7.5 18.75h9M7.5 5.25v4.5a3 3 0 003 3h3a3 3 0 003-3v-4.5M7.5 18.75v-4.5a3 3 0 013-3h3a3 3 0 013 3v4.5" />
+    <path strokeLinecap="round" strokeLinejoin="round" d="M12 9.75v4.5" />
+  </svg>
+);
+
+export const RefreshIcon: React.FC<IconProps> = (props) => (
+  <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" strokeWidth={1.5} stroke="currentColor" {...props}>
+    <path strokeLinecap="round" strokeLinejoin="round" d="M4.5 4.5v6h6M19.5 19.5v-6h-6M5.343 18.657A9 9 0 0118.657 5.343M18.657 18.657A9 9 0 015.343 5.343" />
+  </svg>
+);
+
 
 export const RewindIcon: React.FC<IconProps> = (props) => (
     <svg xmlns="http://www.w3.org/2000/svg" fill="currentColor" viewBox="0 0 24 24" {...props}>

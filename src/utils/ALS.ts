@@ -16,6 +16,7 @@ interface DeriveFeedbackParams {
   transient?: boolean;
   volume?: number;
   color: TrackColorKey;
+  lowBandEnergy?: number;
 }
 
 const clamp01 = (value: number) => Math.min(1, Math.max(0, value));
@@ -64,6 +65,14 @@ export const TRACK_COLOR_SWATCH: Record<
   purple: { base: "#8b5cf6", glow: "#c4b5fd" },
 };
 
+export interface PulsePalette {
+  base: string;
+  glow: string;
+  halo: string;
+  accent: string;
+  pulseStrength: number;
+}
+
 const temperatureFromLevel = (intensity: number): ALSTemperature => {
   if (intensity >= 0.75) return "hot";
   if (intensity >= 0.5) return "warm";
@@ -71,23 +80,29 @@ const temperatureFromLevel = (intensity: number): ALSTemperature => {
   return "cold";
 };
 
-export const deriveTrackALSFeedback = ({
-  level = 0,
-  transient = false,
-  volume = 0.75,
-  color,
-}: DeriveFeedbackParams): TrackALSFeedback => {
-  const intensity = clamp01(level * 1.4);
-  const pulse = transient ? 0.85 : intensity * 0.6;
-  const flow = clamp01(volume);
+export const deriveTrackALSFeedback = (
+  {
+    level = 0,
+    transient = false,
+    volume = 0.75,
+    color,
+    lowBandEnergy = 0,
+  }: DeriveFeedbackParams,
+  globalLowPriority?: number
+): TrackALSFeedback => {
+  const subPriority = Math.max(lowBandEnergy, globalLowPriority ?? 0);
+  const intensity = clamp01(level + subPriority * 0.6);
+  const weightedIntensity = clamp01(intensity * 1.45);
+  const pulse = transient || subPriority > 0.18 ? 0.95 : weightedIntensity * 0.6;
+  const flow = clamp01(volume + subPriority * 0.25);
 
   const { base, glow } = TRACK_COLOR_SWATCH[color];
 
   return {
     color: base,
     glowColor: glow,
-    temperature: temperatureFromLevel(intensity),
-    intensity,
+    temperature: temperatureFromLevel(weightedIntensity),
+    intensity: weightedIntensity,
     pulse,
     flow,
   };
@@ -98,10 +113,38 @@ export const hexToRgba = (hex: string, alpha = 1): string => {
   return `rgba(${r}, ${g}, ${b}, ${clamp01(alpha)})`;
 };
 
+export const derivePulsePalette = (
+  color: TrackColorKey,
+  intensity: number,
+  pulse: number
+): PulsePalette => {
+  const swatch = TRACK_COLOR_SWATCH[color];
+  const energy = clamp01(intensity);
+  const pulseStrength = clamp01(pulse);
+  const halo = mixHexColors(swatch.glow, "#ffffff", 0.28 + energy * 0.32);
+  const accent = mixHexColors(swatch.glow, swatch.base, 0.4 + pulseStrength * 0.25);
+
+  return {
+    base: swatch.base,
+    glow: swatch.glow,
+    halo,
+    accent,
+    pulseStrength,
+  };
+};
+
 export interface BusALSColors {
   base: string;
   glow: string;
   halo: string;
+}
+
+export interface ALSActionPulse {
+  accent: string;
+  glow: string;
+  halo: string;
+  strength: number;
+  decayMs: number;
 }
 
 export const deriveBusALSColors = (
@@ -117,6 +160,27 @@ export const deriveBusALSColors = (
     base: baseTint,
     glow: glowTint,
     halo,
+  };
+};
+
+/**
+ * Fast helper for transient ALS pulses after mixer actions.
+ * what: Generates an ALSActionPulse from a base palette and intensity.
+ * why: Keeps feedback responsive without introducing numeric UI clutter.
+ * how: Blend base/glow and clamp energy into decay values. (Flow / Reduction)
+ */
+export const deriveActionPulse = (
+  palette: PulsePalette,
+  energy: number,
+  decayMs = 420
+): ALSActionPulse => {
+  const strength = clamp01((palette.pulseStrength + energy) * 0.65);
+  return {
+    accent: palette.accent,
+    glow: mixHexColors(palette.glow, "#ffffff", 0.25 + strength * 0.3),
+    halo: mixHexColors(palette.halo, palette.glow, 0.2 + strength * 0.45),
+    strength,
+    decayMs,
   };
 };
 

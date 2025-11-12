@@ -1,14 +1,18 @@
-import React, { useCallback, useEffect, useMemo, useState } from 'react';
+import React, { useEffect, useMemo, useState } from 'react';
 import type {
   MixerSettings,
   TrackAnalysisData,
   TrackData,
   FxWindowConfig,
   FxWindowId,
+  ChannelDynamicsSettings,
+  ChannelEQSettings,
+  MixerBusStripData,
+  MixerBusId,
 } from '../../App';
 import FlowChannelStrip from './FlowChannelStrip';
-import FlowBusStrip from './FlowBusStrip';
 import FlowMasterStrip from './FlowMasterStrip';
+import FlowBusStrip from './FlowBusStrip';
 import {
   MIXER_CONSOLE_MAX_WIDTH,
   MIXER_CONSOLE_MIN_WIDTH,
@@ -22,9 +26,10 @@ import {
 import {
   TRACK_COLOR_SWATCH,
   deriveTrackALSFeedback,
-  deriveBusALSColors,
 } from '../../utils/ALS';
-import type { TrackALSFeedback } from '../../utils/ALS';
+import type { TrackALSFeedback, ALSActionPulse } from '../../utils/ALS';
+import { publishAlsSignal } from '../../state/flowSignals';
+import type { PluginPreset } from '../../utils/pluginState';
 
 interface FlowConsoleProps {
   tracks: TrackData[];
@@ -54,13 +59,54 @@ interface FlowConsoleProps {
   onRemovePlugin?: (trackId: string, index: number) => void;
   onMovePlugin?: (trackId: string, fromIndex: number, toIndex: number) => void;
   onOpenPluginSettings?: (fxId: FxWindowId) => void;
+  fxBypassState?: Record<FxWindowId, boolean>;
+  onToggleBypass?: (fxId: FxWindowId, trackId?: string) => void;
+  availableSends?: Array<{
+    id: string;
+    name: string;
+    color: string;
+    glow: string;
+    shortLabel?: string;
+  }>;
+  trackSendLevels?: Record<string, Record<string, number>>;
+  onSendLevelChange?: (trackId: string, busId: string, value: number) => void;
+  buses?: MixerBusStripData[];
+  selectedBusId?: MixerBusId | null;
+  onSelectBus?: (busId: MixerBusId) => void;
+  dynamicsSettings?: Record<string, ChannelDynamicsSettings>;
+  eqSettings?: Record<string, ChannelEQSettings>;
+  onDynamicsChange?: (
+    trackId: string,
+    patch: Partial<ChannelDynamicsSettings>
+  ) => void;
+  onEQChange?: (trackId: string, patch: Partial<ChannelEQSettings>) => void;
+  pluginInventory?: PluginInventoryItem[];
+  pluginFavorites?: Record<FxWindowId, boolean>;
+  onTogglePluginFavorite?: (pluginId: FxWindowId) => void;
+  pluginPresets?: Record<FxWindowId, PluginPreset[]>;
+  onSavePluginPreset?: (pluginId: FxWindowId, label: string, trackId: string) => void;
+  onLoadPluginPreset?: (pluginId: FxWindowId, presetId: string, trackId: string) => void;
+  onDeletePluginPreset?: (pluginId: FxWindowId, presetId: string) => void;
+  mixerActionPulse?: {
+    trackId: string;
+    pulse: ALSActionPulse;
+    message: string;
+  } | null;
+  onToggleAutomationLaneWithParam?: (
+    trackId: string,
+    fxId: string,
+    paramName: string
+  ) => void;
 }
 
-interface BusGroupMeta {
-  id: string;
+interface PluginInventoryItem {
+  id: FxWindowId;
   name: string;
-  members: string[];
-  colorKey: keyof typeof TRACK_COLOR_SWATCH;
+  colorKey: TrackData['trackColor'];
+  base: string;
+  glow: string;
+  isFavorite: boolean;
+  isCurated: boolean;
 }
 
 const computeStageHeights = () => {
@@ -101,17 +147,29 @@ const FlowConsole: React.FC<FlowConsoleProps> = ({
   onRemovePlugin,
   onMovePlugin,
   onOpenPluginSettings,
+  fxBypassState,
+  onToggleBypass,
+  availableSends,
+  trackSendLevels,
+  onSendLevelChange,
+  selectedBusId,
+  dynamicsSettings,
+  eqSettings,
+  onDynamicsChange,
+  onEQChange,
+  pluginInventory,
+  pluginFavorites,
+  onTogglePluginFavorite,
+  pluginPresets,
+  onSavePluginPreset,
+  onLoadPluginPreset,
+  onDeletePluginPreset,
+  mixerActionPulse,
+  buses = [],
+  onSelectBus,
+  onToggleAutomationLaneWithParam,
 }) => {
-  void onAddPlugin;
-  void onRemovePlugin;
-  void onMovePlugin;
-  void onOpenPluginSettings;
-  void onAddPlugin;
-  void onRemovePlugin;
-  void onMovePlugin;
-  void onOpenPluginSettings;
   const [stageHeights, setStageHeights] = useState(computeStageHeights);
-  const [selectedBusId, setSelectedBusId] = useState<string | null>(null);
 
   useEffect(() => {
     const handleResize = () => setStageHeights(computeStageHeights());
@@ -133,125 +191,78 @@ const FlowConsole: React.FC<FlowConsoleProps> = ({
     }, {} as Record<string, TrackALSFeedback>);
   }, [tracks, trackAnalysis, mixerSettings]);
 
-  const busGroups = useMemo<BusGroupMeta[]>(() => {
-    const groups = new Map<string, BusGroupMeta>();
-    tracks.forEach((track) => {
-      const existing = groups.get(track.group);
-      if (existing) {
-        existing.members.push(track.id);
-        return;
-      }
-      groups.set(track.group, {
-        id: track.group.toLowerCase(),
-        name: track.group,
-        members: [track.id],
-        colorKey: track.trackColor,
-      });
-    });
-    return Array.from(groups.values());
-  }, [tracks]);
-
-  const busVisuals = useMemo(() => {
-    return busGroups.map((bus) => {
-      const analysisValues = bus.members
-        .map((memberId) => trackAnalysis[memberId]?.level ?? 0)
-        .filter((value) => !Number.isNaN(value));
-      const levelAvg =
-        analysisValues.length
-          ? analysisValues.reduce((sum, value) => sum + value, 0) / analysisValues.length
-          : 0;
-
-      const transientActive = bus.members.some(
-        (memberId) => trackAnalysis[memberId]?.transient
-      );
-      const { base, glow } = TRACK_COLOR_SWATCH[bus.colorKey];
-      const palette = deriveBusALSColors(base, glow, levelAvg);
-
-      return {
-        id: bus.id,
-        name: bus.name,
-        members: bus.members,
-        alsColor: palette.base,
-        alsGlow: palette.glow,
-        alsGlowStrength: levelAvg,
-        alsIntensity: levelAvg,
-        alsPulse: transientActive ? 1 : levelAvg * 0.65,
-      };
-    });
-  }, [busGroups, trackAnalysis]);
+  const trackCount = tracks.length;
+  const busCount = buses.length;
+  const masterFeedback = useMemo(
+    () =>
+      deriveTrackALSFeedback({
+        level: masterAnalysis.level ?? 0,
+        transient: masterAnalysis.transient ?? false,
+        volume: masterVolume,
+        color: "purple",
+      }),
+    [masterAnalysis.level, masterAnalysis.transient, masterVolume]
+  );
 
   useEffect(() => {
-    const selectedTrack = tracks.find((track) => track.id === selectedTrackId);
-    if (!selectedTrack) {
-      setSelectedBusId(null);
-      return;
-    }
-    setSelectedBusId(selectedTrack.group.toLowerCase());
-  }, [selectedTrackId, tracks]);
+    publishAlsSignal({
+      source: "mixer",
+      tracks: trackFeedbackMap,
+      master: masterFeedback,
+      meta: { trackCount },
+    });
+  }, [trackFeedbackMap, masterFeedback, trackCount]);
 
-  const handleSelectBus = useCallback(
-    (busId: string, members: string[]) => {
-      setSelectedBusId(busId);
-      const firstMember = members[0];
-      if (firstMember) {
-        onSelectTrack(firstMember);
-      }
-    },
-    [onSelectTrack]
-  );
-
-  const trackCount = tracks.length;
+  const resolvedPluginInventory = pluginInventory ?? [];
+  const resolvedPluginFavorites = pluginFavorites ?? {};
+  const resolvedPluginPresets = pluginPresets ?? {};
   const consoleWidth = Math.max(
-    (trackCount + 2) * MIXER_STRIP_WIDTH + MIXER_MASTER_PADDING,
+    (trackCount + busCount + 2) * MIXER_STRIP_WIDTH + MIXER_MASTER_PADDING,
     MIXER_CONSOLE_MIN_WIDTH
   );
+  const viewportWidth = typeof window !== 'undefined' ? window.innerWidth : consoleWidth;
+  const stageWidth = Math.max(consoleWidth, viewportWidth - 96);
 
   return (
-    <div className="w-full h-full flex flex-col items-center justify-center py-6">
-      <div
-        className="relative w-full px-8"
-        style={{ maxWidth: `${MIXER_CONSOLE_MAX_WIDTH}px` }}
-      >
+    <div className="w-full h-full flex flex-col items-center justify-center py-6 px-4">
+      <div className="relative w-full h-full">
         <div className="absolute inset-0 pointer-events-none">
-          <div className="absolute inset-x-0 top-0 h-32 bg-gradient-to-b from-black/60 via-transparent to-transparent" />
-          <div className="absolute inset-y-0 left-0 w-24 bg-gradient-to-r from-black/45 via-black/10 to-transparent" />
-          <div className="absolute inset-y-0 right-0 w-24 bg-gradient-to-l from-black/45 via-black/10 to-transparent" />
-          <div className="absolute left-1/2 -translate-x-1/2 top-8 h-1 w-2/3 rounded-full bg-gradient-to-r from-white/10 via-white/5 to-white/10 blur-sm" />
+          <div className="absolute inset-x-0 top-0 h-32 bg-gradient-to-b from-[rgba(21,45,88,0.9)] via-transparent to-transparent" />
+          <div className="absolute inset-y-0 left-0 w-24 bg-gradient-to-r from-[rgba(12,28,58,0.75)] via-[rgba(12,28,58,0.2)] to-transparent" />
+          <div className="absolute inset-y-0 right-0 w-24 bg-gradient-to-l from-[rgba(12,28,58,0.75)] via-[rgba(12,28,58,0.2)] to-transparent" />
+          <div className="absolute left-1/2 -translate-x-1/2 top-8 h-1 w-2/3 rounded-full bg-gradient-to-r from-[rgba(64,120,210,0.45)] via-[rgba(126,162,235,0.35)] to-[rgba(64,120,210,0.45)] blur-sm" />
         </div>
 
         <div className="overflow-x-auto">
           <div
             className="relative mx-auto h-full flex flex-col"
-            style={{ width: consoleWidth, height: stageHeights.stageHeight }}
+            style={{ width: stageWidth, height: stageHeights.stageHeight }}
           >
-            {busVisuals.length > 0 && (
-              <div className="flex justify-center gap-3 pb-4">
-                {busVisuals.map((bus) => (
-                  <FlowBusStrip
-                    key={bus.id}
-                    busId={bus.id}
-                    name={bus.name}
-                    members={bus.members}
-                    alsIntensity={bus.alsIntensity}
-                    alsPulse={bus.alsPulse}
-                    alsColor={bus.alsColor}
-                    alsGlow={bus.alsGlow}
-                    alsGlowStrength={bus.alsGlowStrength}
-                    isActive={selectedBusId === bus.id}
-                    onSelectBus={(id) => handleSelectBus(id, bus.members)}
-                  />
-                ))}
-                <div className="w-8 flex-shrink-0" />
-              </div>
-            )}
-
-            <div className="flex items-end justify-center gap-x-3">
+            <div className="flex items-end justify_center gap-x-3">
               {tracks.map((track) => {
                 const analysis = trackAnalysis[track.id] ?? { level: 0, transient: false };
                 const settings =
                   mixerSettings[track.id] ?? { volume: 0.75, pan: 0, isMuted: false };
                 const { base, glow } = TRACK_COLOR_SWATCH[track.trackColor];
                 const alsFeedback = trackFeedbackMap[track.id];
+                const plugins =
+                  (inserts[track.id] ?? []).map((fxId, insertIndex) => {
+                    const fxConfig = fxWindows.find((fw) => fw.id === fxId);
+                    const inventoryMeta = resolvedPluginInventory.find((item) => item.id === fxId);
+                    return {
+                      id: fxId,
+                      name: fxConfig?.name ?? inventoryMeta?.name ?? fxId.toUpperCase(),
+                      color: inventoryMeta?.base ?? glow,
+                      glow: inventoryMeta?.glow ?? glow,
+                      isBypassed: fxBypassState?.[fxId] ?? false,
+                      index: insertIndex,
+                    };
+                  }) ?? [];
+
+                const stripActionPulse =
+                  mixerActionPulse?.trackId === track.id ? mixerActionPulse.pulse : null;
+                const stripActionMessage =
+                  mixerActionPulse?.trackId === track.id ? mixerActionPulse.message : null;
 
                 return (
                   <FlowChannelStrip
@@ -272,13 +283,54 @@ const FlowConsole: React.FC<FlowConsoleProps> = ({
                     onToggleArm={onToggleArm}
                     onRenameTrack={onRenameTrack}
                     inserts={inserts[track.id] ?? []}
+                    plugins={plugins}
                     trackPrimaryColor={base}
                     trackGlowColor={glow}
-                    fxWindows={fxWindows}
+                    onTogglePluginBypass={(channelId, fxId) =>
+                      onToggleBypass?.(fxId, channelId)
+                    }
+                    onOpenPluginSettings={onOpenPluginSettings}
+                    onRemovePlugin={onRemovePlugin}
+                    onMovePlugin={onMovePlugin}
                     onOpenPluginBrowser={() => onOpenPluginBrowser(track.id)}
+                    availableSends={availableSends}
+                    sendLevels={trackSendLevels?.[track.id]}
+                    onSendLevelChange={onSendLevelChange}
+                    dynamicsSettings={dynamicsSettings?.[track.id]}
+                    eqSettings={eqSettings?.[track.id]}
+                    onDynamicsChange={onDynamicsChange}
+                    onEQChange={onEQChange}
+                    pluginInventory={resolvedPluginInventory}
+                    pluginFavorites={resolvedPluginFavorites}
+                    onTogglePluginFavorite={onTogglePluginFavorite}
+                    onAddPlugin={onAddPlugin}
+                    pluginPresets={resolvedPluginPresets}
+                    onSavePluginPreset={onSavePluginPreset}
+                    onLoadPluginPreset={onLoadPluginPreset}
+                    onDeletePluginPreset={onDeletePluginPreset}
+                    actionPulse={stripActionPulse}
+                    actionMessage={stripActionMessage}
+                    selectedBusId={selectedBusId}
+                    onToggleAutomationLaneWithParam={onToggleAutomationLaneWithParam}
                   />
                 );
               })}
+              {buses.map((bus) => (
+                <FlowBusStrip
+                  key={`bus-${bus.id}`}
+                  busId={bus.id}
+                  name={bus.name}
+                  members={bus.members}
+                  alsIntensity={bus.alsIntensity}
+                  alsPulse={bus.alsPulse}
+                  alsColor={bus.alsColor}
+                  alsGlow={bus.alsGlow}
+                  alsHaloColor={bus.alsHaloColor}
+                  alsGlowStrength={bus.alsGlowStrength}
+                  onSelectBus={onSelectBus}
+                  isActive={selectedBusId === bus.id}
+                />
+              ))}
               <div className="w-8 flex-shrink-0" />
               <FlowMasterStrip
                 volume={masterVolume}

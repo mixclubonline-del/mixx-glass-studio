@@ -9,8 +9,34 @@ import MixxFXVisualizer from '../components/MixxFXVisualizer';
 import { getMixxFXEngine } from './MixxFXEngine';
 import TimeWarpVisualizer from '../components/TimeWarpVisualizer';
 import { getTimeWarpEngine } from './TimeWarpEngine';
+import MixxTuneVisualizer from '../components/plugins/MixxTuneVisualizer';
+import { getMixxTuneEngine } from './MixxTuneEngine';
+import MixxVerbVisualizer from '../components/plugins/MixxVerbVisualizer';
+import { getMixxVerbEngine } from './MixxVerbEngine';
+import MixxDelayVisualizer from '../components/plugins/MixxDelayVisualizer';
+import { getMixxDelayEngine } from './MixxDelayEngine';
+import MixxLimiterVisualizer from '../components/plugins/MixxLimiterVisualizer';
+import { getMixxLimiterEngine } from './MixxLimiterEngine';
+import MixxClipperVisualizer from '../components/plugins/MixxClipperVisualizer';
+import { getMixxClipperEngine } from './MixxClipperEngine';
+import MixxDriveVisualizer from '../components/plugins/MixxDriveVisualizer';
+import { getMixxDriveEngine } from './MixxDriveEngine';
+import MixxGlueVisualizer from '../components/plugins/MixxGlueVisualizer';
+import { getMixxGlueEngine } from './MixxGlueEngine';
 
-export type PluginId = 'velvet-curve' | 'harmonic-lattice' | 'mixx-fx' | 'time-warp' | string;
+export type PluginId =
+  | 'velvet-curve'
+  | 'harmonic-lattice'
+  | 'mixx-fx'
+  | 'time-warp'
+  | 'mixx-tune'
+  | 'mixx-verb'
+  | 'mixx-delay'
+  | 'mixx-drive'
+  | 'mixx-glue'
+  | 'mixx-limiter'
+  | 'mixx-clip'
+  | string;
 
 export interface PluginConfig {
   id: PluginId;
@@ -63,10 +89,17 @@ export class PlaceholderAudioEngine implements IAudioEngine {
 
 
 const PLUGIN_REGISTRY: Omit<PluginConfig, 'engineInstance'>[] = [
-    { id: 'velvet-curve', name: 'Velvet Curve', component: VelvetCurveVisualizer },
-    { id: 'harmonic-lattice', name: 'Harmonic Lattice', component: HarmonicLatticeVisualizer },
-    { id: 'mixx-fx', name: 'Mixx FX', component: MixxFXVisualizer },
-    { id: 'time-warp', name: 'Time Warp', component: TimeWarpVisualizer },
+  { id: 'velvet-curve', name: 'Velvet Curve', component: VelvetCurveVisualizer },
+  { id: 'harmonic-lattice', name: 'Harmonic Lattice', component: HarmonicLatticeVisualizer },
+  { id: 'mixx-tune', name: 'Mixx Tune', component: MixxTuneVisualizer },
+  { id: 'mixx-verb', name: 'Mixx Verb', component: MixxVerbVisualizer },
+  { id: 'mixx-delay', name: 'Mixx Delay', component: MixxDelayVisualizer },
+  { id: 'mixx-drive', name: 'Mixx Drive', component: MixxDriveVisualizer },
+  { id: 'mixx-glue', name: 'Mixx Glue', component: MixxGlueVisualizer },
+  { id: 'mixx-limiter', name: 'Mixx Limiter', component: MixxLimiterVisualizer },
+  { id: 'mixx-clip', name: 'Mixx Clip', component: MixxClipperVisualizer },
+  { id: 'mixx-fx', name: 'Mixx FX', component: MixxFXVisualizer },
+  { id: 'time-warp', name: 'Time Warp', component: TimeWarpVisualizer },
 ];
 
 export function getPluginRegistry(ctx: BaseAudioContext): PluginConfig[] {
@@ -78,6 +111,27 @@ export function getPluginRegistry(ctx: BaseAudioContext): PluginConfig[] {
                 break;
             case 'harmonic-lattice':
                 engineInstance = () => getHarmonicLattice(ctx);
+                break;
+            case 'mixx-tune':
+                engineInstance = () => getMixxTuneEngine(ctx);
+                break;
+            case 'mixx-verb':
+                engineInstance = () => getMixxVerbEngine(ctx);
+                break;
+            case 'mixx-delay':
+                engineInstance = () => getMixxDelayEngine(ctx);
+                break;
+            case 'mixx-drive':
+                engineInstance = () => getMixxDriveEngine(ctx);
+                break;
+            case 'mixx-glue':
+                engineInstance = () => getMixxGlueEngine(ctx);
+                break;
+            case 'mixx-limiter':
+                engineInstance = () => getMixxLimiterEngine(ctx);
+                break;
+            case 'mixx-clip':
+                engineInstance = () => getMixxClipperEngine(ctx);
                 break;
             case 'mixx-fx':
                 engineInstance = () => getMixxFXEngine(ctx);

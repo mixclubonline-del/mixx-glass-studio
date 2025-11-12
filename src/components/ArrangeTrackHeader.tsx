@@ -2,13 +2,15 @@
 
 import React from 'react';
 import { TrackData, MixerSettings, FxWindowConfig, FxWindowId } from '../App';
-import { RecordIcon, MuteIcon, SoloIcon, AutomationIcon, PlusCircleIcon } from './icons';
+import { RecordIcon, MuteIcon, SoloIcon, AutomationIcon, PlusCircleIcon, SlidersIcon } from './icons';
 import PluginBadge from './PluginBadge';
 import AutomationParamMenu from './AutomationParamMenu'; // Assuming this component exists or will be created
 import { hexToRgba } from '../utils/ALS';
+import { TrackUIState, TrackContextMode } from '../types/tracks';
 
 interface ArrangeTrackHeaderProps {
   track: TrackData;
+  uiState: TrackUIState;
   selectedTrackId: string | null;
   onSelectTrack: (trackId: string | null) => void;
   isArmed: boolean;
@@ -41,16 +43,23 @@ interface ArrangeTrackHeaderProps {
     intensity: number;
     transient: boolean;
   };
+  onRequestCapsule: (trackId: string) => void;
+  onContextChange: (trackId: string, context: TrackContextMode) => void;
+  onToggleCollapse: (trackId: string) => void;
 }
 
 const ArrangeTrackHeader: React.FC<ArrangeTrackHeaderProps> = ({ 
-    track, 
+    track,
+    uiState,
     selectedTrackId, onSelectTrack, isArmed, onToggleArm, mixerSettings, 
     onMixerChange, isSoloed, onToggleSolo, /* onToggleAutomationLane, */ isAutomationVisible,
     inserts, trackColor, fxWindows, onAddPlugin, onRemovePlugin, onMovePlugin, 
     onOpenPluginBrowser, onOpenPluginSettings,
     automationParamMenu, onOpenAutomationParamMenu, onCloseAutomationParamMenu, onToggleAutomationLaneWithParam,
     alsPalette,
+    onRequestCapsule,
+    onContextChange,
+    onToggleCollapse,
 }) => {
   const fallbackSwatch = (() => {
     switch (track.trackColor) {
@@ -78,6 +87,22 @@ const ArrangeTrackHeader: React.FC<ArrangeTrackHeaderProps> = ({
 
   const isSelected = selectedTrackId === track.id;
   const trackInserts = inserts[track.id] || [];
+  const collapsed = uiState.collapsed;
+  const context = uiState.context ?? "playback";
+
+  const contextSequence: TrackContextMode[] = ["playback", "record", "edit", "performance"];
+  const contextMeta: Record<TrackContextMode, { label: string; description: string; tint: string }> = {
+    playback: { label: "Flow", description: "Playback lane", tint: hexToRgba(palette.base, 0.32) },
+    record: { label: "Record", description: "Input armed", tint: hexToRgba('#f87171', 0.36) },
+    edit: { label: "Edit", description: "Editing focus", tint: hexToRgba('#38bdf8', 0.38) },
+    performance: { label: "Live", description: "Performance controls", tint: hexToRgba('#facc15', 0.34) },
+  };
+
+  const nextContext = () => {
+    const currentIndex = contextSequence.indexOf(context);
+    const next = contextSequence[(currentIndex + 1) % contextSequence.length];
+    onContextChange(track.id, next);
+  };
 
   const baseGradientAlpha = 0.08 + palette.intensity * 0.2;
   const selectedGradientAlpha = 0.22 + palette.intensity * 0.25;
@@ -85,6 +110,7 @@ const ArrangeTrackHeader: React.FC<ArrangeTrackHeaderProps> = ({
     borderLeft: `4px solid ${hexToRgba(palette.glow, 0.9)}`,
     background: `linear-gradient(135deg, ${hexToRgba(palette.base, baseGradientAlpha)} 0%, rgba(3,4,11,0.82) 70%)`,
     boxShadow: isSelected ? `0 0 28px ${hexToRgba(palette.halo, 0.35 + palette.intensity * 0.25)}` : undefined,
+    transition: 'all 220ms ease-out',
   };
 
   if (isSelected) {
@@ -103,6 +129,12 @@ const ArrangeTrackHeader: React.FC<ArrangeTrackHeaderProps> = ({
     boxShadow: `0 0 12px ${hexToRgba(palette.halo, 0.5)}`,
     opacity: isSelected ? 1 : 0,
   };
+
+  if (collapsed) {
+    rootStyle.background = `linear-gradient(120deg, ${hexToRgba('#0f172a', 0.82)} 0%, rgba(3,4,11,0.78) 70%)`;
+    rootStyle.borderLeft = `4px solid ${hexToRgba('#64748b', 0.6)}`;
+    rootStyle.boxShadow = undefined;
+  }
 
   const automationActiveStyle = isAutomationVisible
     ? {
@@ -123,6 +155,7 @@ const ArrangeTrackHeader: React.FC<ArrangeTrackHeaderProps> = ({
     <div 
       className="w-full h-full flex flex-col justify-between p-2 border-b border-white/10 transition-all duration-200 group relative"
       onClick={() => onSelectTrack(track.id)}
+      onDoubleClick={() => onRequestCapsule(track.id)}
       onMouseUp={(e) => e.stopPropagation()}
       style={rootStyle}
     >
@@ -139,6 +172,41 @@ const ArrangeTrackHeader: React.FC<ArrangeTrackHeaderProps> = ({
             )}
             <span className={`text-lg font-bold truncate ${isArmed ? 'text-white' : 'text-gray-200'}`}>{track.trackName}</span>
           </div>
+          <div className="flex items-center gap-2">
+            <button
+              onClick={(e) => {
+                e.stopPropagation();
+                nextContext();
+              }}
+              className="px-2 py-1 rounded-full text-[10px] uppercase tracking-[0.32em] text-ink/80 backdrop-blur-md border border-glass-border transition-all duration-200 hover:border-white/50 hover:text-ink"
+              style={{
+                background: contextMeta[context].tint,
+              }}
+              title={contextMeta[context].description}
+            >
+              {contextMeta[context].label}
+            </button>
+            <button
+              onClick={(e) => {
+                e.stopPropagation();
+                onRequestCapsule(track.id);
+              }}
+              className="w-7 h-7 rounded-full bg-white/10 text-ink/80 hover:bg-white/20 hover:text-ink border border-white/20 backdrop-blur transition-all flex items-center justify-center shadow-[0_0_12px_rgba(148,163,184,0.35)]"
+              title="Open Track Capsule"
+            >
+              <SlidersIcon className="w-3.5 h-3.5" />
+            </button>
+            <button
+              onClick={(e) => {
+                e.stopPropagation();
+                onToggleCollapse(track.id);
+              }}
+              className="w-7 h-7 rounded-full bg-white/5 text-ink/70 hover:bg-white/15 hover:text-ink border border-white/10 backdrop-blur transition-all flex items-center justify-center"
+              title={collapsed ? "Expand track lane" : "Collapse track lane"}
+            >
+              <span className="text-sm">{collapsed ? '▢' : '▾'}</span>
+            </button>
+          </div>
       </div>
       
       {/* Mute, Solo, Arm buttons */}
@@ -146,28 +214,28 @@ const ArrangeTrackHeader: React.FC<ArrangeTrackHeaderProps> = ({
             <button 
                 onClick={(e) => { e.stopPropagation(); onMixerChange(track.id, 'isMuted', !mixerSettings.isMuted); }}
                 title="Mute"
-                className={`w-6 h-6 rounded-full flex items-center justify-center transition-all ${mixerSettings.isMuted ? 'bg-red-600/80 text-white' : 'bg-gray-700/50 text-gray-400 hover:bg-gray-600/50'}`}
+                className={`w-6 h-6 rounded-full flex items-center justify-center transition-all ${mixerSettings.isMuted ? 'bg-red-500/80 text-white' : 'bg-glass-surface-soft text-ink/70 hover:bg-glass-surface hover:text-ink'}`}
             >
                 <MuteIcon className="w-3 h-3"/>
             </button>
             <button
                 onClick={(e) => { e.stopPropagation(); onToggleSolo(track.id); }}
                 title="Solo"
-                className={`w-6 h-6 rounded-full flex items-center justify-center transition-all ${isSoloed ? 'bg-yellow-500/80 text-black' : 'bg-gray-700/50 text-gray-400 hover:bg-gray-600/50'}`}
+                className={`w-6 h-6 rounded-full flex items-center justify-center transition-all ${isSoloed ? 'bg-yellow-300/80 text-ink' : 'bg-glass-surface-soft text-ink/70 hover:bg-glass-surface hover:text-ink'}`}
             >
                 <SoloIcon className="w-3 h-3"/>
             </button>
             <button
                 onClick={(e) => { e.stopPropagation(); onToggleArm(track.id); }}
                 title="Record Arm"
-                className={`w-6 h-6 rounded-full flex items-center justify-center transition-all ${isArmed ? 'bg-red-700 text-white' : 'bg-gray-700/50 text-gray-400 hover:bg-gray-600/50'}`}
+                className={`w-6 h-6 rounded-full flex items-center justify-center transition-all ${isArmed ? 'bg-red-500 text-white' : 'bg-glass-surface-soft text-ink/70 hover:bg-glass-surface hover:text-ink'}`}
             >
                 <RecordIcon className="w-3 h-3"/>
             </button>
             <button
                 onClick={(e) => { e.stopPropagation(); onToggleAutomationLaneWithParam(track.id, 'track', 'volume'); }}
                 title="Toggle Track Automation Lane"
-                className="w-6 h-6 rounded-full flex items-center justify-center transition-all bg-gray-700/50 text-gray-400 hover:bg-gray-600/50"
+                className="w-6 h-6 rounded-full flex items-center justify-center transition-all bg-glass-surface-soft text-ink/70 hover:bg-glass-surface hover:text-ink"
                 style={automationActiveStyle}
             >
                 <AutomationIcon className="w-4 h-4" />
