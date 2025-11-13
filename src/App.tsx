@@ -22,6 +22,8 @@ import FlowWelcomeHub from './components/FlowWelcomeHub';
 import ImportModal from './components/ImportModal';
 import FlowConsole from './components/mixer/Mixer';
 import TrapSamplerConsole from './components/sampler/TrapSamplerConsole';
+import ViewDeck from './components/layout/ViewDeck';
+import OverlayPortal from './components/layout/OverlayPortal';
 import VelvetComplianceHUD from './components/ALS/VelvetComplianceHUD';
 import PrimeBrainInterface from './components/PrimeBrainInterface';
 import { getMixxFXEngine, initializeMixxFXEngine } from './audio/MixxFXEngine';
@@ -6040,78 +6042,98 @@ const FlowRuntime: React.FC<FlowRuntimeProps> = ({ arrangeFocusToken }) => {
   return (
     <div className="relative w-screen h-screen text-ink flex flex-col overflow-hidden" style={backgroundGlowStyle}>
         <div className="pointer-events-none absolute inset-0 bg-gradient-to-br from-[rgba(48,92,178,0.45)] via-[rgba(19,37,74,0.4)] to-transparent blur-[110px] opacity-80"></div>
-        <Header 
-            primeBrainStatus={primeBrainStatus}
-            hushFeedback={hushFeedback}
-            isPlaying={isPlaying}
+        <Header
+          primeBrainStatus={primeBrainStatus}
+          hushFeedback={hushFeedback}
+          isPlaying={isPlaying}
         />
-        <main className="flex-grow relative" style={{ top: '80px', perspective: '1000px', transformStyle: 'preserve-3d' }}>
-            <div className={`w-full h-full transition-all duration-700 ease-in-out absolute inset-0 ${viewMode === 'arrange' ? 'opacity-100 transform-none' : 'opacity-0 transform scale-90 -translate-z-50'}`}>
-              <ArrangeWindow
-                height={typeof window !== 'undefined' ? window.innerHeight - 80 : 760}
-                tracks={tracks}
-                clips={clips}
-                setClips={setClips}
-                isPlaying={isPlaying}
-                currentTime={currentTime}
-                onSeek={handleSeek}
-                bpm={bpm}
-                beatsPerBar={4}
-                pixelsPerSecond={ppsAPI.value}
-                ppsAPI={ppsAPI}
-                scrollX={scrollX}
-                setScrollX={setScrollX}
-                selection={selection}
-                setSelection={setSelection}
-                clearSelection={clearSelection}
-                onSplitAt={onSplitAt}
-                selectedTrackId={selectedTrackId}
-                onSelectTrack={setSelectedTrackId}
-                armedTracks={armedTracks}
-                onToggleArm={handleToggleArm}
-                mixerSettings={mixerSettings}
-                onMixerChange={handleMixerChange}
-                soloedTracks={soloedTracks}
-                onToggleSolo={handleToggleSolo}
-                masterAnalysis={masterAnalysis}
-                automationData={automationData}
-                visibleAutomationLanes={visibleAutomationLanes}
-                onAddAutomationPoint={handleAddAutomationPoint}
-                onUpdateAutomationPoint={handleUpdateAutomationPoint}
-                onDeleteAutomationPoint={handleDeleteAutomationPoint}
-                onUpdateClipProperties={updateClipProperties}
-                inserts={inserts}
-                fxWindows={fxWindows}
-                onAddPlugin={handleAddPlugin}
-                onRemovePlugin={handleRemovePlugin}
-                onMovePlugin={handleMovePlugin}
-                onOpenPluginBrowser={(trackId: string) => { setTrackIdForPluginBrowser(trackId); setIsPluginBrowserOpen(true); }}
-                onOpenPluginSettings={handleOpenPluginSettings}
-                automationParamMenu={automationParamMenu}
-                onOpenAutomationParamMenu={(x, y, trackId) => setAutomationParamMenu({ x, y, trackId })}
-                onCloseAutomationParamMenu={() => setAutomationParamMenu(null)}
-                onToggleAutomationLaneWithParam={handleToggleAutomationLane}
-                style={arrangeBorderGlowStyle}
-                trackAnalysis={trackAnalysis}
-                highlightClipIds={recallHighlightClipIds}
-                followPlayhead={followPlayhead}
-                onManualScroll={handleManualTimelineScroll}
-                trackUiState={trackUiState}
-                onToggleTrackCollapse={handleToggleTrackCollapse}
-                onResizeTrack={handleResizeTrack}
-                onRequestTrackCapsule={handleOpenTrackCapsule}
-                onSetTrackContext={handleTrackContextChange}
-                onOpenPianoRoll={handleOpenPianoRoll}
-                audioBuffers={audioBuffers}
-              />
-            </div>
-            <div className={`absolute inset-0 w-full h-full transition-all duration-700 ease-in-out ${viewMode === 'sampler' ? 'opacity-100 transform-none' : 'opacity-0 transform scale-105 translate-z-50 pointer-events-none'}`}>
-              <div className="flex h-full w-full items-center justify-center px-8">
-                <TrapSamplerConsole tempoBpm={bpm} />
-              </div>
-            </div>
-             <div className={`absolute inset-0 w-full h-full transition-all duration-700 ease-in-out ${viewMode === 'mixer' ? 'opacity-100 transform-none' : 'opacity-0 transform scale-110 translate-z-50'}`}>
-                <FlowConsole 
+        <main className="flex-grow relative" style={{ top: "80px" }}>
+          <ViewDeck
+            viewMode={viewMode}
+            className="h-full w-full"
+            slots={[
+              {
+                id: "arrange",
+                label: "Arrange View",
+                content: (
+                  <ArrangeWindow
+                    height={typeof window !== "undefined" ? window.innerHeight - 80 : 760}
+                    tracks={tracks}
+                    clips={clips}
+                    setClips={setClips}
+                    isPlaying={isPlaying}
+                    currentTime={currentTime}
+                    onSeek={handleSeek}
+                    bpm={bpm}
+                    beatsPerBar={4}
+                    pixelsPerSecond={ppsAPI.value}
+                    ppsAPI={ppsAPI}
+                    scrollX={scrollX}
+                    setScrollX={setScrollX}
+                    selection={selection}
+                    setSelection={setSelection}
+                    clearSelection={clearSelection}
+                    onSplitAt={onSplitAt}
+                    selectedTrackId={selectedTrackId}
+                    onSelectTrack={setSelectedTrackId}
+                    armedTracks={armedTracks}
+                    onToggleArm={handleToggleArm}
+                    mixerSettings={mixerSettings}
+                    onMixerChange={handleMixerChange}
+                    soloedTracks={soloedTracks}
+                    onToggleSolo={handleToggleSolo}
+                    masterAnalysis={masterAnalysis}
+                    automationData={automationData}
+                    visibleAutomationLanes={visibleAutomationLanes}
+                    onAddAutomationPoint={handleAddAutomationPoint}
+                    onUpdateAutomationPoint={handleUpdateAutomationPoint}
+                    onDeleteAutomationPoint={handleDeleteAutomationPoint}
+                    onUpdateClipProperties={updateClipProperties}
+                    inserts={inserts}
+                    fxWindows={fxWindows}
+                    onAddPlugin={handleAddPlugin}
+                    onRemovePlugin={handleRemovePlugin}
+                    onMovePlugin={handleMovePlugin}
+                    onOpenPluginBrowser={(trackId: string) => {
+                      setTrackIdForPluginBrowser(trackId);
+                      setIsPluginBrowserOpen(true);
+                    }}
+                    onOpenPluginSettings={handleOpenPluginSettings}
+                    automationParamMenu={automationParamMenu}
+                    onOpenAutomationParamMenu={(x, y, trackId) =>
+                      setAutomationParamMenu({ x, y, trackId })
+                    }
+                    onCloseAutomationParamMenu={() => setAutomationParamMenu(null)}
+                    onToggleAutomationLaneWithParam={handleToggleAutomationLane}
+                    style={arrangeBorderGlowStyle}
+                    trackAnalysis={trackAnalysis}
+                    highlightClipIds={recallHighlightClipIds}
+                    followPlayhead={followPlayhead}
+                    onManualScroll={handleManualTimelineScroll}
+                    trackUiState={trackUiState}
+                    onToggleTrackCollapse={handleToggleTrackCollapse}
+                    onResizeTrack={handleResizeTrack}
+                    onRequestTrackCapsule={handleOpenTrackCapsule}
+                    onSetTrackContext={handleTrackContextChange}
+                    onOpenPianoRoll={handleOpenPianoRoll}
+                    audioBuffers={audioBuffers}
+                  />
+                ),
+              },
+              {
+                id: "sampler",
+                label: "Trap Sampler Console",
+                content: (
+                  <div className="flex h-full w-full items-center justify-center px-8">
+                    <TrapSamplerConsole tempoBpm={bpm} />
+                  </div>
+                ),
+              },
+              {
+                id: "mixer",
+                label: "Flow Mixer",
+                content: (
+                  <FlowConsole
                     tracks={tracks}
                     mixerSettings={mixerSettings}
                     trackAnalysis={trackAnalysis}
@@ -6133,7 +6155,10 @@ const FlowRuntime: React.FC<FlowRuntimeProps> = ({ arrangeFocusToken }) => {
                     onAddPlugin={handleAddPlugin}
                     onRemovePlugin={handleRemovePlugin}
                     onMovePlugin={handleMovePlugin}
-                    onOpenPluginBrowser={(trackId: string) => { setTrackIdForPluginBrowser(trackId); setIsPluginBrowserOpen(true); }}
+                    onOpenPluginBrowser={(trackId: string) => {
+                      setTrackIdForPluginBrowser(trackId);
+                      setIsPluginBrowserOpen(true);
+                    }}
                     onOpenPluginSettings={handleOpenPluginSettings}
                     fxBypassState={fxBypassState}
                     onToggleBypass={handleToggleBypass}
@@ -6160,31 +6185,39 @@ const FlowRuntime: React.FC<FlowRuntimeProps> = ({ arrangeFocusToken }) => {
                     onLoadPluginPreset={handleLoadPluginPreset}
                     onDeletePluginPreset={handleDeletePluginPreset}
                     mixerActionPulse={mixerActionPulse}
-                />
-            </div>
-
-            <FXRack 
-              onOpenPluginSettings={handleOpenPluginSettings}
-              fxBypassState={fxBypassState}
-              onToggleBypass={(fxId) => handleToggleBypass(fxId)}
-            >
-              {renderFxWindows}
-            </FXRack>
+                  />
+                ),
+              },
+            ]}
+          />
         </main>
-        
-        <VelvetComplianceHUD
-          metrics={loudnessMetrics}
-          profile={currentMasterProfile}
-        />
-        
-        <BloomFloatingHub
+
+        <VelvetComplianceHUD metrics={loudnessMetrics} profile={currentMasterProfile} />
+
+        <OverlayPortal
+          containerId="mixx-fx-portal"
+          className="mixx-overlay mixx-overlay--fx fixed inset-0 z-30 pointer-events-none"
+        >
+          <FXRack
+            onOpenPluginSettings={handleOpenPluginSettings}
+            fxBypassState={fxBypassState}
+            onToggleBypass={(fxId) => handleToggleBypass(fxId)}
+          >
+            {renderFxWindows}
+          </FXRack>
+        </OverlayPortal>
+
+        <OverlayPortal containerId="mixx-bloom-floating-portal">
+          <BloomFloatingHub
             menuConfig={bloomFloatingMenu}
             alsPulseAgent={bloomPulseAgent}
             position={floatingBloomPosition}
             onPositionChange={handleFloatingBloomPositionChange}
-        />
+          />
+        </OverlayPortal>
 
-        <BloomDock 
+        <OverlayPortal containerId="mixx-bloom-dock-portal">
+          <BloomDock
             position={bloomPosition}
             onPositionChange={handleBloomPositionChange}
             alsPulseAgent={bloomPulseAgent}
@@ -6214,7 +6247,8 @@ const FlowRuntime: React.FC<FlowRuntimeProps> = ({ arrangeFocusToken }) => {
             recordingOptions={recordingOptions}
             onToggleRecordingOption={handleToggleRecordingOption}
             onDropTakeMarker={handleDropTakeMarker}
-        />
+          />
+        </OverlayPortal>
 
         {isAddTrackModalOpen && (
             <AddTrackModal

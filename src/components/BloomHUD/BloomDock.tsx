@@ -82,7 +82,9 @@ const ViewToggle: React.FC<{
     }
 
     const isDisabled = nextMode === mode;
-    const { label, icon: Icon } = VIEW_META[nextMode] ?? VIEW_META.arrange;
+    const currentMeta = VIEW_META[mode] ?? VIEW_META.arrange;
+    const nextMeta = VIEW_META[nextMode] ?? VIEW_META.arrange;
+    const { label: currentLabel, icon: CurrentIcon } = currentMeta;
 
     return (
         <button
@@ -96,12 +98,24 @@ const ViewToggle: React.FC<{
             className={`group relative px-4 py-2 rounded-full border border-white/12 bg-glass-surface-soft text-ink/70 transition-all shadow-[0_18px_46px_rgba(4,12,26,0.38)] backdrop-blur-xl ${
                 isDisabled ? 'opacity-40 cursor-not-allowed' : 'hover:text-ink hover:border-white/18'
             }`}
-            aria-label={`Switch to ${label}`}
-            title={`Switch to ${label}`}
+            aria-label={
+                isDisabled
+                    ? `${currentLabel} view`
+                    : `Switch to ${nextMeta.label}`
+            }
+            title={
+                isDisabled
+                    ? `${currentLabel}`
+                    : `Switch to ${nextMeta.label}`
+            }
         >
             <span className="flex items-center gap-2 tracking-[0.32em] text-[11px] uppercase">
-                <Icon className={`w-5 h-5 ${isDisabled ? 'text-slate-500' : 'text-cyan-200 group-hover:text-ink'}`} />
-                {label}
+                <CurrentIcon
+                    className={`w-5 h-5 ${
+                        isDisabled ? 'text-slate-500' : 'text-cyan-200 group-hover:text-ink'
+                    }`}
+                />
+                {currentLabel}
             </span>
             <span
                 aria-hidden
@@ -388,6 +402,12 @@ export const BloomDock: React.FC<BloomDockProps> = (props) => {
         <div className="flex items-center gap-2.5">
             {actionButton(<SquaresPlusIcon className="w-5 h-5 text-emerald-200" />, 'addTrack', undefined, 'Add track')}
             {actionButton(
+                <LoadIcon className="w-5 h-5 text-amber-200" />,
+                'importAudio',
+                undefined,
+                'Import audio or stems'
+            )}
+            {actionButton(
                 <SplitIcon className="w-5 h-5 text-sky-200" />,
                 'splitSelection',
                 { time: currentTime },
@@ -480,6 +500,12 @@ export const BloomDock: React.FC<BloomDockProps> = (props) => {
         <div className="flex items-center gap-2.5">
             {actionButton(<SaveIcon className="w-5 h-5" />, 'saveProject', undefined, 'Save project')}
             {actionButton(<LoadIcon className="w-5 h-5" />, 'loadProject', undefined, 'Load project file')}
+            {actionButton(
+                <PlusCircleIcon className="w-5 h-5 text-emerald-200" />,
+                'importAudio',
+                undefined,
+                'Import audio or stems'
+            )}
             {actionButton(
                 <StarIcon className="w-5 h-5 text-amber-200" />,
                 'analyzeMaster',
@@ -595,6 +621,137 @@ export const BloomDock: React.FC<BloomDockProps> = (props) => {
             window.removeEventListener('keyup', handleKeyUp);
         };
     }, [clearSeekTimers, cueTransportPulse, isPlaying, onPlayPause, onTransportNudge]);
+
+    const transportEnergy = Math.min(1, Math.max(0, masterAnalysis.level));
+    const waveformAccent = hexToRgba(pulseAccent, 0.55);
+    const secondaryAccent = hexToRgba(contextAccent, 0.42);
+    const pulseGlowStyle = (type: TransportPulseType) =>
+        transportPulse === type
+            ? {
+                  boxShadow: `0 0 28px ${hexToRgba(pulseAccent, 0.42)}, inset 0 0 18px ${hexToRgba(pulseAccent, 0.32)}`,
+                  borderColor: hexToRgba(pulseAccent, 0.6),
+              }
+            : undefined;
+
+    const transportModule = (
+        <div className="flex items-center gap-4 px-4 py-2 rounded-full border border-white/10 bg-[rgba(6,12,28,0.68)] backdrop-blur-xl shadow-[0_24px_68px_rgba(4,12,26,0.45)]">
+            <button
+                type="button"
+                aria-label="Cue backward"
+                title="Cue backward"
+                onPointerDown={handleSeekPointerDown('back')}
+                onPointerUp={handleSeekPointerUp('back')}
+                onPointerLeave={() => clearSeekTimers()}
+                onPointerCancel={() => clearSeekTimers()}
+                className="relative w-11 h-11 rounded-full border border-white/14 bg-[rgba(12,26,48,0.65)] text-cyan-100 hover:text-white transition-all"
+                style={pulseGlowStyle('rewind')}
+            >
+                <RewindIcon className="w-5 h-5" />
+            </button>
+            <div className="relative">
+                <button
+                    type="button"
+                    aria-label={isPlaying ? 'Pause transport' : 'Play transport'}
+                    title={isPlaying ? 'Pause' : 'Play'}
+                    onPointerDown={handlePlayPointerDown}
+                    onPointerUp={() => clearSeekTimers()}
+                    className={`relative w-14 h-14 rounded-full border transition-all text-white ${
+                        isPlaying ? 'bg-[rgba(24,32,76,0.78)] border-white/18' : 'bg-[rgba(18,48,84,0.82)] border-white/14'
+                    }`}
+                    style={
+                        transportPulse === 'play' || transportPulse === 'pause'
+                            ? {
+                                  boxShadow: `0 0 36px ${hexToRgba(pulseAccent, 0.5)}, inset 0 0 22px ${hexToRgba(pulseAccent, 0.32)}`,
+                                  borderColor: hexToRgba(pulseAccent, 0.62),
+                              }
+                            : undefined
+                    }
+                >
+                    {isPlaying ? (
+                        <PauseIcon className="w-6 h-6 text-cyan-100" />
+                    ) : (
+                        <PlayIcon className="w-6 h-6 translate-x-[1px] text-cyan-100" />
+                    )}
+                    <span
+                        aria-hidden
+                        className="pointer-events-none absolute inset-0 rounded-full"
+                        style={{
+                            boxShadow: `0 0 ${isPlaying ? 46 : 32}px ${hexToRgba(pulseGlow, isPlaying ? 0.48 : 0.35)}`,
+                            opacity: 0.85,
+                        }}
+                    />
+                </button>
+            </div>
+            <button
+                type="button"
+                aria-label="Cue forward"
+                title="Cue forward"
+                onPointerDown={handleSeekPointerDown('forward')}
+                onPointerUp={handleSeekPointerUp('forward')}
+                onPointerLeave={() => clearSeekTimers()}
+                onPointerCancel={() => clearSeekTimers()}
+                className="relative w-11 h-11 rounded-full border border-white/14 bg-[rgba(12,26,48,0.65)] text-cyan-100 hover:text-white transition-all"
+                style={pulseGlowStyle('forward')}
+            >
+                <FastForwardIcon className="w-5 h-5" />
+            </button>
+            <div className="relative w-40 h-12 rounded-full overflow-hidden border border-white/12 bg-[rgba(4,10,22,0.86)]">
+                <div
+                    className="absolute inset-0"
+                    style={{
+                        opacity: 0.38 + transportEnergy * 0.44,
+                        background: `linear-gradient(135deg, ${hexToRgba(pulseGlow, 0.28)} 0%, ${secondaryAccent} 100%)`,
+                    }}
+                />
+                <div className="absolute inset-0 mix-blend-screen opacity-80">
+                    <MasterWaveform waveform={masterAnalysis.waveform} color={waveformAccent} />
+                </div>
+                {masterAnalysis.transient && (
+                    <div
+                        aria-hidden
+                        className="absolute inset-0 rounded-full pointer-events-none"
+                        style={{
+                            boxShadow: `0 0 42px ${hexToRgba(pulseAccent, 0.55)}`,
+                            opacity: 0.7,
+                        }}
+                    />
+                )}
+                {followPlayhead && (
+                    <div
+                        className="absolute top-1/2 right-3 -translate-y-1/2 w-2.5 h-2.5 rounded-full bg-cyan-200 shadow-[0_0_16px_rgba(45,212,191,0.65)]"
+                        aria-hidden
+                    />
+                )}
+            </div>
+        </div>
+    );
+
+    const loopActive = isLooping || transportPulse === 'loop';
+    const loopButton = (
+        <button
+            type="button"
+            aria-pressed={loopActive}
+            aria-label="Toggle loop"
+            title="Toggle loop"
+            onClick={toggleLoop}
+            className={`relative px-4 py-2 rounded-full border transition-all uppercase tracking-[0.32em] text-[10px] flex items-center gap-2 ${
+                loopActive
+                    ? 'border-cyan-200/70 text-cyan-100 bg-[rgba(12,44,72,0.75)]'
+                    : 'border-glass-border text-ink/70 bg-glass-surface-soft hover:text-ink'
+            }`}
+            style={
+                loopActive
+                    ? {
+                          boxShadow: `0 0 28px ${hexToRgba(pulseAccent, 0.46)}, inset 0 0 18px ${hexToRgba(pulseAccent, 0.3)}`,
+                          borderColor: hexToRgba(pulseAccent, 0.58),
+                      }
+                    : undefined
+            }
+        >
+            <LoopIcon className={`w-5 h-5 ${loopActive ? 'text-cyan-100' : 'text-cyan-200/70'}`} />
+            Loop
+        </button>
+    );
 
     return (
         <div

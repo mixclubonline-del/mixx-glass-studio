@@ -8,6 +8,7 @@ Living reference for Mixx Club systems, doctrines, and coined terms. Update this
 | Flow-Conscious Interface | Doctrine | UI discipline that maintains creator momentum through adaptive behaviors and minimal friction. | Canon pillar |
 | Mixx Recall | Doctrine | Personalized memory system that keeps the Studio context-aware on behalf of the creator. | Canon pillar |
 | Advanced Leveling System (ALS) | Feedback | Prime feedback channel translating system states into temperature, color, and motion cues. | Canon pillar |
+| ALS Privacy Guard | Feedback | Deterministic redaction layer that hashes creator-identifying data before telemetry leaves the runtime, keeping Flow metrics doctrine-compliant. | Introduced Nov 13, 2025 |
 | Bloom Menu | Interaction | Voice-aware, on-demand action surface that stays hidden until summoned. | Canon pillar |
 | Prime Fabric | Infrastructure | Internal orchestrator where training, builds, and sealed operations run before artifacts ship to Studio. | Canon pillar |
 | Prime Brain Fabric Pipeline | Fabric | Training pipeline housed in `prime-fabric/prime-brain/` that sanitizes Studio state, engineers features, fine-tunes Prime Brain, and exports sealed weights. | Introduced Nov 12, 2025 |

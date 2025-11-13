@@ -1,4 +1,4 @@
-import React, { useMemo, useState } from "react";
+import React, { useEffect, useMemo, useState } from "react";
 import {
   addSessionProbeNote,
   exportSessionProbeSnapshot,
@@ -20,6 +20,14 @@ const FlowProbeOverlay: React.FC = () => {
   const store = useSessionProbeStore();
   const [collapsed, setCollapsed] = useState(false);
   const [note, setNote] = useState("");
+  const [engineStats, setEngineStats] = useState<{
+    totalCallbacks: number;
+    averageCallbackNs: number;
+    xruns: number;
+    lastCallbackNs: number;
+    uptimeMs: number;
+  } | null>(null);
+  const [engineStatusLabel, setEngineStatusLabel] = useState<string>("Idle");
 
   if (!store.enabled) {
     return null;
@@ -54,6 +62,66 @@ const FlowProbeOverlay: React.FC = () => {
     if (!serialized) return;
     downloadJson(serialized);
   };
+
+  useEffect(() => {
+    let mounted = true;
+    const hasTauri =
+      typeof window !== "undefined" &&
+      typeof (window as unknown as { __TAURI__?: { invoke?: unknown } }).__TAURI__?.invoke ===
+        "function";
+
+    if (!hasTauri) {
+      return () => {
+        mounted = false;
+      };
+    }
+
+    const pollEngineStats = async () => {
+      try {
+        const status = await (window as unknown as {
+          __TAURI__: { invoke: <T>(cmd: string) => Promise<T> };
+        }).__TAURI__.invoke<{
+          engine?: {
+            total_callbacks: number;
+            average_callback_ns: number;
+            xruns: number;
+            last_callback_ns: number;
+            uptime_ms: number;
+          };
+          is_playing?: boolean;
+        }>("get_flow_status");
+
+        if (!mounted) {
+          return;
+        }
+
+        if (status?.engine) {
+          setEngineStats({
+            totalCallbacks: status.engine.total_callbacks,
+            averageCallbackNs: status.engine.average_callback_ns,
+            xruns: status.engine.xruns,
+            lastCallbackNs: status.engine.last_callback_ns,
+            uptimeMs: status.engine.uptime_ms,
+          });
+        }
+
+        setEngineStatusLabel(status?.is_playing ? "Streaming" : "Armed");
+      } catch {
+        if (!mounted) {
+          return;
+        }
+        setEngineStatusLabel("Unavailable");
+      }
+    };
+
+    void pollEngineStats();
+    const interval = window.setInterval(pollEngineStats, 1000);
+
+    return () => {
+      mounted = false;
+      window.clearInterval(interval);
+    };
+  }, []);
 
   return (
     <div className="fixed bottom-6 right-6 z-[1200] w-[340px] text-xs text-white">
@@ -182,6 +250,32 @@ const FlowProbeOverlay: React.FC = () => {
                   </li>
                 ))}
               </ul>
+            </section>
+
+            <section className="space-y-2">
+              <header className="flex items-center justify-between">
+                <span className="uppercase tracking-[0.32em] text-[10px] text-white/60">
+                  Engine
+                </span>
+                <span className="text-[10px] text-white/40 uppercase tracking-[0.32em]">
+                  {engineStatusLabel}
+                </span>
+              </header>
+              {engineStats ? (
+                <ul className="space-y-1.5 text-white/60 text-[11px]">
+                  <li>
+                    Callbacks · {engineStats.totalCallbacks.toLocaleString()} total (avg{" "}
+                    {engineStats.averageCallbackNs.toFixed(0)} ns)
+                  </li>
+                  <li>
+                    Last · {engineStats.lastCallbackNs.toLocaleString()} ns · XRuns{" "}
+                    {engineStats.xruns}
+                  </li>
+                  <li>Uptime · {(engineStats.uptimeMs / 1000).toFixed(1)} s</li>
+                </ul>
+              ) : (
+                <div className="text-white/50 text-[11px]">Waiting for engine metrics…</div>
+              )}
             </section>
 
             <section className="space-y-2">

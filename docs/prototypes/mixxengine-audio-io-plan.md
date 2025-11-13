@@ -64,6 +64,13 @@ Objective: Prove the Rust-powered MixxEngine core can deliver glitch-free, ultra
 - Introduce lock-free parameter bus (P-3).
 - Wire JUCE UI control → Rust parameter update via ALS-aware conduit (P-4).
 
+---
+
+## Status Update (Nov 13 2025)
+- `mixx_core` crate now exposes `mixx_engine_init/start/stop/shutdown` with CoreAudio duplex streaming via `cpal`.
+- Tauri runtime (`FlowEngine`) boots the engine automatically, surfaces callback metrics in `get_status()`, and stops the stream when transport halts.
+- Header bindings generated in `include/mixx_core_generated.h` for JUCE host integration.
+
 Maintainer: Standards Architect (Prime directive). Update as experiments progress.
 
 

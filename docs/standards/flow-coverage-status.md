@@ -16,7 +16,7 @@ Legend: ✅ Ready · ⚠️ Partial · ❌ Gap
 ## Listen – Sensing & ALS Feedback
 | Standard | Status | Evidence / Notes |
 | --- | --- | --- |
-| Always-On Telemetry | ⚠️ Partial | `SessionProbe` infrastructure exists but gated by `VITE_SESSION_PROBE`; needs default enable. |
+| Always-On Telemetry | ✅ Ready | `SessionProbe` now default-on with ALS Privacy Guard redacting creator identifiers; opt-out via `VITE_SESSION_PROBE=0`. |
 | Latency Ledger | ❌ Gap | No subsystem latency aggregation or ALS pressure mapping. |
 | Harmonic Awareness | ⚠️ Partial | `PrimeBrainSnapshot` captures harmonic state; not re-routed into ALS harmony or Bloom suggestions. |
 
@@ -24,6 +24,7 @@ Legend: ✅ Ready · ⚠️ Partial · ❌ Gap
 | Standard | Status | Evidence / Notes |
 | --- | --- | --- |
 | Flow Context Service | ❌ Gap | No context mesh service; Session Probe data unused for adaptive layout. |
+| View Deck Separation | ✅ Ready | `ViewDeck` layout (`src/components/layout/ViewDeck.tsx`) isolates Arrange/Mixer/Sampler slots; overlays routed through `OverlayPortal` to unblock Flow focus. |
 | Predictive Tools | ❌ Gap | Clip operations are manual; Bloom actions not auto-surfacing from context. |
 | Quantum Scheduler | ❌ Gap | No scheduler orchestration; operations run on main thread. |
 
@@ -38,7 +39,7 @@ Legend: ✅ Ready · ⚠️ Partial · ❌ Gap
 
 ## Immediate Targets
 1. **Flow Context Service spike** (Feel/Listen/Operate) – leverage `flowSignals` and `SessionProbe` to drive ALS-based adaptive behaviors.
-2. **Telemetry default-on** (Listen) – remove build flag dependency; add ALS privacy guardrails.
+2. **Telemetry default-on analytics** (Listen) – monitor opt-out rate and extend ALS Privacy Guard coverage to third-party ingest metadata.
 3. **Quantum Scheduler design** (Operate/Work) – define tiers and instrumentation to prepare for WASM/AI balancing.
 4. **Prime Fabric manifest contract** (Work) – coordinate with Fabric team for signed artifact pipeline.
 

@@ -1,7 +1,10 @@
+use mixx_core::{
+    current_stats as mixx_current_stats, init_engine as mixx_init_engine,
+    start_engine as mixx_start_engine, stop_engine as mixx_stop_engine, EngineConfig as MixxEngineConfig,
+};
 use serde_json;
+use std::sync::atomic::{AtomicBool, AtomicU32, AtomicU64, Ordering};
 use std::sync::Arc;
-use std::sync::atomic::{AtomicBool, AtomicU64, Ordering};
-use std::sync::atomic::AtomicU32;
 
 // Simplified F.L.O.W. Engine for testing
 pub struct FlowEngine {
@@ -15,6 +18,9 @@ pub struct FlowEngine {
     rms_level: Arc<AtomicU32>,
     peak_level: Arc<AtomicU32>,
     energy_level: Arc<AtomicU32>,
+    engine_initialized: Arc<AtomicBool>,
+    engine_running: Arc<AtomicBool>,
+    engine_config: MixxEngineConfig,
 }
 
 impl FlowEngine {
@@ -30,10 +36,24 @@ impl FlowEngine {
             rms_level: Arc::new(AtomicU32::new(0)),
             peak_level: Arc::new(AtomicU32::new(0)),
             energy_level: Arc::new(AtomicU32::new(0)),
+            engine_initialized: Arc::new(AtomicBool::new(false)),
+            engine_running: Arc::new(AtomicBool::new(false)),
+            engine_config: MixxEngineConfig::default(),
         })
     }
 
     pub fn start_audio_stream(&mut self) -> Result<(), String> {
+        if !self
+            .engine_initialized
+            .compare_exchange(false, true, Ordering::SeqCst, Ordering::SeqCst)
+            .is_err()
+        {
+            mixx_init_engine(Some(self.engine_config))
+                .map_err(|err| format!("MixxEngine init failed: {}", err.message()))?;
+        }
+
+        mixx_start_engine().map_err(|err| format!("MixxEngine start failed: {}", err.message()))?;
+        self.engine_running.store(true, Ordering::Relaxed);
         println!("✅ F.L.O.W. audio stream started successfully!");
         Ok(())
     }
@@ -51,6 +71,14 @@ impl FlowEngine {
     pub fn stop(&self) {
         self.is_playing.store(false, Ordering::Relaxed);
         self.current_sample.store(0, Ordering::Relaxed);
+        if self
+            .engine_running
+            .swap(false, Ordering::Relaxed)
+        {
+            if let Err(err) = mixx_stop_engine() {
+                eprintln!("MixxEngine stop failed: {}", err.message());
+            }
+        }
         println!("⏹️ F.L.O.W. Transport: STOP");
     }
 
@@ -71,6 +99,16 @@ impl FlowEngine {
     }
 
     pub fn get_status(&self) -> serde_json::Value {
+        let engine_stats = mixx_current_stats().map(|stats| {
+            serde_json::json!({
+                "total_callbacks": stats.total_callbacks,
+                "average_callback_ns": stats.average_callback_ns,
+                "xruns": stats.xruns,
+                "last_callback_ns": stats.last_callback_ns,
+                "uptime_ms": stats.uptime_ms,
+            })
+        });
+
         serde_json::json!({
             "is_playing": self.is_playing.load(Ordering::Relaxed),
             "is_recording": self.is_recording.load(Ordering::Relaxed),
@@ -82,6 +120,7 @@ impl FlowEngine {
             "rms_level": self.rms_level.load(Ordering::Relaxed) as f32 / 1000.0,
             "peak_level": self.peak_level.load(Ordering::Relaxed) as f32 / 1000.0,
             "energy_level": self.energy_level.load(Ordering::Relaxed) as f32 / 1000.0,
+            "engine": engine_stats,
         })
     }
 }

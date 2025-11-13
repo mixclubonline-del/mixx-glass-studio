@@ -1,6 +1,11 @@
 import { FlowSignal, subscribeToFlow } from "./flowSignals";
+import {
+  sanitizeProbeContext,
+  sanitizeProbeMarker,
+  sanitizeProbeSignal,
+} from "./sessionProbePrivacy";
 
-type TimelineProbeSignal = {
+export type TimelineProbeSignal = {
   channel: "timeline";
   timestamp: number;
   payload: {
@@ -13,7 +18,7 @@ type TimelineProbeSignal = {
   };
 };
 
-type ProbeSignal = FlowSignal | TimelineProbeSignal;
+export type ProbeSignal = FlowSignal | TimelineProbeSignal;
 
 export interface SessionProbeClipSummary {
   id: string;
@@ -60,17 +65,35 @@ export interface SessionProbeState {
 
 const MAX_PROBE_EVENTS = 1200;
 
-const resolveEnv = (): boolean => {
-  if (typeof import.meta === "undefined") return false;
+type ProbeFlags = {
+  enabled: boolean;
+  exportAllowed: boolean;
+};
+
+const resolveProbeFlags = (): ProbeFlags => {
+  if (typeof import.meta === "undefined") {
+    return { enabled: false, exportAllowed: false };
+  }
   try {
     const env = (import.meta as unknown as { env?: Record<string, string | undefined> }).env;
-    return env?.VITE_SESSION_PROBE === "1";
+    if (!env) {
+      return { enabled: true, exportAllowed: false };
+    }
+
+    const explicitlyDisabled = env.VITE_SESSION_PROBE === "0";
+    const explicitlyEnabled = env.VITE_SESSION_PROBE === "1";
+    const enabled = explicitlyEnabled || !explicitlyDisabled;
+    const exportAllowed = env.VITE_SESSION_PROBE_ALLOW_EXPORT === "1";
+
+    return { enabled, exportAllowed };
   } catch {
-    return false;
+    return { enabled: true, exportAllowed: false };
   }
 };
 
-const PROBE_ENABLED = resolveEnv();
+const PROBE_FLAGS = resolveProbeFlags();
+const PROBE_ENABLED = PROBE_FLAGS.enabled;
+const PROBE_EXPORT_ALLOWED = PROBE_FLAGS.exportAllowed;
 
 let state: SessionProbeState = {
   enabled: PROBE_ENABLED,
@@ -100,10 +123,11 @@ const mutateState = (mutator: (prev: SessionProbeState) => SessionProbeState) =>
 };
 
 const appendEvent = (prev: SessionProbeState, signal: ProbeSignal): SessionProbeState => {
+  const sanitizedSignal = sanitizeProbeSignal(signal);
   const nextEvent: SessionProbeEvent = {
-    ...signal,
+    ...sanitizedSignal,
     testing: true,
-    context: prev.context ? { ...prev.context } : null,
+    context: prev.context ? sanitizeProbeContext(prev.context) : null,
   };
 
   const events = [...prev.events, nextEvent];
@@ -120,6 +144,7 @@ const appendEvent = (prev: SessionProbeState, signal: ProbeSignal): SessionProbe
 };
 
 export const isSessionProbeEnabled = () => PROBE_ENABLED;
+export const isSessionProbeExportAllowed = () => PROBE_EXPORT_ALLOWED;
 
 export const initSessionProbe = () => {
   if (!PROBE_ENABLED || unsubscribeFlow) {
@@ -164,9 +189,11 @@ export const updateSessionProbeContext = (
     selectedClips: context.selectedClips.map((clip) => ({ ...clip })),
   };
 
+  const privacySafeContext = sanitizeProbeContext(normalized);
+
   mutateState((prev) => ({
     ...prev,
-    context: normalized,
+    context: privacySafeContext,
   }));
 };
 
@@ -179,16 +206,18 @@ export const addSessionProbeMarker = (
     id: `probe-marker-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`,
     label: label || "Marker",
     timestamp: Date.now(),
-    context: state.context ? { ...state.context } : null,
+    context: state.context ? sanitizeProbeContext(state.context) : null,
     meta,
   };
 
+  const sanitizedMarker = sanitizeProbeMarker(marker);
+
   mutateState((prev) => ({
     ...prev,
-    markers: [...prev.markers, marker],
+    markers: [...prev.markers, sanitizedMarker],
   }));
 
-  return marker;
+  return sanitizedMarker;
 };
 
 export const recordSessionProbeTimelineEvent = (
@@ -224,7 +253,7 @@ export const subscribeToSessionProbe = (listener: () => void) => {
 export const getSessionProbeSnapshot = () => state;
 
 export const exportSessionProbeData = () => {
-  if (!PROBE_ENABLED) return null;
+  if (!PROBE_ENABLED || !PROBE_EXPORT_ALLOWED) return null;
   const snapshot = getSessionProbeSnapshot();
   return JSON.stringify(
     {
