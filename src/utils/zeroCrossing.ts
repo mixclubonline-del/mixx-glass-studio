@@ -63,3 +63,4 @@ export function findNearestZeroCrossing(
 const clampSample = (sampleIndex: number, length: number) =>
   Math.max(0, Math.min(sampleIndex, length - 1));
 
+

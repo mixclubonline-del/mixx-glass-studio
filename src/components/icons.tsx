@@ -168,6 +168,27 @@ export const MixerIcon: React.FC<IconProps> = (props) => (
     </svg>
 );
 
+export const SamplerIcon: React.FC<IconProps> = (props) => (
+    <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={1.3} {...props}>
+        <rect x={3.6} y={3.6} width={16.8} height={16.8} rx={3.2} ry={3.2} />
+        {[0, 1, 2, 3].map((row) =>
+            [0, 1, 2, 3].map((col) => (
+                <rect
+                    key={`${row}-${col}`}
+                    x={5.9 + col * 3.8}
+                    y={5.9 + row * 3.8}
+                    width={2.6}
+                    height={2.6}
+                    rx={0.6}
+                    ry={0.6}
+                    fill="currentColor"
+                    opacity={0.88 - row * 0.12}
+                />
+            ))
+        )}
+    </svg>
+);
+
 export const MuteIcon: React.FC<IconProps> = (props) => (
     <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" strokeWidth={1.5} stroke="currentColor" {...props}>
         <path strokeLinecap="round" strokeLinejoin="round" d="M17.25 9.75L19.5 12m0 0l2.25 2.25M19.5 12l2.25-2.25M19.5 12l-2.25 2.25m-10.5-6l4.72-4.72a.75.75 0 011.28.53v15.88a.75.75 0 01-1.28.53l-4.72-4.72H4.51c-.88 0-1.704-.507-1.938-1.354A9.01 9.01 0 012.25 12c0-.83.112-1.633.322-2.396C2.806 8.756 3.63 8.25 4.51 8.25H6.75z" />
@@ -284,6 +305,55 @@ export const ArrangeViewIcon: React.FC<IconProps> = (props) => (
       strokeLinecap="round"
       strokeLinejoin="round"
       opacity={0.65}
+    />
+  </svg>
+);
+
+export const PianoIcon: React.FC<IconProps> = (props) => (
+  <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" {...props}>
+    <rect
+      x={3.5}
+      y={5}
+      width={17}
+      height={14}
+      rx={2.2}
+      ry={2.2}
+      fill="none"
+      stroke="currentColor"
+      strokeWidth={1.4}
+    />
+    <rect x={6} y={8.2} width={2.6} height={6.8} fill="currentColor" />
+    <rect x={10.2} y={8.2} width={2.6} height={6.8} fill="currentColor" />
+    <rect x={14.4} y={8.2} width={2.6} height={6.8} fill="currentColor" />
+    <path
+      d="M3.5 10.8h17"
+      stroke="currentColor"
+      strokeWidth={1.2}
+      strokeLinecap="round"
+      opacity={0.7}
+    />
+  </svg>
+);
+
+export const EditSurfaceIcon: React.FC<IconProps> = (props) => (
+  <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" {...props}>
+    <path
+      d="M4.5 4.5h9.5c1.4 0 2.5 1.1 2.5 2.5v6.5c0 .66-.54 1.2-1.2 1.2H8.8a1.2 1.2 0 00-.85.35l-3.45 3.45c-.55.55-1.5.16-1.5-.62V7c0-1.38 1.12-2.5 2.5-2.5z"
+      fill="none"
+      stroke="currentColor"
+      strokeWidth={1.4}
+      strokeLinecap="round"
+      strokeLinejoin="round"
+    />
+    <path
+      d="M12.3 9.2l7.2-7.2 1.7 1.7-7.2 7.2-2.1.4.4-2.1z"
+      fill="currentColor"
+    />
+    <path
+      d="M15.8 11.1l2.4 2.4"
+      stroke="currentColor"
+      strokeWidth={1.4}
+      strokeLinecap="round"
     />
   </svg>
 );

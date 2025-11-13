@@ -20,6 +20,7 @@ const colorMap: { [key in TrackColor]: { glow: string; base: string } } = {
   blue: { glow: 'rgba(59, 130, 246, 0.7)', base: '#3b82f6' },
   green: { glow: 'rgba(34, 197, 94, 0.7)', base: '#22c55e' },
   purple: { glow: 'rgba(139, 92, 246, 0.7)', base: '#8b5cf6' },
+  crimson: { glow: 'rgba(244, 63, 94, 0.7)', base: '#f43f5e' },
 };
 
 const EnergyPillar: React.FC<EnergyPillarProps> = ({ level, transient, isPlaying, color }) => {

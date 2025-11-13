@@ -1,48 +1,35 @@
 
 // audio/plugins.ts
-import { IAudioEngine } from '../types/audio-graph';
-import VelvetCurveVisualizer from '../components/VelvetCurveVisualizer';
-import { getVelvetCurveEngine } from './VelvetCurveEngine';
-import HarmonicLatticeVisualizer from '../components/HarmonicLatticeVisualizer';
-import { getHarmonicLattice } from './HarmonicLattice';
-import MixxFXVisualizer from '../components/MixxFXVisualizer';
-import { getMixxFXEngine } from './MixxFXEngine';
-import TimeWarpVisualizer from '../components/TimeWarpVisualizer';
-import { getTimeWarpEngine } from './TimeWarpEngine';
-import MixxTuneVisualizer from '../components/plugins/MixxTuneVisualizer';
-import { getMixxTuneEngine } from './MixxTuneEngine';
-import MixxVerbVisualizer from '../components/plugins/MixxVerbVisualizer';
-import { getMixxVerbEngine } from './MixxVerbEngine';
-import MixxDelayVisualizer from '../components/plugins/MixxDelayVisualizer';
-import { getMixxDelayEngine } from './MixxDelayEngine';
-import MixxLimiterVisualizer from '../components/plugins/MixxLimiterVisualizer';
-import { getMixxLimiterEngine } from './MixxLimiterEngine';
-import MixxClipperVisualizer from '../components/plugins/MixxClipperVisualizer';
-import { getMixxClipperEngine } from './MixxClipperEngine';
-import MixxDriveVisualizer from '../components/plugins/MixxDriveVisualizer';
-import { getMixxDriveEngine } from './MixxDriveEngine';
-import MixxGlueVisualizer from '../components/plugins/MixxGlueVisualizer';
-import { getMixxGlueEngine } from './MixxGlueEngine';
+import React from "react";
+import { IAudioEngine } from "../types/audio-graph";
+import VelvetCurveVisualizer from "../components/VelvetCurveVisualizer";
+import { getVelvetCurveEngine } from "./VelvetCurveEngine";
+import HarmonicLatticeVisualizer from "../components/HarmonicLatticeVisualizer";
+import { getHarmonicLattice } from "./HarmonicLattice";
+import MixxFXVisualizer from "../components/MixxFXVisualizer";
+import { getMixxFXEngine } from "./MixxFXEngine";
+import TimeWarpVisualizer from "../components/TimeWarpVisualizer";
+import { getTimeWarpEngine } from "./TimeWarpEngine";
+import MixxTuneVisualizer from "../components/plugins/MixxTuneVisualizer";
+import { getMixxTuneEngine } from "./MixxTuneEngine";
+import MixxVerbVisualizer from "../components/plugins/MixxVerbVisualizer";
+import { getMixxVerbEngine } from "./MixxVerbEngine";
+import MixxDelayVisualizer from "../components/plugins/MixxDelayVisualizer";
+import { getMixxDelayEngine } from "./MixxDelayEngine";
+import MixxLimiterVisualizer from "../components/plugins/MixxLimiterVisualizer";
+import { getMixxLimiterEngine } from "./MixxLimiterEngine";
+import MixxClipperVisualizer from "../components/plugins/MixxClipperVisualizer";
+import { getMixxClipperEngine } from "./MixxClipperEngine";
+import MixxDriveVisualizer from "../components/plugins/MixxDriveVisualizer";
+import { getMixxDriveEngine } from "./MixxDriveEngine";
+import MixxGlueVisualizer from "../components/plugins/MixxGlueVisualizer";
+import { getMixxGlueEngine } from "./MixxGlueEngine";
+import { PLUGIN_CATALOG } from "./pluginCatalog";
+import type { PluginId, PluginCatalogEntry } from "./pluginTypes";
 
-export type PluginId =
-  | 'velvet-curve'
-  | 'harmonic-lattice'
-  | 'mixx-fx'
-  | 'time-warp'
-  | 'mixx-tune'
-  | 'mixx-verb'
-  | 'mixx-delay'
-  | 'mixx-drive'
-  | 'mixx-glue'
-  | 'mixx-limiter'
-  | 'mixx-clip'
-  | string;
-
-export interface PluginConfig {
-  id: PluginId;
-  name: string;
-  component: React.FC<any>; // Visualizer component
-  engineInstance: (ctx: BaseAudioContext) => IAudioEngine; // Factory for the audio engine instance
+export interface PluginConfig extends PluginCatalogEntry {
+  component: React.FC<any>;
+  engineInstance: (ctx: BaseAudioContext) => IAudioEngine;
 }
 
 // A placeholder for generic plugins or those not yet implemented
@@ -88,60 +75,69 @@ export class PlaceholderAudioEngine implements IAudioEngine {
 }
 
 
-const PLUGIN_REGISTRY: Omit<PluginConfig, 'engineInstance'>[] = [
-  { id: 'velvet-curve', name: 'Velvet Curve', component: VelvetCurveVisualizer },
-  { id: 'harmonic-lattice', name: 'Harmonic Lattice', component: HarmonicLatticeVisualizer },
-  { id: 'mixx-tune', name: 'Mixx Tune', component: MixxTuneVisualizer },
-  { id: 'mixx-verb', name: 'Mixx Verb', component: MixxVerbVisualizer },
-  { id: 'mixx-delay', name: 'Mixx Delay', component: MixxDelayVisualizer },
-  { id: 'mixx-drive', name: 'Mixx Drive', component: MixxDriveVisualizer },
-  { id: 'mixx-glue', name: 'Mixx Glue', component: MixxGlueVisualizer },
-  { id: 'mixx-limiter', name: 'Mixx Limiter', component: MixxLimiterVisualizer },
-  { id: 'mixx-clip', name: 'Mixx Clip', component: MixxClipperVisualizer },
-  { id: 'mixx-fx', name: 'Mixx FX', component: MixxFXVisualizer },
-  { id: 'time-warp', name: 'Time Warp', component: TimeWarpVisualizer },
-];
+const COMPONENT_REGISTRY: Partial<Record<PluginId, React.FC<any>>> = {
+  "velvet-curve": VelvetCurveVisualizer,
+  "harmonic-lattice": HarmonicLatticeVisualizer,
+  "mixx-tune": MixxTuneVisualizer,
+  "mixx-verb": MixxVerbVisualizer,
+  "mixx-delay": MixxDelayVisualizer,
+  "mixx-drive": MixxDriveVisualizer,
+  "mixx-glue": MixxGlueVisualizer,
+  "mixx-limiter": MixxLimiterVisualizer,
+  "mixx-clip": MixxClipperVisualizer,
+  "mixx-fx": MixxFXVisualizer,
+  "time-warp": TimeWarpVisualizer,
+};
+
+const resolveEngineFactory = (
+  id: PluginId,
+  ctx: BaseAudioContext
+): ((ctx: BaseAudioContext) => IAudioEngine) => {
+  switch (id) {
+    case "velvet-curve":
+      return () => getVelvetCurveEngine(ctx);
+    case "harmonic-lattice":
+      return () => getHarmonicLattice(ctx);
+    case "mixx-tune":
+      return () => getMixxTuneEngine(ctx);
+    case "mixx-verb":
+      return () => getMixxVerbEngine(ctx);
+    case "mixx-delay":
+      return () => getMixxDelayEngine(ctx);
+    case "mixx-drive":
+      return () => getMixxDriveEngine(ctx);
+    case "mixx-glue":
+      return () => getMixxGlueEngine(ctx);
+    case "mixx-limiter":
+      return () => getMixxLimiterEngine(ctx);
+    case "mixx-clip":
+      return () => getMixxClipperEngine(ctx);
+    case "mixx-fx":
+      return () => getMixxFXEngine(ctx);
+    case "time-warp":
+      return () => getTimeWarpEngine(ctx);
+    default:
+      return (innerCtx) => new PlaceholderAudioEngine(innerCtx);
+  }
+};
 
 export function getPluginRegistry(ctx: BaseAudioContext): PluginConfig[] {
-    return PLUGIN_REGISTRY.map(p => {
-        let engineInstance: (ctx: BaseAudioContext) => IAudioEngine;
-        switch(p.id) {
-            case 'velvet-curve':
-                engineInstance = () => getVelvetCurveEngine(ctx);
-                break;
-            case 'harmonic-lattice':
-                engineInstance = () => getHarmonicLattice(ctx);
-                break;
-            case 'mixx-tune':
-                engineInstance = () => getMixxTuneEngine(ctx);
-                break;
-            case 'mixx-verb':
-                engineInstance = () => getMixxVerbEngine(ctx);
-                break;
-            case 'mixx-delay':
-                engineInstance = () => getMixxDelayEngine(ctx);
-                break;
-            case 'mixx-drive':
-                engineInstance = () => getMixxDriveEngine(ctx);
-                break;
-            case 'mixx-glue':
-                engineInstance = () => getMixxGlueEngine(ctx);
-                break;
-            case 'mixx-limiter':
-                engineInstance = () => getMixxLimiterEngine(ctx);
-                break;
-            case 'mixx-clip':
-                engineInstance = () => getMixxClipperEngine(ctx);
-                break;
-            case 'mixx-fx':
-                engineInstance = () => getMixxFXEngine(ctx);
-                break;
-            case 'time-warp':
-                engineInstance = () => getTimeWarpEngine(ctx);
-                break;
-            default:
-                engineInstance = (ctx) => new PlaceholderAudioEngine(ctx);
-        }
-        return { ...p, engineInstance };
+  return Object.values(PLUGIN_CATALOG)
+    .filter((entry) => Boolean(COMPONENT_REGISTRY[entry.id]))
+    .map((entry) => {
+      const component = COMPONENT_REGISTRY[entry.id]!;
+      const engineInstance = resolveEngineFactory(entry.id, ctx);
+      return {
+        ...entry,
+        component,
+        engineInstance,
+      };
     });
 }
+
+export type {
+  PluginId,
+  PluginTier,
+  PluginCatalogEntry,
+  PluginInventoryItem,
+} from "./pluginTypes";

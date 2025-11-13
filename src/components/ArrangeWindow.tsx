@@ -4,7 +4,7 @@ import { ArrangeClip as ClipModel, useArrange, ClipId } from "../hooks/useArrang
 import { recordSessionProbeTimelineEvent } from "../hooks/useSessionProbe";
 import { ArrangeClip } from "./ArrangeClip";
 import { quantizeSeconds, secondsPerBar, secondsPerBeat } from "../utils/time";
-import { TrackData, MixerSettings, AutomationPoint, FxWindowId, FxWindowConfig, TrackAnalysisData } from "../App";
+import { TrackData, MixerSettings, AutomationPoint, TrackAnalysisData, FxWindowId } from "../App";
 import ArrangeTrackHeader from "./ArrangeTrackHeader";
 import AutomationLane from "./AutomationLane";
 import { deriveTrackALSFeedback, TrackALSFeedback, hexToRgba } from "../utils/ALS";
@@ -14,8 +14,11 @@ import {
   TrackContextMode,
   DEFAULT_TRACK_LANE_HEIGHT,
   COLLAPSED_TRACK_LANE_HEIGHT,
+  MIN_TRACK_LANE_HEIGHT,
+  MAX_TRACK_LANE_HEIGHT,
 } from "../types/tracks";
 import TimelineNavigator from "./timeline/TimelineNavigator";
+import { useFlowContext } from "../state/flowContextService";
 
 type DragKind = "move" | "resize-left" | "resize-right" | "fade-in" | "fade-out" | "gain";
 
@@ -53,12 +56,9 @@ type Props = {
   onSplitAt: (clipId: ClipId, sec: number) => void; 
   selectedTrackId: string | null;
   onSelectTrack: (trackId: string | null) => void;
-  armedTracks: Set<string>;
-  onToggleArm: (trackId: string) => void;
   mixerSettings: { [key: string]: MixerSettings };
-  onMixerChange: (trackId: string, setting: keyof MixerSettings, value: number | boolean) => void;
+  armedTracks: Set<string>;
   soloedTracks: Set<string>;
-  onToggleSolo: (trackId: string) => void;
   masterAnalysis: { level: number; transient: boolean; waveform: Uint8Array };
   // Automation Props
   automationData: Record<string, Record<string, Record<string, AutomationPoint[]>>>; // trackId -> fxId -> paramName -> points
@@ -68,39 +68,29 @@ type Props = {
   onDeleteAutomationPoint: (trackId: string, fxId: FxWindowId, paramName: string, index: number) => void;
   // Smart Clip Editing
   onUpdateClipProperties: (clipId: ClipId, props: Partial<Pick<ClipModel, 'fadeIn' | 'fadeOut' | 'gain'>>) => void;
-  // Plugin Props for TrackHeader and PluginBrowser
-  inserts: Record<string, FxWindowId[]>;
-  fxWindows: FxWindowConfig[];
-  onAddPlugin: (trackId: string, pluginId: FxWindowId) => void;
-  onRemovePlugin: (trackId: string, index: number) => void;
-  onMovePlugin: (trackId: string, fromIndex: number, toIndex: number) => void;
-  onOpenPluginBrowser: (trackId: string) => void;
-  onOpenPluginSettings: (fxId: FxWindowId) => void;
-  automationParamMenu: { x: number; y: number; trackId: string; } | null;
-  onOpenAutomationParamMenu: (x: number, y: number, trackId: string) => void;
-  onCloseAutomationParamMenu: () => void;
-  onToggleAutomationLaneWithParam: (trackId: string, fxId: string, paramName: string) => void;
   style?: React.CSSProperties; // New prop for dynamic styling from App.tsx
   trackAnalysis: Record<string, TrackAnalysisData>;
   highlightClipIds?: ClipId[];
   followPlayhead: boolean;
   onManualScroll?: () => void;
   trackUiState: Record<string, TrackUIState>;
-  onToggleTrackCollapse: (trackId: string) => void;
   onResizeTrack: (trackId: string, height: number) => void;
-  onRequestTrackCapsule: (trackId: string) => void;
   onSetTrackContext: (trackId: string, context: TrackContextMode) => void;
   onOpenPianoRoll: (clip: ClipModel) => void;
   audioBuffers: Record<string, AudioBuffer | undefined>;
+  onInvokeTrackBloom?: (trackId: string) => void;
 };
 
 const BASE_CLIP_LANE_H = DEFAULT_TRACK_LANE_HEIGHT;
 const AUTOMATION_LANE_H = 68;
 const RULER_H = 24;
-const TRACK_HEADER_WIDTH = 240;
 const TIMELINE_NAVIGATOR_H = 48;
 const ZERO_CROSS_WINDOW_SEC = 0.006;
 const AUTO_CROSSFADE_SEC = 0.03;
+const TRACK_HEADER_WIDTH_STORAGE_KEY = 'mixxclub:arrange:headerWidth';
+const TRACK_HEADER_WIDTH_DEFAULT = 240;
+const TRACK_HEADER_WIDTH_MIN = 180;
+const TRACK_HEADER_WIDTH_MAX = 420;
 const clampNumber = (value: number, min: number, max: number) =>
   Math.max(min, Math.min(max, value));
 
@@ -174,20 +164,49 @@ const deriveAdaptiveDivision = (
 
 export const ArrangeWindow: React.FC<Props> = (props) => {
   const {
-    height = 540, tracks, clips, setClips, isPlaying, currentTime, onSeek, bpm, beatsPerBar,
-    pixelsPerSecond, ppsAPI, scrollX, setScrollX, selection, setSelection, clearSelection,
-    onSplitAt, 
-    selectedTrackId, onSelectTrack, armedTracks, onToggleArm, mixerSettings, onMixerChange, soloedTracks, onToggleSolo,
-    masterAnalysis, 
-    automationData, visibleAutomationLanes, onAddAutomationPoint,
-    onUpdateAutomationPoint, onDeleteAutomationPoint, onUpdateClipProperties,
-    inserts, fxWindows, onAddPlugin, onRemovePlugin, onMovePlugin, onOpenPluginBrowser, onOpenPluginSettings,
-    automationParamMenu, onOpenAutomationParamMenu, onCloseAutomationParamMenu, onToggleAutomationLaneWithParam,
-    style, trackAnalysis, highlightClipIds, followPlayhead, onManualScroll,
-    trackUiState = {}, onToggleTrackCollapse, onResizeTrack, onRequestTrackCapsule, onSetTrackContext,
+    height = 540,
+    tracks,
+    clips,
+    setClips,
+    isPlaying,
+    currentTime,
+    onSeek,
+    bpm,
+    beatsPerBar,
+    pixelsPerSecond,
+    ppsAPI,
+    scrollX,
+    setScrollX,
+    selection,
+    setSelection,
+    clearSelection,
+    onSplitAt,
+    selectedTrackId,
+    onSelectTrack,
+    mixerSettings,
+    armedTracks,
+    soloedTracks,
+    masterAnalysis,
+    automationData,
+    visibleAutomationLanes,
+    onAddAutomationPoint,
+    onUpdateAutomationPoint,
+    onDeleteAutomationPoint,
+    onUpdateClipProperties,
+    style,
+    trackAnalysis,
+    highlightClipIds,
+    followPlayhead,
+    onManualScroll,
+    trackUiState = {},
+    onResizeTrack,
+    onSetTrackContext,
     onOpenPianoRoll,
+    onInvokeTrackBloom,
     audioBuffers = {},
   } = props;
+
+  const flowContext = useFlowContext();
 
   const timelineViewportRef = useRef<HTMLDivElement>(null);
   const [viewportWidth, setViewportWidth] = useState(0);
@@ -198,6 +217,18 @@ export const ArrangeWindow: React.FC<Props> = (props) => {
   const [draggingSelection, setDraggingSelection] = useState<null | { startSec: number }>(null);
   const [snapIndicator, setSnapIndicator] = useState<number | null>(null);
   const [resizing, setResizing] = useState<null | { trackId: string; startY: number; startHeight: number }>(null);
+  const [resizingHeader, setResizingHeader] = useState<null | { startX: number; startWidth: number }>(null);
+  const [trackHeaderWidth, setTrackHeaderWidth] = useState<number>(() => {
+    if (typeof window === 'undefined') {
+      return TRACK_HEADER_WIDTH_DEFAULT;
+    }
+    const stored = window.localStorage.getItem(TRACK_HEADER_WIDTH_STORAGE_KEY);
+    const parsed = stored ? parseFloat(stored) : NaN;
+    if (!Number.isFinite(parsed)) {
+      return TRACK_HEADER_WIDTH_DEFAULT;
+    }
+    return clampNumber(parsed, TRACK_HEADER_WIDTH_MIN, TRACK_HEADER_WIDTH_MAX);
+  });
 
   useEffect(() => {
     const node = timelineViewportRef.current;
@@ -231,6 +262,12 @@ export const ArrangeWindow: React.FC<Props> = (props) => {
 
   const laneLayouts = useMemo(() => {
     let top = 0;
+    const laneHeightScale =
+      flowContext.intensity === "immersed"
+        ? 1.16 + flowContext.momentum * 0.08
+        : flowContext.intensity === "charged"
+        ? 1.06 + flowContext.momentum * 0.05
+        : 1;
     return tracks.map((track) => {
       const ui = trackUiState[track.id] ?? {
         context: "playback" as TrackContextMode,
@@ -238,7 +275,14 @@ export const ArrangeWindow: React.FC<Props> = (props) => {
         collapsed: false,
       };
       const collapsed = ui.collapsed;
-      const clipHeight = collapsed ? COLLAPSED_TRACK_LANE_HEIGHT : ui.laneHeight ?? BASE_CLIP_LANE_H;
+      const requestedLaneHeight = ui.laneHeight ?? BASE_CLIP_LANE_H;
+      const clipHeight = collapsed
+        ? COLLAPSED_TRACK_LANE_HEIGHT
+        : clampNumber(
+            Math.round(requestedLaneHeight * laneHeightScale),
+            MIN_TRACK_LANE_HEIGHT,
+            MAX_TRACK_LANE_HEIGHT
+          );
       const visibleAutomationConfig = collapsed ? null : visibleAutomationLanes[track.id];
       const isAutomationVisible = !!visibleAutomationConfig;
       const laneHeight = clipHeight + (isAutomationVisible ? AUTOMATION_LANE_H : 0);
@@ -254,7 +298,7 @@ export const ArrangeWindow: React.FC<Props> = (props) => {
       top += laneHeight;
       return layout;
     });
-  }, [tracks, visibleAutomationLanes, trackUiState]);
+  }, [tracks, visibleAutomationLanes, trackUiState, flowContext.intensity, flowContext.momentum]);
 
   const totalLaneHeight = useMemo(
     () => laneLayouts.reduce((sum, layout) => sum + layout.laneHeight, 0),
@@ -521,10 +565,20 @@ export const ArrangeWindow: React.FC<Props> = (props) => {
     const rect = timelineViewportRef.current?.getBoundingClientRect();
     if (!rect) return;
 
+    if (resizingHeader) {
+      const deltaX = e.clientX - resizingHeader.startX;
+      const nextWidth = clampNumber(
+        resizingHeader.startWidth + deltaX,
+        TRACK_HEADER_WIDTH_MIN,
+        TRACK_HEADER_WIDTH_MAX
+      );
+      setTrackHeaderWidth(nextWidth);
+      return;
+    }
+
     if (resizing) {
       const deltaY = e.clientY - resizing.startY;
       onResizeTrack(resizing.trackId, resizing.startHeight + deltaY);
-    onResizeTrack(resizing.trackId, resizing.startHeight + deltaY);
       return;
     }
 
@@ -744,7 +798,7 @@ export const ArrangeWindow: React.FC<Props> = (props) => {
     } else if (!drag) {
       setSnapIndicator(null);
     }
-  }, [drag, pixelsPerSecond, laneLayouts, snapToGrid, setClips, clips, draggingSelection, scrollX, setSelection, onUpdateClipProperties, resizing, onResizeTrack]);
+  }, [drag, pixelsPerSecond, laneLayouts, snapToGrid, setClips, clips, draggingSelection, scrollX, setSelection, onUpdateClipProperties, resizing, onResizeTrack, resizingHeader]);
 
   const onMouseUp = useCallback(() => {
     if (drag) {
@@ -754,7 +808,8 @@ export const ArrangeWindow: React.FC<Props> = (props) => {
     setDraggingSelection(null);
     setSnapIndicator(null);
     setResizing(null);
-  }, [drag, setClips]);
+    setResizingHeader(null);
+  }, [drag, setClips, setResizingHeader]);
 
   const onRulerDown = useCallback((e: React.MouseEvent) => {
     const rect = e.currentTarget.getBoundingClientRect();
@@ -827,8 +882,14 @@ export const ArrangeWindow: React.FC<Props> = (props) => {
         document.body.style.cursor = "";
       };
     }
+    if (resizingHeader) {
+      document.body.style.cursor = "col-resize";
+      return () => {
+        document.body.style.cursor = "";
+      };
+    }
     return undefined;
-  }, [resizing]);
+  }, [resizing, resizingHeader]);
 
   useEffect(() => {
     if (!resizing) return;
@@ -841,6 +902,27 @@ export const ArrangeWindow: React.FC<Props> = (props) => {
     };
   }, [resizing]);
 
+  useEffect(() => {
+    if (!resizingHeader) return;
+    const handleMouseUp = () => {
+      setResizingHeader(null);
+    };
+    window.addEventListener("mouseup", handleMouseUp);
+    return () => {
+      window.removeEventListener("mouseup", handleMouseUp);
+    };
+  }, [resizingHeader]);
+
+  useEffect(() => {
+    if (typeof window === 'undefined') {
+      return;
+    }
+    window.localStorage.setItem(
+      TRACK_HEADER_WIDTH_STORAGE_KEY,
+      trackHeaderWidth.toString()
+    );
+  }, [trackHeaderWidth]);
+
   const transientKey = masterAnalysis?.transient ? Date.now() : 0;
   const playheadX = currentTime * pixelsPerSecond - scrollX;
   const playheadVisible = playheadX > -80 && playheadX < contentWidth + 80;
@@ -852,38 +934,33 @@ export const ArrangeWindow: React.FC<Props> = (props) => {
       onMouseUp={onMouseUp}
       onMouseLeave={onMouseUp}
     >
-      <div className="flex-shrink-0 bg-glass-surface-soft border-r border-glass-border backdrop-blur-xl" style={{ width: TRACK_HEADER_WIDTH }}>
+      <div className="relative flex-shrink-0 bg-glass-surface-soft border-r border-glass-border backdrop-blur-xl" style={{ width: trackHeaderWidth }}>
+        <div
+          className="absolute top-0 right-0 z-20 h-full w-2 cursor-col-resize"
+          onMouseDown={(e) => {
+            e.preventDefault();
+            e.stopPropagation();
+            setResizingHeader({ startX: e.clientX, startWidth: trackHeaderWidth });
+          }}
+          style={{ background: 'linear-gradient(to left, rgba(56,189,248,0.4), rgba(15,23,42,0.05))' }}
+        />
         <div className="h-[24px] border-b border-glass-border"></div>
         <div className="h-[calc(100%_-_24px)] overflow-y-auto">
-          {laneLayouts.map(({ track, laneHeight, clipHeight, isAutomationVisible, uiState }) => (
+          {laneLayouts.map(({ track, laneHeight, clipHeight, isAutomationVisible, uiState }) => {
+            const trackFeedback = alsFeedbackByTrack.get(track.id);
+            const alsIntensity = trackFeedback?.intensity ?? 0;
+            return (
             <div key={track.id} style={{ height: laneHeight }} className="transition-[height] duration-300 ease-out relative">
               <ArrangeTrackHeader
                 track={track}
                 uiState={uiState}
                 selectedTrackId={selectedTrackId}
                 onSelectTrack={onSelectTrack}
-                isArmed={armedTracks.has(track.id)}
-                onToggleArm={onToggleArm}
                 mixerSettings={mixerSettings[track.id]}
-                onMixerChange={onMixerChange}
+                isArmed={armedTracks.has(track.id)}
                 isSoloed={soloedTracks.has(track.id)}
-                onToggleSolo={onToggleSolo}
-                isAutomationVisible={isAutomationVisible}
-                inserts={inserts}
-                trackColor={track.trackColor}
-                fxWindows={fxWindows}
-                onAddPlugin={onAddPlugin}
-                onRemovePlugin={onRemovePlugin}
-                onMovePlugin={onMovePlugin}
-                onOpenPluginBrowser={onOpenPluginBrowser}
-                onOpenPluginSettings={onOpenPluginSettings}
-                automationParamMenu={automationParamMenu}
-                onOpenAutomationParamMenu={onOpenAutomationParamMenu}
-                onCloseAutomationParamMenu={onCloseAutomationParamMenu}
-                onToggleAutomationLaneWithParam={onToggleAutomationLaneWithParam}
-                onRequestCapsule={() => onRequestTrackCapsule(track.id)}
-                onContextChange={onSetTrackContext}
-                onToggleCollapse={() => onToggleTrackCollapse(track.id)}
+                alsIntensity={alsIntensity}
+                onInvokeBloom={onInvokeTrackBloom}
               />
               {!uiState.collapsed && (
                 <div
@@ -903,7 +980,7 @@ export const ArrangeWindow: React.FC<Props> = (props) => {
                 />
               )}
             </div>
-          ))}
+          )})}
         </div>
       </div>
         

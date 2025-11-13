@@ -16,7 +16,7 @@ type Props = {
     kind: DragKind,
     startClientX: number,
     startClientY: number,
-    modifiers?: { altKey?: boolean; shiftKey?: boolean; metaKey?: boolean }
+    modifiers?: { altKey?: boolean; shiftKey?: boolean; metaKey?: boolean; ctrlKey?: boolean }
   ) => void;
   onSelect: (append: boolean) => void;
   feedback?: TrackALSFeedback;

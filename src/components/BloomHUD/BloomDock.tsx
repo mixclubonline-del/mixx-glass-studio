@@ -1,11 +1,23 @@
 import React, { useState, useMemo, useRef, useCallback, useEffect } from 'react';
-import { PlayIcon, PauseIcon, RewindIcon, FastForwardIcon, LoopIcon, HushIcon, SaveIcon, LoadIcon, SlidersIcon, MixerIcon, SquaresPlusIcon, StarIcon, PlusCircleIcon, SparklesIcon, SplitIcon, MergeIcon, RefreshIcon, BulbIcon, ArrangeViewIcon } from '../icons';
+import { PlayIcon, PauseIcon, RewindIcon, FastForwardIcon, LoopIcon, HushIcon, SaveIcon, LoadIcon, SlidersIcon, MixerIcon, SparklesIcon, ArrangeViewIcon, PianoIcon, EditSurfaceIcon, SamplerIcon, SquaresPlusIcon, PlusCircleIcon, SplitIcon, MergeIcon, RefreshIcon, BulbIcon, StarIcon } from '../icons';
 import { ArrangeClip, ClipId } from '../../hooks/useArrange';
 import FXMenu from '../FXMenu';
 import { FxWindowConfig, FxWindowId } from '../../App';
-import { hexToRgba } from '../../utils/ALS';
+import { hexToRgba, ALSActionPulse } from '../../utils/ALS';
 import type { PulsePalette } from '../../utils/ALS';
 import type { BloomActionMeta } from '../../types/bloom';
+import type { PrimeBrainStatus } from '../../types/primeBrainStatus';
+import type { TranslationProfileKey, TranslationProfileInfo, CalibrationPreset } from '../../audio/TranslationMatrix';
+import type { IngestJobSnapshot } from '../../ingest/IngestQueueManager';
+
+type ImportProgressLike = {
+    id: string;
+    label: string;
+    percent: number;
+    type: string;
+    color?: string;
+    parentId?: string;
+};
 
 type TransportPulseType = 'play' | 'pause' | 'rewind' | 'forward' | 'loop' | 'record';
 
@@ -34,26 +46,62 @@ const MasterWaveform: React.FC<{ waveform: Uint8Array, color: string }> = ({ wav
     );
 };
 
+type DockViewMode = 'arrange' | 'sampler' | 'mixer' | 'piano' | 'edit';
+
+const VIEW_ORDER: DockViewMode[] = ['arrange', 'sampler', 'mixer', 'piano', 'edit'];
+
+const VIEW_META: Record<DockViewMode, { label: string; icon: React.ComponentType<{ className?: string }> }> = {
+    arrange: { label: 'Arrange View', icon: ArrangeViewIcon },
+    sampler: { label: 'Sampler View', icon: SamplerIcon },
+    mixer: { label: 'Mix View', icon: MixerIcon },
+    piano: { label: 'Piano Roll', icon: PianoIcon },
+    edit: { label: 'Clip Edit', icon: EditSurfaceIcon },
+};
+
 const ViewToggle: React.FC<{
-    mode: 'arrange' | 'mixer';
+    mode: DockViewMode;
     accent: string;
-    onSwitch: (next: 'arrange' | 'mixer') => void;
-}> = ({ mode, accent, onSwitch }) => {
-    const targetMode = mode === 'arrange' ? 'mixer' : 'arrange';
-    const Icon = targetMode === 'mixer' ? MixerIcon : ArrangeViewIcon;
-    const label = targetMode === 'mixer' ? 'Enter Mix View' : 'Return to Arrange';
+    onSwitch: (next: DockViewMode) => void;
+    availableModes?: Partial<Record<DockViewMode, boolean>>;
+}> = ({ mode, accent, onSwitch, availableModes }) => {
+    const isModeAvailable = useCallback(
+        (candidate: DockViewMode) => (availableModes?.[candidate] ?? true),
+        [availableModes]
+    );
+
+    const currentIndex = VIEW_ORDER.indexOf(mode);
+    const safeIndex = currentIndex === -1 ? 0 : currentIndex;
+
+    let nextMode: DockViewMode = mode;
+    for (let offset = 1; offset <= VIEW_ORDER.length; offset += 1) {
+        const candidate = VIEW_ORDER[(safeIndex + offset) % VIEW_ORDER.length];
+        if (isModeAvailable(candidate)) {
+            nextMode = candidate;
+            break;
+        }
+    }
+
+    const isDisabled = nextMode === mode;
+    const { label, icon: Icon } = VIEW_META[nextMode] ?? VIEW_META.arrange;
 
     return (
         <button
             type="button"
-            onClick={() => onSwitch(targetMode)}
-            className="group relative px-4 py-2 rounded-full border border-white/12 bg-glass-surface-soft text-ink/70 hover:text-ink hover:border-white/18 transition-all shadow-[0_18px_46px_rgba(4,12,26,0.38)] backdrop-blur-xl"
-            aria-label={label}
-            title={label}
+            onClick={() => {
+                if (!isDisabled) {
+                    onSwitch(nextMode);
+                }
+            }}
+            disabled={isDisabled}
+            className={`group relative px-4 py-2 rounded-full border border-white/12 bg-glass-surface-soft text-ink/70 transition-all shadow-[0_18px_46px_rgba(4,12,26,0.38)] backdrop-blur-xl ${
+                isDisabled ? 'opacity-40 cursor-not-allowed' : 'hover:text-ink hover:border-white/18'
+            }`}
+            aria-label={`Switch to ${label}`}
+            title={`Switch to ${label}`}
         >
             <span className="flex items-center gap-2 tracking-[0.32em] text-[11px] uppercase">
-                <Icon className="w-5 h-5 text-cyan-200 group-hover:text-ink" />
-                {targetMode === 'mixer' ? 'Mix View' : 'Arrange View'}
+                <Icon className={`w-5 h-5 ${isDisabled ? 'text-slate-500' : 'text-cyan-200 group-hover:text-ink'}`} />
+                {label}
             </span>
             <span
                 aria-hidden
@@ -85,8 +133,8 @@ interface BloomDockProps {
     fxVisibility: Record<FxWindowId, boolean>;
     onToggleFxVisibility: (fxId: FxWindowId) => void;
     selectedTrackId: string | null;
-    viewMode: 'arrange' | 'mixer';
-    onViewModeChange: (mode: 'arrange' | 'mixer') => void;
+    viewMode: DockViewMode;
+    onViewModeChange: (mode: DockViewMode) => void;
     onOpenAIHub: () => void;
     currentTime: number;
     canRecallLastImport: boolean;
@@ -101,6 +149,19 @@ interface BloomDockProps {
     };
     onToggleRecordingOption: (option: 'preRoll' | 'countIn' | 'inputMonitor' | 'hushGate') => void;
     onDropTakeMarker: () => void;
+    primeBrainStatus?: PrimeBrainStatus;
+    translationProfile?: TranslationProfileKey;
+    translationProfiles?: TranslationProfileInfo[];
+    calibrationPresets?: CalibrationPreset[];
+    activeCalibration?: CalibrationPreset | null;
+    onApplyCalibration?: (preset: CalibrationPreset) => void;
+    isRecordingActive?: boolean;
+    armedTracks?: Set<string>;
+    importProgress?: ImportProgressLike[];
+    ingestSnapshot?: IngestJobSnapshot | null;
+    mixerActionPulse?: { trackId: string; pulse: ALSActionPulse; message: string } | null;
+    onBloomAction?: (action: string, payload?: any, meta?: BloomActionMeta) => void;
+    onSetTranslationProfile?: (action: string, payload?: any, meta?: BloomActionMeta) => void;
 }
 
 export const BloomDock: React.FC<BloomDockProps> = (props) => {
@@ -307,6 +368,7 @@ export const BloomDock: React.FC<BloomDockProps> = (props) => {
       );
     const canConsolidate = selectedClips.length > 1;
     const canReingest = Boolean(singleSelectedClip?.sourceJobId);
+    const canOpenClipEditor = Boolean(singleSelectedClip?.bufferId);
     
     const actionButton = (icon: React.ReactNode, action: string, payload?: any, tooltip?: string, disabled?: boolean) => (
         <button
@@ -319,44 +381,12 @@ export const BloomDock: React.FC<BloomDockProps> = (props) => {
         </button>
     );
 
+    const clipEditAvailable = canOpenClipEditor || viewMode === 'edit';
+    const availableViewModes = useMemo(() => ({ edit: clipEditAvailable, sampler: true }), [clipEditAvailable]);
+
     const arrangeWorkflowCluster = (
         <div className="flex items-center gap-2.5">
-            {actionButton(<SquaresPlusIcon className="w-5 h-5" />, 'addTrack', undefined, 'Add New Track')}
-            {actionButton(<PlusCircleIcon className="w-5 h-5" />, 'importAudio', undefined, 'Import Audio File')}
-            {actionButton(<SaveIcon className="w-5 h-5" />, 'saveProject', undefined, 'Save Project')}
-            {actionButton(<LoadIcon className="w-5 h-5" />, 'loadProject', undefined, 'Load Project File')}
-            {actionButton(
-                <BulbIcon className={`w-5 h-5 ${followPlayhead ? 'text-cyan-200' : 'text-slate-400'}`} />,
-                'toggleFollowPlayhead',
-                undefined,
-                followPlayhead ? 'Pause playhead follow' : 'Enable playhead follow'
-            )}
-            {actionButton(
-                <SlidersIcon className="w-5 h-5 text-indigo-200" />,
-                'openTrackCapsule',
-                { trackId: selectedTrackId ?? undefined },
-                'Open track capsule',
-                !selectedTrackId
-            )}
-            {actionButton(
-                <SparklesIcon className="w-5 h-5 text-violet-200" />,
-                'toggleTrackCollapse',
-                { trackId: selectedTrackId ?? undefined },
-                'Collapse / expand selected track',
-                !selectedTrackId
-            )}
-            {actionButton(
-                <RefreshIcon className="w-5 h-5 text-emerald-200" />,
-                'recallLastImport',
-                undefined,
-                'Recall last import',
-                !canRecallLastImport
-            )}
-        </div>
-    );
-
-    const editingCluster = hasSelection ? (
-        <div className="flex items-center gap-2.5">
+            {actionButton(<SquaresPlusIcon className="w-5 h-5 text-emerald-200" />, 'addTrack', undefined, 'Add track')}
             {actionButton(
                 <SplitIcon className="w-5 h-5 text-sky-200" />,
                 'splitSelection',
@@ -372,27 +402,42 @@ export const BloomDock: React.FC<BloomDockProps> = (props) => {
                 !canConsolidate
             )}
             {actionButton(
-                <RefreshIcon className="w-5 h-5 text-cyan-200 transform rotate-180" />,
-                'reingestClip',
-                singleSelectedClip?.id,
-                'Re-ingest source audio',
-                !canReingest
+                <RefreshIcon className="w-5 h-5 text-cyan-200" />,
+                'recallLastImport',
+                undefined,
+                'Recall last import',
+                !canRecallLastImport
             )}
         </div>
-    ) : null;
+    );
 
-    const recordToggle = (
-        label: string,
-        option: 'preRoll' | 'countIn' | 'inputMonitor',
-        Icon: React.ComponentType<{ className?: string }>,
-        active: boolean
-    ) => (
+    const editingCluster =
+        singleSelectedClip || viewMode === 'edit'
+            ? (
+                <div className="flex items-center gap-2.5">
+                    {actionButton(
+                        <EditSurfaceIcon className={`w-5 h-5 ${viewMode === 'edit' ? 'text-violet-200' : 'text-rose-200'}`} />,
+                        'openClipEditor',
+                        { clipId: singleSelectedClip?.id },
+                        'Open Clip Edit Surface',
+                        !clipEditAvailable
+                    )}
+                    {actionButton(
+                        <RefreshIcon className="w-5 h-5 text-amber-200 rotate-180" />,
+                        'reingestClip',
+                        singleSelectedClip?.id,
+                        'Re-ingest source audio',
+                        !canReingest
+                    )}
+                </div>
+            )
+            : null;
+
+    const recordToggle = (label: string, option: 'preRoll' | 'countIn' | 'inputMonitor', Icon: React.ComponentType<{ className?: string }>, active: boolean) => (
         <button
             onClick={() => onToggleRecordingOption(option)}
             className={`px-3 py-2 rounded-full border text-[0.55rem] uppercase tracking-[0.3em] flex items-center gap-2 transition-colors ${
-                active
-                    ? 'border-cyan-300/60 text-cyan-200 bg-[rgba(16,66,94,0.45)]'
-                    : 'border-glass-border text-ink/60 bg-glass-surface-soft hover:text-ink'
+                active ? 'border-cyan-300/60 text-cyan-200 bg-[rgba(16,66,94,0.45)]' : 'border-glass-border text-ink/60 bg-glass-surface-soft hover:text-ink'
             }`}
         >
             <Icon className="w-4 h-4" />
@@ -408,29 +453,24 @@ export const BloomDock: React.FC<BloomDockProps> = (props) => {
                 {recordToggle('Monitor', 'inputMonitor', BulbIcon, recordingOptions.inputMonitor)}
                 <button
                     onClick={() => {
-                        toggleHush();
                         onToggleRecordingOption('hushGate');
+                        onAction('toggleHush', undefined, { source: 'bloom-dock' });
                     }}
                     className={`px-3 py-2 rounded-full border text-[0.55rem] uppercase tracking-[0.3em] flex items-center gap-2 transition-colors ${
-                        isHushActive
-                            ? 'border-cyan-300/60 text-cyan-200 bg-[rgba(16,66,94,0.45)]'
-                            : 'border-glass-border text-ink/60 bg-glass-surface-soft hover:text-ink'
+                        isHushActive ? 'border-cyan-300/60 text-cyan-200 bg-[rgba(16,66,94,0.45)]' : 'border-glass-border text-ink/60 bg-glass-surface-soft hover:text-ink'
                     }`}
-                    title="Toggle HUSH input system"
                 >
                     <HushIcon className="w-4 h-4" />
                     HUSH
                 </button>
+            </div>
+            <div className="flex items-center gap-2.5">
                 <button
-                    onClick={() => {
-                        onDropTakeMarker();
-                        cueTransportPulse('record');
-                    }}
-                    className="px-3 py-2 rounded-full border border-rose-300/60 text-rose-200 text-[0.55rem] uppercase tracking-[0.3em] bg-[rgba(88,22,48,0.45)] hover:bg-[rgba(88,22,48,0.6)] transition-colors"
+                    onClick={onDropTakeMarker}
+                    className="px-3 py-2 rounded-full border border-white/14 text-[0.55rem] uppercase tracking-[0.3em] text-amber-200 bg-[rgba(80,48,20,0.38)] hover:bg-[rgba(120,78,30,0.48)] transition-colors"
                     title="Drop take marker"
                 >
-                    <StarIcon className="w-4 h-4" />
-                    Take Mark
+                    Drop Take
                 </button>
             </div>
         </div>
@@ -438,32 +478,53 @@ export const BloomDock: React.FC<BloomDockProps> = (props) => {
 
     const mixCluster = (
         <div className="flex items-center gap-2.5">
-            {actionButton(<SaveIcon className="w-5 h-5" />, 'saveProject', undefined, 'Save Project')}
-            {actionButton(<LoadIcon className="w-5 h-5" />, 'loadProject', undefined, 'Load Project File')}
+            {actionButton(<SaveIcon className="w-5 h-5" />, 'saveProject', undefined, 'Save project')}
+            {actionButton(<LoadIcon className="w-5 h-5" />, 'loadProject', undefined, 'Load project file')}
             {actionButton(
-                <RefreshIcon className="w-5 h-5 text-emerald-200" />,
-                'recallLastImport',
+                <StarIcon className="w-5 h-5 text-amber-200" />,
+                'analyzeMaster',
                 undefined,
-                'Recall last import',
-                !canRecallLastImport
+                'Analyze master energy'
             )}
-            <button
-                onClick={() => onAction('analyzeMaster', undefined, { source: 'bloom-dock' })}
-                className="w-11 h-11 rounded-full flex items-center justify-center transition-colors text-amber-200 bg-[rgba(120,98,255,0.18)] hover:bg-[rgba(120,98,255,0.32)]"
-                title="Analyze Master"
-            >
-                <StarIcon className="w-5 h-5" />
-            </button>
+        </div>
+    );
+
+    const samplerCluster = (
+        <div className="flex items-center gap-2.5">
+            {actionButton(
+                <SquaresPlusIcon className="w-5 h-5 text-cyan-200" />,
+                'triggerSamplerNoteRepeat',
+                { mode: 'triplet' },
+                'Note repeat modes'
+            )}
+            {actionButton(
+                <SparklesIcon className="w-5 h-5 text-indigo-200" />,
+                'openSamplerMacros',
+                undefined,
+                'Open sampler macros'
+            )}
+            {actionButton(
+                <PlusCircleIcon className="w-5 h-5 text-rose-200" />,
+                'captureSamplerPattern',
+                undefined,
+                'Capture new pattern'
+            )}
         </div>
     );
 
     const leftSegments: React.ReactNode[] = [];
+    const isArrangeSurface = viewMode === 'arrange' || viewMode === 'piano' || viewMode === 'edit';
 
-    if (viewMode === 'arrange') {
+    if (isArrangeSurface) {
         leftSegments.push(arrangeWorkflowCluster);
         if (editingCluster) {
             leftSegments.push(editingCluster);
         }
+        if (recordCluster) {
+            leftSegments.push(recordCluster);
+        }
+    } else if (viewMode === 'sampler') {
+        leftSegments.push(samplerCluster);
         if (recordCluster) {
             leftSegments.push(recordCluster);
         }
@@ -488,92 +549,6 @@ export const BloomDock: React.FC<BloomDockProps> = (props) => {
         cueTransportPulse('loop');
         onToggleLoop();
     }, [cueTransportPulse, onToggleLoop]);
-
-    const toggleHush = useCallback(() => {
-        cueTransportPulse('record');
-        onAction('toggleHush', undefined, { source: 'bloom-dock' });
-    }, [cueTransportPulse, onAction]);
-
-    const transportModule = (
-        <div className="relative w-48 h-[4.6rem] flex items-center justify-center">
-            <div className="absolute w-full h-full">
-                <MasterWaveform waveform={masterAnalysis.waveform} color={pulseAccent} />
-            </div>
-            <div
-                className={`relative z-10 w-16 h-[4.2rem] rounded-full bg-glass-surface border-2 border-cyan-300/55 shadow-lg flex items-center justify-center text-ink transition-transform duration-150 ${
-                    transportPulse === 'play'
-                        ? 'ring-2 ring-cyan-200/70 scale-[1.05]'
-                        : transportPulse === 'pause'
-                        ? 'ring-2 ring-indigo-200/70 scale-[1.03]'
-                        : 'ring-0'
-                }`}
-                style={{
-                    boxShadow: isPlaying
-                        ? `0 0 20px ${pulseGlow}, 0 0 ${46 + pulseStrength * 20}px ${pulseGlow}`
-                        : `0 0 12px ${pulseGlow}`,
-                    transition: 'box-shadow 0.3s ease-in-out',
-                }}
-            >
-                <button
-                    onPointerDown={handlePlayPointerDown}
-                    className="w-full h-full flex items-center justify-center focus:outline-none"
-                    aria-label={isPlaying ? 'Pause playback' : 'Play'}
-                >
-                    {isPlaying ? <PauseIcon className="w-8 h-8" /> : <PlayIcon className="w-8 h-8 pl-1" />}
-                </button>
-            </div>
-            <button
-                onPointerDown={handleSeekPointerDown('back')}
-                onPointerUp={handleSeekPointerUp('back')}
-                onPointerLeave={handleSeekPointerUp('back')}
-                onPointerCancel={handleSeekPointerUp('back')}
-                className={`absolute left-0 z-10 p-2 transition-colors ${
-                    transportPulse === 'rewind' ? 'text-cyan-200' : 'text-ink/50 hover:text-ink'
-                }`}
-                aria-label="Rewind five seconds"
-                title="Rewind five seconds"
-            >
-                <RewindIcon className="w-6 h-6" />
-            </button>
-            <button
-                onPointerDown={handleSeekPointerDown('forward')}
-                onPointerUp={handleSeekPointerUp('forward')}
-                onPointerLeave={handleSeekPointerUp('forward')}
-                onPointerCancel={handleSeekPointerUp('forward')}
-                className={`absolute right-0 z-10 p-2 transition-colors ${
-                    transportPulse === 'forward' ? 'text-cyan-200' : 'text-ink/50 hover:text-ink'
-                }`}
-                aria-label="Fast forward five seconds"
-                title="Fast forward five seconds"
-            >
-                <FastForwardIcon className="w-6 h-6" />
-            </button>
-        </div>
-    );
-
-    const loopButton = (
-        <button
-            onPointerDown={(event) => {
-                event.preventDefault();
-                toggleLoop();
-            }}
-            onKeyDown={(event) => {
-                if ((event.key === 'Enter' || event.key === ' ') && !event.repeat) {
-                    event.preventDefault();
-                    toggleLoop();
-                }
-            }}
-            title="Toggle Loop"
-            className={`w-11 h-11 rounded-full flex items-center justify-center transition-colors ${
-                isLooping
-                    ? 'text-cyan-300 bg-[rgba(30,78,140,0.65)]'
-                    : 'text-ink/60 bg-glass-surface-soft hover:bg-glass-surface hover:text-ink'
-            } ${transportPulse === 'loop' ? 'ring-2 ring-cyan-200/70' : ''}`}
-            aria-label={isLooping ? 'Disable loop playback' : 'Enable loop playback'}
-        >
-            <LoopIcon className="w-5 h-5" />
-        </button>
-    );
 
     useEffect(() => {
         const shouldIgnoreKeyEvent = (event: KeyboardEvent) => {
@@ -672,7 +647,12 @@ export const BloomDock: React.FC<BloomDockProps> = (props) => {
                         </div>
                         <div className="w-px h-10 bg-[rgba(102,140,198,0.22)]" />
                         <div className="flex items-center gap-2.5 relative">
-                            <ViewToggle mode={viewMode} accent={contextAccent} onSwitch={onViewModeChange} />
+                            <ViewToggle
+                                mode={viewMode}
+                                accent={contextAccent}
+                                onSwitch={onViewModeChange}
+                                availableModes={availableViewModes}
+                            />
                             <button
                                 onClick={() => setIsFxMenuOpen((prev) => !prev)}
                                 className="w-11 h-11 rounded-full bg-glass-surface-soft flex items-center justify-center text-ink/70 hover:bg-glass-surface hover:text-ink transition-colors shadow-[inset_0_0_15px_rgba(4,12,26,0.4)]"

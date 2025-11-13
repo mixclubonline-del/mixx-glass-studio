@@ -27,13 +27,13 @@ const TrapSamplerConsole: React.FC<TrapSamplerConsoleProps> = ({ tempoBpm }) => 
   const tempoDescriptor = tempoToDescriptor(tempoBpm);
 
   return (
-    <aside className="flex w-full max-w-[420px] flex-col gap-5 rounded-[36px] border border-white/12 bg-[rgba(4,8,18,0.92)] p-6 shadow-[0_40px_120px_rgba(4,12,26,0.72)] backdrop-blur-[28px]">
+    <aside className="flex w-full flex-col gap-8 rounded-[48px] border border-white/12 bg-[rgba(4,8,18,0.92)] px-10 py-9 shadow-[0_60px_160px_rgba(4,12,26,0.78)] backdrop-blur-[36px]">
       <header className="flex items-center justify-between">
         <div>
-          <p className="text-[11px] uppercase tracking-[0.4em] text-ink/60">
+          <p className="text-[12px] uppercase tracking-[0.42em] text-ink/55">
             Mixx Drum Grid
           </p>
-          <h2 className="text-lg font-semibold tracking-[0.2em] text-ink">
+          <h2 className="pt-1 text-xl font-semibold tracking-[0.24em] text-ink">
             Trap Pad Matrix
           </h2>
         </div>
@@ -57,28 +57,28 @@ const TrapSamplerConsole: React.FC<TrapSamplerConsoleProps> = ({ tempoBpm }) => 
         onFocusPad={sampler.setFocusedPad}
       />
 
-      <InstantSampleFlipPanel
-        waveform={snapshot.waveform}
-        chopSensitivity={snapshot.chopSensitivity}
-        phaseOffset={snapshot.phaseOffset}
-        onChopSensitivityChange={sampler.setChopSensitivity}
-        onPhaseOffsetChange={(value) => {
-          sampler.setPhaseOffset(value);
-        }}
-      />
-
-      <Multi808FusionPanel
-        pad={activePad}
-        phaseOffset={snapshot.phaseOffset}
-        onPhaseOffsetChange={sampler.setPhaseOffset}
-        onLayerChange={(layerId: TrapSamplerLayerId, patch) =>
-          sampler.updateLayer(snapshot.focusedPadId, layerId, patch)
-        }
-      />
+      <div className="grid gap-5 xl:grid-cols-1">
+        <InstantSampleFlipPanel
+          waveform={snapshot.waveform}
+          chopSensitivity={snapshot.chopSensitivity}
+          phaseOffset={snapshot.phaseOffset}
+          onChopSensitivityChange={sampler.setChopSensitivity}
+          onPhaseOffsetChange={sampler.setPhaseOffset}
+        />
+        <Multi808FusionPanel
+          pad={activePad}
+          phaseOffset={snapshot.phaseOffset}
+          onPhaseOffsetChange={sampler.setPhaseOffset}
+          onLayerChange={(layerId: TrapSamplerLayerId, patch) =>
+            sampler.updateLayer(snapshot.focusedPadId, layerId, patch)
+          }
+        />
+      </div>
     </aside>
   );
 };
 
 export default TrapSamplerConsole;
+
 
 

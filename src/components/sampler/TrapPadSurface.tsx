@@ -32,16 +32,16 @@ const TrapPadSurface: React.FC<TrapPadSurfaceProps> = ({
   }, [pads]);
 
   return (
-    <div className="flex flex-col gap-3 rounded-3xl border border-white/10 bg-[rgba(12,16,28,0.78)] p-4 shadow-[0_28px_80px_rgba(4,12,26,0.65)] backdrop-blur-2xl">
+    <div className="flex flex-col gap-4 rounded-4xl border border-white/10 bg-[rgba(12,16,28,0.78)] p-6 shadow-[0_40px_120px_rgba(4,12,26,0.72)] backdrop-blur-2xl">
       <div className="flex items-center justify-between px-1">
-        <span className="text-[11px] uppercase tracking-[0.4em] text-ink/50">
+        <span className="text-[12px] uppercase tracking-[0.42em] text-ink/50">
           Mixx Drum Grid
         </span>
-        <span className="text-[10px] uppercase tracking-[0.36em] text-ink/40">
+        <span className="text-[11px] uppercase tracking-[0.34em] text-ink/40">
           Adaptive Velocity
         </span>
       </div>
-      <div className="grid grid-cols-4 gap-3">
+      <div className="grid grid-cols-4 gap-4">
         {PAD_LAYOUT.flatMap((row) => row).map((padId) => {
           const pad = padMap[padId];
           if (!pad) return null;
@@ -60,12 +60,12 @@ const TrapPadSurface: React.FC<TrapPadSurfaceProps> = ({
                   ? `0 0 18px ${hexToRgba(glowColor, 0.35)}`
                   : "inset 0 0 18px rgba(6,10,20,0.65)",
               }}
-              className={`relative aspect-square rounded-2xl border transition-colors duration-150 ${
+              className={`relative aspect-square min-h-[104px] min-w-[104px] rounded-3xl border transition-colors duration-150 ${
                 isActive
-                  ? "border-white/45 bg-gradient-to-br from-white/35 via-white/15 to-transparent"
+                  ? "border-white/55 bg-gradient-to-br from-white/45 via-white/18 to-transparent"
                   : isFocused
-                  ? "border-white/25 bg-white/[0.12]"
-                  : "border-white/8 bg-white/[0.04] hover:border-white/18 hover:bg-white/[0.08]"
+                  ? "border-white/28 bg-white/[0.16]"
+                  : "border-white/10 bg-white/[0.06] hover:border-white/22 hover:bg-white/[0.12]"
               }`}
               onPointerDown={(event) => {
                 const velocity = Math.min(1, Math.max(0.2, event.pressure || 0.92));
@@ -74,10 +74,10 @@ const TrapPadSurface: React.FC<TrapPadSurfaceProps> = ({
               }}
             >
               <span
-                className={`absolute inset-x-0 bottom-3 mx-auto w-16 rounded-full px-3 py-1 text-[10px] uppercase tracking-[0.32em] ${
+                className={`absolute inset-x-0 bottom-4 mx-auto w-20 rounded-full px-4 py-1.5 text-[11px] uppercase tracking-[0.34em] ${
                   isActive
                     ? "bg-white text-slate-900"
-                    : "bg-slate-900/80 text-ink/60"
+                    : "bg-slate-900/85 text-ink/60"
                 }`}
                 style={{
                   boxShadow: isActive
@@ -87,11 +87,11 @@ const TrapPadSurface: React.FC<TrapPadSurfaceProps> = ({
               >
                 {pad.label}
               </span>
-              <span className="absolute left-3 top-3 text-[9px] uppercase tracking-[0.28em] text-ink/30">
+              <span className="absolute left-4 top-4 text-[10px] uppercase tracking-[0.3em] text-ink/30">
                 {pad.bank}
               </span>
               <span
-                className="absolute right-3 top-3 h-2 w-2 rounded-full"
+                className="absolute right-4 top-4 h-2.5 w-2.5 rounded-full"
                 style={{
                   background: isActive
                     ? glowColor
@@ -109,5 +109,6 @@ const TrapPadSurface: React.FC<TrapPadSurfaceProps> = ({
 };
 
 export default TrapPadSurface;
+
 
 

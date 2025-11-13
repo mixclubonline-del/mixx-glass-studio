@@ -1,7 +1,7 @@
 export async function createTruePeakLimiterNode(
   context: AudioContext | OfflineAudioContext,
   thresholdDb = -1
-): Promise<AudioWorkletNode | GainNode> {
+): Promise<AudioNode> {
   if ('audioWorklet' in context) {
     try {
       await (context as AudioContext).audioWorklet.addModule(
@@ -23,12 +23,13 @@ export async function createTruePeakLimiterNode(
     }
   }
 
-  const fallback = context.createDynamicsCompressor();
-  fallback.threshold.value = thresholdDb;
-  fallback.ratio.value = 20;
-  fallback.attack.value = 0.001;
-  fallback.release.value = 0.05;
-  fallback.knee.value = 0;
-  return fallback;
+  const fallbackCompressor = context.createDynamicsCompressor();
+  fallbackCompressor.threshold.value = thresholdDb;
+  fallbackCompressor.ratio.value = 20;
+  fallbackCompressor.attack.value = 0.001;
+  fallbackCompressor.release.value = 0.05;
+  fallbackCompressor.knee.value = 0;
+  return fallbackCompressor;
 }
+
 

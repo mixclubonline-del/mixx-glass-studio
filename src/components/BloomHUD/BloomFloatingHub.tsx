@@ -1,5 +1,6 @@
 import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { hexToRgba } from '../../utils/ALS';
+import { useFlowContext } from '../../state/flowContextService';
 import type { PulsePalette } from '../../utils/ALS';
 
 export interface BloomFloatingMenuItem {
@@ -25,6 +26,7 @@ interface BloomFloatingHubProps {
   label?: string;
   position: { x: number; y: number };
   onPositionChange: (position: { x: number; y: number }) => void;
+  menuRequest?: { menu: string; open?: boolean; timestamp: number } | null;
 }
 
 const PETAL_RADIUS = 128;
@@ -102,7 +104,10 @@ export const BloomFloatingHub: React.FC<BloomFloatingHubProps> = ({
   label = 'Bloom HUD',
   position,
   onPositionChange,
+  menuRequest,
 }) => {
+  const clamp01 = (value: number) => Math.max(0, Math.min(1, value));
+  const flowContext = useFlowContext();
   const fallbackPosition = useMemo(getFallbackHubPosition, []);
   const [activeMenu, setActiveMenu] = useState(initialMenu);
   const [isOpen, setIsOpen] = useState(false);
@@ -123,7 +128,16 @@ export const BloomFloatingHub: React.FC<BloomFloatingHubProps> = ({
 
   const glowColor = alsPulseAgent?.glow ?? '#22d3ee';
   const haloColor = alsPulseAgent?.halo ?? '#38bdf8';
-  const pulseStrength = alsPulseAgent?.pulseStrength ?? (isOpen ? 0.65 : 0.4);
+  const basePulseStrength = alsPulseAgent?.pulseStrength ?? (isOpen ? 0.65 : 0.4);
+  const intensityBoost =
+    flowContext.intensity === 'immersed'
+      ? 0.22
+      : flowContext.intensity === 'charged'
+      ? 0.12
+      : 0.02;
+  const pulseStrength = clamp01(
+    basePulseStrength + intensityBoost + flowContext.momentum * 0.18 + flowContext.momentumTrend * 0.35
+  );
 
   const flowGlowColor = useMemo(
     () => hexToRgba(glowColor, (isOpen || isDragging ? 0.6 : 0.38) + pulseStrength * 0.2),
@@ -180,6 +194,21 @@ export const BloomFloatingHub: React.FC<BloomFloatingHubProps> = ({
     targetPositionRef.current = position;
     scheduleAnimation();
   }, [position, scheduleAnimation]);
+
+  useEffect(() => {
+    if (!menuRequest) {
+      return;
+    }
+    const { menu, open = true } = menuRequest;
+    if (!menu || !menuConfig[menu]) {
+      return;
+    }
+    setActiveMenu(menu);
+    if (open) {
+      setIsOpen(true);
+    }
+    setHoveredItem(null);
+  }, [menuConfig, menuRequest]);
 
   useEffect(() => {
     isDraggingRef.current = isDragging;
@@ -309,8 +338,14 @@ useEffect(() => {
     }
   };
 
+  const dynamicRadius = useMemo(
+    () => PETAL_RADIUS * (0.88 + flowContext.momentum * 0.28),
+    [flowContext.momentum]
+  );
+
   const petals = items.map((item, index) => {
-    const { x, y } = getPetalPosition(index, items.length, isOpen ? PETAL_RADIUS : 0);
+    const radius = isOpen ? dynamicRadius : 0;
+    const { x, y } = getPetalPosition(index, items.length, radius);
     const accent = item.accentColor ?? glowColor;
     const progress = item.progressPercent;
     const energy = progress !== undefined ? Math.max(0.35, progress / 100) : isOpen ? 1 : 0.6;

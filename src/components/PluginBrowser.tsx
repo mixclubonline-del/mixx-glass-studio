@@ -1,221 +1,334 @@
 // components/PluginBrowser.tsx
-import React, { useMemo, useState } from "react";
-import { FxWindowConfig, FxWindowId } from "../App";
+import React, { useMemo, useState, useCallback } from "react";
+import type { FxWindowId } from "../App";
 import { PlusCircleIcon, XIcon, StarIcon } from "./icons";
 import { hexToRgba } from "../utils/ALS";
+import type {
+  PluginInventoryItem,
+  PluginTier,
+} from "../audio/pluginTypes";
+import { TIER_ORDER } from "../audio/pluginCatalog";
 
 interface PluginBrowserProps {
   trackId: string;
-  onClose: () => void;
-  onAddPlugin: (trackId: string, pluginId: FxWindowId) => void;
-  fxWindows: FxWindowConfig[]; // All available plugin configs
-  inserts: Record<string, FxWindowId[]>; // Current inserts for all tracks
-  inventory: Array<{
-    id: FxWindowId;
-    name: string;
-    base: string;
-    glow: string;
-    isFavorite: boolean;
-    isCurated: boolean;
-  }>;
+  trackName?: string;
+  activeInserts: FxWindowId[];
+  inventory: PluginInventoryItem[];
   favorites: Record<FxWindowId, boolean>;
+  onAddPlugin: (trackId: string, pluginId: FxWindowId) => void;
   onToggleFavorite: (pluginId: FxWindowId) => void;
+  onClose: () => void;
+  onPreview?: (trackId: string, pluginId: FxWindowId) => void;
 }
+
+const tierHeadline: Record<PluginTier, string> = {
+  pillar: "Five Pillars",
+  core: "Core Tier",
+  neural: "Neural Tier",
+  master: "Master Tier",
+  system: "System Layer",
+  signature: "Signature Halo",
+};
+
+const tierSubtitle: Record<PluginTier, string> = {
+  pillar: "Five pillars locked in",
+  core: "Anchor energy steady",
+  neural: "Neural net listening",
+  master: "Translation guardians awake",
+  system: "System lattice humming",
+  signature: "Signature halo breathing",
+};
+
+const motionBadge: Record<PluginInventoryItem["lightingProfile"]["motion"], string> = {
+  float: "Float",
+  breathe: "Breathe",
+  pulse: "Pulse",
+  burst: "Burst",
+  shimmer: "Shimmer",
+  sweep: "Sweep",
+  drift: "Drift",
+  expand: "Expand",
+  flare: "Flare",
+  bars: "Meters",
+  glow: "Glow",
+  heartbeat: "Heartbeat",
+  mirror: "Mirror",
+};
+
+const gradientFor = (item: PluginInventoryItem) => {
+  const { hueStart, hueEnd } = item.lightingProfile;
+  return `linear-gradient(135deg, hsla(${hueStart}, 82%, 62%, 0.28), hsla(${hueEnd}, 78%, 58%, 0.32))`;
+};
+
+const tierSort = (a: PluginTier, b: PluginTier) =>
+  (TIER_ORDER[a] ?? 99) - (TIER_ORDER[b] ?? 99);
 
 const PluginBrowser: React.FC<PluginBrowserProps> = ({
   trackId,
-  onClose,
-  onAddPlugin,
-  fxWindows,
-  inserts,
+  trackName,
+  activeInserts,
   inventory,
   favorites,
+  onAddPlugin,
   onToggleFavorite,
+  onClose,
+  onPreview,
 }) => {
-  const currentTrackInserts = inserts[trackId] || [];
   const [searchTerm, setSearchTerm] = useState("");
 
-  const fxConfigMap = useMemo(() => {
-    const map = new Map<FxWindowId, FxWindowConfig>();
-    fxWindows.forEach((fx) => map.set(fx.id, fx));
-    return map;
-  }, [fxWindows]);
-
-  // Browser roster: what -> ordered map of available modules, why -> fuel curated/favorite groupings, how -> stable sort by name with ALS tint metadata. (Reduction / Flow / Recall)
-  const normalizedInventory = useMemo(() => {
-    const sorted = [...inventory];
-    return sorted.sort((a, b) => a.name.localeCompare(b.name));
+  const curatedHighlights = useMemo(() => {
+    return inventory
+      .filter((item) => item.isCurated)
+      .sort((a, b) => {
+        const tierDelta = tierSort(a.tier, b.tier);
+        if (tierDelta !== 0) return tierDelta;
+        return a.name.localeCompare(b.name);
+      })
+      .slice(0, 6);
   }, [inventory]);
 
-  const curatedList = useMemo(
-    () => normalizedInventory.filter((item) => item.isCurated),
-    [normalizedInventory]
-  );
-
-  const favoriteList = useMemo(
-    () => normalizedInventory.filter((item) => favorites[item.id]),
-    [favorites, normalizedInventory]
-  );
+  const favoriteList = useMemo(() => {
+    return inventory
+      .filter((item) => favorites[item.id])
+      .sort((a, b) => {
+        if (a.tier === b.tier) {
+          return a.name.localeCompare(b.name);
+        }
+        return tierSort(a.tier, b.tier);
+      });
+  }, [favorites, inventory]);
 
   const filteredInventory = useMemo(() => {
     const term = searchTerm.trim().toLowerCase();
-    if (!term) return normalizedInventory;
-    return normalizedInventory.filter((item) =>
-      item.name.toLowerCase().includes(term)
-    );
-  }, [normalizedInventory, searchTerm]);
+    if (!term) {
+      return inventory;
+    }
+    return inventory.filter((item) => {
+      return (
+        item.name.toLowerCase().includes(term) ||
+        item.description.toLowerCase().includes(term) ||
+        item.moodResponse.toLowerCase().includes(term)
+      );
+    });
+  }, [inventory, searchTerm]);
 
-  const handleAdd = (pluginId: FxWindowId) => {
-    if (currentTrackInserts.includes(pluginId)) return;
-    onAddPlugin(trackId, pluginId);
-  };
+  const groupedByTier = useMemo(() => {
+    const groups = new Map<PluginTier, PluginInventoryItem[]>();
+    filteredInventory.forEach((item) => {
+      if (!groups.has(item.tier)) {
+        groups.set(item.tier, []);
+      }
+      groups.get(item.tier)!.push(item);
+    });
+    return Array.from(groups.entries())
+      .sort(([tierA], [tierB]) => tierSort(tierA, tierB))
+      .map(([tier, plugins]) => ({
+        tier,
+        headline: tierHeadline[tier] ?? tier,
+        plugins: plugins.sort((a, b) => a.name.localeCompare(b.name)),
+      }));
+  }, [filteredInventory]);
+
+  const handleAdd = useCallback(
+    (pluginId: FxWindowId) => {
+      if (activeInserts.includes(pluginId)) return;
+      onAddPlugin(trackId, pluginId);
+    },
+    [activeInserts, onAddPlugin, trackId]
+  );
+
+  const handleHover = useCallback(
+    (pluginId: FxWindowId) => {
+      onPreview?.(trackId, pluginId);
+    },
+    [onPreview, trackId]
+  );
 
   return (
     <div
-      className="fixed inset-0 bg-black/70 flex items-center justify-center z-[100] backdrop-filter backdrop-blur-md"
+      className="fixed inset-0 z-[160] flex items-center justify-center bg-[rgba(2,4,12,0.76)] backdrop-blur-3xl"
       onClick={onClose}
     >
       <div
-        className="relative w-[480px] h-[560px] rounded-2xl bg-gradient-to-br from-gray-900/60 to-gray-900/50 border border-gray-500/40 flex flex-col p-6 shadow-2xl shadow-purple-500/20"
-        onClick={(e) => e.stopPropagation()}
+        className="relative flex h-[620px] w-[880px] flex-col overflow-hidden rounded-[32px] border border-white/10 bg-[rgba(6,14,32,0.85)] shadow-[0_45px_120px_rgba(4,10,26,0.65)]"
+        onClick={(event) => event.stopPropagation()}
       >
-        <header className="flex justify-between items-center mb-4">
-          <h2 className="text-lg font-semibold tracking-[0.4em] text-gray-100 uppercase">
-            Insert Bloom
-          </h2>
+        <header className="flex items-center justify-between px-8 pt-7 pb-5">
+          <div>
+            <p className="text-[0.5rem] uppercase tracking-[0.45em] text-cyan-200/65">
+              {trackName ? `Routing into ${trackName}` : "Flow Insert Browser"}
+            </p>
+            <h2 className="mt-2 text-2xl font-semibold tracking-[0.18em] text-white">
+              Bloom Module Halo
+            </h2>
+          </div>
           <button
             onClick={onClose}
-            className="p-1 rounded-full hover:bg-white/10 text-gray-300 hover:text-white transition-colors"
-            aria-label="Close plugin browser"
+            className="flex h-10 w-10 items-center justify-center rounded-full border border-white/15 bg-white/8 text-white/70 transition-colors hover:bg-white/16 hover:text-white"
+            aria-label="Close plug-in browser"
           >
-            <XIcon className="w-5 h-5" />
+            <XIcon className="h-5 w-5" />
           </button>
         </header>
 
-        <div className="flex flex-col gap-3 flex-grow overflow-hidden">
-          <div className="flex items-center gap-2 rounded-xl border border-white/15 bg-black/35 px-3 py-2">
-            <input
-              value={searchTerm}
-              onChange={(event) => setSearchTerm(event.target.value)}
-              placeholder="Search flow modules"
-              className="flex-1 bg-transparent text-[0.6rem] uppercase tracking-[0.35em] text-white/80 placeholder:text-white/30 focus:outline-none"
-            />
-          </div>
-
-          {!searchTerm && favoriteList.length > 0 && (
-            <div className="flex flex-col gap-1">
-              <div className="text-[0.48rem] uppercase tracking-[0.35em] text-white/55">
-                Favorites
-              </div>
-              <div className="flex flex-wrap gap-2">
-                {favoriteList.map((plugin) => (
-                  <button
-                    key={`fav-${plugin.id}`}
-                    onClick={() => handleAdd(plugin.id)}
-                    className="flex items-center gap-1 rounded-lg px-2 py-1 text-[0.48rem] uppercase tracking-[0.35em] text-white/80 border border-white/15 bg-white/5 hover:bg-white/10 transition-all"
-                    style={{
-                      boxShadow: `0 0 12px ${hexToRgba(plugin.glow, 0.35)}`,
-                      background: `linear-gradient(135deg, ${hexToRgba(
-                        plugin.base,
-                        0.18
-                      )}, transparent)`
-                    }}
-                  >
-                    <span className="truncate">{plugin.name}</span>
-                    <StarIcon filled className="w-3 h-3 text-amber-300" />
-                  </button>
-                ))}
-              </div>
+        <div className="flex flex-col gap-4 px-8 pb-7">
+          <div className="flex items-center gap-4">
+            <div className="flex flex-1 items-center rounded-2xl border border-white/12 bg-[rgba(10,24,44,0.6)] px-4 py-3 backdrop-blur">
+              <input
+                value={searchTerm}
+                onChange={(event) => setSearchTerm(event.target.value)}
+                placeholder="Search by vibe, tier, or mood response"
+                className="flex-1 bg-transparent text-sm uppercase tracking-[0.35em] text-white/80 placeholder:text-white/35 focus:outline-none"
+              />
             </div>
-          )}
-
-          {!searchTerm && curatedList.length > 0 && (
-            <div className="flex flex-col gap-1">
-              <div className="text-[0.48rem] uppercase tracking-[0.35em] text-white/55">
-                Curated signal chain
-              </div>
-              <div className="flex flex-wrap gap-2">
-                {curatedList.map((plugin) => (
-                  <button
-                    key={`curated-${plugin.id}`}
-                    onClick={() => handleAdd(plugin.id)}
-                    className="flex items-center gap-1 rounded-lg px-2 py-1 text-[0.48rem] uppercase tracking-[0.35em] text-white/80 border border-white/15 bg-white/5 hover:bg-white/10 transition-all"
-                    style={{
-                      boxShadow: `0 0 10px ${hexToRgba(plugin.glow, 0.3)}`,
-                      background: `linear-gradient(135deg, ${hexToRgba(
-                        plugin.glow,
-                        0.2
-                      )}, transparent)`
-                    }}
-                  >
-                    <span className="truncate">{plugin.name}</span>
-                  </button>
-                ))}
-              </div>
-            </div>
-          )}
-
-          <div className="flex-1 overflow-y-auto pr-1">
-            {filteredInventory.map((plugin) => {
-              const isAdded = currentTrackInserts.includes(plugin.id);
-              const config = fxConfigMap.get(plugin.id);
-              return (
-                <div
-                  key={plugin.id}
-                  className="flex items-center justify-between rounded-xl border border-white/12 bg-black/30 px-3 py-2 mb-2 shadow-[0_4px_18px_rgba(10,10,20,0.35)]"
-                  style={{ boxShadow: `0 0 14px ${hexToRgba(plugin.glow, 0.22)}` }}
-                >
-                  <div className="flex flex-col">
-                    <span className="text-[0.55rem] uppercase tracking-[0.35em] text-white/80">
-                      {plugin.name}
-                    </span>
-                    <span className="text-[0.45rem] uppercase tracking-[0.3em] text-white/35">
-                      {config?.component?.name ?? "Flow module"}
-                    </span>
-                  </div>
-                  <div className="flex items-center gap-2">
-                    <button
-                      onClick={() => onToggleFavorite(plugin.id)}
-                      className={`p-1 rounded-full border border-white/15 transition-colors ${
-                        favorites[plugin.id]
-                          ? "bg-amber-300/20 text-amber-200"
-                          : "text-white/40 hover:text-white/70"
-                      }`}
-                      aria-label={favorites[plugin.id] ? "Unfavorite" : "Favorite"}
-                    >
-                      <StarIcon filled={favorites[plugin.id]} className="w-4 h-4" />
-                    </button>
-                    <button
-                      onClick={() => handleAdd(plugin.id)}
-                      disabled={isAdded}
-                      className={`flex items-center gap-1 rounded-lg px-2 py-1 text-[0.48rem] uppercase tracking-[0.35em] border border-white/15 transition-all ${
-                        isAdded
-                          ? "bg-white/10 text-white/40 cursor-default"
-                          : "bg-white/15 text-white/80 hover:bg-white/25"
-                      }`}
-                    >
-                      {isAdded ? "In chain" : "Add"}
-                      {!isAdded && <PlusCircleIcon className="w-4 h-4" />}
-                    </button>
-                  </div>
-                </div>
-              );
-            })}
-            {!filteredInventory.length && (
-              <div className="text-[0.5rem] uppercase tracking-[0.35em] text-white/40 text-center py-8">
-                No modules match
+            {favoriteList.length > 0 && (
+              <div className="flex items-center gap-3 rounded-2xl border border-amber-200/20 bg-amber-400/8 px-4 py-3">
+                <StarIcon filled className="h-4 w-4 text-amber-200" />
+                <span className="text-[0.55rem] uppercase tracking-[0.35em] text-amber-100/80">
+                  Favorites pulsing
+                </span>
               </div>
             )}
           </div>
+
+          {!searchTerm && curatedHighlights.length > 0 && (
+            <section className="flex flex-col gap-2">
+              <div className="flex items-center justify-between">
+                <span className="text-[0.48rem] uppercase tracking-[0.45em] text-white/55">
+                  Curated Flow Chain
+                </span>
+                <span className="text-[0.45rem] uppercase tracking-[0.3em] text-white/30">
+                  Tap to load
+                </span>
+              </div>
+              <div className="flex flex-wrap gap-3">
+                {curatedHighlights.map((plugin) => (
+                  <button
+                    key={`curated-${plugin.id}`}
+                    onClick={() => handleAdd(plugin.id)}
+                    onMouseEnter={() => handleHover(plugin.id)}
+                    className="rounded-2xl border border-white/12 bg-[rgba(12,24,48,0.78)] px-4 py-2 text-left transition-all hover:border-white/25 hover:bg-[rgba(16,36,68,0.85)]"
+                    style={{
+                      boxShadow: `0 0 28px ${hexToRgba(plugin.glow, 0.26)}`,
+                      backgroundImage: gradientFor(plugin),
+                    }}
+                  >
+                    <div className="flex items-center gap-2">
+                      <span className="text-[0.58rem] uppercase tracking-[0.32em] text-white/85">
+                        {plugin.name}
+                      </span>
+                      <span className="rounded-full bg-white/15 px-2 py-[2px] text-[0.42rem] uppercase tracking-[0.32em] text-white/70">
+                        {motionBadge[plugin.lightingProfile.motion]}
+                      </span>
+                    </div>
+                    <p className="mt-1 text-[0.48rem] uppercase tracking-[0.25em] text-white/55">
+                      {plugin.moodResponse}
+                    </p>
+                  </button>
+                ))}
+              </div>
+            </section>
+          )}
         </div>
 
-        <footer className="mt-4 flex justify-end">
+        <div className="relative flex-1 overflow-hidden px-8 pb-8">
+          <div className="absolute left-0 top-0 h-12 w-full bg-gradient-to-b from-[rgba(6,14,32,0.95)] to-transparent" />
+          <div className="absolute bottom-0 left-0 h-12 w-full bg-gradient-to-t from-[rgba(6,14,32,0.95)] to-transparent" />
+          <div className="h-full w-full overflow-y-auto pr-2">
+            <div className="flex flex-col gap-6 pb-6">
+              {groupedByTier.map(({ tier, headline, plugins }) => (
+                <section key={tier} className="flex flex-col gap-3">
+                  <div className="flex items-center justify-between">
+                    <div>
+                      <span className="text-[0.42rem] uppercase tracking-[0.42em] text-white/35">
+                        {headline}
+                      </span>
+                      <p className="mt-1 text-[0.62rem] uppercase tracking-[0.42em] text-white/55">
+                        {tierSubtitle[tier]}
+                      </p>
+                    </div>
+                  </div>
+                  <div className="grid grid-cols-1 gap-4 md:grid-cols-2">
+                    {plugins.map((plugin) => {
+                      const isAdded = activeInserts.includes(plugin.id);
+                      const isFavorite = favorites[plugin.id];
+                      return (
+                        <article
+                          key={plugin.id}
+                          onMouseEnter={() => handleHover(plugin.id)}
+                          className="group relative flex flex-col justify-between rounded-[24px] border border-white/10 bg-[rgba(8,16,36,0.78)] p-5 transition-all duration-200 hover:border-white/25 hover:shadow-[0_22px_48px_rgba(6,16,38,0.55)]"
+                          style={{
+                            backgroundImage: gradientFor(plugin),
+                          }}
+                        >
+                          <div className="flex items-start justify-between gap-4">
+                            <div>
+                              <h3 className="text-sm uppercase tracking-[0.3em] text-white">
+                                {plugin.name}
+                              </h3>
+                              <p className="mt-2 text-[0.55rem] uppercase tracking-[0.28em] text-white/65">
+                                {plugin.description}
+                              </p>
+                            </div>
+                            <button
+                              onClick={(event) => {
+                                event.stopPropagation();
+                                onToggleFavorite(plugin.id);
+                              }}
+                              className={`flex h-9 w-9 items-center justify-center rounded-full border transition-colors ${
+                                isFavorite
+                                  ? "border-amber-200/60 bg-amber-200/15 text-amber-100"
+                                  : "border-white/18 bg-white/8 text-white/60 hover:text-white"
+                              }`}
+                              aria-label={isFavorite ? "Remove favorite" : "Add to favorites"}
+                            >
+                              <StarIcon filled={isFavorite} className="h-4 w-4" />
+                            </button>
+                          </div>
+                          <p className="mt-3 text-[0.48rem] uppercase tracking-[0.28em] text-white/50">
+                            {plugin.moodResponse}
+                          </p>
+                          <div className="mt-4 flex items-center justify-between">
+                            <span className="rounded-full border border-white/15 bg-white/10 px-3 py-1 text-[0.4rem] uppercase tracking-[0.35em] text-white/70">
+                              {motionBadge[plugin.lightingProfile.motion]}
+                            </span>
+                            <button
+                              onClick={() => handleAdd(plugin.id)}
+                              disabled={isAdded}
+                              className={`flex items-center gap-2 rounded-full border px-4 py-2 text-[0.55rem] uppercase tracking-[0.32em] transition-all ${
+                                isAdded
+                                  ? "cursor-default border-white/15 bg-white/12 text-white/45"
+                                  : "border-white/25 bg-white/15 text-white/85 hover:bg-white/25"
+                              }`}
+                            >
+                              {isAdded ? "In Chain" : "Add Module"}
+                              {!isAdded && <PlusCircleIcon className="h-4 w-4" />}
+                            </button>
+                          </div>
+                        </article>
+                      );
+                    })}
+                  </div>
+                </section>
+              ))}
+              {!groupedByTier.length && (
+                <div className="py-16 text-center text-[0.55rem] uppercase tracking-[0.38em] text-white/35">
+                  Nothing matches that vibe yet
+                </div>
+              )}
+            </div>
+          </div>
+        </div>
+
+        <footer className="flex items-center justify-between border-t border-white/8 bg-[rgba(4,10,24,0.9)] px-8 py-4">
+          <div className="text-[0.42rem] uppercase tracking-[0.32em] text-white/40">
+            Modules respond to ALS — no numbers, only flow.
+          </div>
           <button
-            type="button"
             onClick={onClose}
-            className="px-4 py-2 rounded-lg bg-white/10 hover:bg-white/20 border border-white/15 text-[0.55rem] uppercase tracking-[0.35em] text-white/70 transition-colors"
+            className="rounded-full border border-white/15 px-4 py-2 text-[0.55rem] uppercase tracking-[0.28em] text-white/70 transition-all hover:border-white/30 hover:text-white"
           >
-            Close
+            Close Browser
           </button>
         </footer>
       </div>

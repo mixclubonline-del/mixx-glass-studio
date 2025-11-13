@@ -1,3 +1,5 @@
+@import url("https://fonts.googleapis.com/css2?family=Orbitron:wght@400;700&display=swap");
+
 @tailwind base;
 @tailwind components;
 @tailwind utilities;
@@ -192,6 +194,79 @@ button {
 }
 .animate-target-pulse {
   animation: target-pulse 1.5s infinite ease-in-out;
+}
+
+/* --- MixxClub Plugin Suite Overlay Tokens --- */
+:root {
+  --suite-grid-color: rgba(0, 255, 255, 0.05);
+  --suite-scanline-color: rgba(0, 0, 0, 0.3);
+  --suite-glow-cyan: #00ffff;
+  --suite-glow-pink: #f472b6;
+  --suite-border-color: rgba(100, 200, 255, 0.2);
+  --suite-border-highlight: rgba(150, 220, 255, 0.5);
+}
+
+.suite-screen {
+  background-color: #020010;
+}
+
+.font-orbitron {
+  font-family: "Orbitron", sans-serif;
+}
+
+.custom-scrollbar::-webkit-scrollbar {
+  width: 8px;
+  height: 8px;
+}
+.custom-scrollbar::-webkit-scrollbar-track {
+  background: rgba(0, 0, 0, 0.2);
+  border-radius: 4px;
+}
+.custom-scrollbar::-webkit-scrollbar-thumb {
+  background: rgba(0, 255, 255, 0.2);
+  border-radius: 4px;
+  border: 1px solid rgba(0, 255, 255, 0.3);
+  transition: background 0.3s ease;
+}
+.custom-scrollbar::-webkit-scrollbar-thumb:hover {
+  background: rgba(0, 255, 255, 0.5);
+}
+
+@keyframes suite-halo-pulse {
+  0%,
+  100% {
+    transform: scale(1);
+    opacity: 1;
+  }
+  50% {
+    opacity: 0.6;
+  }
+}
+
+.halo-icon-animated .halo-ring-1 {
+  animation: suite-halo-pulse 4s infinite ease-in-out;
+  transform-origin: center;
+}
+.halo-icon-animated .halo-ring-2 {
+  animation: suite-halo-pulse 4s infinite 0.5s ease-in-out;
+  transform-origin: center;
+}
+
+@keyframes suite-midi-learn {
+  0%,
+  100% {
+    transform: scale(1);
+    box-shadow: 0 0 0 0 rgba(244, 114, 182, 0.7);
+    background-color: rgba(244, 114, 182, 0.7);
+  }
+  50% {
+    transform: scale(1.1);
+    box-shadow: 0 0 5px 10px rgba(244, 114, 182, 0);
+    background-color: rgba(244, 114, 182, 1);
+  }
+}
+.midi-learn-active {
+  animation: suite-midi-learn 1.5s infinite;
 }
 
 /* --- Living Playhead --- */

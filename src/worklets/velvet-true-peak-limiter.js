@@ -120,3 +120,4 @@ class VelvetTruePeakLimiter extends AudioWorkletProcessor {
 
 registerProcessor('velvet-true-peak-limiter', VelvetTruePeakLimiter);
 
+

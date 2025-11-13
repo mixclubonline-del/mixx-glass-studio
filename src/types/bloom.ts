@@ -16,6 +16,8 @@ export type BloomContext =
   | "master"
   | "ai"
   | "ingest"
+  | "sampler"
+  | "edit"
   | "idle";
 
 export const BLOOM_CONTEXT_LABELS: Record<BloomContext, string> = {
@@ -25,6 +27,8 @@ export const BLOOM_CONTEXT_LABELS: Record<BloomContext, string> = {
   master: "Master Bloom",
   ai: "Prime Bloom",
   ingest: "Ingest Bloom",
+  sampler: "Sampler Bloom",
+  edit: "Edit Bloom",
   idle: "Bloom HUD",
 };
 
@@ -35,6 +39,8 @@ export const BLOOM_CONTEXT_ACCENTS: Record<BloomContext, string> = {
   master: "#f5a34c",
   ai: "#f472d0",
   ingest: "#38d9a9",
+  sampler: "#6ad5ff",
+  edit: "#8b5cf6",
   idle: "#94a3b8",
 };
 

@@ -91,7 +91,7 @@ export const ingestHistoryStore = new IngestHistoryStore();
 export interface HistoryNote {
   id: string;
   timestamp: number;
-  scope: "mixer" | "timeline" | "system";
+  scope: "mixer" | "timeline" | "system" | "recording";
   message: string;
   accent?: string;
 }

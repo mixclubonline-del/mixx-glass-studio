@@ -41,4 +41,7 @@
 
 Stay aligned with Reductionist Engineering, keep Flow frictionless, and make sure Mixx Recall can remember every tweak.
 
-
+## Update — Nov 13 2025
+- **Bloom Module Halo (Flow/Recall):** Contextual plug-in browser now groups modules by tier, pulses ALS on hover, and keeps quick-add petals alive for curated favourites.
+- **Tier Taxonomy (Reduction):** Core, Neural, Master, Signature, System layers surface canonical module stories without exposing numeric scaffolding.
+- **Regression checklist:** add module, remove module, reorder chain, toggle bypass, save/recall preset, sidechain link change, favourites toggle, Bloom preview pulse while transport runs.

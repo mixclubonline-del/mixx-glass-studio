@@ -21,6 +21,7 @@ import { ArrangeWindow } from "./components/ArrangeWindow";
 import FlowWelcomeHub from './components/FlowWelcomeHub';
 import ImportModal from './components/ImportModal';
 import FlowConsole from './components/mixer/Mixer';
+import TrapSamplerConsole from './components/sampler/TrapSamplerConsole';
 import VelvetComplianceHUD from './components/ALS/VelvetComplianceHUD';
 import PrimeBrainInterface from './components/PrimeBrainInterface';
 import { getMixxFXEngine, initializeMixxFXEngine } from './audio/MixxFXEngine';
@@ -59,7 +60,6 @@ import {
   deriveTrackALSFeedback,
   deriveBusALSColors,
   deriveActionPulse,
-  TrackColorKey,
 } from './utils/ALS';
 import type { PulsePalette, ALSActionPulse } from './utils/ALS';
 import {
@@ -85,6 +85,7 @@ import TrackCapsule from './components/TrackCapsule';
 import PianoRollPanel from './components/piano/PianoRollPanel';
 import { ingestHistoryStore, IngestHistoryEntry } from './state/ingestHistory';
 import { publishAlsSignal, publishBloomSignal, publishIngestSignal } from './state/flowSignals';
+import { useFlowContext } from './state/flowContextService';
 import {
   TrackUIState,
   TrackContextMode,
@@ -1367,6 +1368,7 @@ const FlowRuntime: React.FC<FlowRuntimeProps> = ({ arrangeFocusToken }) => {
     }
     return null;
   });
+  const flowContext = useFlowContext();
   useEffect(() => {
     if (typeof window === 'undefined') return;
     window.localStorage.setItem(
@@ -1556,23 +1558,34 @@ const FlowRuntime: React.FC<FlowRuntimeProps> = ({ arrangeFocusToken }) => {
     const audioMetricsState = primeBrainAudioMetricsRef.current;
 
     const alsTemperature = clamp01(masterAnalysis.level);
-    let momentum = isPlaying ? 0.45 + masterAnalysis.level * 0.4 : 0.18;
+    let momentum = Math.max(flowContext.momentum, isPlaying ? 0.45 + masterAnalysis.level * 0.4 : 0.18);
     if (mixerActionPulse) {
-      momentum = Math.min(1, momentum + mixerActionPulse.pulse.intensity * 0.4);
+      momentum = Math.min(
+        1,
+        Math.max(momentum, flowContext.momentum + mixerActionPulse.pulse.intensity * 0.3)
+      );
     }
-    const pressureBase = masterAnalysis.transient
-      ? 0.55 + masterAnalysis.level * 0.4
-      : masterAnalysis.level * 0.6;
+    const pressureBase =
+      (masterAnalysis.transient ? 0.55 + masterAnalysis.level * 0.4 : masterAnalysis.level * 0.6) +
+      flowContext.momentumTrend * 0.35;
     const pressure = clamp01(importMessage ? Math.max(pressureBase, 0.65) : pressureBase);
     const harmony = analysisResult
       ? clamp01((analysisResult.soul / 100) * 0.6 + (analysisResult.silk / 100) * 0.4)
       : 0.38;
+    const harmonyWithFlow = clamp01(
+      harmony +
+        (flowContext.intensity === 'immersed'
+          ? 0.08
+          : flowContext.intensity === 'charged'
+          ? 0.04
+          : 0)
+    );
 
     const alsChannels: PrimeBrainSnapshotInputs['alsChannels'] = [
       { channel: 'temperature', value: alsTemperature },
       { channel: 'momentum', value: momentum },
       { channel: 'pressure', value: pressure },
-      { channel: 'harmony', value: harmony },
+      { channel: 'harmony', value: harmonyWithFlow },
     ];
 
     const aiAnalysisFlags: PrimeBrainAIFlag[] = captureReport.notes.map((note) => {
@@ -1700,6 +1713,9 @@ const FlowRuntime: React.FC<FlowRuntimeProps> = ({ arrangeFocusToken }) => {
     musicalContext,
     hushFeedback,
     isHushActive,
+    flowContext.intensity,
+    flowContext.momentum,
+    flowContext.momentumTrend,
   ]);
 
   const primeBrainStatus = useMemo<PrimeBrainStatus>(() => {
@@ -1862,7 +1878,7 @@ const FlowRuntime: React.FC<FlowRuntimeProps> = ({ arrangeFocusToken }) => {
   );
 
 
-  const [viewMode, setViewMode] = useState<'arrange' | 'mixer'>('arrange');
+  const [viewMode, setViewMode] = useState<'arrange' | 'sampler' | 'mixer'>('arrange');
   useEffect(() => {
     if (arrangeFocusToken > 0) {
       setViewMode('arrange');
@@ -3406,8 +3422,8 @@ const FlowRuntime: React.FC<FlowRuntimeProps> = ({ arrangeFocusToken }) => {
                     source: 'translation-matrix',
                     profile,
                 });
-            }
-            break;
+              }
+              break;
           case 'resetMix':
               setMixerSettings(prev => {
                   const newSettings = { ...prev };
@@ -5459,25 +5475,54 @@ const FlowRuntime: React.FC<FlowRuntimeProps> = ({ arrangeFocusToken }) => {
 
   const bloomPulseAgent = useMemo<PulsePalette>(() => {
     if (importMessage) {
-      return derivePulsePalette('magenta', 0.85, 0.55);
+      return derivePulsePalette('magenta', 0.85, clamp01(0.55 + flowContext.momentum * 0.25));
     }
 
     if (isHushActive) {
-      return derivePulsePalette('green', 0.7, 0.62);
+      return derivePulsePalette('green', 0.7, clamp01(0.62 + flowContext.momentumTrend * 0.25));
     }
 
     if (mixerPulseAgent) {
+      const baseStrength = Math.max(mixerPulseAgent.pulseStrength, isPlaying ? 0.45 : 0.25);
+      const boostedStrength = clamp01(
+        baseStrength +
+          (flowContext.intensity === 'immersed'
+            ? 0.18
+            : flowContext.intensity === 'charged'
+            ? 0.1
+            : 0.02) +
+          flowContext.momentum * 0.22 +
+          flowContext.momentumTrend * 0.3
+      );
       return {
         ...mixerPulseAgent,
-        pulseStrength: Math.max(mixerPulseAgent.pulseStrength, isPlaying ? 0.45 : 0.25),
+        pulseStrength: boostedStrength,
       };
     }
 
     const fallbackColor: TrackColorKey = isPlaying ? 'cyan' : 'purple';
     const fallbackIntensity = isPlaying ? 0.55 : 0.3;
-    const fallbackPulse = isPlaying ? 0.48 : 0.22;
+    const fallbackPulseBase = isPlaying ? 0.48 : 0.22;
+    const fallbackPulse = clamp01(
+      fallbackPulseBase +
+        (flowContext.intensity === 'immersed'
+          ? 0.18
+          : flowContext.intensity === 'charged'
+          ? 0.08
+          : 0) +
+        flowContext.momentum * 0.18 +
+        flowContext.momentumTrend * 0.25
+    );
     return derivePulsePalette(fallbackColor, fallbackIntensity, fallbackPulse);
-  }, [importMessage, isHushActive, isPlaying, mixerPulseAgent]);
+  }, [
+    flowContext.intensity,
+    flowContext.momentum,
+    flowContext.momentumTrend,
+    importMessage,
+    isHushActive,
+    isPlaying,
+    mixerPulseAgent,
+  ]);
 
   const ingestJobs = ingestSnapshot.jobs;
 
@@ -5490,6 +5535,7 @@ const FlowRuntime: React.FC<FlowRuntimeProps> = ({ arrangeFocusToken }) => {
     if (isAIHubOpen) return 'ai';
     if (isAnyTrackArmed || isHushActive) return 'record';
     if (viewMode === 'mixer') return 'mix';
+    if (viewMode === 'sampler') return 'sampler';
     if (analysisResult) return 'master';
     if (viewMode === 'arrange') return 'arrange';
     return 'idle';
@@ -5532,7 +5578,16 @@ const FlowRuntime: React.FC<FlowRuntimeProps> = ({ arrangeFocusToken }) => {
   );
   const sessionProbeEnabled = useSessionProbe(sessionProbeContext);
 
-  const bloomLabel = useMemo(() => BLOOM_CONTEXT_LABELS[bloomContext], [bloomContext]);
+  const bloomLabel = useMemo(() => {
+    const baseLabel = BLOOM_CONTEXT_LABELS[bloomContext];
+    const flowDescriptor =
+      flowContext.intensity === 'immersed'
+        ? 'Immersed'
+        : flowContext.intensity === 'charged'
+        ? 'Charged'
+        : 'Calm';
+    return `${baseLabel} • ${flowDescriptor}`;
+  }, [bloomContext, flowContext.intensity]);
   const bloomAccent = useMemo(() => BLOOM_CONTEXT_ACCENTS[bloomContext], [bloomContext]);
 
   const bloomFloatingMenu = useMemo<Record<string, BloomFloatingMenu>>(() => {
@@ -5760,6 +5815,35 @@ const FlowRuntime: React.FC<FlowRuntimeProps> = ({ arrangeFocusToken }) => {
         ];
         return attachSettingsMenu(buildSimpleMenu(arrangeItems));
       }
+      case 'sampler': {
+        const samplerItems: BloomFloatingMenuItem[] = [
+          {
+            name: 'Arm Pads',
+            description: 'Ready the Trap Pad Matrix for a take.',
+            action: () => handleBloomAction('armSamplerPads', undefined, meta),
+            accentColor: '#6ad5ff',
+          },
+          {
+            name: 'Note Repeat',
+            description: 'Toggle triplet and burst rolls.',
+            action: () => handleBloomAction('triggerSamplerNoteRepeat', { mode: 'triplet' }, meta),
+            accentColor: '#8dd4ff',
+          },
+          {
+            name: 'Flip Sample',
+            description: 'Jump into Instant Sample Flip.',
+            action: () => handleBloomAction('openSamplerMacros', undefined, meta),
+            accentColor: '#c0a8ff',
+          },
+          {
+            name: 'Capture Pattern',
+            description: 'Commit this pad take to Mixx Recall.',
+            action: () => handleBloomAction('captureSamplerPattern', undefined, meta),
+            accentColor: '#ffa7d1',
+          },
+        ];
+        return attachSettingsMenu(buildSimpleMenu(samplerItems));
+      }
       case 'record': {
         const recordItems: BloomFloatingMenuItem[] = [
           {
@@ -5936,7 +6020,7 @@ const FlowRuntime: React.FC<FlowRuntimeProps> = ({ arrangeFocusToken }) => {
     canRecallLastImport,
     currentTime,
     followPlayhead,
-    primeBrainStatus.health,
+    primeBrainStatus,
     primeBrainTelemetryEnabled,
   ]);
 
@@ -6021,6 +6105,11 @@ const FlowRuntime: React.FC<FlowRuntimeProps> = ({ arrangeFocusToken }) => {
                 audioBuffers={audioBuffers}
               />
             </div>
+            <div className={`absolute inset-0 w-full h-full transition-all duration-700 ease-in-out ${viewMode === 'sampler' ? 'opacity-100 transform-none' : 'opacity-0 transform scale-105 translate-z-50 pointer-events-none'}`}>
+              <div className="flex h-full w-full items-center justify-center px-8">
+                <TrapSamplerConsole tempoBpm={bpm} />
+              </div>
+            </div>
              <div className={`absolute inset-0 w-full h-full transition-all duration-700 ease-in-out ${viewMode === 'mixer' ? 'opacity-100 transform-none' : 'opacity-0 transform scale-110 translate-z-50'}`}>
                 <FlowConsole 
                     tracks={tracks}
@@ -6071,7 +6160,6 @@ const FlowRuntime: React.FC<FlowRuntimeProps> = ({ arrangeFocusToken }) => {
                     onLoadPluginPreset={handleLoadPluginPreset}
                     onDeletePluginPreset={handleDeletePluginPreset}
                     mixerActionPulse={mixerActionPulse}
-                tempoBpm={bpm}
                 />
             </div>
 
@@ -6088,7 +6176,7 @@ const FlowRuntime: React.FC<FlowRuntimeProps> = ({ arrangeFocusToken }) => {
           metrics={loudnessMetrics}
           profile={currentMasterProfile}
         />
-
+        
         <BloomFloatingHub
             menuConfig={bloomFloatingMenu}
             alsPulseAgent={bloomPulseAgent}
@@ -6178,18 +6266,31 @@ const FlowRuntime: React.FC<FlowRuntimeProps> = ({ arrangeFocusToken }) => {
 
         {/* Plugin Browser Modal */}
         {isPluginBrowserOpen && trackIdForPluginBrowser && (
-          <PluginBrowser
-            trackId={trackIdForPluginBrowser}
-            onClose={() => { setIsPluginBrowserOpen(false); setTrackIdForPluginBrowser(null); }}
-            onAddPlugin={handleAddPlugin}
-            fxWindows={fxWindows}
-            inserts={inserts}
-            inventory={pluginInventory}
-            favorites={pluginFavorites}
-            onToggleFavorite={handleTogglePluginFavorite}
-          />
+          <div className="fixed inset-0 z-[200]">
+            <SuitePluginSurface
+              trackId={trackIdForPluginBrowser}
+              trackName={
+                tracks.find((track) => track.id === trackIdForPluginBrowser)?.trackName
+              }
+              existingPluginIds={inserts[trackIdForPluginBrowser] ?? []}
+              onAddPlugin={(pluginId) => {
+                handleAddPlugin(trackIdForPluginBrowser, pluginId as FxWindowId);
+                setIsPluginBrowserOpen(false);
+                setTrackIdForPluginBrowser(null);
+              }}
+              onClose={handleClosePluginBrowser}
+            />
+          </div>
         )}
-        <input type="file" ref={fileInputRef} className="hidden" onChange={handleFileLoad} accept=".json,audio/*" multiple aria-label="Load audio or project file" />
+        <input
+          type="file"
+          ref={fileInputRef}
+          className="hidden"
+          onChange={handleFileLoad}
+          accept=".json,.wav,.aiff,.aif,.mp3,.flac,.ogg,.m4a,.aac,audio/*"
+          multiple
+          aria-label="Load audio or project file"
+        />
 
         {isAIHubOpen && (
             <AIHub

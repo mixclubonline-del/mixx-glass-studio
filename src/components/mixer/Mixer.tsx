@@ -30,7 +30,7 @@ import {
 import type { TrackALSFeedback, ALSActionPulse } from '../../utils/ALS';
 import { publishAlsSignal } from '../../state/flowSignals';
 import type { PluginPreset } from '../../utils/pluginState';
-import TrapSamplerConsole from '../sampler/TrapSamplerConsole';
+import type { PluginInventoryItem } from "../../audio/pluginTypes";
 
 interface FlowConsoleProps {
   tracks: TrackData[];
@@ -98,17 +98,6 @@ interface FlowConsoleProps {
     fxId: string,
     paramName: string
   ) => void;
-  tempoBpm?: number;
-}
-
-interface PluginInventoryItem {
-  id: FxWindowId;
-  name: string;
-  colorKey: TrackData['trackColor'];
-  base: string;
-  glow: string;
-  isFavorite: boolean;
-  isCurated: boolean;
 }
 
 const computeStageHeights = () => {
@@ -170,7 +159,6 @@ const FlowConsole: React.FC<FlowConsoleProps> = ({
   buses = [],
   onSelectBus,
   onToggleAutomationLaneWithParam,
-  tempoBpm = 140,
 }) => {
   const [stageHeights, setStageHeights] = useState(computeStageHeights);
 
@@ -347,9 +335,6 @@ const FlowConsole: React.FC<FlowConsoleProps> = ({
             </div>
           </div>
         </div>
-      </div>
-      <div className="flex w-full justify-center lg:w-auto lg:min-w-[420px]">
-        <TrapSamplerConsole tempoBpm={tempoBpm} />
       </div>
     </div>
   );

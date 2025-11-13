@@ -15,6 +15,7 @@ import type {
 import type { TrackALSFeedback, ALSActionPulse } from "../../utils/ALS";
 import { hexToRgba } from "../../utils/ALS";
 import type { PluginPreset } from "../../utils/pluginState";
+import type { PluginInventoryItem } from "../../audio/pluginTypes";
 import FlowMeter from "./FlowMeter";
 import FlowFader from "./FlowFader";
 import {
@@ -99,15 +100,7 @@ interface FlowChannelStripProps {
   ) => void;
   onEQChange?: (trackId: string, patch: Partial<ChannelEQSettings>) => void;
   selectedBusId?: string | null;
-  pluginInventory: Array<{
-    id: FxWindowId;
-    name: string;
-    colorKey: TrackData["trackColor"];
-    base: string;
-    glow: string;
-    isFavorite: boolean;
-    isCurated: boolean;
-  }>;
+  pluginInventory: PluginInventoryItem[];
   pluginFavorites: Record<FxWindowId, boolean>;
   onTogglePluginFavorite?: (pluginId: FxWindowId) => void;
   onAddPlugin?: (trackId: string, pluginId: FxWindowId) => void;

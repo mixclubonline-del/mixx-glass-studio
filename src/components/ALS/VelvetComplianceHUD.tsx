@@ -1,7 +1,6 @@
-import React, { useMemo } from 'react';
+import React from 'react';
 import type { VelvetLoudnessMetrics } from '../../audio/VelvetLoudnessMeter';
 import type { MasteringProfile } from '../../types/sonic-architecture';
-import { hexToRgba } from '../../utils/ALS';
 
 interface VelvetComplianceHUDProps {
   metrics: VelvetLoudnessMetrics;
@@ -11,18 +10,11 @@ interface VelvetComplianceHUDProps {
 
 type StatusState = 'ready' | 'soft' | 'hot' | 'settling';
 
-interface StatusDescriptor {
+export interface StatusDescriptor {
   label: string;
   description: string;
   tone: StatusState;
 }
-
-const STATUS_COLORS: Record<StatusState, { base: string; glow: string }> = {
-  ready: { base: '#c4b5fd', glow: '#8b5cf6' },
-  soft: { base: '#38bdf8', glow: '#0ea5e9' },
-  hot: { base: '#fb7185', glow: '#f43f5e' },
-  settling: { base: '#facc15', glow: '#f59e0b' },
-};
 
 const VELVET_TARGET_BAND = 1;
 
@@ -128,72 +120,25 @@ function evaluateDynamics(momentary: number, shortTerm: number): StatusDescripto
   };
 }
 
-const VelvetComplianceHUD: React.FC<VelvetComplianceHUDProps> = ({
-  metrics,
-  profile,
-  className,
-}) => {
+export interface ComplianceStatus {
+  loudness: StatusDescriptor;
+  dynamics: StatusDescriptor;
+  crest: StatusDescriptor;
+}
+
+export function deriveComplianceStatus(
+  metrics: VelvetLoudnessMetrics,
+  profile: MasteringProfile
+): ComplianceStatus {
   const ceiling = profile.truePeakCeiling;
+  return {
+    loudness: evaluateLoudness(metrics.integratedLUFS, profile.targetLUFS, ceiling),
+    dynamics: evaluateDynamics(metrics.momentaryLUFS, metrics.shortTermLUFS),
+    crest: evaluateTruePeak(metrics.truePeakDb, ceiling),
+  };
+}
 
-  const sections = useMemo(() => {
-    const loudness = evaluateLoudness(metrics.integratedLUFS, profile.targetLUFS, ceiling);
-    const dynamics = evaluateDynamics(metrics.momentaryLUFS, metrics.shortTermLUFS);
-    const crest = evaluateTruePeak(metrics.truePeakDb, ceiling);
-    return [
-      { key: 'loudness', title: 'Energy', descriptor: loudness },
-      { key: 'dynamics', title: 'Dynamics', descriptor: dynamics },
-      { key: 'crest', title: 'Headroom', descriptor: crest },
-    ];
-  }, [metrics.integratedLUFS, metrics.momentaryLUFS, metrics.shortTermLUFS, metrics.truePeakDb, profile.targetLUFS, ceiling]);
-
-  return (
-    <div
-      className={`pointer-events-none fixed bottom-40 right-12 z-30 flex flex-col gap-3 ${className ?? ''}`}
-    >
-      <div className="flex items-center gap-2">
-        <span className="text-[0.62rem] uppercase tracking-[0.4em] text-ink/70">
-          Velvet Compliance
-        </span>
-        <span className="px-3 py-1 rounded-full bg-[rgba(68,37,130,0.35)] border border-[rgba(147,112,219,0.6)] text-[0.55rem] uppercase tracking-[0.3em] text-violet-100">
-          {profile.name}
-        </span>
-      </div>
-      <div className="grid grid-cols-3 gap-3">
-        {sections.map(({ key, title, descriptor }) => {
-          const palette = STATUS_COLORS[descriptor.tone];
-          return (
-            <div
-              key={key}
-              className="rounded-2xl border border-white/8 bg-[rgba(10,17,32,0.88)] backdrop-blur-xl px-4 py-4 shadow-[0_22px_48px_rgba(4,12,26,0.45)] pointer-events-auto"
-              style={{
-                boxShadow: `0 0 18px ${hexToRgba(palette.glow, 0.35)}`,
-              }}
-            >
-              <div className="flex items-center justify-between mb-3">
-                <span className="text-[0.55rem] uppercase tracking-[0.35em] text-ink/70">
-                  {title}
-                </span>
-                <span
-                  className="px-2 py-1 rounded-full text-[0.55rem] uppercase tracking-[0.3em]"
-                  style={{
-                    background: hexToRgba(palette.base, 0.18),
-                    color: hexToRgba(palette.glow, 0.9),
-                    border: `1px solid ${hexToRgba(palette.glow, 0.4)}`,
-                  }}
-                >
-                  {descriptor.label}
-                </span>
-              </div>
-              <p className="text-xs leading-relaxed text-ink/70">
-                {descriptor.description}
-              </p>
-            </div>
-          );
-        })}
-      </div>
-    </div>
-  );
-};
+const VelvetComplianceHUD: React.FC<VelvetComplianceHUDProps> = () => null;
 
 export default VelvetComplianceHUD;
 
