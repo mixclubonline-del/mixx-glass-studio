@@ -227,7 +227,25 @@ fn quantum_get_superposition_status() -> Result<serde_json::Value, String> {
 }
 
 fn main() {
+    // Initialize logger for MixxEngine debug output
+    // Set RUST_LOG=mixx_core=info to see engine logs, or RUST_LOG=debug for verbose
+    env_logger::Builder::from_default_env()
+        .filter_level(log::LevelFilter::Info)
+        .filter_module("mixx_core", log::LevelFilter::Info)
+        .init();
+    
     tauri::Builder::default()
+        .setup(|app| {
+            #[cfg(target_os = "macos")]
+            {
+                use tauri::Manager;
+                if let Some(window) = app.get_webview_window("main") {
+                    let _ = window.set_focus();
+                    let _ = window.show();
+                }
+            }
+            Ok(())
+        })
         .invoke_handler(tauri::generate_handler![
             greet,
             // F.L.O.W. Engine Commands

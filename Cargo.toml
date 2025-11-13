@@ -12,12 +12,13 @@ crate-type = ["cdylib", "rlib"]
 [dependencies]
 # Audio I/O and Processing
 cpal = "0.15"
+dasp_sample = "0.11"
 hound = "3.5"
 rubato = "0.14"
 
 # SIMD and Performance
 portaudio-rs = "0.3"
-simd = "0.2"
+# simd = "0.2"  # Disabled until P-2 SIMD benchmark work
 wide = "0.7"
 
 # Concurrency and Lock-Free
@@ -49,6 +50,6 @@ libc = "0.2"
 cbindgen = "0.26"
 
 [features]
-default = ["simd"]
-simd = []
+default = []
+simd = []  # Will enable simd crate when needed for P-2
 juce-bindings = []

@@ -1382,9 +1382,24 @@ const FlowRuntime: React.FC<FlowRuntimeProps> = ({ arrangeFocusToken }) => {
   const [musicalContext, setMusicalContext] = useState<MusicalContext>({ genre: 'Streaming', mood: 'Balanced' });
   const [isHushActive, setIsHushActive] = useState(false);
   const [hushFeedback, setHushFeedback] = useState({ color: '#1a1030', intensity: 0.0, isEngaged: false, noiseCount: 0 });
+  const [headerHeight, setHeaderHeight] = useState(() =>
+    typeof window !== "undefined" ? Math.min(180, window.innerHeight * 0.2) : 140
+  );
+  const [viewportHeight, setViewportHeight] = useState(() =>
+    typeof window !== "undefined" ? window.innerHeight : 900
+  );
   const hushSystem = useMemo(() => getHushSystem(), []);
   const hushProcessorNodeRef = useRef<ScriptProcessorNode | null>(null);
   const skipAudioSetupWarmupRef = useRef<boolean>(import.meta.env.DEV);
+
+  useEffect(() => {
+    if (typeof window === "undefined") return;
+    const handleResize = () => {
+      setViewportHeight(window.innerHeight);
+    };
+    window.addEventListener("resize", handleResize);
+    return () => window.removeEventListener("resize", handleResize);
+  }, []);
 
   useEffect(() => {
     if (!mixerActionPulse || typeof window === 'undefined') return;
@@ -2135,7 +2150,7 @@ const FlowRuntime: React.FC<FlowRuntimeProps> = ({ arrangeFocusToken }) => {
   const [isAIHubOpen, setIsAIHubOpen] = useState(false);
 
 
-  const { clips, setClips, selection, setSelection, clearSelection, ppsAPI, scrollX, setScrollX, moveClip, resizeClip, onSplitAt, setClipsSelect, duplicateClips, updateClipProperties } = useArrange({
+  const { clips, setClips, selection, setSelection, clearSelection, ppsAPI, scrollX, setScrollX, moveClip, resizeClip, onSplitAt, setClipsSelect, duplicateClips, updateClipProperties, undo, redo, canUndo, canRedo } = useArrange({
     clips: []
   });
 
@@ -3165,7 +3180,9 @@ const FlowRuntime: React.FC<FlowRuntimeProps> = ({ arrangeFocusToken }) => {
     }
   };
 
-  const handlePlayPause = useCallback(() => {
+  const handlePlayPause = useCallback(async () => {
+    const isTauri = typeof window !== 'undefined' && typeof (window as unknown as { __TAURI__?: unknown }).__TAURI__ !== 'undefined';
+    
     setIsPlaying((prevIsPlaying) => {
       const newIsPlaying = !prevIsPlaying;
       const ctx = audioContextRef.current;
@@ -3180,6 +3197,36 @@ const FlowRuntime: React.FC<FlowRuntimeProps> = ({ arrangeFocusToken }) => {
           });
         }
       }
+      
+      // Initialize and control Tauri Flow Engine
+      if (isTauri) {
+        const tauriInvoke = (window as unknown as { __TAURI__: { invoke: <T>(cmd: string, args?: unknown) => Promise<T> } }).__TAURI__.invoke;
+        
+        if (newIsPlaying) {
+          // Initialize engine if not already done, then start playback
+          tauriInvoke('initialize_flow_engine')
+            .then(() => {
+              console.log('✅ Flow Engine initialized');
+              return tauriInvoke('flow_play');
+            })
+            .then(() => {
+              console.log('▶️ Flow Engine: PLAY');
+            })
+            .catch((error) => {
+              console.warn('[FLOW] Failed to start engine:', error);
+            });
+        } else {
+          // Pause the engine
+          tauriInvoke('flow_pause')
+            .then(() => {
+              console.log('⏸️ Flow Engine: PAUSE');
+            })
+            .catch((error) => {
+              console.warn('[FLOW] Failed to pause engine:', error);
+            });
+        }
+      }
+      
       return newIsPlaying;
     });
   }, []);
@@ -4341,6 +4388,18 @@ const FlowRuntime: React.FC<FlowRuntimeProps> = ({ arrangeFocusToken }) => {
 
 
   const handleAddAutomationPoint = useCallback((trackId: string, fxId: string, paramName: string, point: AutomationPoint) => {
+    // Record history
+    import('./utils/history').then(({ recordHistory }) => {
+      recordHistory({
+        type: 'automation-point',
+        trackId,
+        parameter: `${fxId}:${paramName}`,
+        time: point.time,
+        oldValue: null,
+        newValue: point.value,
+      });
+    });
+    
     setAutomationData(prev => {
         const trackAutomation = prev[trackId] || {};
         const fxAutomation = trackAutomation[fxId] || {};
@@ -4360,12 +4419,29 @@ const FlowRuntime: React.FC<FlowRuntimeProps> = ({ arrangeFocusToken }) => {
   }, []);
   
   const handleUpdateAutomationPoint = useCallback((trackId: string, fxId: string, paramName: string, index: number, newPoint: AutomationPoint) => {
+    // Record history
     setAutomationData(prev => {
         const trackAutomation = prev[trackId];
         if (!trackAutomation) return prev;
         const fxAutomation = trackAutomation[fxId];
         if (!fxAutomation) return prev;
         const paramPoints = [...fxAutomation[paramName]];
+        const oldPoint = paramPoints[index];
+        
+        // Record history before update
+        if (oldPoint) {
+          import('./utils/history').then(({ recordHistory }) => {
+            recordHistory({
+              type: 'automation-point',
+              trackId,
+              parameter: `${fxId}:${paramName}`,
+              time: newPoint.time,
+              oldValue: oldPoint.value,
+              newValue: newPoint.value,
+            });
+          });
+        }
+        
         paramPoints[index] = newPoint;
         paramPoints.sort((a, b) => a.time - b.time); // Re-sort if time changed
         return { 
@@ -4382,19 +4458,37 @@ const FlowRuntime: React.FC<FlowRuntimeProps> = ({ arrangeFocusToken }) => {
   }, []);
   
   const handleDeleteAutomationPoint = useCallback((trackId: string, fxId: string, paramName: string, index: number) => {
+    // Record history
     setAutomationData(prev => {
         const trackAutomation = prev[trackId];
         if (!trackAutomation) return prev;
         const fxAutomation = trackAutomation[fxId];
         if (!fxAutomation) return prev;
-        const paramPoints = fxAutomation[paramName].filter((_, i) => i !== index);
+        const paramPoints = fxAutomation[paramName];
+        const deletedPoint = paramPoints[index];
+        
+        // Record history before deletion
+        if (deletedPoint) {
+          import('./utils/history').then(({ recordHistory }) => {
+            recordHistory({
+              type: 'automation-point',
+              trackId,
+              parameter: `${fxId}:${paramName}`,
+              time: deletedPoint.time,
+              oldValue: deletedPoint.value,
+              newValue: null,
+            });
+          });
+        }
+        
+        const filteredPoints = paramPoints.filter((_, i) => i !== index);
         return { 
           ...prev, 
           [trackId]: {
             ...trackAutomation,
             [fxId]: {
               ...fxAutomation,
-              [paramName]: paramPoints
+              [paramName]: filteredPoints
             }
           }
         };
@@ -6038,16 +6132,21 @@ const FlowRuntime: React.FC<FlowRuntimeProps> = ({ arrangeFocusToken }) => {
 
   const currentMasterProfile =
     masterNodesRef.current?.getProfile() ?? MASTERING_PROFILES.streaming;
+  const contentHeight = Math.max(420, viewportHeight - headerHeight);
 
   return (
-    <div className="relative w-screen h-screen text-ink flex flex-col overflow-hidden" style={backgroundGlowStyle}>
+    <div className="relative w-screen h-screen text-ink overflow-hidden" style={backgroundGlowStyle}>
         <div className="pointer-events-none absolute inset-0 bg-gradient-to-br from-[rgba(48,92,178,0.45)] via-[rgba(19,37,74,0.4)] to-transparent blur-[110px] opacity-80"></div>
         <Header
           primeBrainStatus={primeBrainStatus}
           hushFeedback={hushFeedback}
           isPlaying={isPlaying}
+          onHeightChange={setHeaderHeight}
         />
-        <main className="flex-grow relative" style={{ top: "80px" }}>
+        <main
+          className="absolute left-0 right-0 overflow-hidden"
+          style={{ top: headerHeight, bottom: 0 }}
+        >
           <ViewDeck
             viewMode={viewMode}
             className="h-full w-full"
@@ -6057,7 +6156,7 @@ const FlowRuntime: React.FC<FlowRuntimeProps> = ({ arrangeFocusToken }) => {
                 label: "Arrange View",
                 content: (
                   <ArrangeWindow
-                    height={typeof window !== "undefined" ? window.innerHeight - 80 : 760}
+                    height={contentHeight}
                     tracks={tracks}
                     clips={clips}
                     setClips={setClips}
@@ -6074,6 +6173,10 @@ const FlowRuntime: React.FC<FlowRuntimeProps> = ({ arrangeFocusToken }) => {
                     setSelection={setSelection}
                     clearSelection={clearSelection}
                     onSplitAt={onSplitAt}
+                    undo={undo}
+                    redo={redo}
+                    canUndo={canUndo}
+                    canRedo={canRedo}
                     selectedTrackId={selectedTrackId}
                     onSelectTrack={setSelectedTrackId}
                     armedTracks={armedTracks}

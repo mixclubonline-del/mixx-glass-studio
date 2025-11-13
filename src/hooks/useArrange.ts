@@ -2,6 +2,7 @@
 // src/hooks/useArrange.ts
 import { useCallback, useMemo, useRef, useState } from "react";
 import { GridUnit, quantizeSeconds } from "../utils/time";
+import { recordHistory, undoHistory, redoHistory, canUndo, canRedo, type HistoryOperation } from "../utils/history";
 
 export type ClipId = string;
 export type TrackId = string;
@@ -96,16 +97,42 @@ export function useArrange(initial: Partial<{ clips: (Omit<ArrangeClip, 'bufferI
   }, []);
 
   const moveClip = useCallback((id: ClipId, newStart: number, newTrackId: TrackId) => {
-    setClips(prev => prev.map(c => c.id === id ? { ...c, start: newStart, trackId: newTrackId } : c));
+    setClips(prev => {
+      const clip = prev.find(c => c.id === id);
+      if (!clip) return prev;
+      
+      // Record history before change
+      recordHistory({
+        type: 'clip-move',
+        clipIds: [id],
+        oldPositions: [{ id, start: clip.start, trackId: clip.trackId }],
+        newPositions: [{ id, start: newStart, trackId: newTrackId }],
+      });
+      
+      return prev.map(c => c.id === id ? { ...c, start: newStart, trackId: newTrackId } : c);
+    });
   }, [setClips]);
 
   const resizeClip = useCallback((id: ClipId, newStart: number, newDuration: number, newSourceStart?: number) => {
-    setClips(prev => prev.map(c => c.id === id ? {
-      ...c,
-      start: newStart,
-      duration: newDuration,
-      sourceStart: newSourceStart !== undefined ? newSourceStart : c.sourceStart // Update sourceStart if provided
-    } : c));
+    setClips(prev => {
+      const clip = prev.find(c => c.id === id);
+      if (!clip) return prev;
+      
+      // Record history before change
+      recordHistory({
+        type: 'clip-resize',
+        clipIds: [id],
+        oldDurations: [{ id, duration: clip.duration }],
+        newDurations: [{ id, duration: newDuration }],
+      });
+      
+      return prev.map(c => c.id === id ? {
+        ...c,
+        start: newStart,
+        duration: newDuration,
+        sourceStart: newSourceStart !== undefined ? newSourceStart : c.sourceStart
+      } : c);
+    });
   }, [setClips]);
 
   const updateClipProperties = useCallback((id: ClipId, props: Partial<ArrangeClip>) => {
@@ -145,31 +172,92 @@ export function useArrange(initial: Partial<{ clips: (Omit<ArrangeClip, 'bufferI
         .filter((anchor) => anchor >= splitPointInClip)
         .map((anchor) => anchor - splitPointInClip);
 
+      const firstId = `clip-${Date.now()}-a`;
+      const secondId = `clip-${Date.now()}-b`;
+
+      // Record history before change
+      recordHistory({
+        type: 'clip-split',
+        clipId,
+        splitTime,
+        newClipIds: [firstId, secondId],
+      });
+
       const firstPart: ArrangeClip = {
         ...clipToSplit,
-        id: `clip-${Date.now()}-a`, // New unique ID
+        id: firstId,
         duration: splitPointInClip,
-        selected: true, // Select both new halves
-        fadeOut: 0, // Reset fade on split edge
+        selected: true,
+        fadeOut: 0,
         warpAnchors: firstAnchors,
       };
       const secondPart: ArrangeClip = {
         ...clipToSplit,
-        id: `clip-${Date.now()}-b`, // New unique ID
+        id: secondId,
         start: splitTime,
         duration: clipToSplit.duration - splitPointInClip,
         sourceStart: clipToSplit.sourceStart + splitPointInClip,
-        selected: true, // Select both new halves
-        fadeIn: 0, // Reset fade on split edge
+        selected: true,
+        fadeIn: 0,
         warpAnchors: secondAnchors,
       };
       return [...prev.filter(c => c.id !== clipToSplit.id), firstPart, secondPart];
     });
   }, [setClips]);
 
-  const splitSelection = useCallback(() => {
-    console.warn("splitSelection not fully implemented without current time or specific clip context.");
-  }, []);
+  const splitSelection = useCallback((splitTime: number) => {
+    setClips(prev => {
+      const clipsToSplit = prev.filter(c => {
+        if (!c.selected) return false;
+        // Check if split time intersects with this clip
+        return splitTime > c.start && splitTime < c.start + c.duration;
+      });
+      
+      if (clipsToSplit.length === 0) return prev;
+      
+      const newClips: ArrangeClip[] = [];
+      const updatedClips = prev.map(clip => {
+        if (!clipsToSplit.some(c => c.id === clip.id)) {
+          return clip;
+        }
+        
+        const splitPointInClip = splitTime - clip.start;
+        if (splitPointInClip <= 0 || splitPointInClip >= clip.duration) {
+          return clip;
+        }
+        
+        const anchors = Array.isArray(clip.warpAnchors) ? clip.warpAnchors : [];
+        const firstAnchors = anchors.filter((anchor) => anchor < splitPointInClip);
+        const secondAnchors = anchors
+          .filter((anchor) => anchor >= splitPointInClip)
+          .map((anchor) => anchor - splitPointInClip);
+        
+        const firstPart: ArrangeClip = {
+          ...clip,
+          id: `${clip.id}-split-1`,
+          duration: splitPointInClip,
+          fadeOut: 0,
+          warpAnchors: firstAnchors,
+        };
+        
+        const secondPart: ArrangeClip = {
+          ...clip,
+          id: `${clip.id}-split-2`,
+          start: splitTime,
+          duration: clip.duration - splitPointInClip,
+          sourceStart: clip.sourceStart + splitPointInClip,
+          fadeIn: 0,
+          warpAnchors: secondAnchors,
+          selected: true, // Keep selection on second part
+        };
+        
+        newClips.push(secondPart);
+        return firstPart;
+      });
+      
+      return [...updatedClips, ...newClips];
+    });
+  }, [setClips]);
 
   const duplicateClips = useCallback((idsToDuplicate: ClipId[]) => {
     setClips(prev => {
@@ -208,6 +296,116 @@ export function useArrange(initial: Partial<{ clips: (Omit<ArrangeClip, 'bufferI
   }), [pixelsPerSecond, scrollX]);
 
 
+  // Undo/redo functions
+  const handleUndo = useCallback(() => {
+    const operation = undoHistory();
+    if (!operation) return;
+    
+    setClips(prev => {
+      switch (operation.type) {
+        case 'clip-move':
+          return prev.map(c => {
+            const oldPos = operation.oldPositions.find(p => p.id === c.id);
+            if (oldPos) {
+              return { ...c, start: oldPos.start, trackId: oldPos.trackId };
+            }
+            return c;
+          });
+        case 'clip-resize':
+          return prev.map(c => {
+            const oldDur = operation.oldDurations.find(d => d.id === c.id);
+            if (oldDur) {
+              return { ...c, duration: oldDur.duration };
+            }
+            return c;
+          });
+        case 'clip-split': {
+          // Merge split clips back together
+          const newClipIds = operation.newClipIds;
+          const clipsToMerge = prev.filter(c => newClipIds.includes(c.id));
+          if (clipsToMerge.length === 2) {
+            const [first, second] = clipsToMerge.sort((a, b) => a.start - b.start);
+            const merged: ArrangeClip = {
+              ...first,
+              id: operation.clipId,
+              duration: first.duration + second.duration,
+              fadeOut: first.fadeOut || second.fadeOut || 0,
+              fadeIn: 0,
+              warpAnchors: [...(first.warpAnchors || []), ...(second.warpAnchors || []).map(a => a + first.duration)],
+            };
+            return [...prev.filter(c => !newClipIds.includes(c.id)), merged];
+          }
+          return prev;
+        }
+        default:
+          return prev;
+      }
+    });
+  }, [setClips]);
+
+  const handleRedo = useCallback(() => {
+    const operation = redoHistory();
+    if (!operation) return;
+    
+    setClips(prev => {
+      switch (operation.type) {
+        case 'clip-move':
+          return prev.map(c => {
+            const newPos = operation.newPositions.find(p => p.id === c.id);
+            if (newPos) {
+              return { ...c, start: newPos.start, trackId: newPos.trackId };
+            }
+            return c;
+          });
+        case 'clip-resize':
+          return prev.map(c => {
+            const newDur = operation.newDurations.find(d => d.id === c.id);
+            if (newDur) {
+              return { ...c, duration: newDur.duration };
+            }
+            return c;
+          });
+        case 'clip-split': {
+          // Re-split the clip
+          const clipToSplit = prev.find(c => c.id === operation.clipId);
+          if (clipToSplit) {
+            const splitPointInClip = operation.splitTime - clipToSplit.start;
+            if (splitPointInClip > 0 && splitPointInClip < clipToSplit.duration) {
+              const anchors = Array.isArray(clipToSplit.warpAnchors) ? clipToSplit.warpAnchors : [];
+              const firstAnchors = anchors.filter((anchor) => anchor < splitPointInClip);
+              const secondAnchors = anchors
+                .filter((anchor) => anchor >= splitPointInClip)
+                .map((anchor) => anchor - splitPointInClip);
+              
+              const firstPart: ArrangeClip = {
+                ...clipToSplit,
+                id: operation.newClipIds[0],
+                duration: splitPointInClip,
+                selected: true,
+                fadeOut: 0,
+                warpAnchors: firstAnchors,
+              };
+              const secondPart: ArrangeClip = {
+                ...clipToSplit,
+                id: operation.newClipIds[1],
+                start: operation.splitTime,
+                duration: clipToSplit.duration - splitPointInClip,
+                sourceStart: clipToSplit.sourceStart + splitPointInClip,
+                selected: true,
+                fadeIn: 0,
+                warpAnchors: secondAnchors,
+              };
+              return [...prev.filter(c => c.id !== operation.clipId), firstPart, secondPart];
+            }
+          }
+          return prev;
+        }
+        default:
+          return prev;
+      }
+    });
+  }, [setClips]);
+
   return {
     clips,
     setClips,
@@ -219,10 +417,14 @@ export function useArrange(initial: Partial<{ clips: (Omit<ArrangeClip, 'bufferI
     setScrollX: setScrollXState,
     moveClip,
     resizeClip,
-    updateClipProperties, // Expose the new updater
-    onSplitAt, // FIX: Renamed splitAt to onSplitAt
+    updateClipProperties,
+    onSplitAt,
     splitSelection,
     setClipsSelect,
     duplicateClips,
+    undo: handleUndo,
+    redo: handleRedo,
+    canUndo: () => canUndo(),
+    canRedo: () => canRedo(),
   };
 }

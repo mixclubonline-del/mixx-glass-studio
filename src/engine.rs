@@ -1,5 +1,6 @@
 use cpal::traits::{DeviceTrait, HostTrait, StreamTrait};
 use cpal::{BufferSize, Sample, SampleFormat, SampleRate, Stream};
+use dasp_sample::FromSample;
 use crossbeam_queue::ArrayQueue;
 use log::{info, warn};
 use std::sync::atomic::{AtomicBool, AtomicU64, Ordering};
@@ -44,6 +45,12 @@ impl From<cpal::PauseStreamError> for EngineError {
     }
 }
 
+impl std::fmt::Display for EngineError {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(f, "{}", self.message)
+    }
+}
+
 #[repr(C)]
 #[derive(Debug, Clone, Copy)]
 pub struct EngineConfig {
@@ -84,6 +91,10 @@ pub struct EngineMetric {
 struct EngineState {
     engine: MixxEngine,
 }
+
+// Safety: cpal::Stream is Send-safe on macOS/Linux/Windows in cpal 0.15+
+// The streams are only accessed from the audio callback thread and main thread
+unsafe impl Send for EngineState {}
 
 struct MixxEngine {
     config: EngineConfig,
@@ -136,7 +147,10 @@ pub fn start_engine() -> Result<(), EngineError> {
     let state = guard
         .as_mut()
         .ok_or_else(|| EngineError::new("MixxEngine not initialized"))?;
+    
+    info!("MixxEngine: Starting audio streams...");
     state.engine.start()?;
+    info!("MixxEngine: Audio streams started successfully");
     Ok(())
 }
 
@@ -162,7 +176,14 @@ pub fn current_stats() -> Option<EngineStats> {
     let guard = ENGINE_STATE
         .lock()
         .expect("MixxEngine global mutex poisoned");
-    guard.as_ref().map(|state| state.engine.stats())
+    guard.as_ref().map(|state| {
+        let stats = state.engine.stats();
+        // Log if we're getting stats but they're all zeros (engine might not be running)
+        if stats.total_callbacks == 0 && stats.uptime_ms == 0 {
+            log::debug!("MixxEngine stats: engine state exists but no callbacks yet");
+        }
+        stats
+    })
 }
 
 pub fn pop_metric() -> Option<EngineMetric> {
@@ -272,7 +293,7 @@ impl MixxEngine {
     }
 
     fn pop_metric(&self) -> Option<EngineMetric> {
-        self.metrics_queue.pop().ok()
+        self.metrics_queue.pop()
     }
 
     fn configure_stream_config(
@@ -397,13 +418,15 @@ impl MixxEngine {
         metrics: &ArrayQueue<EngineMetric>,
     ) where
         T: Sample,
+        f32: FromSample<T>,
     {
         let start = Instant::now();
         let mut dropped = 0_u32;
         let frames = data.len() / channels;
 
         for sample in data.iter() {
-            let value = sample.to_f32();
+            // Convert sample to f32 using Sample trait
+            let value: f32 = f32::from_sample(*sample);
             if queue.push(value).is_err() {
                 dropped += 1;
             }
@@ -440,18 +463,25 @@ impl MixxEngine {
         metrics: &ArrayQueue<EngineMetric>,
     ) where
         T: Sample,
+        T: FromSample<f32>,
     {
         let start = Instant::now();
         let mut underruns = 0_u32;
         let frames = data.len() / channels;
+        
+        // Log first callback to confirm audio is working
+        let callback_count = stats.total_callbacks.load(Ordering::Relaxed);
+        if callback_count == 0 {
+            info!("MixxEngine: First output callback received ({} frames, {} channels)", frames, channels);
+        }
 
         for sample in data.iter_mut() {
             match queue.pop() {
-                Ok(value) => {
-                    *sample = T::from(&value);
+                Some(value) => {
+                    *sample = T::from_sample(value);
                 }
-                Err(_) => {
-                    *sample = T::from(&0.0);
+                None => {
+                    *sample = T::from_sample(0.0);
                     underruns += 1;
                 }
             }
@@ -490,7 +520,7 @@ impl MixxEngine {
         metrics: Arc<ArrayQueue<EngineMetric>>,
     ) -> Result<Stream, EngineError> {
         match format {
-            SampleFormat::F32 => device.build_input_stream(
+            SampleFormat::F32 => Ok(device.build_input_stream(
                 &config,
                 move |data: &[f32], _| {
                     Self::handle_input_callback(
@@ -503,8 +533,8 @@ impl MixxEngine {
                 },
                 handle_input_error,
                 None,
-            ),
-            SampleFormat::I16 => device.build_input_stream(
+            )?),
+            SampleFormat::I16 => Ok(device.build_input_stream(
                 &config,
                 move |data: &[i16], _| {
                     Self::handle_input_callback(
@@ -517,8 +547,8 @@ impl MixxEngine {
                 },
                 handle_input_error,
                 None,
-            ),
-            SampleFormat::U16 => device.build_input_stream(
+            )?),
+            SampleFormat::U16 => Ok(device.build_input_stream(
                 &config,
                 move |data: &[u16], _| {
                     Self::handle_input_callback(
@@ -531,7 +561,7 @@ impl MixxEngine {
                 },
                 handle_input_error,
                 None,
-            ),
+            )?),
             other => Err(EngineError::new(format!(
                 "Unsupported input sample format {other:?}"
             ))),
@@ -548,7 +578,7 @@ impl MixxEngine {
         metrics: Arc<ArrayQueue<EngineMetric>>,
     ) -> Result<Stream, EngineError> {
         match format {
-            SampleFormat::F32 => device.build_output_stream(
+            SampleFormat::F32 => Ok(device.build_output_stream(
                 &config,
                 move |data: &mut [f32], _| {
                     Self::handle_output_callback(
@@ -561,8 +591,8 @@ impl MixxEngine {
                 },
                 handle_output_error,
                 None,
-            ),
-            SampleFormat::I16 => device.build_output_stream(
+            )?),
+            SampleFormat::I16 => Ok(device.build_output_stream(
                 &config,
                 move |data: &mut [i16], _| {
                     Self::handle_output_callback(
@@ -575,8 +605,8 @@ impl MixxEngine {
                 },
                 handle_output_error,
                 None,
-            ),
-            SampleFormat::U16 => device.build_output_stream(
+            )?),
+            SampleFormat::U16 => Ok(device.build_output_stream(
                 &config,
                 move |data: &mut [u16], _| {
                     Self::handle_output_callback(
@@ -589,7 +619,7 @@ impl MixxEngine {
                 },
                 handle_output_error,
                 None,
-            ),
+            )?),
             other => Err(EngineError::new(format!(
                 "Unsupported output sample format {other:?}"
             ))),

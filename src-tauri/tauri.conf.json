@@ -1,11 +1,43 @@
 {
+  "productName": "Mixx Club Studio",
+  "version": "0.1.0",
+  "identifier": "com.mixxclub.studio",
   "build": {
     "beforeDevCommand": "npm run dev",
     "beforeBuildCommand": "npm run build",
-    "devUrl": "http://localhost:3002",
+    "devUrl": "http://localhost:3001",
     "frontendDist": "../dist"
   },
-  "productName": "Mixx Club Studio",
-  "version": "0.1.0",
-  "identifier": "com.mixxclub.studio"
+  "bundle": {
+    "macOS": {
+      "frameworks": [],
+      "minimumSystemVersion": "10.13",
+      "exceptionDomain": "",
+      "signingIdentity": null,
+      "providerShortName": null,
+      "entitlements": null
+    }
+  },
+  "app": {
+    "windows": [
+      {
+        "label": "main",
+        "title": "Mixx Club Studio",
+        "width": 1400,
+        "height": 900,
+        "minWidth": 800,
+        "minHeight": 600,
+        "resizable": true,
+        "fullscreen": false,
+        "visible": true,
+        "decorations": true,
+        "transparent": false,
+        "alwaysOnTop": false,
+        "skipTaskbar": false
+      }
+    ],
+    "security": {
+      "csp": null
+    }
+  }
 }

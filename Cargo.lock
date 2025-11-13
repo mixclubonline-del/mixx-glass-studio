@@ -564,6 +564,7 @@ dependencies = [
  "cpal",
  "crossbeam-channel",
  "crossbeam-queue",
+ "dasp_sample",
  "env_logger",
  "hound",
  "libc",
@@ -576,7 +577,6 @@ dependencies = [
  "rubato",
  "serde",
  "serde_json",
- "simd",
  "thiserror",
  "wide",
 ]
@@ -1013,12 +1013,6 @@ dependencies = [
  "paste",
  "wide",
 ]
-
-[[package]]
-name = "simd"
-version = "0.2.5"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "0e4d15397136bb64ab58a037f139f2d8bac3e5051aab31eaa109a57b1987429c"
 
 [[package]]
 name = "strength_reduce"

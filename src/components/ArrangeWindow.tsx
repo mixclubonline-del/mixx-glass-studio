@@ -19,6 +19,22 @@ import {
 } from "../types/tracks";
 import TimelineNavigator from "./timeline/TimelineNavigator";
 import { useFlowContext } from "../state/flowContextService";
+import { useTimelineInteractions } from "../hooks/useTimelineInteractions";
+import {
+  DEFAULT_TIMELINE_TOOL,
+  TimelineTool,
+  getToolFromShortcut,
+  useTimelineToolPalette,
+} from "../utils/timelineTools";
+import {
+  DEFAULT_SNAP_SETTINGS,
+  SnapCandidate,
+  SnapSettings,
+  applySnapIfEnabled,
+  buildSnapCandidates,
+  shouldSnap,
+} from "../utils/snapSystem";
+import { registerShortcut, unregisterShortcut } from "../utils/keyboardShortcuts";
 
 type DragKind = "move" | "resize-left" | "resize-right" | "fade-in" | "fade-out" | "gain";
 
@@ -34,7 +50,31 @@ type DragState = {
   hasDuplicated?: boolean;
   disableZeroCrossing?: boolean;
   fineAdjust?: boolean;
+  hasSurpassedThreshold?: boolean;
 };
+
+type BoxSelection = {
+  originClientX: number;
+  originClientY: number;
+  startSec: number;
+  endSec: number;
+  top: number;
+  bottom: number;
+};
+
+type ScrubState = {
+  isScrubbing: boolean;
+  originX: number;
+  originTime: number;
+};
+
+type WaveformDisplayMode = "peak" | "rms" | "normalized";
+
+interface WaveformOptions {
+  mode: WaveformDisplayMode;
+  heightMultiplier: number;
+  zoomLevel: number;
+}
 
 type Props = {
   height: number;
@@ -53,7 +93,11 @@ type Props = {
   selection: { start: number; end: number } | null;
   setSelection: (a: number, b: number) => void;
   clearSelection: () => void;
-  onSplitAt: (clipId: ClipId, sec: number) => void; 
+  onSplitAt: (clipId: ClipId, sec: number) => void;
+  undo?: () => void;
+  redo?: () => void;
+  canUndo?: () => boolean;
+  canRedo?: () => boolean;
   selectedTrackId: string | null;
   onSelectTrack: (trackId: string | null) => void;
   mixerSettings: { [key: string]: MixerSettings };
@@ -93,6 +137,7 @@ const TRACK_HEADER_WIDTH_MIN = 180;
 const TRACK_HEADER_WIDTH_MAX = 420;
 const clampNumber = (value: number, min: number, max: number) =>
   Math.max(min, Math.min(max, value));
+const CLICK_THRESHOLD_PX = 3;
 
 const applyAutomaticCrossfades = (clips: ClipModel[]) => {
   const byTrack = new Map<string, ClipModel[]>();
@@ -181,6 +226,10 @@ export const ArrangeWindow: React.FC<Props> = (props) => {
     setSelection,
     clearSelection,
     onSplitAt,
+    undo,
+    redo,
+    canUndo: canUndoCheck,
+    canRedo: canRedoCheck,
     selectedTrackId,
     onSelectTrack,
     mixerSettings,
@@ -218,6 +267,93 @@ export const ArrangeWindow: React.FC<Props> = (props) => {
   const [snapIndicator, setSnapIndicator] = useState<number | null>(null);
   const [resizing, setResizing] = useState<null | { trackId: string; startY: number; startHeight: number }>(null);
   const [resizingHeader, setResizingHeader] = useState<null | { startX: number; startWidth: number }>(null);
+  const [activeTool, setActiveTool] = useState<TimelineTool>(DEFAULT_TIMELINE_TOOL);
+  const toolPalette = useTimelineToolPalette({ activeTool });
+  const [snapSettings, setSnapSettings] = useState<SnapSettings>(DEFAULT_SNAP_SETTINGS);
+  const [snapCandidates, setSnapCandidates] = useState<SnapCandidate[]>([]);
+  const [boxSelection, setBoxSelection] = useState<BoxSelection | null>(null);
+  const [scrubState, setScrubState] = useState<ScrubState>({ isScrubbing: false, originX: 0, originTime: 0 });
+  const [waveformOptions, setWaveformOptions] = useState<WaveformOptions>({
+    mode: "peak",
+    heightMultiplier: 1,
+    zoomLevel: 1,
+  });
+  const [isViewportPanning, setViewportPanning] = useState(false);
+  const panOriginRef = useRef<{ x: number; scrollStart: number } | null>(null);
+  const followInterruptedRef = useRef(false);
+  const resumeFollowTimeoutRef = useRef<number | null>(null);
+  const spacePressedRef = useRef(false);
+  const shiftPressedRef = useRef(false);
+
+  useEffect(() => {
+    const handleKeyDown = (event: KeyboardEvent) => {
+      const target = event.target as HTMLElement | null;
+      const isEditable =
+        target &&
+        (target.isContentEditable ||
+          ["INPUT", "SELECT", "TEXTAREA"].includes(target.tagName) ||
+          target.getAttribute("role") === "textbox");
+      if (isEditable) return;
+
+      if (event.code === "Space") {
+        spacePressedRef.current = true;
+        event.preventDefault();
+      } else if (event.key === "Shift") {
+        shiftPressedRef.current = true;
+      }
+    };
+
+    const handleKeyUp = (event: KeyboardEvent) => {
+      if (event.code === "Space") {
+        spacePressedRef.current = false;
+        setViewportPanning(false);
+        panOriginRef.current = null;
+      } else if (event.key === "Shift") {
+        shiftPressedRef.current = false;
+      }
+    };
+
+    window.addEventListener("keydown", handleKeyDown, true);
+    window.addEventListener("keyup", handleKeyUp, true);
+    return () => {
+      window.removeEventListener("keydown", handleKeyDown, true);
+      window.removeEventListener("keyup", handleKeyUp, true);
+    };
+  }, []);
+
+  const {
+    smoothScrollTo,
+    zoomAroundPoint,
+    zoomToFit,
+    zoomToRange,
+    stopMomentum,
+    setPixelsPerSecondClamped,
+  } = useTimelineInteractions({
+    scrollX,
+    setScrollX,
+    getPixelsPerSecond: () => ppsAPI.value,
+    setPixelsPerSecond: (value) => ppsAPI.set(value),
+    contentWidth,
+    viewportRef: timelineViewportRef,
+    onManualScroll: () => {
+      followInterruptedRef.current = true;
+      onManualScroll?.();
+    },
+  });
+  const previousScrollRef = useRef(scrollX);
+
+  useEffect(() => {
+    if (previousScrollRef.current !== scrollX) {
+      recordSessionProbeTimelineEvent({
+        kind: "scroll",
+        scrollX,
+        pixelsPerSecond,
+        viewportWidth,
+        contentWidth,
+      });
+      previousScrollRef.current = scrollX;
+    }
+  }, [scrollX, pixelsPerSecond, viewportWidth, contentWidth]);
   const [trackHeaderWidth, setTrackHeaderWidth] = useState<number>(() => {
     if (typeof window === 'undefined') {
       return TRACK_HEADER_WIDTH_DEFAULT;
@@ -229,6 +365,47 @@ export const ArrangeWindow: React.FC<Props> = (props) => {
     }
     return clampNumber(parsed, TRACK_HEADER_WIDTH_MIN, TRACK_HEADER_WIDTH_MAX);
   });
+  const clipBoundaries = useMemo(() => {
+    const set = new Set<number>();
+    clips.forEach((clip) => {
+      set.add(clip.start);
+      set.add(clip.start + clip.duration);
+    });
+    return Array.from(set).sort((a, b) => a - b);
+  }, [clips]);
+
+  useEffect(() => {
+    if (!shouldSnap(snapSettings)) {
+      setSnapCandidates([]);
+      return;
+    }
+    const viewport = timelineViewportRef.current;
+    const viewportWidthPx = viewport?.clientWidth ?? 0;
+    const windowStart = Math.max(0, scrollX / pixelsPerSecond - 2);
+    const windowEnd = Math.max(windowStart + 4, (scrollX + viewportWidthPx) / pixelsPerSecond + 2);
+    const candidates = buildSnapCandidates(
+      {
+        bpm,
+        beatsPerBar,
+        pixelsPerSecond,
+        clipBoundaries,
+      },
+      snapSettings,
+      windowStart,
+      windowEnd
+    );
+    setSnapCandidates(candidates);
+  }, [bpm, beatsPerBar, clipBoundaries, pixelsPerSecond, scrollX, snapSettings]);
+
+  const snapContext = useMemo(
+    () => ({
+      bpm,
+      beatsPerBar,
+      pixelsPerSecond,
+      clipBoundaries,
+    }),
+    [bpm, beatsPerBar, clipBoundaries, pixelsPerSecond]
+  );
 
   useEffect(() => {
     const node = timelineViewportRef.current;
@@ -259,6 +436,157 @@ export const ArrangeWindow: React.FC<Props> = (props) => {
     (value: number) => quantizeSeconds(Math.max(0, value), bpm, beatsPerBar, "beats", adaptiveDivision),
     [adaptiveDivision, bpm, beatsPerBar]
   );
+
+  const handleClipSplit = useCallback(
+    (clipId: ClipId, splitTime: number) => {
+      onSplitAt(clipId, splitTime);
+    },
+    [onSplitAt]
+  );
+
+  const handleSetTool = useCallback((tool: TimelineTool) => {
+    setActiveTool(tool);
+  }, []);
+
+  const handleToggleSnap = useCallback(
+    (key: "enableGrid" | "enableClips" | "enableMarkers" | "enableZeroCrossings") => {
+      setSnapSettings((prev) => ({ ...prev, [key]: !prev[key] }));
+    },
+    []
+  );
+
+  const handleCycleWaveformMode = useCallback(() => {
+    setWaveformOptions((prev) => {
+      const nextMode = prev.mode === "peak" ? "rms" : prev.mode === "rms" ? "normalized" : "peak";
+      return { ...prev, mode: nextMode };
+    });
+  }, []);
+
+  const handleAdjustWaveformHeight = useCallback((delta: number) => {
+    setWaveformOptions((prev) => ({
+      ...prev,
+      heightMultiplier: clampNumber(prev.heightMultiplier + delta, 0.5, 3),
+    }));
+  }, []);
+
+  const handleAdjustWaveformZoom = useCallback((delta: number) => {
+    setWaveformOptions((prev) => ({
+      ...prev,
+      zoomLevel: clampNumber(prev.zoomLevel + delta, 0.2, 3.5),
+    }));
+  }, []);
+
+  const handleZoomIn = useCallback(() => {
+    const viewport = timelineViewportRef.current;
+    const anchorX = viewport ? viewport.clientWidth / 2 : 0;
+    zoomAroundPoint(1.15, anchorX);
+  }, [zoomAroundPoint]);
+
+  const handleZoomOut = useCallback(() => {
+    const viewport = timelineViewportRef.current;
+    const anchorX = viewport ? viewport.clientWidth / 2 : 0;
+    zoomAroundPoint(1 / 1.15, anchorX);
+  }, [zoomAroundPoint]);
+
+  const handleZoomFit = useCallback(() => {
+    zoomToFit(Math.max(projectDuration, 1));
+  }, [projectDuration, zoomToFit]);
+
+  const handleZoomSelection = useCallback(() => {
+    if (!selection) return;
+    const start = Math.min(selection.start, selection.end);
+    const end = Math.max(selection.start, selection.end);
+    if (end - start <= 0.01) return;
+    zoomToRange(start, end);
+  }, [selection, zoomToRange]);
+
+  useEffect(() => {
+    const handlers: string[] = [];
+    const isEditableTarget = (event: KeyboardEvent) => {
+      const target = event.target as HTMLElement | null;
+      if (!target) return false;
+      return (
+        target.isContentEditable ||
+        ["INPUT", "TEXTAREA", "SELECT"].includes(target.tagName) ||
+        target.getAttribute("role") === "textbox"
+      );
+    };
+
+    const addShortcut = (
+      id: string,
+      config: Parameters<typeof registerShortcut>[1],
+      handler: (event: KeyboardEvent) => void
+    ) => {
+      registerShortcut(id, config, (event) => {
+        if (isEditableTarget(event)) return;
+        handler(event);
+      });
+      handlers.push(id);
+    };
+
+    addShortcut("timeline-tool-select", { key: "1" }, () => handleSetTool("select"));
+    addShortcut("timeline-tool-move", { key: "2" }, () => handleSetTool("move"));
+    addShortcut("timeline-tool-trim", { key: "3" }, () => handleSetTool("trim"));
+    addShortcut("timeline-tool-split", { key: "4" }, () => handleSetTool("split"));
+    addShortcut("timeline-snap-grid", { key: "g" }, () => handleToggleSnap("enableGrid"));
+    addShortcut("timeline-snap-clips", { key: "s" }, () => handleToggleSnap("enableClips"));
+    addShortcut("timeline-snap-markers", { key: "m" }, () => handleToggleSnap("enableMarkers"));
+    addShortcut("timeline-snap-zero", { key: "z" }, () => handleToggleSnap("enableZeroCrossings"));
+    addShortcut("timeline-zoom-in-meta", { meta: true, key: "=" }, () => handleZoomIn());
+    addShortcut("timeline-zoom-in-ctrl", { ctrl: true, key: "=" }, () => handleZoomIn());
+    addShortcut("timeline-zoom-out-meta", { meta: true, key: "-" }, () => handleZoomOut());
+    addShortcut("timeline-zoom-out-ctrl", { ctrl: true, key: "-" }, () => handleZoomOut());
+    addShortcut("timeline-zoom-fit-meta", { meta: true, key: "0" }, () => handleZoomFit());
+    addShortcut("timeline-zoom-fit-ctrl", { ctrl: true, key: "0" }, () => handleZoomFit());
+    addShortcut(
+      "timeline-zoom-selection-meta",
+      { meta: true, shift: true, key: "z" },
+      () => handleZoomSelection()
+    );
+    addShortcut(
+      "timeline-undo-meta",
+      { meta: true, key: "z" },
+      () => {
+        if (undo && canUndoCheck?.()) undo();
+      }
+    );
+    addShortcut(
+      "timeline-undo-ctrl",
+      { ctrl: true, key: "z" },
+      () => {
+        if (undo && canUndoCheck?.()) undo();
+      }
+    );
+    addShortcut(
+      "timeline-redo-meta",
+      { meta: true, shift: true, key: "z" },
+      () => {
+        if (redo && canRedoCheck?.()) redo();
+      }
+    );
+    addShortcut(
+      "timeline-redo-ctrl",
+      { ctrl: true, key: "y" },
+      () => {
+        if (redo && canRedoCheck?.()) redo();
+      }
+    );
+
+    return () => {
+      handlers.forEach((id) => unregisterShortcut(id));
+    };
+  }, [
+    canRedoCheck,
+    canUndoCheck,
+    handleSetTool,
+    handleToggleSnap,
+    handleZoomFit,
+    handleZoomIn,
+    handleZoomOut,
+    handleZoomSelection,
+    redo,
+    undo,
+  ]);
 
   const laneLayouts = useMemo(() => {
     let top = 0;
@@ -520,285 +848,446 @@ export const ArrangeWindow: React.FC<Props> = (props) => {
     [audioBuffers]
   );
 
-  const onWheel = useCallback((e: React.WheelEvent) => {
-    if (e.ctrlKey || e.metaKey) {
-        e.preventDefault();
-        const rect = timelineViewportRef.current!.getBoundingClientRect();
-        const mouseX = e.clientX - rect.left;
-        const anchorSec = (scrollX + mouseX) / pixelsPerSecond;
-        const factor = e.deltaY < 0 ? 1.1 : 1 / 1.1;
-        ppsAPI.zoomBy(factor, anchorSec);
-    } else {
-      const delta = e.deltaY !== 0 ? e.deltaY : e.deltaX;
-      if (delta !== 0) {
+  const onBgMouseDown = useCallback(
+    (e: React.MouseEvent) => {
+      const viewport = timelineViewportRef.current;
+      if (!viewport) return;
+
+      if (e.button === 1 || (e.button === 0 && spacePressedRef.current)) {
+        stopMomentum();
+        setViewportPanning(true);
+        panOriginRef.current = { x: e.clientX, scrollStart: scrollX };
+        followInterruptedRef.current = true;
         onManualScroll?.();
-        const nextScroll = Math.max(0, scrollX + delta);
-        setScrollX(nextScroll);
-        if (viewportWidth > 0) {
-          recordSessionProbeTimelineEvent({
-            kind: "scroll",
-            scrollX: nextScroll,
-            pixelsPerSecond,
-            viewportWidth,
-            contentWidth,
-          });
-        }
+        return;
       }
-    }
-  }, [scrollX, pixelsPerSecond, ppsAPI, setScrollX, onManualScroll, viewportWidth, contentWidth]);
 
-  const onBgMouseDown = useCallback((e: React.MouseEvent) => {
-    if (e.button !== 0) return;
-    onManualScroll?.();
-    clearSelection();
-    const rect = timelineViewportRef.current!.getBoundingClientRect();
-    const xPx = e.clientX - rect.left + scrollX;
-    const startSec = xPx / pixelsPerSecond;
-    setDraggingSelection({ startSec });
-    setSelection(startSec, startSec);
-    // FIX: Ensure 'selected' property is explicitly set to boolean false for all clips.
-    setClips(prev => prev.map(c => ({...c, selected: false})));
-    onSelectTrack(null);
-  }, [scrollX, pixelsPerSecond, setSelection, setClips, onSelectTrack, clearSelection, onManualScroll]);
+      if (e.button !== 0) return;
+
+      onManualScroll?.();
+      followInterruptedRef.current = true;
+      const rect = viewport.getBoundingClientRect();
+      const xPx = e.clientX - rect.left + scrollX;
+      const yPx = e.clientY - rect.top - RULER_H;
+      const startSec = xPx / pixelsPerSecond;
+
+      if (!shiftPressedRef.current) {
+        clearSelection();
+        setClips((prev) => prev.map((clip) => ({ ...clip, selected: false })));
+        onSelectTrack(null);
+      }
+
+      setDraggingSelection({ startSec });
+      setSelection(startSec, startSec);
+      setBoxSelection({
+        originClientX: e.clientX,
+        originClientY: e.clientY,
+        startSec,
+        endSec: startSec,
+        top: yPx,
+        bottom: yPx,
+      });
+      setSnapIndicator(null);
+    },
+    [
+      clearSelection,
+      onManualScroll,
+      onSelectTrack,
+      pixelsPerSecond,
+      scrollX,
+      setClips,
+      setSelection,
+      stopMomentum,
+    ]
+  );
   
-  const onMouseMove = useCallback((e: React.MouseEvent) => {
-    const rect = timelineViewportRef.current?.getBoundingClientRect();
-    if (!rect) return;
+  const onMouseMove = useCallback(
+    (e: React.MouseEvent) => {
+      const rect = timelineViewportRef.current?.getBoundingClientRect();
+      if (!rect) return;
 
-    if (resizingHeader) {
-      const deltaX = e.clientX - resizingHeader.startX;
-      const nextWidth = clampNumber(
-        resizingHeader.startWidth + deltaX,
-        TRACK_HEADER_WIDTH_MIN,
-        TRACK_HEADER_WIDTH_MAX
-      );
-      setTrackHeaderWidth(nextWidth);
-      return;
-    }
+      if (resizingHeader) {
+        const deltaX = e.clientX - resizingHeader.startX;
+        const nextWidth = clampNumber(
+          resizingHeader.startWidth + deltaX,
+          TRACK_HEADER_WIDTH_MIN,
+          TRACK_HEADER_WIDTH_MAX
+        );
+        setTrackHeaderWidth(nextWidth);
+        return;
+      }
 
-    if (resizing) {
-      const deltaY = e.clientY - resizing.startY;
-      onResizeTrack(resizing.trackId, resizing.startHeight + deltaY);
-      return;
-    }
+      if (resizing) {
+        const deltaY = e.clientY - resizing.startY;
+        onResizeTrack(resizing.trackId, resizing.startHeight + deltaY);
+        return;
+      }
 
-    if (drag) {
-      if (drag.duplicate && !drag.hasDuplicated) {
-        const duplicates = drag.originalClips.map((clip) => {
-          const newId = `clip-${Date.now()}-${Math.random().toString(36).slice(2, 9)}`;
-          return { ...clip, id: newId, selected: true };
-        });
-        const newIds = duplicates.map((clip) => clip.id);
-        if (newIds.length) {
-          setClips((prev) => {
-            const base = prev.map((clip) =>
-              drag.clipIds.includes(clip.id) ? { ...clip, selected: false } : clip
-            );
-            return [...base, ...duplicates];
-          });
-          setDrag((prev) =>
-            prev
-              ? {
-                  ...prev,
-                  clipIds: newIds,
-                  originalClips: duplicates.map((clip) => ({ ...clip })),
-                  hasDuplicated: true,
-                }
-              : prev
-          );
-          setSnapIndicator(duplicates[0].start);
+      if (isViewportPanning && panOriginRef.current) {
+        followInterruptedRef.current = true;
+        const viewportWidthPx = viewportWidth;
+        const maxScroll = Math.max(0, contentWidth - viewportWidthPx);
+        const deltaX = panOriginRef.current.x - e.clientX;
+        const nextScroll = clampNumber(panOriginRef.current.scrollStart + deltaX, 0, maxScroll);
+        setScrollX(nextScroll);
+        return;
+      }
+
+      if (scrubState.isScrubbing) {
+        const viewport = timelineViewportRef.current;
+        if (viewport) {
+          const bounds = viewport.getBoundingClientRect();
+          const xPx = e.clientX - bounds.left + scrollX;
+          let sec = Math.max(0, xPx / pixelsPerSecond);
+          if (!e.altKey && shouldSnap(snapSettings)) {
+            const result = applySnapIfEnabled(sec, snapContext, snapSettings, snapCandidates);
+            sec = result.time;
+          } else {
+            sec = snapToGrid(sec);
+          }
+          onSeek(sec);
         }
         return;
       }
 
-      const dxPx = e.clientX - drag.startX;
-      const dy = e.clientY - drag.startY;
-      const dxSec = dxPx / pixelsPerSecond;
-      const rippleActive = drag.ripple || e.altKey;
-      const originalMap = new Map(drag.originalClips.map((clip) => [clip.id, clip]));
-      const selectionSet = new Set(drag.clipIds);
-      const primaryOriginal = originalMap.get(drag.primaryId);
-      if (!primaryOriginal) return;
+      if (boxSelection) {
+        const xPx = e.clientX - rect.left + scrollX;
+        const currentSec = xPx / pixelsPerSecond;
+        const yPx = e.clientY - rect.top - RULER_H;
+        const topPx = Math.min(boxSelection.originClientY, e.clientY) - rect.top - RULER_H;
+        const bottomPx = Math.max(boxSelection.originClientY, e.clientY) - rect.top - RULER_H;
+        const minSec = Math.min(boxSelection.startSec, currentSec);
+        const maxSec = Math.max(boxSelection.startSec, currentSec);
 
-      let snapValue: number | null = null;
+        setSelection(minSec, maxSec);
+        setBoxSelection({
+          ...boxSelection,
+          endSec: currentSec,
+          top: topPx,
+          bottom: bottomPx,
+        });
 
-      if (drag.kind === "move") {
-        const hoveredY = e.clientY - rect.top - RULER_H;
-        let targetTrackId = primaryOriginal.trackId;
-        for (const layout of laneLayouts) {
-          if (hoveredY >= layout.top && hoveredY < layout.top + layout.laneHeight) {
-            targetTrackId = layout.track.id;
-            break;
+        const selectedIds = new Set<ClipId>();
+        clips.forEach((clip) => {
+          const layout = trackLaneLookup.get(clip.trackId);
+          if (!layout) return;
+          const clipTop = layout.top;
+          const clipBottom = layout.top + layout.clipHeight;
+          if (clipBottom < Math.min(topPx, bottomPx) || clipTop > Math.max(topPx, bottomPx)) {
+            return;
+          }
+          const clipStart = clip.start;
+          const clipEnd = clip.start + clip.duration;
+          if (clipEnd >= minSec && clipStart <= maxSec) {
+            selectedIds.add(clip.id);
+          }
+        });
+
+        setClips((prev) =>
+          prev.map((clip) => {
+            const alreadySelected = clip.selected;
+            const shouldSelect = selectedIds.has(clip.id) || (shiftPressedRef.current && alreadySelected);
+            if (shouldSelect === alreadySelected) {
+              return clip;
+            }
+            return { ...clip, selected: shouldSelect };
+          })
+        );
+        return;
+      }
+
+      if (drag) {
+        const dxPx = e.clientX - drag.startX;
+        const dy = e.clientY - drag.startY;
+        if (!drag.hasSurpassedThreshold) {
+          if (Math.abs(dxPx) > CLICK_THRESHOLD_PX || Math.abs(dy) > CLICK_THRESHOLD_PX) {
+            setDrag((prev) => (prev ? { ...prev, hasSurpassedThreshold: true } : prev));
+          } else {
+            return;
           }
         }
 
-        const snappedPrimary = snapToGrid(primaryOriginal.start + dxSec);
-        const deltaSec = snappedPrimary - primaryOriginal.start;
-        snapValue = snappedPrimary;
-
-        if (Math.abs(deltaSec) < 1e-6 && !rippleActive) {
-          setSnapIndicator(snapValue);
+        if (drag.duplicate && !drag.hasDuplicated) {
+          const duplicates = drag.originalClips.map((clip) => {
+            const newId = `clip-${Date.now()}-${Math.random().toString(36).slice(2, 9)}`;
+            return { ...clip, id: newId, selected: true };
+          });
+          const newIds = duplicates.map((clip) => clip.id);
+          if (newIds.length) {
+            setClips((prev) => {
+              const base = prev.map((clip) =>
+                drag.clipIds.includes(clip.id) ? { ...clip, selected: false } : clip
+              );
+              return [...base, ...duplicates];
+            });
+            setDrag((prev) =>
+              prev
+                ? {
+                    ...prev,
+                    clipIds: newIds,
+                    originalClips: duplicates.map((clip) => ({ ...clip })),
+                    hasDuplicated: true,
+                  }
+                : prev
+            );
+            setSnapIndicator(duplicates[0].start);
+          }
           return;
         }
 
-        const ripplePlan = new Map<string, { delta: number; selectionEnd: number }>();
-        drag.originalClips.forEach((clip) => {
-          const assignedTrackId = clip.id === drag.primaryId ? targetTrackId : clip.trackId;
-          const clipEnd = clip.start + clip.duration;
-          const existing = ripplePlan.get(assignedTrackId);
-          if (existing) {
-            existing.selectionEnd = Math.max(existing.selectionEnd, clipEnd);
-            existing.delta = deltaSec;
-          } else {
-            ripplePlan.set(assignedTrackId, { delta: deltaSec, selectionEnd: clipEnd });
-          }
-        });
+        const constrainVerticalMovement = shiftPressedRef.current;
+        const dxSec = dxPx / pixelsPerSecond;
+        const rippleActive = drag.ripple || e.altKey;
+        const altDisableSnap = e.altKey;
+        const originalMap = new Map(drag.originalClips.map((clip) => [clip.id, clip]));
+        const selectionSet = new Set(drag.clipIds);
+        const primaryOriginal = originalMap.get(drag.primaryId);
+        if (!primaryOriginal) return;
 
-        setClips((prev) => {
-          let next = prev.map((clip) => {
-            if (!selectionSet.has(clip.id)) return clip;
-            const reference = originalMap.get(clip.id)!;
-            const assignedTrackId = reference.id === drag.primaryId ? targetTrackId : reference.trackId;
-            const newStart = Math.max(0, reference.start + deltaSec);
-            if (
-              Math.abs(clip.start - newStart) < 1e-6 &&
-              clip.trackId === assignedTrackId
-            ) {
-              return clip;
+        let snapValue: number | null = null;
+
+        if (drag.kind === "move") {
+          const hoveredY = constrainVerticalMovement
+            ? drag.startY - rect.top - RULER_H
+            : e.clientY - rect.top - RULER_H;
+          let targetTrackId = primaryOriginal.trackId;
+          if (!constrainVerticalMovement) {
+            for (const layout of laneLayouts) {
+              if (hoveredY >= layout.top && hoveredY < layout.top + layout.laneHeight) {
+                targetTrackId = layout.track.id;
+                break;
+              }
             }
-            return {
-              ...clip,
-              start: newStart,
-              trackId: assignedTrackId,
-            };
+          }
+
+          const desiredStart = primaryOriginal.start + dxSec;
+          let snappedPrimary = desiredStart;
+          if (!altDisableSnap && shouldSnap(snapSettings)) {
+            const result = applySnapIfEnabled(desiredStart, snapContext, snapSettings, snapCandidates);
+            snappedPrimary = result.time;
+            if (result.snappedTo) {
+              snapValue = result.snappedTo.time;
+            }
+          } else {
+            snappedPrimary = snapToGrid(desiredStart);
+            snapValue = snappedPrimary;
+          }
+
+          const deltaSec = snappedPrimary - primaryOriginal.start;
+
+        if (Math.abs(deltaSec) < 1e-6 && !rippleActive) {
+            setSnapIndicator(snapValue);
+            return;
+          }
+
+          const ripplePlan = new Map<string, { delta: number; selectionEnd: number }>();
+          drag.originalClips.forEach((clip) => {
+            const assignedTrackId = clip.id === drag.primaryId ? targetTrackId : clip.trackId;
+            const clipEnd = clip.start + clip.duration;
+            const existing = ripplePlan.get(assignedTrackId);
+            if (existing) {
+              existing.selectionEnd = Math.max(existing.selectionEnd, clipEnd);
+              existing.delta = deltaSec;
+            } else {
+              ripplePlan.set(assignedTrackId, { delta: deltaSec, selectionEnd: clipEnd });
+            }
           });
 
-          if (rippleActive && Math.abs(deltaSec) > 1e-6) {
-            next = next.map((clip) => {
-              if (selectionSet.has(clip.id)) return clip;
-              const plan = ripplePlan.get(clip.trackId);
-              if (!plan) return clip;
-              if (clip.start >= plan.selectionEnd - 1e-6) {
-                const shifted = Math.max(0, clip.start + plan.delta);
-                if (Math.abs(shifted - clip.start) > 1e-6) {
-                  return { ...clip, start: shifted };
-                }
+          setClips((prev) => {
+            let next = prev.map((clip) => {
+              if (!selectionSet.has(clip.id)) return clip;
+              const reference = originalMap.get(clip.id)!;
+              const assignedTrackId = reference.id === drag.primaryId ? targetTrackId : reference.trackId;
+              const newStart = Math.max(0, reference.start + deltaSec);
+              if (
+                Math.abs(clip.start - newStart) < 1e-6 &&
+                clip.trackId === assignedTrackId
+              ) {
+                return clip;
               }
-              return clip;
+              return {
+                ...clip,
+                start: newStart,
+                trackId: assignedTrackId,
+              };
             });
-          }
 
-          return next;
-        });
-      } else if (drag.kind === "resize-left") {
-        const reference = primaryOriginal;
-        const newStart = snapToGrid(reference.start + dxSec);
-        const originalEnd = reference.start + reference.duration;
-        const newDuration = originalEnd - newStart;
-        const startChange = newStart - reference.start;
-        const newSourceStart = (reference.sourceStart ?? 0) + startChange;
-        if (newDuration > 0.05 && newSourceStart >= 0) {
-          let finalStart = newStart;
+            if (rippleActive && Math.abs(deltaSec) > 1e-6) {
+              next = next.map((clip) => {
+                if (selectionSet.has(clip.id)) return clip;
+                const plan = ripplePlan.get(clip.trackId);
+                if (!plan) return clip;
+                if (clip.start >= plan.selectionEnd - 1e-6) {
+                  const shifted = Math.max(0, clip.start + plan.delta);
+                  if (Math.abs(shifted - clip.start) > 1e-6) {
+                    return { ...clip, start: shifted };
+                  }
+                }
+                return clip;
+              });
+            }
+
+            return next;
+          });
+        } else if (drag.kind === "resize-left") {
+          const reference = primaryOriginal;
+          const desiredStart = reference.start + dxSec;
+          let newStart = desiredStart;
+          if (!altDisableSnap && shouldSnap(snapSettings)) {
+            const result = applySnapIfEnabled(desiredStart, snapContext, snapSettings, snapCandidates);
+            newStart = result.time;
+            if (result.snappedTo) {
+              snapValue = result.snappedTo.time;
+            }
+          } else {
+            newStart = snapToGrid(desiredStart);
+            snapValue = newStart;
+          }
+          const originalEnd = reference.start + reference.duration;
+          const newDuration = originalEnd - newStart;
+          const startChange = newStart - reference.start;
+          const newSourceStart = (reference.sourceStart ?? 0) + startChange;
+          if (newDuration > 0.05 && newSourceStart >= 0) {
+            let finalStart = newStart;
+            setClips((prev) =>
+              prev.map((clip) => {
+                if (clip.id !== drag.primaryId) return clip;
+                let candidate = {
+                  start: newStart,
+                  duration: newDuration,
+                  sourceStart: newSourceStart,
+                };
+                let zeroStart = false;
+                if (!(drag.disableZeroCrossing || e.shiftKey)) {
+                  const snapped = snapStartToZeroCrossing(clip, candidate);
+                  candidate = {
+                    start: snapped.start,
+                    duration: snapped.duration,
+                    sourceStart: snapped.sourceStart,
+                  };
+                  zeroStart = Boolean(snapped.zeroStart);
+                }
+                finalStart = candidate.start;
+                return {
+                  ...clip,
+                  ...candidate,
+                  zeroStart,
+                  zeroEnd: clip.zeroEnd ?? false,
+                };
+              })
+            );
+            snapValue = finalStart;
+          }
+        } else if (drag.kind === "resize-right") {
+          const reference = primaryOriginal;
+          const desiredEnd = reference.start + reference.duration + dxSec;
+          let newEnd = desiredEnd;
+          if (!altDisableSnap && shouldSnap(snapSettings)) {
+            const result = applySnapIfEnabled(desiredEnd, snapContext, snapSettings, snapCandidates);
+            newEnd = result.time;
+            if (result.snappedTo) {
+              snapValue = result.snappedTo.time;
+            }
+          } else {
+            newEnd = snapToGrid(desiredEnd);
+            snapValue = newEnd;
+          }
+          const newDuration = Math.max(0.05, newEnd - reference.start);
+          let finalEnd = reference.start + newDuration;
           setClips((prev) =>
             prev.map((clip) => {
               if (clip.id !== drag.primaryId) return clip;
               let candidate = {
-                start: newStart,
+                start: clip.start,
                 duration: newDuration,
-                sourceStart: newSourceStart,
+                sourceStart: clip.sourceStart ?? 0,
               };
-              let zeroStart = false;
+              let zeroEnd = false;
               if (!(drag.disableZeroCrossing || e.shiftKey)) {
-                const snapped = snapStartToZeroCrossing(clip, candidate);
+                const snapped = snapEndToZeroCrossing(clip, candidate);
                 candidate = {
-                  start: snapped.start,
+                  ...candidate,
                   duration: snapped.duration,
-                  sourceStart: snapped.sourceStart,
                 };
-                zeroStart = Boolean(snapped.zeroStart);
+                zeroEnd = Boolean(snapped.zeroEnd);
               }
-              finalStart = candidate.start;
+              finalEnd = candidate.start + candidate.duration;
               return {
                 ...clip,
-                ...candidate,
-                zeroStart,
-                zeroEnd: clip.zeroEnd ?? false,
+                duration: candidate.duration,
+                zeroEnd,
+                zeroStart: clip.zeroStart ?? false,
               };
             })
           );
-          snapValue = finalStart;
+          snapValue = finalEnd;
+        } else if (drag.kind === "fade-in") {
+          snapValue = null;
+          const currentClip = clips.find((clip) => clip.id === drag.primaryId) ?? primaryOriginal;
+          const newFadeIn = Math.max(
+            0,
+            Math.min(currentClip.duration / 2, (currentClip.fadeIn ?? 0) + dxSec)
+          );
+          onUpdateClipProperties(currentClip.id, { fadeIn: newFadeIn });
+        } else if (drag.kind === "fade-out") {
+          snapValue = null;
+          const currentClip = clips.find((clip) => clip.id === drag.primaryId) ?? primaryOriginal;
+          const newFadeOut = Math.max(
+            0,
+            Math.min(currentClip.duration / 2, (currentClip.fadeOut ?? 0) - dxSec)
+          );
+          onUpdateClipProperties(currentClip.id, { fadeOut: newFadeOut });
+        } else if (drag.kind === "gain") {
+          snapValue = null;
+          const currentClip = clips.find((clip) => clip.id === drag.primaryId) ?? primaryOriginal;
+          const sensitivity = drag.fineAdjust || e.ctrlKey ? 0.002 : 0.01;
+          const newGain = Math.max(
+            0,
+            Math.min(2.0, (currentClip.gain ?? 1.0) - dy * sensitivity)
+          );
+          onUpdateClipProperties(currentClip.id, { gain: newGain });
         }
-      } else if (drag.kind === "resize-right") {
-        const reference = primaryOriginal;
-        const newEnd = snapToGrid(reference.start + reference.duration + dxSec);
-        const newDuration = Math.max(0.05, newEnd - reference.start);
-        let finalEnd = reference.start + newDuration;
-        setClips((prev) =>
-          prev.map((clip) => {
-            if (clip.id !== drag.primaryId) return clip;
-            let candidate = {
-              start: clip.start,
-              duration: newDuration,
-              sourceStart: clip.sourceStart ?? 0,
-            };
-            let zeroEnd = false;
-            if (!(drag.disableZeroCrossing || e.shiftKey)) {
-              const snapped = snapEndToZeroCrossing(clip, candidate);
-              candidate = {
-                ...candidate,
-                duration: snapped.duration,
-              };
-              zeroEnd = Boolean(snapped.zeroEnd);
-            }
-            finalEnd = candidate.start + candidate.duration;
-            return {
-              ...clip,
-              duration: candidate.duration,
-              zeroEnd,
-              zeroStart: clip.zeroStart ?? false,
-            };
-          })
-        );
-        snapValue = finalEnd;
-      } else if (drag.kind === "fade-in") {
-        snapValue = null;
-        const currentClip = clips.find((clip) => clip.id === drag.primaryId) ?? primaryOriginal;
-        const newFadeIn = Math.max(
-          0,
-          Math.min(currentClip.duration / 2, (currentClip.fadeIn ?? 0) + dxSec)
-        );
-        onUpdateClipProperties(currentClip.id, { fadeIn: newFadeIn });
-      } else if (drag.kind === "fade-out") {
-        snapValue = null;
-        const currentClip = clips.find((clip) => clip.id === drag.primaryId) ?? primaryOriginal;
-        const newFadeOut = Math.max(
-          0,
-          Math.min(currentClip.duration / 2, (currentClip.fadeOut ?? 0) - dxSec)
-        );
-        onUpdateClipProperties(currentClip.id, { fadeOut: newFadeOut });
-      } else if (drag.kind === "gain") {
-        snapValue = null;
-        const currentClip = clips.find((clip) => clip.id === drag.primaryId) ?? primaryOriginal;
-        const sensitivity = drag.fineAdjust || e.ctrlKey ? 0.002 : 0.01;
-        const newGain = Math.max(
-          0,
-          Math.min(2.0, (currentClip.gain ?? 1.0) - dy * sensitivity)
-        );
-        onUpdateClipProperties(currentClip.id, { gain: newGain });
+
+        setSnapIndicator(snapValue);
+        return;
       }
 
-      setSnapIndicator(snapValue);
-      return;
-    }
-
-    if (draggingSelection) {
-      const xPx = e.clientX - rect.left + scrollX;
-      const endSec = xPx / pixelsPerSecond;
-      setSelection(draggingSelection.startSec, endSec);
-    } else if (!drag) {
-      setSnapIndicator(null);
-    }
-  }, [drag, pixelsPerSecond, laneLayouts, snapToGrid, setClips, clips, draggingSelection, scrollX, setSelection, onUpdateClipProperties, resizing, onResizeTrack, resizingHeader]);
+      if (draggingSelection) {
+        const xPx = e.clientX - rect.left + scrollX;
+        const endSec = xPx / pixelsPerSecond;
+        setSelection(draggingSelection.startSec, endSec);
+      } else if (!drag) {
+        setSnapIndicator(null);
+      }
+    },
+    [
+      boxSelection,
+      clips,
+      contentWidth,
+      drag,
+      draggingSelection,
+      isViewportPanning,
+      laneLayouts,
+      onResizeTrack,
+      onUpdateClipProperties,
+      pixelsPerSecond,
+      resizing,
+      resizingHeader,
+      scrollX,
+      setBoxSelection,
+      setClips,
+      setScrollX,
+      setSelection,
+      setSnapIndicator,
+      setTrackHeaderWidth,
+      snapCandidates,
+      snapContext,
+      snapSettings,
+      snapToGrid,
+      trackLaneLookup,
+      viewportWidth,
+    ]
+  );
 
   const onMouseUp = useCallback(() => {
     if (drag) {
@@ -809,14 +1298,24 @@ export const ArrangeWindow: React.FC<Props> = (props) => {
     setSnapIndicator(null);
     setResizing(null);
     setResizingHeader(null);
-  }, [drag, setClips, setResizingHeader]);
+    setBoxSelection(null);
+    setViewportPanning(false);
+    panOriginRef.current = null;
+    if (scrubState.isScrubbing) {
+      setScrubState({ isScrubbing: false, originX: 0, originTime: 0 });
+    }
+  }, [drag, scrubState.isScrubbing, setBoxSelection, setClips, setResizingHeader]);
 
   const onRulerDown = useCallback((e: React.MouseEvent) => {
+    if (e.button !== 0) return;
+    stopMomentum();
+    followInterruptedRef.current = true;
     const rect = e.currentTarget.getBoundingClientRect();
     const xPx = e.clientX - rect.left;
     const sec = Math.max(0, (xPx + scrollX) / pixelsPerSecond);
     onSeek(sec);
-  }, [scrollX, pixelsPerSecond, onSeek]);
+    setScrubState({ isScrubbing: true, originX: e.clientX, originTime: sec });
+  }, [onSeek, pixelsPerSecond, scrollX, stopMomentum]);
   
   const masterLevel = masterAnalysis?.level ?? 0;
   const glowIntensity = Math.min(1, masterLevel * 3.0);
@@ -849,31 +1348,44 @@ export const ArrangeWindow: React.FC<Props> = (props) => {
   } as React.CSSProperties;
 
   useEffect(() => {
-    if (!followPlayhead || !isPlaying) return;
+    if (!followPlayhead) {
+      followInterruptedRef.current = false;
+      return;
+    }
+    if (!isPlaying) {
+      followInterruptedRef.current = false;
+      return;
+    }
+    if (followInterruptedRef.current) {
+      if (resumeFollowTimeoutRef.current !== null) {
+        window.clearTimeout(resumeFollowTimeoutRef.current);
+      }
+      resumeFollowTimeoutRef.current = window.setTimeout(() => {
+        followInterruptedRef.current = false;
+      }, 1200);
+      return;
+    }
     const viewportNode = timelineViewportRef.current;
     if (!viewportNode) return;
-    const viewportWidth = viewportNode.clientWidth;
-    if (viewportWidth <= 0) return;
-    const margin = viewportWidth * 0.25;
+    const viewportWidthPx = viewportNode.clientWidth;
+    if (viewportWidthPx <= 0) return;
+    const margin = viewportWidthPx * 0.25;
     const playheadPx = currentTime * pixelsPerSecond;
     const leftEdge = scrollX;
-    const rightEdge = scrollX + viewportWidth;
+    const rightEdge = scrollX + viewportWidthPx;
 
     let targetScroll = scrollX;
     if (playheadPx > rightEdge - margin) {
-      targetScroll = playheadPx - viewportWidth + margin;
+      targetScroll = playheadPx - viewportWidthPx + margin;
     } else if (playheadPx < leftEdge + margin) {
       targetScroll = playheadPx - margin;
     }
 
     targetScroll = Math.max(0, targetScroll);
-    if (Math.abs(targetScroll - scrollX) > 1) {
-      setScrollX((prev) => {
-        const next = prev + (targetScroll - prev) * 0.4;
-        return next < 0 ? 0 : next;
-      });
+    if (Math.abs(targetScroll - scrollX) > 0.5) {
+      smoothScrollTo(targetScroll);
     }
-  }, [followPlayhead, isPlaying, currentTime, pixelsPerSecond, scrollX, setScrollX]);
+  }, [followPlayhead, isPlaying, currentTime, pixelsPerSecond, scrollX, smoothScrollTo]);
 
   useEffect(() => {
     if (resizing) {
@@ -914,6 +1426,14 @@ export const ArrangeWindow: React.FC<Props> = (props) => {
   }, [resizingHeader]);
 
   useEffect(() => {
+    return () => {
+      if (resumeFollowTimeoutRef.current !== null) {
+        window.clearTimeout(resumeFollowTimeoutRef.current);
+      }
+    };
+  }, []);
+
+  useEffect(() => {
     if (typeof window === 'undefined') {
       return;
     }
@@ -934,6 +1454,136 @@ export const ArrangeWindow: React.FC<Props> = (props) => {
       onMouseUp={onMouseUp}
       onMouseLeave={onMouseUp}
     >
+      <div
+        className="absolute top-3 z-40 flex flex-wrap items-center gap-3 pointer-events-none"
+        style={{ left: trackHeaderWidth + 24 }}
+      >
+        <div className="flex items-center gap-1 rounded-full bg-black/55 px-3 py-1 pointer-events-auto shadow-lg shadow-black/60">
+          {toolPalette.map((tool) => (
+            <button
+              key={tool.id}
+              type="button"
+              onClick={() => handleSetTool(tool.id)}
+              className={`text-[11px] uppercase tracking-[0.28em] px-2 py-1 rounded-full transition ${
+                tool.active ? "bg-cyan-300 text-black shadow-md" : "text-white/70 hover:text-white/90"
+              }`}
+              title={`Tool ${tool.label} (${tool.shortcut})`}
+            >
+              {tool.label}
+              <span className="ml-1 text-white/40 text-[9px]">{tool.shortcut}</span>
+            </button>
+          ))}
+        </div>
+        <div className="flex items-center gap-1 rounded-full bg-black/50 px-2 py-1 pointer-events-auto shadow shadow-black/50">
+          {[
+            { key: "enableGrid", label: "Grid", shortcut: "G", active: snapSettings.enableGrid },
+            { key: "enableClips", label: "Clips", shortcut: "S", active: snapSettings.enableClips },
+            { key: "enableMarkers", label: "Markers", shortcut: "M", active: snapSettings.enableMarkers },
+            { key: "enableZeroCrossings", label: "Zero", shortcut: "Z", active: snapSettings.enableZeroCrossings },
+          ].map((snap) => (
+            <button
+              key={snap.key}
+              type="button"
+              onClick={() =>
+                handleToggleSnap(snap.key as "enableGrid" | "enableClips" | "enableMarkers" | "enableZeroCrossings")
+              }
+              className={`px-2 py-1 text-[10px] tracking-[0.35em] uppercase rounded-full transition ${
+                snap.active ? "bg-emerald-400 text-black" : "text-white/60 hover:text-white"
+              }`}
+              title={`${snap.label} snap (${snap.shortcut})`}
+            >
+              {snap.label}
+            </button>
+          ))}
+        </div>
+        <div className="flex items-center gap-1 rounded-full bg-black/45 px-2 py-1 pointer-events-auto shadow shadow-black/50">
+          <button
+            type="button"
+            onClick={handleCycleWaveformMode}
+            className="px-2 py-1 text-[10px] uppercase tracking-[0.32em] rounded-full bg-cyan-500/20 text-cyan-200 hover:bg-cyan-500/35 transition"
+            title="Cycle waveform display (Peak / RMS / Normalized)"
+          >
+            {waveformOptions.mode === "peak"
+              ? "Peak"
+              : waveformOptions.mode === "rms"
+              ? "RMS"
+              : "Norm"}
+          </button>
+          <div className="flex items-center gap-1 text-white/60">
+            <button
+              type="button"
+              onClick={() => handleAdjustWaveformHeight(-0.1)}
+              className="w-7 h-7 flex items-center justify-center rounded-full bg-white/10 hover:bg-white/20 transition"
+              title="Decrease waveform height"
+            >
+              –
+            </button>
+            <button
+              type="button"
+              onClick={() => handleAdjustWaveformHeight(0.1)}
+              className="w-7 h-7 flex items-center justify-center rounded-full bg-white/10 hover:bg-white/20 transition"
+              title="Increase waveform height"
+            >
+              +
+            </button>
+            <span className="mx-1 text-[9px] uppercase tracking-[0.3em]">
+              {Math.round(waveformOptions.heightMultiplier * 100)}%
+            </span>
+          </div>
+          <div className="flex items-center gap-1 text-white/60">
+            <button
+              type="button"
+              onClick={() => handleAdjustWaveformZoom(-0.1)}
+              className="w-7 h-7 flex items-center justify-center rounded-full bg-white/10 hover:bg-white/20 transition"
+              title="Zoom out waveform"
+            >
+              ◂
+            </button>
+            <button
+              type="button"
+              onClick={() => handleAdjustWaveformZoom(0.1)}
+              className="w-7 h-7 flex items-center justify-center rounded-full bg-white/10 hover:bg-white/20 transition"
+              title="Zoom in waveform"
+            >
+              ▸
+            </button>
+          </div>
+        </div>
+        <div className="flex items-center gap-1 rounded-full bg-black/55 px-2 py-1 pointer-events-auto shadow shadow-black/50">
+          <button
+            type="button"
+            onClick={handleZoomOut}
+            className="w-8 h-7 flex items-center justify-center rounded-full bg-white/10 hover:bg-white/20 transition text-white/70 text-sm"
+            title="Zoom out (Cmd/Ctrl + -)"
+          >
+            –
+          </button>
+          <button
+            type="button"
+            onClick={handleZoomIn}
+            className="w-8 h-7 flex items-center justify-center rounded-full bg-white/10 hover:bg-white/20 transition text-white/70 text-sm"
+            title="Zoom in (Cmd/Ctrl + +)"
+          >
+            +
+          </button>
+          <button
+            type="button"
+            onClick={handleZoomSelection}
+            className="px-2 py-1 text-[10px] uppercase tracking-[0.32em] rounded-full bg-white/10 hover:bg-white/20 transition text-white/70"
+            title="Zoom to selection (Cmd/ Ctrl + Shift + Z)"
+          >
+            Sel
+          </button>
+          <button
+            type="button"
+            onClick={handleZoomFit}
+            className="px-2 py-1 text-[10px] uppercase tracking-[0.32em] rounded-full bg-white/10 hover:bg-white/20 transition text-white/70"
+            title="Zoom to fit (Cmd/ Ctrl + 0)"
+          >
+            Fit
+          </button>
+        </div>
+      </div>
       <div className="relative flex-shrink-0 bg-glass-surface-soft border-r border-glass-border backdrop-blur-xl" style={{ width: trackHeaderWidth }}>
         <div
           className="absolute top-0 right-0 z-20 h-full w-2 cursor-col-resize"
@@ -987,7 +1637,6 @@ export const ArrangeWindow: React.FC<Props> = (props) => {
       <div 
         ref={timelineViewportRef}
         className="relative flex-grow h-full overflow-hidden"
-        onWheel={onWheel}
        >
         <div className="absolute left-0 right-0 top-0 h-[24px] bg-glass-surface-soft border-b border-glass-border select-none backdrop-blur-lg" onMouseDown={onRulerDown}>
             <div className="relative" style={{ width: contentWidth, transform: `translateX(-${scrollX}px)` }}>
@@ -1101,6 +1750,11 @@ export const ArrangeWindow: React.FC<Props> = (props) => {
                       audioBuffer={audioBuffers[clipModel.bufferId]}
                       feedback={clipFeedback}
                       isRecallTarget={highlightClipIdSet.has(clipModel.id)}
+                      activeTool={activeTool}
+                      waveformMode={waveformOptions.mode}
+                      waveformZoom={waveformOptions.zoomLevel}
+                      waveformHeightMultiplier={waveformOptions.heightMultiplier}
+                      onSplitAt={handleClipSplit}
                       onBeginDrag={(kind, startClientX, startClientY, modifiers) => {
                         const clip = clips.find((x) => x.id === clipModel.id);
                         if (!clip) return;
@@ -1130,6 +1784,7 @@ export const ArrangeWindow: React.FC<Props> = (props) => {
                           duplicate: Boolean(modifiers?.metaKey),
                           disableZeroCrossing: Boolean(modifiers?.shiftKey),
                           fineAdjust: Boolean(modifiers?.ctrlKey),
+                          hasSurpassedThreshold: false,
                         });
                       }}
                       onSelect={(append) => {
@@ -1153,6 +1808,26 @@ export const ArrangeWindow: React.FC<Props> = (props) => {
                     />
                   );
                 })}
+                {boxSelection && (
+                  <div
+                    className="absolute border border-cyan-300/60 bg-cyan-400/10 pointer-events-none rounded-sm"
+                    style={{
+                      left:
+                        Math.min(boxSelection.startSec, boxSelection.endSec ?? boxSelection.startSec) *
+                        pixelsPerSecond,
+                      width: Math.max(
+                        2,
+                        Math.abs((boxSelection.endSec ?? boxSelection.startSec) - boxSelection.startSec) *
+                          pixelsPerSecond
+                      ),
+                      top: clampNumber(Math.min(boxSelection.top, boxSelection.bottom), 0, totalLaneHeight),
+                      height: Math.max(
+                        4,
+                        Math.abs(boxSelection.bottom - boxSelection.top)
+                      ),
+                    }}
+                  />
+                )}
                 {snapIndicator !== null && (
                   <div
                     className="absolute top-0 bottom-0 pointer-events-none z-20"

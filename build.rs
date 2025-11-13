@@ -14,8 +14,8 @@ fn main() {
         .expect("Unable to generate bindings")
         .write_to_file("include/mixx_core_generated.h");
     
-    // Tell cargo to link the library
-    println!("cargo:rustc-link-lib=static=mixx_core");
+    // Note: Rust dependencies are linked automatically via Cargo.toml
+    // This build script is only for generating C++ bindings
     
     // Tell cargo to invalidate the built crate whenever the wrapper changes
     println!("cargo:rerun-if-changed=src/ffi.rs");

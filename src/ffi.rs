@@ -9,6 +9,7 @@ use std::sync::{LazyLock, Mutex};
 static LAST_ERROR: LazyLock<Mutex<Option<CString>>> = LazyLock::new(|| Mutex::new(None));
 
 #[repr(C)]
+#[derive(Copy, Clone)]
 pub struct MixxEngineConfig {
     pub sample_rate: u32,
     pub buffer_size: u32,

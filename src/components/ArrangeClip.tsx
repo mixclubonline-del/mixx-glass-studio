@@ -1,8 +1,9 @@
 // src/components/ArrangeClip.tsx
 import React, { useMemo, useRef, useState } from "react";
-import { ArrangeClip as ArrangeClipModel } from '../hooks/useArrange';
+import { ArrangeClip as ArrangeClipModel } from "../hooks/useArrange";
 import { TrackALSFeedback, hexToRgba } from "../utils/ALS";
 import { WaveformRenderer } from "./WaveformRenderer";
+import { TimelineTool } from "../utils/timelineTools";
 
 type DragKind = "move" | "resize-left" | "resize-right" | "fade-in" | "fade-out" | "gain";
 
@@ -22,6 +23,11 @@ type Props = {
   feedback?: TrackALSFeedback;
   isRecallTarget?: boolean;
   onOpenPianoRoll?: () => void;
+  activeTool: TimelineTool;
+  waveformMode: "peak" | "rms" | "normalized";
+  waveformZoom: number;
+  waveformHeightMultiplier: number;
+  onSplitAt: (clipId: string, splitTime: number) => void;
 };
 
 const HANDLE_W = 12;
@@ -38,6 +44,11 @@ export const ArrangeClip: React.FC<Props> = ({
   feedback,
   isRecallTarget,
   onOpenPianoRoll,
+  activeTool,
+  waveformMode,
+  waveformZoom,
+  waveformHeightMultiplier,
+  onSplitAt,
 }) => {
   const {
     id,
@@ -66,12 +77,38 @@ export const ArrangeClip: React.FC<Props> = ({
   } as React.CSSProperties), [x, laneTop, laneHeight, w]);
 
   const onLocalMouseDown = (e: React.MouseEvent) => {
-    const modifiers = { altKey: e.altKey, shiftKey: e.shiftKey, metaKey: e.metaKey || e.ctrlKey };
-    if (hoverRegion) {
-      onBeginDrag(hoverRegion, e.clientX, e.clientY, modifiers);
-    } else {
-      onBeginDrag("move", e.clientX, e.clientY, modifiers);
+    const modifiers = { altKey: e.altKey, shiftKey: e.shiftKey, metaKey: e.metaKey || e.ctrlKey, ctrlKey: e.ctrlKey };
+    if (activeTool === "split") {
+      const node = ref.current;
+      if (node) {
+        const rect = node.getBoundingClientRect();
+        const localX = e.clientX - rect.left;
+        const rawSplit = startSec + localX / pps;
+        const minSplit = startSec + 0.001;
+        const maxSplit = startSec + durationSec - 0.001;
+        const clampedSplit = Math.min(Math.max(rawSplit, minSplit), maxSplit);
+        onSplitAt(id, clampedSplit);
+      }
+      e.stopPropagation();
+      return;
     }
+    let dragKind: DragKind | null = hoverRegion;
+    if (!dragKind) {
+      if (activeTool === "move" || activeTool === "select") {
+        dragKind = "move";
+      } else if (activeTool === "trim") {
+        const localX = ref.current ? e.clientX - ref.current.getBoundingClientRect().left : 0;
+        dragKind = localX < w / 2 ? "resize-left" : "resize-right";
+      } else {
+        dragKind = "move";
+      }
+    } else if (activeTool === "move" && dragKind !== "move") {
+      dragKind = "move";
+    } else if (activeTool === "trim" && dragKind === "move") {
+      const localX = ref.current ? e.clientX - ref.current.getBoundingClientRect().left : 0;
+      dragKind = localX < w / 2 ? "resize-left" : "resize-right";
+    }
+    onBeginDrag(dragKind ?? "move", e.clientX, e.clientY, modifiers);
     e.stopPropagation();
   };
 
@@ -84,19 +121,31 @@ export const ArrangeClip: React.FC<Props> = ({
     
     let region: DragKind | null = "move"; // Default to move
     if (localY < FADE_HANDLE_H) {
-        if (localX < HANDLE_W + 10) region = 'fade-in';
-        else if (localX > w - (HANDLE_W + 10)) region = 'fade-out';
+      if (localX < HANDLE_W + 10) region = "fade-in";
+      else if (localX > w - (HANDLE_W + 10)) region = "fade-out";
     } else if (Math.abs(localY - (laneHeight - (laneHeight * (gain / 2.0)))) < 8) {
-        region = 'gain';
+      region = "gain";
     } else {
-        if (localX < HANDLE_W) region = "resize-left";
-        else if (w > HANDLE_W * 2 && localX > w - HANDLE_W) region = "resize-right";
+      if (localX < HANDLE_W) region = "resize-left";
+      else if (w > HANDLE_W * 2 && localX > w - HANDLE_W) region = "resize-right";
+    }
+
+    if (activeTool === "move") {
+      region = "move";
+    } else if (activeTool === "trim") {
+      region = localX < HANDLE_W * 2 ? "resize-left" : "resize-right";
+    } else if (activeTool === "split") {
+      region = null;
     }
     setHoverRegion(region);
   };
   
   const getCursorStyle = () => {
-    switch(hoverRegion) {
+    if (activeTool === "split") {
+      return "crosshair";
+    }
+    const region = hoverRegion ?? (activeTool === "trim" ? "resize-right" : "move");
+    switch(region) {
         case 'resize-left':
         case 'resize-right':
         case 'fade-in':
@@ -118,8 +167,11 @@ export const ArrangeClip: React.FC<Props> = ({
     clip.originalDuration ?? durationSec * playbackRate
   );
   const waveformWidth = Math.max(4, w - 6);
-  const waveformHeight = Math.max(24, laneHeight - 12);
+  const waveformBaseHeight = Math.max(24, laneHeight - 12);
+  const waveformHeight = Math.max(18, waveformBaseHeight * waveformHeightMultiplier);
   const waveformColor = feedback?.glowColor ?? color;
+  const waveformDisplayMode = waveformMode === "rms" ? "rms" : "peak";
+  const waveformNormalize = waveformMode === "normalized";
 
   return (
     <div
@@ -168,14 +220,16 @@ export const ArrangeClip: React.FC<Props> = ({
           <WaveformRenderer
             audioBuffer={audioBuffer}
             width={waveformWidth}
-            height={Math.max(18, waveformHeight)}
+            height={waveformHeight}
             color={waveformColor}
             startTime={Math.min(sourceStartSec, Math.max(0, audioBuffer.duration - 0.01))}
             duration={Math.min(
               sourceDurationSec,
               Math.max(0.01, audioBuffer.duration - sourceStartSec)
             )}
-            zoom={pps}
+            zoom={pps * waveformZoom}
+            displayMode={waveformDisplayMode}
+            normalize={waveformNormalize}
           />
         </div>
       )}

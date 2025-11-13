@@ -48,10 +48,18 @@ impl FlowEngine {
             .compare_exchange(false, true, Ordering::SeqCst, Ordering::SeqCst)
             .is_err()
         {
+            println!("🎵 Initializing MixxEngine ({} Hz, {} frames, {} channels)...", 
+                self.engine_config.sample_rate, 
+                self.engine_config.buffer_size, 
+                self.engine_config.channels);
             mixx_init_engine(Some(self.engine_config))
                 .map_err(|err| format!("MixxEngine init failed: {}", err.message()))?;
+            println!("✅ MixxEngine initialized");
+        } else {
+            println!("⚠️ MixxEngine already initialized, skipping init");
         }
 
+        println!("▶️ Starting MixxEngine audio streams...");
         mixx_start_engine().map_err(|err| format!("MixxEngine start failed: {}", err.message()))?;
         self.engine_running.store(true, Ordering::Relaxed);
         println!("✅ F.L.O.W. audio stream started successfully!");
@@ -99,7 +107,8 @@ impl FlowEngine {
     }
 
     pub fn get_status(&self) -> serde_json::Value {
-        let engine_stats = mixx_current_stats().map(|stats| {
+        let engine_stats_result = mixx_current_stats();
+        let engine_stats = engine_stats_result.map(|stats| {
             serde_json::json!({
                 "total_callbacks": stats.total_callbacks,
                 "average_callback_ns": stats.average_callback_ns,
@@ -109,8 +118,33 @@ impl FlowEngine {
             })
         });
 
+        let is_playing = self.is_playing.load(Ordering::Relaxed);
+        let engine_running = self.engine_running.load(Ordering::Relaxed);
+        let engine_initialized = self.engine_initialized.load(Ordering::Relaxed);
+        
+        // Debug: log why stats might not be available
+        if engine_running && engine_stats.is_none() {
+            eprintln!("[FlowEngine] WARNING: Engine running but mixx_current_stats() returned None. Initialized: {}", engine_initialized);
+        }
+        
+        // If engine is running but stats aren't available yet, provide a placeholder
+        let engine_stats_final = if engine_stats.is_some() {
+            engine_stats
+        } else if engine_running || engine_initialized {
+            // Engine is initialized/running but stats not available yet (just started or state issue)
+            Some(serde_json::json!({
+                "total_callbacks": 0,
+                "average_callback_ns": 0.0,
+                "xruns": 0,
+                "last_callback_ns": 0,
+                "uptime_ms": 0,
+            }))
+        } else {
+            None
+        };
+
         serde_json::json!({
-            "is_playing": self.is_playing.load(Ordering::Relaxed),
+            "is_playing": is_playing,
             "is_recording": self.is_recording.load(Ordering::Relaxed),
             "current_sample": self.current_sample.load(Ordering::Relaxed),
             "bpm": self.bpm.load(Ordering::Relaxed) as f32,
@@ -120,7 +154,8 @@ impl FlowEngine {
             "rms_level": self.rms_level.load(Ordering::Relaxed) as f32 / 1000.0,
             "peak_level": self.peak_level.load(Ordering::Relaxed) as f32 / 1000.0,
             "energy_level": self.energy_level.load(Ordering::Relaxed) as f32 / 1000.0,
-            "engine": engine_stats,
+            "engine": engine_stats_final,
+            "engine_running": engine_running,
         })
     }
 }

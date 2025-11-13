@@ -21,6 +21,7 @@ interface WaveformRendererProps {
   duration?: number;
   displayMode?: WaveformDisplayMode;
   zoom?: number;
+  normalize?: boolean;
 }
 
 const FALLBACK_COLOR = "#4fd1c5"; // teal glow aligning with ALS cool palette
@@ -35,6 +36,7 @@ export const WaveformRenderer: React.FC<WaveformRendererProps> = ({
   duration,
   displayMode = "peak",
   zoom = 100,
+  normalize = false,
 }) => {
   const canvasRef = useRef<HTMLCanvasElement>(null);
 
@@ -98,13 +100,15 @@ export const WaveformRenderer: React.FC<WaveformRendererProps> = ({
       }
     }
 
+    const amplitudeScale = normalize && measuredMaxAmplitude > 0 ? measuredMaxAmplitude : 1;
     const gradient = ctx.createLinearGradient(0, 0, 0, scaledHeight);
     const applyGradientStops = (g: CanvasGradient, opacity = 1) => {
-      if (measuredMaxAmplitude > 0.8) {
+      const intensity = normalize ? 0.9 : measuredMaxAmplitude;
+      if (intensity > 0.8) {
         g.addColorStop(0, `hsl(15 100% 68% / ${opacity})`);
         g.addColorStop(0.5, `hsl(32 100% 60% / ${opacity})`);
         g.addColorStop(1, `hsl(44 100% 52% / ${opacity})`);
-      } else if (measuredMaxAmplitude > 0.5) {
+      } else if (intensity > 0.5) {
         g.addColorStop(0, `hsl(275 88% 70% / ${opacity})`);
         g.addColorStop(1, `hsl(314 82% 67% / ${opacity})`);
       } else {
@@ -158,7 +162,7 @@ export const WaveformRenderer: React.FC<WaveformRendererProps> = ({
     const drawUpper = () => {
       for (let x = 0; x < scaledWidth; x += detailLevel) {
         const { max } = sampleWindowForPixel(x);
-        const y = centerY - max * centerY * 0.92;
+        const y = centerY - (max / amplitudeScale) * centerY * 0.92;
         if (x === 0) {
           ctx.moveTo(x, y);
         } else {
@@ -170,7 +174,7 @@ export const WaveformRenderer: React.FC<WaveformRendererProps> = ({
     const drawLower = () => {
       for (let x = scaledWidth; x >= 0; x -= detailLevel) {
         const { min } = sampleWindowForPixel(x);
-        const y = centerY - min * centerY * 0.92;
+        const y = centerY - (min / amplitudeScale) * centerY * 0.92;
         ctx.lineTo(x, y);
       }
     };

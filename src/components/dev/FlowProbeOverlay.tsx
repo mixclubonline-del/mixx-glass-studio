@@ -4,7 +4,7 @@ import {
   exportSessionProbeSnapshot,
   useSessionProbeStore,
 } from "../../hooks/useSessionProbe";
-import { clearSessionProbe } from "../../state/sessionProbe";
+import { clearSessionProbe, isSessionProbeExportAllowed } from "../../state/sessionProbe";
 
 const downloadJson = (payload: string) => {
   const blob = new Blob([payload], { type: "application/json" });
@@ -28,10 +28,6 @@ const FlowProbeOverlay: React.FC = () => {
     uptimeMs: number;
   } | null>(null);
   const [engineStatusLabel, setEngineStatusLabel] = useState<string>("Idle");
-
-  if (!store.enabled) {
-    return null;
-  }
 
   const events = useMemo(() => store.events.slice(-10).reverse(), [store.events]);
   const currentContext = store.context;
@@ -59,9 +55,16 @@ const FlowProbeOverlay: React.FC = () => {
 
   const handleExport = () => {
     const serialized = exportSessionProbeSnapshot();
-    if (!serialized) return;
+    if (!serialized) {
+      console.warn('[Session Probe] Export not available. Set VITE_SESSION_PROBE_ALLOW_EXPORT=1 to enable.');
+      alert('Export is disabled. Set VITE_SESSION_PROBE_ALLOW_EXPORT=1 in your environment to enable JSON export.');
+      return;
+    }
     downloadJson(serialized);
   };
+
+  // Check if export is allowed
+  const canExport = isSessionProbeExportAllowed();
 
   useEffect(() => {
     let mounted = true;
@@ -87,29 +90,82 @@ const FlowProbeOverlay: React.FC = () => {
             xruns: number;
             last_callback_ns: number;
             uptime_ms: number;
-          };
+          } | null;
           is_playing?: boolean;
+          engine_running?: boolean;
+          error?: string;
         }>("get_flow_status");
 
         if (!mounted) {
           return;
         }
 
+        // Update engine stats if available
         if (status?.engine) {
-          setEngineStats({
-            totalCallbacks: status.engine.total_callbacks,
-            averageCallbackNs: status.engine.average_callback_ns,
-            xruns: status.engine.xruns,
-            lastCallbackNs: status.engine.last_callback_ns,
-            uptimeMs: status.engine.uptime_ms,
-          });
+          const stats = status.engine;
+          // Only update if we have actual data (not placeholder zeros)
+          if (stats.total_callbacks > 0 || stats.uptime_ms > 0) {
+            setEngineStats({
+              totalCallbacks: stats.total_callbacks,
+              averageCallbackNs: stats.average_callback_ns,
+              xruns: stats.xruns,
+              lastCallbackNs: stats.last_callback_ns,
+              uptimeMs: stats.uptime_ms,
+            });
+          } else if (status?.engine_running) {
+            // Engine is running but no callbacks yet - keep existing stats or show placeholder
+            setEngineStats(null);
+          }
+        } else {
+          setEngineStats(null);
         }
 
-        setEngineStatusLabel(status?.is_playing ? "Streaming" : "Armed");
-      } catch {
+        // Determine status label based on engine state and playback
+        const webAudioPlaying = currentContext?.isPlaying ?? false;
+        
+        // Check is_playing first, as it's the most reliable indicator
+        if (status?.is_playing) {
+          setEngineStatusLabel("Streaming");
+        } else if (status?.engine_running) {
+          // Engine is running but not playing (armed/ready)
+          setEngineStatusLabel("Armed");
+        } else if (webAudioPlaying) {
+          // Web Audio is playing but Tauri engine not initialized
+          setEngineStatusLabel("Web Audio Only");
+        } else if (status?.error) {
+          // Engine not initialized - show error state
+          setEngineStatusLabel("Not Initialized");
+        } else {
+          // Engine not initialized or not running
+          setEngineStatusLabel("Idle");
+        }
+        
+        // Debug logging - check if Web Audio is playing but Tauri engine isn't
+        if (webAudioPlaying && !status?.is_playing && !status?.engine_running) {
+          console.warn('[FlowProbe] Web Audio is playing but Tauri FlowEngine not initialized:', {
+            webAudioPlaying,
+            tauriIsPlaying: status?.is_playing,
+            engine: status?.engine,
+            engine_running: status?.engine_running,
+            error: status?.error,
+            fullStatus: status,
+          });
+        }
+        
+        // Debug: log status periodically to help diagnose
+        if (status && (status.engine_running || status.is_playing)) {
+          console.log('[FlowProbe] Engine status:', {
+            is_playing: status.is_playing,
+            engine_running: status.engine_running,
+            has_stats: !!status.engine,
+            total_callbacks: status.engine?.total_callbacks ?? 0,
+          });
+        }
+      } catch (error) {
         if (!mounted) {
           return;
         }
+        console.warn('[FlowProbe] Failed to get engine status:', error);
         setEngineStatusLabel("Unavailable");
       }
     };
@@ -198,9 +254,9 @@ const FlowProbeOverlay: React.FC = () => {
                 {events.length === 0 && (
                   <li className="text-white/50">No events captured yet.</li>
                 )}
-                {events.map((event) => (
+                {events.map((event, index) => (
                   <li
-                    key={`${event.channel}-${event.timestamp}`}
+                    key={`${event.channel}-${event.timestamp}-${index}`}
                     className="rounded-lg bg-white/5 px-3 py-2 border border-white/10"
                   >
                     <div className="flex items-center justify-between">
@@ -273,6 +329,14 @@ const FlowProbeOverlay: React.FC = () => {
                   </li>
                   <li>Uptime · {(engineStats.uptimeMs / 1000).toFixed(1)} s</li>
                 </ul>
+              ) : engineStatusLabel === "Streaming" || engineStatusLabel === "Armed" ? (
+                <div className="text-white/50 text-[11px]">
+                  Engine running · {engineStatusLabel === "Streaming" ? "Stats initializing…" : "Waiting for playback…"}
+                </div>
+              ) : engineStatusLabel === "Web Audio Only" ? (
+                <div className="text-amber-400/70 text-[11px]">
+                  Web Audio active · Tauri engine not initialized
+                </div>
               ) : (
                 <div className="text-white/50 text-[11px]">Waiting for engine metrics…</div>
               )}
@@ -310,8 +374,14 @@ const FlowProbeOverlay: React.FC = () => {
           </div>
           <button
             type="button"
-            className="px-3 py-1 rounded-lg bg-white/15 hover:bg-white/25 text-[11px] font-semibold transition"
+            disabled={!canExport}
+            className={`px-3 py-1 rounded-lg text-[11px] font-semibold transition ${
+              canExport
+                ? "bg-white/15 hover:bg-white/25 cursor-pointer"
+                : "bg-white/5 text-white/30 cursor-not-allowed"
+            }`}
             onClick={handleExport}
+            title={canExport ? "Export session probe data as JSON" : "Export disabled. Set VITE_SESSION_PROBE_ALLOW_EXPORT=1 to enable."}
           >
             Save JSON
           </button>

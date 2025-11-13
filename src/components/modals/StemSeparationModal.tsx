@@ -75,29 +75,31 @@ const StemSeparationModal: React.FC<StemSeparationModalProps> = ({ onClose, onSe
           Select the stems you want Hybrid Transformer Demucs to extract.
         </p>
 
-        <form onSubmit={handleSubmit} className="flex flex-1 flex-col overflow-hidden">
-          <div className="grid flex-1 grid-cols-2 gap-x-6 gap-y-3 pr-2">
-            {AVAILABLE_STEMS.map((stem) => (
-              <label
-                key={stem}
-                className="flex cursor-pointer items-center space-x-3 rounded-md p-2 transition-colors hover:bg-white/10"
-              >
-                <input
-                  type="checkbox"
-                  checked={selectedStems.has(stem)}
-                  onChange={() => handleToggleStem(stem)}
-                  className="h-5 w-5 rounded border-gray-100/30 bg-black/30 text-cyan-500 focus:ring-cyan-500 focus:ring-offset-gray-900"
-                />
-                <span className="text-gray-300">{stem}</span>
-              </label>
-            ))}
+        <form onSubmit={handleSubmit} className="flex flex-1 flex-col overflow-hidden min-h-0">
+          <div className="flex-1 overflow-y-auto pr-2 mb-4">
+            <div className="grid grid-cols-2 gap-x-6 gap-y-3">
+              {AVAILABLE_STEMS.map((stem) => (
+                <label
+                  key={stem}
+                  className="flex cursor-pointer items-center space-x-3 rounded-md p-2 transition-colors hover:bg-white/10"
+                >
+                  <input
+                    type="checkbox"
+                    checked={selectedStems.has(stem)}
+                    onChange={() => handleToggleStem(stem)}
+                    className="h-5 w-5 rounded border-gray-100/30 bg-black/30 text-cyan-500 focus:ring-cyan-500 focus:ring-offset-gray-900"
+                  />
+                  <span className="text-gray-300">{stem}</span>
+                </label>
+              ))}
+            </div>
           </div>
 
-          <div className="mt-6 flex justify-end space-x-4 border-t border-white/10 pt-6">
+          <div className="flex justify-end space-x-4 border-t border-white/10 pt-4 mt-auto shrink-0">
             <button
               type="button"
               onClick={onClose}
-              className="rounded-lg bg-gray-700/50 px-4 py-2 transition-colors hover:bg-gray-700"
+              className="rounded-lg bg-gray-700/50 px-4 py-2 text-gray-200 transition-colors hover:bg-gray-700"
             >
               Cancel
             </button>
@@ -105,7 +107,7 @@ const StemSeparationModal: React.FC<StemSeparationModalProps> = ({ onClose, onSe
               type="submit"
               className="rounded-lg bg-indigo-600 px-6 py-2 font-bold text-white shadow-[0_0_10px_rgba(99,102,241,0.5)] transition-colors hover:bg-indigo-500"
             >
-              Separate ({selectedStems.size})
+              Add Stems ({selectedStems.size})
             </button>
           </div>
         </form>
