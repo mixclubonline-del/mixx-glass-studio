@@ -185,6 +185,22 @@ export const WaveformRenderer: React.FC<WaveformRendererProps> = ({
     ctx.fill();
     ctx.stroke();
 
+    if (zoom > 420 && channelData) {
+      ctx.save();
+      ctx.fillStyle = "rgba(103, 232, 249, 0.28)";
+      const step = Math.max(1, Math.floor(samplesPerPixel));
+      for (let pixel = 1; pixel < scaledWidth; pixel += step) {
+        const sampleIndex = clippedStartSample + Math.floor(pixel * samplesPerPixel);
+        if (sampleIndex <= 0 || sampleIndex >= channelData.length) continue;
+        const prevSample = channelData[sampleIndex - 1];
+        const currentSample = channelData[sampleIndex];
+        if ((prevSample <= 0 && currentSample >= 0) || (prevSample >= 0 && currentSample <= 0)) {
+          ctx.fillRect(pixel, 0, 1, scaledHeight);
+        }
+      }
+      ctx.restore();
+    }
+
     const renderTime = performance.now() - renderStart;
     if (renderTime > 16) {
       console.warn(`[WaveformRenderer] Render took ${renderTime.toFixed(2)}ms at zoom ${zoom}`);

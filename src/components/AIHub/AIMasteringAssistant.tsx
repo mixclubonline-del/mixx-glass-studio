@@ -5,6 +5,7 @@ import RadioButton from '../common/RadioButton';
 import { DownloadIcon, SlidersIcon } from '../icons'; // Using SlidersIcon for visual identity
 import { VelvetProcessor, VelvetProcessorOptions } from '../../audio/VelvetProcessor';
 import { MASTERING_PROFILES, MasteringProfile } from '../../types/sonic-architecture';
+import { ensureMasterCompliance } from '../../audio/VelvetValidator';
 
 interface AIMasteringAssistantProps {
   audioContext: AudioContext | null;
@@ -87,12 +88,19 @@ const AIMasteringAssistant: React.FC<AIMasteringAssistantProps> = ({ audioContex
       };
 
       const processedBuffer = await velvetProcessor.processAudioBuffer(audioBuffer, options);
+      const validation = ensureMasterCompliance(processedBuffer, profile);
+      setProcessingMessage(
+        `Compliance ready • Δ ${(validation.metrics.integratedLUFS - profile.targetLUFS).toFixed(1)} LUFS vs target`
+      );
       const blob = velvetProcessor.exportWAV(processedBuffer);
       setMasteredBlob(blob);
-      setProcessingMessage('Mastering complete!');
     } catch (err: any) {
       console.error("Error during AI mastering:", err);
-      setError(`Mastering failed: ${err.message || 'Unknown error'}`);
+      if (Array.isArray(err?.issues) && err.issues.length) {
+        setError(`Mastering failed: ${err.issues.join(' • ')}`);
+      } else {
+        setError(`Mastering failed: ${err.message || 'Unknown error'}`);
+      }
     } finally {
       setIsProcessing(false);
     }

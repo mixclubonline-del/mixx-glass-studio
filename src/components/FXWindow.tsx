@@ -30,6 +30,7 @@ const colorStyles: { [key in TrackData['trackColor']]: { border: string, shadow:
     blue:    { border: 'border-blue-500/80',    shadow: 'shadow-[0_0_20px_theme(colors.blue.500/0.4)]', bg: 'bg-blue-500', nodeGlow: 'shadow-[0_0_15px_2px_theme(colors.blue.500)]', hexForCss: '#3b82f6' },
     green:   { border: 'border-green-500/80',   shadow: 'shadow-[0_0_20px_theme(colors.green.500/0.4)]', bg: 'bg-green-500', nodeGlow: 'shadow-[0_0_15px_2px_theme(colors.green.500)]', hexForCss: '#22c55e' },
     purple:  { border: 'border-violet-500/80',  shadow: 'shadow-[0_0_20px_theme(colors.violet.500/0.4)]', bg: 'bg-violet-500', nodeGlow: 'shadow-[0_0_15px_2px_theme(colors.violet.500)]', hexForCss: '#8b5cf6' },
+    crimson: { border: 'border-rose-500/80',    shadow: 'shadow-[0_0_20px_theme(colors.rose.500/0.4)]', bg: 'bg-rose-500', nodeGlow: 'shadow-[0_0_15px_2px_theme(colors.rose.400)]', hexForCss: '#f43f5e' },
 };
 
 const FXWindow: React.FC<FXWindowProps> = (props) => {

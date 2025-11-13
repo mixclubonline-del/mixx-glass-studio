@@ -237,6 +237,149 @@ button {
   animation: processing-pulse 2s infinite ease-in-out;
 }
 
+@keyframes flow-welcome-drift {
+  0%,
+  100% {
+    transform: translate(-5%, -4%) scale(1.05);
+  }
+  50% {
+    transform: translate(5%, 4%) scale(1.12);
+  }
+}
+
+@keyframes flow-noise-shift {
+  0% {
+    transform: translate3d(-2%, -3%, 0);
+  }
+  50% {
+    transform: translate3d(2%, 3%, 0);
+  }
+  100% {
+    transform: translate3d(-2%, -3%, 0);
+  }
+}
+
+.flow-welcome-shell {
+  position: relative;
+  min-height: 100vh;
+  width: 100%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: clamp(2rem, 6vw, 4rem);
+  overflow: hidden;
+  isolation: isolate;
+}
+
+.flow-welcome-halo {
+  position: absolute;
+  inset: -30%;
+  background: radial-gradient(circle at 40% 30%, rgba(136, 197, 255, 0.35), transparent 60%),
+    radial-gradient(circle at 70% 70%, rgba(175, 124, 255, 0.35), transparent 58%);
+  filter: blur(120px);
+  opacity: 0.85;
+  animation: flow-welcome-drift 18s ease-in-out infinite;
+}
+
+.flow-welcome-noise {
+  position: absolute;
+  inset: -20%;
+  background:
+    radial-gradient(circle at 10% 20%, rgba(255, 255, 255, 0.14), transparent 35%),
+    radial-gradient(circle at 85% 25%, rgba(160, 198, 255, 0.12), transparent 40%),
+    radial-gradient(circle at 55% 80%, rgba(155, 112, 255, 0.16), transparent 45%);
+  mix-blend-mode: screen;
+  opacity: 0.45;
+  animation: flow-noise-shift 24s linear infinite;
+}
+
+.flow-welcome-core {
+  position: relative;
+  z-index: 1;
+  width: min(420px, 80vw);
+  padding: clamp(2.75rem, 6vw, 3.75rem);
+  border-radius: 36px;
+  background: linear-gradient(160deg, rgba(16, 28, 54, 0.85), rgba(32, 52, 92, 0.48));
+  border: 1px solid var(--glass-border);
+  box-shadow: var(--glass-shadow), inset 0 0 0.5px rgba(255, 255, 255, 0.25);
+  backdrop-filter: blur(28px) saturate(160%);
+  text-align: center;
+  color: var(--ink-foreground);
+}
+
+.flow-welcome-lotus {
+  width: clamp(120px, 28vw, 160px);
+  margin: 0 auto clamp(1.75rem, 4vw, 2.25rem);
+  filter: drop-shadow(0 0 26px rgba(165, 124, 255, 0.45));
+}
+
+.flow-welcome-title {
+  font-size: clamp(2.25rem, 6vw, 3.25rem);
+  letter-spacing: 0.52em;
+  margin: 0;
+}
+
+.flow-welcome-mantra {
+  margin: 0.75rem 0 2.5rem;
+  letter-spacing: 0.32em;
+  text-transform: uppercase;
+  color: rgba(226, 233, 255, 0.75);
+  font-size: clamp(0.75rem, 1.8vw, 0.95rem);
+}
+
+.flow-welcome-button {
+  position: relative;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  padding: 0.9rem 2.6rem;
+  border-radius: 999px;
+  border: 1px solid rgba(188, 161, 255, 0.6);
+  background: linear-gradient(140deg, rgba(40, 64, 118, 0.95), rgba(122, 84, 222, 0.72));
+  color: #f8f9ff;
+  font-weight: 600;
+  letter-spacing: 0.24em;
+  text-transform: uppercase;
+  cursor: pointer;
+  box-shadow: 0 22px 45px rgba(8, 24, 54, 0.65);
+  transition: transform 0.25s ease, box-shadow 0.25s ease;
+}
+
+.flow-welcome-button::after {
+  content: "";
+  position: absolute;
+  inset: 0;
+  border-radius: inherit;
+  border: 1px solid rgba(255, 255, 255, 0.28);
+  opacity: 0.6;
+}
+
+.flow-welcome-button:hover,
+.flow-welcome-button:focus-visible {
+  transform: translateY(-3px) scale(1.02);
+  box-shadow: 0 28px 55px rgba(9, 20, 44, 0.75);
+  outline: none;
+}
+
+.flow-welcome-button:active {
+  transform: translateY(0);
+}
+
+.flow-welcome-hint {
+  display: block;
+  margin-top: 1.5rem;
+  letter-spacing: 0.24em;
+  text-transform: uppercase;
+  color: rgba(222, 226, 255, 0.5);
+  font-size: clamp(0.6rem, 1.4vw, 0.75rem);
+}
+
+@media (max-width: 680px) {
+  .flow-welcome-core {
+    padding: 2.5rem;
+  }
+}
+
 /* Scrollbar styling for glass aesthetic */
 ::-webkit-scrollbar {
   width: 8px;

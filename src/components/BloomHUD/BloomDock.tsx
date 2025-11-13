@@ -1,5 +1,5 @@
 import React, { useState, useMemo, useRef, useCallback, useEffect } from 'react';
-import { PlayIcon, PauseIcon, RewindIcon, FastForwardIcon, LoopIcon, HushIcon, SaveIcon, LoadIcon, SlidersIcon, MixerIcon, SquaresPlusIcon, StarIcon, PlusCircleIcon, SparklesIcon, SplitIcon, MergeIcon, RefreshIcon, BulbIcon } from '../icons';
+import { PlayIcon, PauseIcon, RewindIcon, FastForwardIcon, LoopIcon, HushIcon, SaveIcon, LoadIcon, SlidersIcon, MixerIcon, SquaresPlusIcon, StarIcon, PlusCircleIcon, SparklesIcon, SplitIcon, MergeIcon, RefreshIcon, BulbIcon, ArrangeViewIcon } from '../icons';
 import { ArrangeClip, ClipId } from '../../hooks/useArrange';
 import FXMenu from '../FXMenu';
 import { FxWindowConfig, FxWindowId } from '../../App';
@@ -34,6 +34,38 @@ const MasterWaveform: React.FC<{ waveform: Uint8Array, color: string }> = ({ wav
     );
 };
 
+const ViewToggle: React.FC<{
+    mode: 'arrange' | 'mixer';
+    accent: string;
+    onSwitch: (next: 'arrange' | 'mixer') => void;
+}> = ({ mode, accent, onSwitch }) => {
+    const targetMode = mode === 'arrange' ? 'mixer' : 'arrange';
+    const Icon = targetMode === 'mixer' ? MixerIcon : ArrangeViewIcon;
+    const label = targetMode === 'mixer' ? 'Enter Mix View' : 'Return to Arrange';
+
+    return (
+        <button
+            type="button"
+            onClick={() => onSwitch(targetMode)}
+            className="group relative px-4 py-2 rounded-full border border-white/12 bg-glass-surface-soft text-ink/70 hover:text-ink hover:border-white/18 transition-all shadow-[0_18px_46px_rgba(4,12,26,0.38)] backdrop-blur-xl"
+            aria-label={label}
+            title={label}
+        >
+            <span className="flex items-center gap-2 tracking-[0.32em] text-[11px] uppercase">
+                <Icon className="w-5 h-5 text-cyan-200 group-hover:text-ink" />
+                {targetMode === 'mixer' ? 'Mix View' : 'Arrange View'}
+            </span>
+            <span
+                aria-hidden
+                className="pointer-events-none absolute inset-0 rounded-full opacity-0 group-hover:opacity-100 transition-opacity"
+                style={{
+                    boxShadow: `0 0 32px ${hexToRgba(accent, 0.45)}`,
+                }}
+            />
+        </button>
+    );
+};
+
 interface BloomDockProps {
     position: { x: number; y: number };
     onPositionChange: (position: { x: number; y: number }) => void;
@@ -41,8 +73,8 @@ interface BloomDockProps {
     isPlaying: boolean;
     isLooping: boolean;
     onPlayPause: () => void;
-    onRewind: () => void;
-    onFastForward: () => void;
+    onTransportJump: (direction: 'back' | 'forward') => void;
+    onTransportNudge: (direction: 'back' | 'forward') => void;
     onToggleLoop: () => void;
     masterAnalysis: { level: number; transient: boolean; waveform: Uint8Array };
     selectedClips: ArrangeClip[];
@@ -54,44 +86,38 @@ interface BloomDockProps {
     onToggleFxVisibility: (fxId: FxWindowId) => void;
     selectedTrackId: string | null;
     viewMode: 'arrange' | 'mixer';
-    onToggleViewMode: () => void;
+    onViewModeChange: (mode: 'arrange' | 'mixer') => void;
     onOpenAIHub: () => void;
     currentTime: number;
     canRecallLastImport: boolean;
     followPlayhead: boolean;
     contextLabel?: string;
     contextAccent?: string;
+    recordingOptions: {
+        preRoll: boolean;
+        countIn: boolean;
+        inputMonitor: boolean;
+        hushGate: boolean;
+    };
+    onToggleRecordingOption: (option: 'preRoll' | 'countIn' | 'inputMonitor' | 'hushGate') => void;
+    onDropTakeMarker: () => void;
 }
-
-const ViewToggle: React.FC<{ mode: 'arrange' | 'mixer'; onToggle: () => void }> = ({ mode, onToggle }) => {
-    return (
-        <div className="flex items-center space-x-1 p-1 rounded-full border border-glass-border bg-glass-surface shadow-[0_18px_46px_rgba(4,12,26,0.48)] backdrop-blur-xl">
-            <button onClick={onToggle} disabled={mode === 'arrange'} className={`px-3 py-1.5 text-sm rounded-full transition-colors flex items-center space-x-2 ${mode === 'arrange' ? 'bg-gradient-to-r from-cyan-300 via-sky-400 to-indigo-400 text-ink shadow-[0_14px_32px_rgba(56,189,248,0.4)]' : 'text-ink/60 hover:bg-glass-surface-soft hover:text-ink'}`}>
-              <SquaresPlusIcon className="w-5 h-5" />
-              <span>Arrange</span>
-            </button>
-            <button onClick={onToggle} disabled={mode === 'mixer'} className={`px-3 py-1.5 text-sm rounded-full transition-colors flex items-center space-x-2 ${mode === 'mixer' ? 'bg-gradient-to-r from-fuchsia-300 via-violet-400 to-indigo-400 text-ink shadow-[0_14px_32px_rgba(192,132,252,0.4)]' : 'text-ink/60 hover:bg-glass-surface-soft hover:text-ink'}`}>
-              <MixerIcon className="w-5 h-5" />
-              <span>Mix</span>
-            </button>
-        </div>
-    );
-};
-
-const DOCK_DEFAULT_POSITION = { x: 160, y: 664 };
 
 export const BloomDock: React.FC<BloomDockProps> = (props) => {
     const { 
         position,
         onPositionChange,
         alsPulseAgent,
-        isPlaying, isLooping, onPlayPause, onRewind, onFastForward, onToggleLoop,
+        isPlaying, isLooping, onPlayPause, onTransportJump, onTransportNudge, onToggleLoop,
         masterAnalysis, selectedClips, onAction, isAnyTrackArmed, isHushActive, fxWindows,
         fxVisibility, onToggleFxVisibility, selectedTrackId,
-        viewMode, onToggleViewMode, onOpenAIHub,
+        viewMode, onViewModeChange, onOpenAIHub,
         currentTime, canRecallLastImport, followPlayhead,
         contextLabel = 'FLOW',
         contextAccent = '#86efac',
+        recordingOptions,
+        onToggleRecordingOption,
+        onDropTakeMarker,
     } = props;
     
     const containerRef = useRef<HTMLDivElement>(null);
@@ -103,8 +129,9 @@ export const BloomDock: React.FC<BloomDockProps> = (props) => {
     const [isFxMenuOpen, setIsFxMenuOpen] = useState(false);
     const [transportPulse, setTransportPulse] = useState<TransportPulseType | null>(null);
     const transportPulseTimeoutRef = useRef<number | null>(null);
-    const seekIntervalRef = useRef<number | null>(null);
-    const activeSeekRef = useRef<'rewind' | 'forward' | null>(null);
+    const holdTimeoutRef = useRef<number | null>(null);
+    const holdIntervalRef = useRef<number | null>(null);
+    const hasHeldRef = useRef(false);
 
     const clampPosition = useCallback((rawPosition: { x: number; y: number }) => {
         if (typeof window === 'undefined') return rawPosition;
@@ -185,18 +212,11 @@ export const BloomDock: React.FC<BloomDockProps> = (props) => {
     }, [clampPosition, onPositionChange, position.x, position.y]);
 
     useEffect(() => {
-        return () => {
-            if (cleanupDragListenersRef.current) {
-                cleanupDragListenersRef.current();
-            }
-            if (seekIntervalRef.current) {
-                window.clearInterval(seekIntervalRef.current);
-            }
-            if (transportPulseTimeoutRef.current) {
-                window.clearTimeout(transportPulseTimeoutRef.current);
-            }
-        };
-    }, []);
+        const clamped = clampPosition(position);
+        if (clamped.x !== position.x || clamped.y !== position.y) {
+            onPositionChange(clamped);
+        }
+    }, [clampPosition, onPositionChange, position.x, position.y]);
 
     const pulseGlow = alsPulseAgent?.glow ?? '#22d3ee';
     const pulseHalo = alsPulseAgent?.halo ?? '#38bdf8';
@@ -213,6 +233,18 @@ export const BloomDock: React.FC<BloomDockProps> = (props) => {
         background: `linear-gradient(135deg, ${hexToRgba(contextAccent, 0.22)} 0%, rgba(8,14,28,0.92) 60%, rgba(4,7,16,0.9) 100%)`,
     }), [contextAccent, isDragging, pulseGlow, pulseHalo, pulseStrength]);
 
+    const clearSeekTimers = useCallback(() => {
+        if (holdTimeoutRef.current) {
+            window.clearTimeout(holdTimeoutRef.current);
+            holdTimeoutRef.current = null;
+        }
+        if (holdIntervalRef.current) {
+            window.clearInterval(holdIntervalRef.current);
+            holdIntervalRef.current = null;
+        }
+        hasHeldRef.current = false;
+    }, []);
+
     const cueTransportPulse = useCallback((type: TransportPulseType) => {
         setTransportPulse(type);
         if (transportPulseTimeoutRef.current) {
@@ -224,28 +256,47 @@ export const BloomDock: React.FC<BloomDockProps> = (props) => {
         }, 220);
     }, []);
 
-    const stopSeekLoop = useCallback(() => {
-        if (seekIntervalRef.current) {
-            window.clearInterval(seekIntervalRef.current);
-            seekIntervalRef.current = null;
-        }
-        activeSeekRef.current = null;
-    }, []);
+    useEffect(() => {
+        return () => {
+            if (cleanupDragListenersRef.current) {
+                cleanupDragListenersRef.current();
+            }
+            clearSeekTimers();
+            if (transportPulseTimeoutRef.current) {
+                window.clearTimeout(transportPulseTimeoutRef.current);
+            }
+        };
+    }, [clearSeekTimers]);
 
-    const startSeekLoop = useCallback(
-        (direction: 'rewind' | 'forward') => {
-            stopSeekLoop();
-            activeSeekRef.current = direction;
-            const action = direction === 'rewind' ? onRewind : onFastForward;
-            const pulseType: TransportPulseType = direction === 'rewind' ? 'rewind' : 'forward';
-            action();
-            cueTransportPulse(pulseType);
-            seekIntervalRef.current = window.setInterval(() => {
-                action();
-                cueTransportPulse(pulseType);
-            }, 160);
+    const handleSeekPointerDown = useCallback(
+        (direction: 'back' | 'forward') => (event: React.PointerEvent<HTMLButtonElement>) => {
+            event.preventDefault();
+            clearSeekTimers();
+            hasHeldRef.current = false;
+            holdTimeoutRef.current = window.setTimeout(() => {
+                hasHeldRef.current = true;
+                onTransportNudge(direction);
+                cueTransportPulse(direction === 'back' ? 'rewind' : 'forward');
+                holdIntervalRef.current = window.setInterval(() => {
+                    onTransportNudge(direction);
+                    cueTransportPulse(direction === 'back' ? 'rewind' : 'forward');
+                }, 160);
+            }, 220);
         },
-        [cueTransportPulse, onFastForward, onRewind, stopSeekLoop]
+        [clearSeekTimers, cueTransportPulse, onTransportNudge]
+    );
+
+    const handleSeekPointerUp = useCallback(
+        (direction: 'back' | 'forward') => (event: React.PointerEvent<HTMLButtonElement>) => {
+            event.preventDefault();
+            const wasHeld = hasHeldRef.current;
+            clearSeekTimers();
+            if (!wasHeld) {
+                onTransportJump(direction);
+                cueTransportPulse(direction === 'back' ? 'rewind' : 'forward');
+            }
+        },
+        [clearSeekTimers, cueTransportPulse, onTransportJump]
     );
 
     const hasSelection = selectedClips.length > 0;
@@ -330,27 +381,58 @@ export const BloomDock: React.FC<BloomDockProps> = (props) => {
         </div>
     ) : null;
 
+    const recordToggle = (
+        label: string,
+        option: 'preRoll' | 'countIn' | 'inputMonitor',
+        Icon: React.ComponentType<{ className?: string }>,
+        active: boolean
+    ) => (
+        <button
+            onClick={() => onToggleRecordingOption(option)}
+            className={`px-3 py-2 rounded-full border text-[0.55rem] uppercase tracking-[0.3em] flex items-center gap-2 transition-colors ${
+                active
+                    ? 'border-cyan-300/60 text-cyan-200 bg-[rgba(16,66,94,0.45)]'
+                    : 'border-glass-border text-ink/60 bg-glass-surface-soft hover:text-ink'
+            }`}
+        >
+            <Icon className="w-4 h-4" />
+            {label}
+        </button>
+    );
+
     const recordCluster = isAnyTrackArmed ? (
-        <div className="flex items-center gap-2.5">
-            <button
-                onPointerDown={(event) => {
-                    event.preventDefault();
-                    toggleHush();
-                }}
-                onKeyDown={(event) => {
-                    if ((event.key === 'Enter' || event.key === ' ') && !event.repeat) {
-                        event.preventDefault();
+        <div className="flex flex-col gap-2.5">
+            <div className="flex items-center gap-2.5">
+                {recordToggle('Pre-Roll', 'preRoll', LoopIcon, recordingOptions.preRoll)}
+                {recordToggle('Count-In', 'countIn', SparklesIcon, recordingOptions.countIn)}
+                {recordToggle('Monitor', 'inputMonitor', BulbIcon, recordingOptions.inputMonitor)}
+                <button
+                    onClick={() => {
                         toggleHush();
-                    }
-                }}
-                title="Toggle HUSH Input System"
-                className={`w-11 h-11 rounded-full flex items-center justify-center transition-colors ${
-                    isHushActive ? 'text-cyan-300 bg-cyan-500/20 ring-2 ring-cyan-200/50' : 'text-ink/80 bg-glass-surface'
-                } ${transportPulse === 'record' ? 'ring-2 ring-cyan-200/70 scale-[1.03]' : ''}`}
-                aria-label={isHushActive ? 'Deactivate HUSH input system' : 'Activate HUSH input system'}
-            >
-                <HushIcon className="w-6 h-6" />
-            </button>
+                        onToggleRecordingOption('hushGate');
+                    }}
+                    className={`px-3 py-2 rounded-full border text-[0.55rem] uppercase tracking-[0.3em] flex items-center gap-2 transition-colors ${
+                        isHushActive
+                            ? 'border-cyan-300/60 text-cyan-200 bg-[rgba(16,66,94,0.45)]'
+                            : 'border-glass-border text-ink/60 bg-glass-surface-soft hover:text-ink'
+                    }`}
+                    title="Toggle HUSH input system"
+                >
+                    <HushIcon className="w-4 h-4" />
+                    HUSH
+                </button>
+                <button
+                    onClick={() => {
+                        onDropTakeMarker();
+                        cueTransportPulse('record');
+                    }}
+                    className="px-3 py-2 rounded-full border border-rose-300/60 text-rose-200 text-[0.55rem] uppercase tracking-[0.3em] bg-[rgba(88,22,48,0.45)] hover:bg-[rgba(88,22,48,0.6)] transition-colors"
+                    title="Drop take marker"
+                >
+                    <StarIcon className="w-4 h-4" />
+                    Take Mark
+                </button>
+            </div>
         </div>
     ) : null;
 
@@ -395,49 +477,11 @@ export const BloomDock: React.FC<BloomDockProps> = (props) => {
     const handlePlayPointerDown = useCallback(
         (event: React.PointerEvent<HTMLButtonElement>) => {
             event.preventDefault();
-            stopSeekLoop();
+            clearSeekTimers();
             cueTransportPulse(isPlaying ? 'pause' : 'play');
             onPlayPause();
         },
-        [cueTransportPulse, isPlaying, onPlayPause, stopSeekLoop]
-    );
-
-    const handleRewindPointerDown = useCallback(
-        (event: React.PointerEvent<HTMLButtonElement>) => {
-            event.preventDefault();
-            startSeekLoop('rewind');
-            const release = () => {
-                stopSeekLoop();
-                window.removeEventListener('pointerup', release);
-                window.removeEventListener('pointercancel', release);
-            };
-            window.addEventListener('pointerup', release, { once: true });
-            window.addEventListener('pointercancel', release, { once: true });
-        },
-        [startSeekLoop, stopSeekLoop]
-    );
-
-    const handleFastForwardPointerDown = useCallback(
-        (event: React.PointerEvent<HTMLButtonElement>) => {
-            event.preventDefault();
-            startSeekLoop('forward');
-            const release = () => {
-                stopSeekLoop();
-                window.removeEventListener('pointerup', release);
-                window.removeEventListener('pointercancel', release);
-            };
-            window.addEventListener('pointerup', release, { once: true });
-            window.addEventListener('pointercancel', release, { once: true });
-        },
-        [startSeekLoop, stopSeekLoop]
-    );
-
-    const handleSeekButtonPointerUp = useCallback(
-        (event: React.PointerEvent<HTMLButtonElement>) => {
-            event.preventDefault();
-            stopSeekLoop();
-        },
-        [stopSeekLoop]
+        [clearSeekTimers, cueTransportPulse, isPlaying, onPlayPause]
     );
 
     const toggleLoop = useCallback(() => {
@@ -479,10 +523,10 @@ export const BloomDock: React.FC<BloomDockProps> = (props) => {
                 </button>
             </div>
             <button
-                onPointerDown={handleRewindPointerDown}
-                onPointerUp={handleSeekButtonPointerUp}
-                onPointerLeave={handleSeekButtonPointerUp}
-                onPointerCancel={handleSeekButtonPointerUp}
+                onPointerDown={handleSeekPointerDown('back')}
+                onPointerUp={handleSeekPointerUp('back')}
+                onPointerLeave={handleSeekPointerUp('back')}
+                onPointerCancel={handleSeekPointerUp('back')}
                 className={`absolute left-0 z-10 p-2 transition-colors ${
                     transportPulse === 'rewind' ? 'text-cyan-200' : 'text-ink/50 hover:text-ink'
                 }`}
@@ -492,10 +536,10 @@ export const BloomDock: React.FC<BloomDockProps> = (props) => {
                 <RewindIcon className="w-6 h-6" />
             </button>
             <button
-                onPointerDown={handleFastForwardPointerDown}
-                onPointerUp={handleSeekButtonPointerUp}
-                onPointerLeave={handleSeekButtonPointerUp}
-                onPointerCancel={handleSeekButtonPointerUp}
+                onPointerDown={handleSeekPointerDown('forward')}
+                onPointerUp={handleSeekPointerUp('forward')}
+                onPointerLeave={handleSeekPointerUp('forward')}
+                onPointerCancel={handleSeekPointerUp('forward')}
                 className={`absolute right-0 z-10 p-2 transition-colors ${
                     transportPulse === 'forward' ? 'text-cyan-200' : 'text-ink/50 hover:text-ink'
                 }`}
@@ -553,19 +597,19 @@ export const BloomDock: React.FC<BloomDockProps> = (props) => {
                 cueTransportPulse(isPlaying ? 'pause' : 'play');
                 onPlayPause();
             } else if (event.code === 'ArrowLeft') {
-                if (event.repeat) return;
                 event.preventDefault();
-                startSeekLoop('rewind');
+                onTransportNudge('back');
+                cueTransportPulse('rewind');
             } else if (event.code === 'ArrowRight') {
-                if (event.repeat) return;
                 event.preventDefault();
-                startSeekLoop('forward');
+                onTransportNudge('forward');
+                cueTransportPulse('forward');
             }
         };
 
         const handleKeyUp = (event: KeyboardEvent) => {
             if (event.code === 'ArrowLeft' || event.code === 'ArrowRight') {
-                stopSeekLoop();
+                clearSeekTimers();
             }
         };
 
@@ -575,7 +619,7 @@ export const BloomDock: React.FC<BloomDockProps> = (props) => {
             window.removeEventListener('keydown', handleKeyDown);
             window.removeEventListener('keyup', handleKeyUp);
         };
-    }, [cueTransportPulse, isPlaying, onPlayPause, startSeekLoop, stopSeekLoop]);
+    }, [clearSeekTimers, cueTransportPulse, isPlaying, onPlayPause, onTransportNudge]);
 
     return (
         <div
@@ -628,7 +672,7 @@ export const BloomDock: React.FC<BloomDockProps> = (props) => {
                         </div>
                         <div className="w-px h-10 bg-[rgba(102,140,198,0.22)]" />
                         <div className="flex items-center gap-2.5 relative">
-                            <ViewToggle mode={viewMode} onToggle={onToggleViewMode} />
+                            <ViewToggle mode={viewMode} accent={contextAccent} onSwitch={onViewModeChange} />
                             <button
                                 onClick={() => setIsFxMenuOpen((prev) => !prev)}
                                 className="w-11 h-11 rounded-full bg-glass-surface-soft flex items-center justify-center text-ink/70 hover:bg-glass-surface hover:text-ink transition-colors shadow-[inset_0_0_15px_rgba(4,12,26,0.4)]"

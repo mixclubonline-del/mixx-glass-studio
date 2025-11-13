@@ -52,6 +52,7 @@ export const ArrangeClip: React.FC<Props> = ({
     groupId,
     warpAnchors = [],
   } = clip;
+  const { zeroStart = false, zeroEnd = false, autoFade = false } = clip;
   const x = startSec * pps;
   const w = Math.max(pps * durationSec, 8);
   const ref = useRef<HTMLDivElement>(null);
@@ -243,6 +244,20 @@ export const ArrangeClip: React.FC<Props> = ({
             style={{ backgroundColor: feedback.glowColor }}
           />
           <span>{feedback.temperature}</span>
+        </div>
+      )}
+
+      {zeroStart && (
+        <div className="absolute top-1 left-1 w-2.5 h-2.5 rounded-full bg-cyan-300 shadow-[0_0_8px_rgba(56,189,248,0.65)] pointer-events-none" />
+      )}
+
+      {zeroEnd && (
+        <div className="absolute top-1 right-1 w-2.5 h-2.5 rounded-full bg-cyan-300 shadow-[0_0_8px_rgba(56,189,248,0.65)] pointer-events-none" />
+      )}
+
+      {autoFade && (
+        <div className="absolute inset-x-3 top-2 text-[9px] uppercase tracking-[0.45em] text-white/50 text-center pointer-events-none">
+          XF
         </div>
       )}
     </div>

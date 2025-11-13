@@ -1,4 +1,4 @@
-export type TrackColorKey = "cyan" | "magenta" | "blue" | "green" | "purple";
+export type TrackColorKey = "cyan" | "magenta" | "blue" | "green" | "purple" | "crimson";
 
 export type ALSTemperature = "cold" | "cool" | "warm" | "hot";
 
@@ -63,6 +63,7 @@ export const TRACK_COLOR_SWATCH: Record<
   blue: { base: "#3b82f6", glow: "#93c5fd" },
   green: { base: "#22c55e", glow: "#86efac" },
   purple: { base: "#8b5cf6", glow: "#c4b5fd" },
+  crimson: { base: "#f43f5e", glow: "#fb7185" },
 };
 
 export interface PulsePalette {

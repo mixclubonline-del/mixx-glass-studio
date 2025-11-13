@@ -22,6 +22,7 @@ const colorMap = {
   blue: 'bg-blue-500/50 border-blue-400/70 text-blue-200',
   green: 'bg-green-500/50 border-green-400/70 text-green-200',
   purple: 'bg-violet-500/50 border-violet-400/70 text-violet-200',
+  crimson: 'bg-rose-500/50 border-rose-400/70 text-rose-200',
 };
 
 const PluginBadge: React.FC<PluginBadgeProps> = ({

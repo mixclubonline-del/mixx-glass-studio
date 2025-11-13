@@ -30,6 +30,7 @@ import {
 import type { TrackALSFeedback, ALSActionPulse } from '../../utils/ALS';
 import { publishAlsSignal } from '../../state/flowSignals';
 import type { PluginPreset } from '../../utils/pluginState';
+import TrapSamplerConsole from '../sampler/TrapSamplerConsole';
 
 interface FlowConsoleProps {
   tracks: TrackData[];
@@ -97,6 +98,7 @@ interface FlowConsoleProps {
     fxId: string,
     paramName: string
   ) => void;
+  tempoBpm?: number;
 }
 
 interface PluginInventoryItem {
@@ -168,6 +170,7 @@ const FlowConsole: React.FC<FlowConsoleProps> = ({
   buses = [],
   onSelectBus,
   onToggleAutomationLaneWithParam,
+  tempoBpm = 140,
 }) => {
   const [stageHeights, setStageHeights] = useState(computeStageHeights);
 
@@ -224,18 +227,17 @@ const FlowConsole: React.FC<FlowConsoleProps> = ({
   const stageWidth = Math.max(consoleWidth, viewportWidth - 96);
 
   return (
-    <div className="w-full h-full flex flex-col items-center justify-center py-6 px-4">
-      <div className="relative w-full h-full">
-        <div className="absolute inset-0 pointer-events-none">
+    <div className="flex h-full w-full flex-col gap-6 px-4 py-6 lg:flex-row">
+      <div className="relative flex-1 overflow-hidden rounded-[32px] border border-white/8 bg-[rgba(8,12,24,0.82)] shadow-[0_32px_90px_rgba(4,12,26,0.6)]">
+        <div className="pointer-events-none absolute inset-0">
           <div className="absolute inset-x-0 top-0 h-32 bg-gradient-to-b from-[rgba(21,45,88,0.9)] via-transparent to-transparent" />
-          <div className="absolute inset-y-0 left-0 w-24 bg-gradient-to-r from-[rgba(12,28,58,0.75)] via-[rgba(12,28,58,0.2)] to-transparent" />
-          <div className="absolute inset-y-0 right-0 w-24 bg-gradient-to-l from-[rgba(12,28,58,0.75)] via-[rgba(12,28,58,0.2)] to-transparent" />
-          <div className="absolute left-1/2 -translate-x-1/2 top-8 h-1 w-2/3 rounded-full bg-gradient-to-r from-[rgba(64,120,210,0.45)] via-[rgba(126,162,235,0.35)] to-[rgba(64,120,210,0.45)] blur-sm" />
+          <div className="absolute inset-y-0 left-0 w-20 bg-gradient-to-r from-[rgba(12,28,58,0.75)] via-[rgba(12,28,58,0.2)] to-transparent" />
+          <div className="absolute inset-y-0 right-0 w-20 bg-gradient-to-l from-[rgba(12,28,58,0.75)] via-[rgba(12,28,58,0.2)] to-transparent" />
+          <div className="absolute left-1/2 top-8 h-1 w-2/3 -translate-x-1/2 rounded-full bg-gradient-to-r from-[rgba(64,120,210,0.45)] via-[rgba(126,162,235,0.35)] to-[rgba(64,120,210,0.45)] blur-sm" />
         </div>
-
-        <div className="overflow-x-auto">
+        <div className="relative h-full w-full overflow-x-auto">
           <div
-            className="relative mx-auto h-full flex flex-col"
+            className="relative mx-auto flex h-full flex-col"
             style={{ width: stageWidth, height: stageHeights.stageHeight }}
           >
             <div className="flex items-end justify_center gap-x-3">
@@ -345,6 +347,9 @@ const FlowConsole: React.FC<FlowConsoleProps> = ({
             </div>
           </div>
         </div>
+      </div>
+      <div className="flex w-full justify-center lg:w-auto lg:min-w-[420px]">
+        <TrapSamplerConsole tempoBpm={tempoBpm} />
       </div>
     </div>
   );

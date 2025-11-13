@@ -2,7 +2,7 @@
 import React, { useState } from 'react';
 import { TrackData } from '../App';
 
-type NewTrackData = Omit<TrackData, 'id'>;
+type NewTrackData = Pick<TrackData, 'trackName' | 'trackColor' | 'waveformType' | 'group'>;
 
 interface AddTrackModalProps {
   onClose: () => void;
@@ -66,6 +66,7 @@ const AddTrackModal: React.FC<AddTrackModalProps> = ({ onClose, onAddTrack }) =>
               <option value="blue">Blue</option>
               <option value="green">Green</option>
               <option value="purple">Purple</option>
+              <option value="crimson">Crimson</option>
             </select>
           </div>
           <div>

@@ -32,6 +32,9 @@ export interface ArrangeClip {
   sourceFileName?: string | null;
   sourceFingerprint?: string | null;
   lastIngestAt?: number | null;
+  zeroStart?: boolean;
+  zeroEnd?: boolean;
+  autoFade?: boolean;
 }
 
 export interface ArrangeState {
@@ -65,6 +68,9 @@ export function useArrange(initial: Partial<{ clips: (Omit<ArrangeClip, 'bufferI
     warpAnchors: Array.isArray(c.warpAnchors)
       ? c.warpAnchors.map((anchor) => Number(anchor) || 0).filter((anchor) => anchor >= 0)
       : [],
+    zeroStart: c.zeroStart ?? false,
+    zeroEnd: c.zeroEnd ?? false,
+    autoFade: c.autoFade ?? false,
   })) ?? []);
   // FIX: Added missing useState hooks for selection, pixelsPerSecond, and scrollX.
   const [selection, setSelectionState] = useState<ArrangeState['selection']>(initial.selection ?? null);

@@ -30,6 +30,7 @@ export interface MusicalContext {
 export interface MasteringProfile {
   name: string;
   targetLUFS: number;
+  truePeakCeiling: number;
   velvetFloor: VelvetFloorSettings;
   harmonicLattice: HarmonicLatticeSettings;
   phaseWeave: PhaseWeaveSettings;
@@ -56,6 +57,7 @@ export const MASTERING_PROFILES = {
   streaming: {
     name: 'Streaming Standard',
     targetLUFS: -14,
+    truePeakCeiling: -1,
     velvetFloor: { depth: 70, translation: 'deep', warmth: 60 },
     harmonicLattice: { character: 'warm', presence: 75, airiness: 70 },
     phaseWeave: { width: 80, monoCompatibility: 90 },
@@ -63,11 +65,43 @@ export const MASTERING_PROFILES = {
   club: {
     name: 'Club Mix',
     targetLUFS: -9,
+    truePeakCeiling: -0.8,
     velvetFloor: { depth: 90, translation: 'resonant', warmth: 70 },
     harmonicLattice: { character: 'bright', presence: 85, airiness: 80 },
     phaseWeave: { width: 90, monoCompatibility: 80 },
   } as MasteringProfile,
-  // Add more profiles as needed
+  appleMusic: {
+    name: 'Apple Music',
+    targetLUFS: -16,
+    truePeakCeiling: -1,
+    velvetFloor: { depth: 65, translation: 'deep', warmth: 55 },
+    harmonicLattice: { character: 'warm', presence: 70, airiness: 68 },
+    phaseWeave: { width: 78, monoCompatibility: 92 },
+  } as MasteringProfile,
+  spotify: {
+    name: 'Spotify Loud',
+    targetLUFS: -14,
+    truePeakCeiling: -1,
+    velvetFloor: { depth: 72, translation: 'deep', warmth: 62 },
+    harmonicLattice: { character: 'neutral', presence: 74, airiness: 72 },
+    phaseWeave: { width: 82, monoCompatibility: 88 },
+  } as MasteringProfile,
+  tidal: {
+    name: 'Tidal HiFi',
+    targetLUFS: -14,
+    truePeakCeiling: -2,
+    velvetFloor: { depth: 68, translation: 'subtle', warmth: 58 },
+    harmonicLattice: { character: 'warm', presence: 72, airiness: 75 },
+    phaseWeave: { width: 85, monoCompatibility: 86 },
+  } as MasteringProfile,
+  dolbyAtmos: {
+    name: 'Dolby Atmos Music',
+    targetLUFS: -18,
+    truePeakCeiling: -1,
+    velvetFloor: { depth: 60, translation: 'subtle', warmth: 50 },
+    harmonicLattice: { character: 'neutral', presence: 68, airiness: 80 },
+    phaseWeave: { width: 92, monoCompatibility: 95 },
+  } as MasteringProfile,
 };
 
 // ─────────────────────────────────────────────────────────────────────────────

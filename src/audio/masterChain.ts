@@ -1,67 +1,421 @@
+import { MasteringProfile, MASTERING_PROFILES } from '../types/sonic-architecture';
+import {
+  createHarmonicLatticeStage,
+  createPhaseWeaveStage,
+  createVelvetCurveStage,
+  createVelvetFloorStage,
+  createSaturationCurve,
+} from './fivePillars';
+import { createDcBlocker } from './utils';
+import { createTruePeakLimiterNode } from './VelvetTruePeakLimiter';
+import { createDitherNode } from './DitherNode';
 
+type MasterProfileKey = keyof typeof MASTERING_PROFILES;
 
-import { createDcBlocker } from "./utils";
+const DEFAULT_PROFILE_KEY: MasterProfileKey = 'streaming';
+const REFERENCE_LUFS = -14;
 
-export function buildMasterChain(ctx: AudioContext | OfflineAudioContext) {
+interface MidSideStage {
+  input: GainNode;
+  output: GainNode;
+  midFilter: BiquadFilterNode;
+  sideShelf: BiquadFilterNode;
+  sideCompressor: DynamicsCompressorNode;
+}
+
+interface MultiBandStage {
+  input: GainNode;
+  output: GainNode;
+  low: { filter: BiquadFilterNode; compressor: DynamicsCompressorNode; gain: GainNode };
+  mid: { filter: BiquadFilterNode; compressor: DynamicsCompressorNode; gain: GainNode };
+  high: { filter: BiquadFilterNode; enhancer: WaveShaperNode; gain: GainNode };
+}
+
+export interface VelvetMasterChain {
+  input: AudioNode;
+  output: GainNode;
+  analyser: AnalyserNode;
+  complianceTap: GainNode;
+  midSideStage: MidSideStage;
+  multiBandStage: MultiBandStage;
+  velvetFloor: ReturnType<typeof createVelvetFloorStage>;
+  harmonicLattice: ReturnType<typeof createHarmonicLatticeStage>;
+  phaseWeave: ReturnType<typeof createPhaseWeaveStage>;
+  velvetCurve: ReturnType<typeof createVelvetCurveStage>;
+  glue: DynamicsCompressorNode;
+  colorDrive: GainNode;
+  colorShaper: WaveShaperNode;
+  softLimiter: DynamicsCompressorNode;
+  truePeakLimiter: AudioNode;
+  dither: AudioNode;
+  preLimiterTap: GainNode;
+  preLimiterAnalyser: AnalyserNode;
+  postLimiterAnalyser: AnalyserNode;
+  panner: StereoPannerNode;
+  masterGain: GainNode;
+  setProfile: (profile: MasteringProfile | MasterProfileKey) => void;
+  getProfile: () => MasteringProfile;
+  setOutputCeiling: (ceilingDb: number) => void;
+  setMasterTrim: (gain: number) => void;
+}
+
+export async function buildMasterChain(
+  ctx: AudioContext | OfflineAudioContext
+): Promise<VelvetMasterChain> {
+  const profile = MASTERING_PROFILES[DEFAULT_PROFILE_KEY];
+
   const dc = createDcBlocker(ctx);
+  const velvetFloor = createVelvetFloorStage(ctx, profile.velvetFloor);
+  const harmonicLattice = createHarmonicLatticeStage(ctx, profile.harmonicLattice);
+  const phaseWeave = createPhaseWeaveStage(ctx, profile.phaseWeave);
+  const velvetCurve = createVelvetCurveStage(ctx);
+  const midSideStage = createMidSideStage(ctx);
+  const multiBandStage = createMultiBandStage(ctx);
 
-  // gentle bus glue
-  const glue = ctx.createDynamicsCompressor();
-  glue.threshold.value = -18; // dB
-  glue.ratio.value = 1.8;
-  glue.attack.value = 0.015;
-  glue.release.value = 0.15;
-  glue.knee.value = 1;
+  const glue = createGlueCompressor(ctx);
+  const { drive: colorDrive, shaper: colorShaper } = createVelvetSaturator(ctx);
 
-  // soft saturator
-  const drive = ctx.createGain(); drive.gain.value = 1.0;
-  const shaper = ctx.createWaveShaper();
-  const curve = new Float32Array(1024);
-  for (let i=0;i<curve.length;i++){
-    const x = (i/ (curve.length-1)) * 2 - 1; // -1..1
-    curve[i] = Math.tanh(2.2 * x);
-  }
-  shaper.curve = curve;
+  const preLimiterTap = ctx.createGain();
+  preLimiterTap.gain.value = 1;
+  const complianceTap = ctx.createGain();
+  complianceTap.gain.value = 1;
 
-  // temp limiter (swap to lookahead worklet in next step)
-  const limiter = ctx.createDynamicsCompressor();
-  limiter.threshold.value = -1.0;
-  limiter.ratio.value = 20;
-  limiter.attack.value = 0.001;
-  limiter.release.value = 0.08;
-  limiter.knee.value = 0;
+  const preLimiterAnalyser = createAnalyser(ctx, 512, 0.6);
+  const softLimiter = createLimiter(ctx, {
+    threshold: -6,
+    ratio: 6,
+    attack: 0.01,
+    release: 0.1,
+    knee: 4,
+  });
 
-  // pre-limiter tap (for true-peak meter)
-  const preLimiter = ctx.createGain();
-  
-  // Master panner for balance control
+  const truePeakLimiter = await createTruePeakLimiterNode(ctx, -1);
+  const dither = await createDitherNode(ctx);
+
+  const postLimiterAnalyser = createAnalyser(ctx, 2048, 0.75);
   const panner = ctx.createStereoPanner();
+  const masterGain = ctx.createGain();
 
-  // Master analyser for HUD visualization
-  const analyser = ctx.createAnalyser();
-  analyser.fftSize = 256;
-  analyser.smoothingTimeConstant = 0.6;
+  masterGain.gain.value = gainForLUFS(profile.targetLUFS);
 
-  const masterOutputGain = ctx.createGain();
-  masterOutputGain.gain.value = 1.0;
+  const currentProfile = { value: profile };
 
-  // wire
-  dc.connect(glue);
-  glue.connect(drive); drive.connect(shaper);
-  shaper.connect(preLimiter);
-  preLimiter.connect(analyser);
-  analyser.connect(limiter);
-  limiter.connect(panner);
-  panner.connect(masterOutputGain);
+  dc.connect(velvetFloor.input);
+  velvetFloor.output.connect(harmonicLattice.input);
+  harmonicLattice.output.connect(phaseWeave.input);
+  phaseWeave.output.connect(velvetCurve.input);
+  velvetCurve.output.connect(midSideStage.input);
+  midSideStage.output.connect(multiBandStage.input);
+  multiBandStage.output.connect(glue);
+  glue.connect(colorDrive);
+  colorDrive.connect(colorShaper);
+  colorShaper.connect(preLimiterTap);
+
+  preLimiterTap.connect(preLimiterAnalyser);
+  preLimiterTap.connect(complianceTap);
+  complianceTap.connect(softLimiter);
+
+  softLimiter.connect(truePeakLimiter);
+  truePeakLimiter.connect(postLimiterAnalyser);
+  postLimiterAnalyser.connect(dither);
+  dither.connect(panner);
+  panner.connect(masterGain);
+
+  const setProfile = (next: MasteringProfile | MasterProfileKey) => {
+    const resolved =
+      typeof next === 'string' ? MASTERING_PROFILES[next] : next;
+
+    currentProfile.value = resolved;
+
+    velvetFloor.setSettings(resolved.velvetFloor);
+    harmonicLattice.setSettings(resolved.harmonicLattice);
+    phaseWeave.setSettings(resolved.phaseWeave);
+    masterGain.gain.setTargetAtTime(
+      gainForLUFS(resolved.targetLUFS),
+      ctx.currentTime,
+      0.02
+    );
+
+    recalibrateGlue(glue, resolved);
+    recalibrateSaturator(colorDrive, resolved);
+    setOutputCeiling(resolved.truePeakCeiling);
+  };
+
+  const setOutputCeiling = (ceilingDb: number) => {
+    if (truePeakLimiter instanceof AudioWorkletNode) {
+      truePeakLimiter.parameters
+        .get('threshold')
+        ?.setValueAtTime(ceilingDb, ctx.currentTime);
+    } else if (truePeakLimiter instanceof DynamicsCompressorNode) {
+      truePeakLimiter.threshold.setTargetAtTime(
+        ceilingDb,
+        ctx.currentTime,
+        0.002
+      );
+    }
+  };
+
+  const setMasterTrim = (gain: number) => {
+    masterGain.gain.setTargetAtTime(gain, ctx.currentTime, 0.01);
+  };
+
+  const getProfile = () => currentProfile.value;
+
+  setOutputCeiling(profile.truePeakCeiling);
 
   return {
     input: dc,
+    output: masterGain,
+    analyser: postLimiterAnalyser,
+    complianceTap,
+    midSideStage,
+    multiBandStage,
+    velvetFloor,
+    harmonicLattice,
+    phaseWeave,
+    velvetCurve,
     glue,
-    shaper,
-    preLimiter,
-    analyser,
-    limiter,
+    colorDrive,
+    colorShaper,
+    softLimiter,
+    truePeakLimiter,
+    dither,
+    preLimiterTap,
+    preLimiterAnalyser,
+    postLimiterAnalyser,
     panner,
-    output: masterOutputGain,
+    masterGain,
+    setProfile,
+    getProfile,
+    setOutputCeiling,
+    setMasterTrim,
   };
+}
+
+function createGlueCompressor(
+  ctx: AudioContext | OfflineAudioContext
+): DynamicsCompressorNode {
+  const glue = ctx.createDynamicsCompressor();
+  glue.threshold.value = -18;
+  glue.ratio.value = 2.2;
+  glue.attack.value = 0.015;
+  glue.release.value = 0.25;
+  glue.knee.value = 2;
+  return glue;
+}
+
+function createVelvetSaturator(ctx: AudioContext | OfflineAudioContext) {
+  const drive = ctx.createGain();
+  drive.gain.value = 1.0;
+
+  const shaper = ctx.createWaveShaper();
+  shaper.curve = createSaturationCurve(0.45);
+
+  return { drive, shaper };
+}
+
+function createMidSideStage(ctx: AudioContext | OfflineAudioContext): MidSideStage {
+  const input = ctx.createGain();
+  const output = ctx.createGain();
+
+  const splitter = ctx.createChannelSplitter(2);
+  const merger = ctx.createChannelMerger(2);
+
+  const midNode = ctx.createGain();
+  const sideNode = ctx.createGain();
+
+  const midFilter = ctx.createBiquadFilter();
+  midFilter.type = 'peaking';
+  midFilter.frequency.value = 320;
+  midFilter.gain.value = -1.5;
+  midFilter.Q.value = 1;
+
+  const sideShelf = ctx.createBiquadFilter();
+  sideShelf.type = 'highshelf';
+  sideShelf.frequency.value = 6500;
+  sideShelf.gain.value = 1.5;
+
+  const sideCompressor = ctx.createDynamicsCompressor();
+  sideCompressor.threshold.value = -26;
+  sideCompressor.ratio.value = 1.8;
+  sideCompressor.attack.value = 0.002;
+  sideCompressor.release.value = 0.12;
+  sideCompressor.knee.value = 6;
+
+  const leftMid = ctx.createGain();
+  const rightMid = ctx.createGain();
+  const leftSide = ctx.createGain();
+  const rightSide = ctx.createGain();
+  leftMid.gain.value = Math.SQRT1_2;
+  rightMid.gain.value = Math.SQRT1_2;
+  leftSide.gain.value = Math.SQRT1_2;
+  rightSide.gain.value = -Math.SQRT1_2;
+
+  input.connect(splitter);
+
+  splitter.connect(leftMid, 0);
+  splitter.connect(rightMid, 1);
+  splitter.connect(leftSide, 0);
+  splitter.connect(rightSide, 1);
+
+  leftMid.connect(midNode);
+  rightMid.connect(midNode);
+  midNode.connect(midFilter);
+
+  leftSide.connect(sideNode);
+  rightSide.connect(sideNode);
+  sideNode.connect(sideShelf);
+  sideShelf.connect(sideCompressor);
+
+  const midToLeft = ctx.createGain();
+  midToLeft.gain.value = Math.SQRT1_2;
+  const midToRight = ctx.createGain();
+  midToRight.gain.value = Math.SQRT1_2;
+  const sideToLeft = ctx.createGain();
+  sideToLeft.gain.value = Math.SQRT1_2;
+  const sideToRight = ctx.createGain();
+  sideToRight.gain.value = -Math.SQRT1_2;
+
+  midFilter.connect(midToLeft);
+  midFilter.connect(midToRight);
+  sideCompressor.connect(sideToLeft);
+  sideCompressor.connect(sideToRight);
+
+  midToLeft.connect(merger, 0, 0);
+  sideToLeft.connect(merger, 0, 0);
+  midToRight.connect(merger, 0, 1);
+  sideToRight.connect(merger, 0, 1);
+
+  merger.connect(output);
+
+  return {
+    input,
+    output,
+    midFilter,
+    sideShelf,
+    sideCompressor,
+  };
+}
+
+function createMultiBandStage(ctx: AudioContext | OfflineAudioContext): MultiBandStage {
+  const input = ctx.createGain();
+  const output = ctx.createGain();
+
+  const lowFilter = ctx.createBiquadFilter();
+  lowFilter.type = 'lowpass';
+  lowFilter.frequency.value = 120;
+  lowFilter.Q.value = 0.707;
+
+  const lowComp = ctx.createDynamicsCompressor();
+  lowComp.threshold.value = -30;
+  lowComp.ratio.value = 2.2;
+  lowComp.attack.value = 0.015;
+  lowComp.release.value = 0.18;
+  lowComp.knee.value = 4;
+  const lowGain = ctx.createGain();
+  lowGain.gain.value = 1.05;
+
+  const midFilter = ctx.createBiquadFilter();
+  midFilter.type = 'bandpass';
+  midFilter.frequency.value = 1600;
+  midFilter.Q.value = 0.9;
+  const midComp = ctx.createDynamicsCompressor();
+  midComp.threshold.value = -22;
+  midComp.ratio.value = 1.6;
+  midComp.attack.value = 0.008;
+  midComp.release.value = 0.25;
+  midComp.knee.value = 6;
+  const midGain = ctx.createGain();
+  midGain.gain.value = 1;
+
+  const highFilter = ctx.createBiquadFilter();
+  highFilter.type = 'highpass';
+  highFilter.frequency.value = 5500;
+  highFilter.Q.value = 0.7;
+
+  const highEnhancer = ctx.createWaveShaper();
+  const curveSize = 512;
+  const curve = new Float32Array(curveSize);
+  for (let i = 0; i < curveSize; i++) {
+    const x = (i / (curveSize - 1)) * 2 - 1;
+    curve[i] = x >= 0 ? Math.pow(x, 0.8) : -Math.pow(-x, 0.8);
+  }
+  highEnhancer.curve = curve;
+  const highGain = ctx.createGain();
+  highGain.gain.value = 1.1;
+
+  input.connect(lowFilter);
+  input.connect(midFilter);
+  input.connect(highFilter);
+
+  lowFilter.connect(lowComp);
+  lowComp.connect(lowGain);
+  lowGain.connect(output);
+
+  midFilter.connect(midComp);
+  midComp.connect(midGain);
+  midGain.connect(output);
+
+  highFilter.connect(highEnhancer);
+  highEnhancer.connect(highGain);
+  highGain.connect(output);
+
+  return {
+    input,
+    output,
+    low: { filter: lowFilter, compressor: lowComp, gain: lowGain },
+    mid: { filter: midFilter, compressor: midComp, gain: midGain },
+    high: { filter: highFilter, enhancer: highEnhancer, gain: highGain },
+  };
+}
+
+function createLimiter(
+  ctx: AudioContext | OfflineAudioContext,
+  config: { threshold: number; ratio: number; attack: number; release: number; knee: number }
+): DynamicsCompressorNode {
+  const limiter = ctx.createDynamicsCompressor();
+  limiter.threshold.value = config.threshold;
+  limiter.ratio.value = config.ratio;
+  limiter.attack.value = config.attack;
+  limiter.release.value = config.release;
+  limiter.knee.value = config.knee;
+  return limiter;
+}
+
+function createAnalyser(
+  ctx: AudioContext | OfflineAudioContext,
+  fftSize: number,
+  smoothing: number
+): AnalyserNode {
+  const analyser = ctx.createAnalyser();
+  analyser.fftSize = fftSize;
+  analyser.smoothingTimeConstant = smoothing;
+  return analyser;
+}
+
+function recalibrateGlue(
+  glue: DynamicsCompressorNode,
+  profile: MasteringProfile
+) {
+  const isClub = profile.targetLUFS >= -10;
+  const threshold = isClub ? -14 : -18;
+  const ratio = isClub ? 2.5 : 2.2;
+
+  glue.threshold.setTargetAtTime(threshold, glue.context.currentTime, 0.02);
+  glue.ratio.setTargetAtTime(ratio, glue.context.currentTime, 0.02);
+}
+
+function recalibrateSaturator(drive: GainNode, profile: MasteringProfile) {
+  const reference = Math.max(-14, Math.min(-8, profile.targetLUFS));
+  const extraGain = (REFERENCE_LUFS - reference) / 20;
+  drive.gain.setTargetAtTime(
+    1 + extraGain,
+    drive.context.currentTime,
+    0.02
+  );
+}
+
+function gainForLUFS(targetLUFS: number) {
+  const delta = targetLUFS - REFERENCE_LUFS;
+  return Math.pow(10, delta / 20);
 }

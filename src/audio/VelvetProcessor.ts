@@ -1,9 +1,10 @@
-import { 
-  MasteringProfile, 
-  VelvetFloorSettings, 
-  HarmonicLatticeSettings, 
-  PhaseWeaveSettings 
-} from '../types/sonic-architecture';
+import { MasteringProfile } from '../types/sonic-architecture';
+import {
+  createVelvetFloorStage,
+  createHarmonicLatticeStage,
+  createPhaseWeaveStage,
+  createVelvetCurveStage,
+} from './fivePillars';
 
 export interface VelvetProcessorOptions {
   profile: MasteringProfile;
@@ -39,16 +40,25 @@ export class VelvetProcessor {
     source.buffer = inputBuffer;
 
     // 🎵 VELVET FLOOR - Sub-harmonic foundation
-    const velvetFloor = this.createVelvetFloor(offlineContext, profile.velvetFloor);
+    const velvetFloor = createVelvetFloorStage(
+      offlineContext,
+      profile.velvetFloor
+    );
     
     // 🎶 HARMONIC LATTICE - Upper harmonic warmth
-    const harmonicLattice = this.createHarmonicLattice(offlineContext, profile.harmonicLattice);
+    const harmonicLattice = createHarmonicLatticeStage(
+      offlineContext,
+      profile.harmonicLattice
+    );
     
     // 🌀 PHASE WEAVE - Stereo imaging
-    const phaseWeave = this.createPhaseWeave(offlineContext, profile.phaseWeave);
+    const phaseWeave = createPhaseWeaveStage(
+      offlineContext,
+      profile.phaseWeave
+    );
     
     // 👑 VELVET CURVE - MixxClub signature
-    const velvetCurve = this.createVelvetCurve(offlineContext);
+    const velvetCurve = createVelvetCurveStage(offlineContext);
     
     // Master gain for LUFS targeting
     const masterGain = offlineContext.createGain();
@@ -100,137 +110,6 @@ export class VelvetProcessor {
   }
 
   /**
-   * 🎵 VELVET FLOOR - Sub-harmonic foundation
-   */
-  private createVelvetFloor(ctx: BaseAudioContext, settings: VelvetFloorSettings) {
-    const input = ctx.createGain();
-    const output = ctx.createGain();
-    
-    // Low-pass filter for sub isolation
-    const lowPass = ctx.createBiquadFilter();
-    lowPass.type = 'lowpass';
-    lowPass.frequency.value = 150; // Sub range
-    lowPass.Q.value = 0.7;
-    
-    // Harmonic exciter for warmth
-    const exciter = ctx.createWaveShaper();
-    const saturationCurve = this.createSaturationCurve(settings.warmth / 100);
-    exciter.curve = saturationCurve;
-    
-    // Makeup gain based on depth
-    const makeup = ctx.createGain();
-    makeup.gain.value = 1 + (settings.depth / 200); // Boost bass based on depth
-    
-    // Connect: input → lowPass → exciter → makeup → output
-    input.connect(lowPass);
-    lowPass.connect(exciter);
-    exciter.connect(makeup);
-    makeup.connect(output);
-    
-    // Also pass dry signal (simplified, could be mixed)
-    input.connect(output);
-    
-    return { input, output };
-  }
-
-  /**
-   * 🎶 HARMONIC LATTICE - Upper harmonic warmth
-   */
-  private createHarmonicLattice(ctx: BaseAudioContext, settings: HarmonicLatticeSettings) {
-    const input = ctx.createGain();
-    const output = ctx.createGain();
-    
-    // Mid-range presence boost
-    const midBoost = ctx.createBiquadFilter();
-    midBoost.type = 'peaking';
-    midBoost.frequency.value = 1000; // Mid range
-    midBoost.Q.value = 1.0;
-    midBoost.gain.value = (settings.presence - 65) / 5; // Subtle boost/cut
-    
-    // High-frequency air
-    const highShelf = ctx.createBiquadFilter();
-    highShelf.type = 'highshelf';
-    highShelf.frequency.value = 8000;
-    highShelf.gain.value = (settings.airiness - 60) / 10; // Subtle air
-    
-    // Character saturation
-    const saturation = ctx.createWaveShaper();
-    const saturationAmount = this.getCharacterSaturation(settings.character);
-    const saturationCurve = this.createSaturationCurve(saturationAmount);
-    saturation.curve = saturationCurve;
-    
-    // Connect: input → midBoost → highShelf → saturation → output
-    input.connect(midBoost);
-    midBoost.connect(highShelf);
-    highShelf.connect(saturation);
-    saturation.connect(output);
-    
-    return { input, output };
-  }
-
-  /**
-   * 🌀 PHASE WEAVE - Stereo imaging
-   */
-  private createPhaseWeave(ctx: BaseAudioContext, settings: PhaseWeaveSettings) {
-    const input = ctx.createGain();
-    const output = ctx.createGain();
-    
-    // Stereo width control (simplified)
-    const widthGain = (settings.width / 100) * 1.5; // Scale to usable range
-    
-    // Mid/side processing simulation
-    const midGain = ctx.createGain();
-    midGain.gain.value = 1.0; // Mono component
-    
-    const sideGain = ctx.createGain();
-    sideGain.gain.value = widthGain; // Stereo component
-    
-    // Simple stereo widening
-    input.connect(midGain);
-    midGain.connect(output);
-    
-    input.connect(sideGain);
-    sideGain.connect(output);
-    
-    return { input, output };
-  }
-
-  /**
-   * 👑 VELVET CURVE - MixxClub signature
-   */
-  private createVelvetCurve(ctx: BaseAudioContext) {
-    const input = ctx.createGain();
-    const output = ctx.createGain();
-    
-    // Gentle multi-band compression simulation
-    const lowComp = ctx.createDynamicsCompressor();
-    lowComp.threshold.value = -24;
-    lowComp.ratio.value = 3;
-    lowComp.attack.value = 0.01;
-    lowComp.release.value = 0.25;
-    
-    // Low-pass for low band
-    const lowPass = ctx.createBiquadFilter();
-    lowPass.type = 'lowpass';
-    lowPass.frequency.value = 200;
-    
-    // High-pass for high band
-    const highPass = ctx.createBiquadFilter();
-    highPass.type = 'highpass';
-    highPass.frequency.value = 200;
-    
-    // Split signal and process
-    input.connect(lowPass);
-    lowPass.connect(lowComp);
-    lowComp.connect(output);
-    
-    input.connect(highPass);
-    highPass.connect(output);
-    
-    return { input, output };
-  }
-
-  /**
    * Create safety limiter (-1dB ceiling)
    */
   private createLimiter(ctx: BaseAudioContext) {
@@ -248,36 +127,6 @@ export class VelvetProcessor {
     limiter.connect(output);
     
     return { input, output };
-  }
-
-  /**
-   * Create saturation curve for harmonic excitement
-   */
-  private createSaturationCurve(amount: number) {
-    const samples = 1024;
-    const curve = new Float32Array(samples);
-    const deg = Math.PI / 180;
-    
-    for (let i = 0; i < samples; i++) {
-      const x = (i * 2) / samples - 1;
-      const y = ((3 + amount) * x * 20 * deg) / (Math.PI + amount * Math.abs(x));
-      curve[i] = y;
-    }
-    
-    return curve;
-  }
-
-  /**
-   * Get saturation amount based on character
-   */
-  private getCharacterSaturation(character: string): number {
-    switch (character) {
-      case 'vintage': return 0.6;
-      case 'warm': return 0.4;
-      case 'bright': return 0.2;
-      case 'neutral': return 0.1;
-      default: return 0.1;
-    }
   }
 
   /**

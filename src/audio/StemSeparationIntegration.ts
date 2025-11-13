@@ -72,6 +72,7 @@ const TRACK_COLOR_SWATCH: Record<TrackData['trackColor'], string> = {
   blue: '#3b82f6',
   green: '#22c55e',
   purple: '#8b5cf6',
+  crimson: '#f43f5e',
 };
 
 export class StemSeparationIntegration {
@@ -264,7 +265,7 @@ export class StemSeparationIntegration {
     const buffers: { [key: string]: AudioBuffer } = {};
     const mixerSettings: { [key: string]: MixerSettings } = {};
 
-    const trackColors: TrackData['trackColor'][] = ['cyan', 'magenta', 'blue', 'green', 'purple'];
+    const trackColors: TrackData['trackColor'][] = ['cyan', 'magenta', 'blue', 'green', 'purple', 'crimson'];
     const color = trackColors[startTrackIndex % trackColors.length];
     const baseName = fileName.replace(/\.[^/.]+$/, '').toUpperCase();
     const timestamp = Date.now();

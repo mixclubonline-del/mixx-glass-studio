@@ -1,18 +1,21 @@
 // src/components/ArrangeWindow.tsx
 import React, { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { ArrangeClip as ClipModel, useArrange, ClipId } from "../hooks/useArrange";
+import { recordSessionProbeTimelineEvent } from "../hooks/useSessionProbe";
 import { ArrangeClip } from "./ArrangeClip";
 import { quantizeSeconds, secondsPerBar, secondsPerBeat } from "../utils/time";
 import { TrackData, MixerSettings, AutomationPoint, FxWindowId, FxWindowConfig, TrackAnalysisData } from "../App";
 import ArrangeTrackHeader from "./ArrangeTrackHeader";
 import AutomationLane from "./AutomationLane";
 import { deriveTrackALSFeedback, TrackALSFeedback, hexToRgba } from "../utils/ALS";
+import { findNearestZeroCrossing } from "../utils/zeroCrossing";
 import {
   TrackUIState,
   TrackContextMode,
   DEFAULT_TRACK_LANE_HEIGHT,
   COLLAPSED_TRACK_LANE_HEIGHT,
 } from "../types/tracks";
+import TimelineNavigator from "./timeline/TimelineNavigator";
 
 type DragKind = "move" | "resize-left" | "resize-right" | "fade-in" | "fade-out" | "gain";
 
@@ -26,6 +29,8 @@ type DragState = {
   ripple: boolean;
   duplicate?: boolean;
   hasDuplicated?: boolean;
+  disableZeroCrossing?: boolean;
+  fineAdjust?: boolean;
 };
 
 type Props = {
@@ -93,6 +98,59 @@ const BASE_CLIP_LANE_H = DEFAULT_TRACK_LANE_HEIGHT;
 const AUTOMATION_LANE_H = 68;
 const RULER_H = 24;
 const TRACK_HEADER_WIDTH = 240;
+const TIMELINE_NAVIGATOR_H = 48;
+const ZERO_CROSS_WINDOW_SEC = 0.006;
+const AUTO_CROSSFADE_SEC = 0.03;
+const clampNumber = (value: number, min: number, max: number) =>
+  Math.max(min, Math.min(max, value));
+
+const applyAutomaticCrossfades = (clips: ClipModel[]) => {
+  const byTrack = new Map<string, ClipModel[]>();
+  clips.forEach((clip) => {
+    const list = byTrack.get(clip.trackId) ?? [];
+    list.push(clip);
+    byTrack.set(clip.trackId, list);
+  });
+
+  const updated = new Map<string, ClipModel>();
+
+  byTrack.forEach((trackClips) => {
+    const ordered = [...trackClips].sort((a, b) => a.start - b.start);
+    for (let i = 0; i < ordered.length - 1; i++) {
+      const current = ordered[i];
+      const next = ordered[i + 1];
+      const currentEnd = current.start + current.duration;
+      const overlap = currentEnd - next.start;
+      if (overlap <= 0) {
+        if (current.autoFade) {
+          updated.set(current.id, { ...current, autoFade: false });
+        }
+        continue;
+      }
+
+      const maxFade = Math.min(
+        AUTO_CROSSFADE_SEC,
+        overlap / 2,
+        current.duration / 2,
+        next.duration / 2
+      );
+      if (maxFade <= 0) continue;
+
+      const fadeOut = Math.max(current.fadeOut ?? 0, maxFade);
+      const fadeIn = Math.max(next.fadeIn ?? 0, maxFade);
+
+      updated.set(current.id, { ...current, fadeOut, autoFade: true });
+      updated.set(next.id, { ...next, fadeIn, autoFade: true });
+    }
+
+    const lastClip = ordered.at(-1);
+    if (lastClip && lastClip.autoFade && !updated.has(lastClip.id)) {
+      updated.set(lastClip.id, { ...lastClip, autoFade: false });
+    }
+  });
+
+  return clips.map((clip) => updated.get(clip.id) ?? clip);
+};
 
 const deriveAdaptiveDivision = (
   pixelsPerSecond: number,
@@ -132,6 +190,7 @@ export const ArrangeWindow: React.FC<Props> = (props) => {
   } = props;
 
   const timelineViewportRef = useRef<HTMLDivElement>(null);
+  const [viewportWidth, setViewportWidth] = useState(0);
   const projectDuration = useMemo(() => clips.reduce((max, clip) => Math.max(max, clip.start + clip.duration), 60), [clips]);
   const contentWidth = useMemo(() => Math.max((projectDuration + 60) * pixelsPerSecond, 4000), [projectDuration, pixelsPerSecond]);
   
@@ -139,6 +198,26 @@ export const ArrangeWindow: React.FC<Props> = (props) => {
   const [draggingSelection, setDraggingSelection] = useState<null | { startSec: number }>(null);
   const [snapIndicator, setSnapIndicator] = useState<number | null>(null);
   const [resizing, setResizing] = useState<null | { trackId: string; startY: number; startHeight: number }>(null);
+
+  useEffect(() => {
+    const node = timelineViewportRef.current;
+    if (!node) return;
+
+    const measure = () => {
+      setViewportWidth(node.clientWidth ?? 0);
+    };
+
+    measure();
+
+    if (typeof ResizeObserver !== "undefined") {
+      const observer = new ResizeObserver(measure);
+      observer.observe(node);
+      return () => observer.disconnect();
+    }
+
+    window.addEventListener("resize", measure);
+    return () => window.removeEventListener("resize", measure);
+  }, []);
 
   const adaptiveDivision = useMemo(
     () => deriveAdaptiveDivision(pixelsPerSecond, bpm, masterAnalysis?.level ?? 0),
@@ -256,6 +335,147 @@ export const ArrangeWindow: React.FC<Props> = (props) => {
     return guides;
   }, [adaptiveDivision, bpm, contentWidth, pixelsPerSecond]);
 
+  const handleNavigatorScroll = useCallback((targetScroll: number) => {
+    onManualScroll?.();
+    if (viewportWidth <= 0) return;
+    const maxScroll = Math.max(0, contentWidth - viewportWidth);
+    const clamped = Math.max(0, Math.min(targetScroll, maxScroll));
+    setScrollX(clamped);
+    recordSessionProbeTimelineEvent({
+      kind: "scroll",
+      scrollX: clamped,
+      pixelsPerSecond,
+      viewportWidth,
+      contentWidth,
+    });
+  }, [contentWidth, viewportWidth, setScrollX, onManualScroll, pixelsPerSecond]);
+
+  const handleNavigatorZoom = useCallback((startRatio: number, endRatio: number) => {
+    if (viewportWidth <= 0) return;
+    const start = Math.min(startRatio, endRatio);
+    const end = Math.max(startRatio, endRatio);
+    if (end <= start) {
+      handleNavigatorScroll(start * contentWidth - viewportWidth / 2);
+      return;
+    }
+
+    const span = end - start;
+    const minimalSpan = 0.01;
+    if (span < minimalSpan) {
+      const centerPx = ((start + end) / 2) * contentWidth;
+      handleNavigatorScroll(centerPx - viewportWidth / 2);
+      return;
+    }
+
+    onManualScroll?.();
+
+    const startPx = start * contentWidth;
+    const endPx = end * contentWidth;
+    const startSec = startPx / pixelsPerSecond;
+    const endSec = endPx / pixelsPerSecond;
+    const durationSec = Math.max(0.1, endSec - startSec);
+    const newPps = Math.min(500, Math.max(10, viewportWidth / durationSec));
+    const newContentWidth = Math.max((projectDuration + 60) * newPps, 4000);
+    const maxScroll = Math.max(0, newContentWidth - viewportWidth);
+    const newScroll = Math.max(0, Math.min(startSec * newPps, maxScroll));
+
+    ppsAPI.set(newPps);
+    setScrollX(newScroll);
+    recordSessionProbeTimelineEvent({
+      kind: "zoom",
+      scrollX: newScroll,
+      pixelsPerSecond: newPps,
+      viewportWidth,
+      contentWidth: newContentWidth,
+      ratioRange: [start, end],
+    });
+  }, [
+    viewportWidth,
+    contentWidth,
+    pixelsPerSecond,
+    projectDuration,
+    handleNavigatorScroll,
+    onManualScroll,
+    ppsAPI,
+    setScrollX,
+  ]);
+
+  const snapStartToZeroCrossing = useCallback(
+    (
+      clip: ClipModel,
+      candidate: { start: number; duration: number; sourceStart: number }
+    ) => {
+      const buffer = audioBuffers?.[clip.bufferId];
+      if (!buffer) {
+        return { ...candidate, zeroStart: false };
+      }
+      const zeroTime = findNearestZeroCrossing(buffer, candidate.sourceStart, {
+        windowSec: ZERO_CROSS_WINDOW_SEC,
+        direction: "both",
+      });
+      if (zeroTime === null) {
+        return { ...candidate, zeroStart: false };
+      }
+      const adjustment = zeroTime - candidate.sourceStart;
+      if (Math.abs(adjustment) > ZERO_CROSS_WINDOW_SEC * 1.5) {
+        return { ...candidate, zeroStart: false };
+      }
+      let adjustedStart = candidate.start + adjustment;
+      let adjustedSourceStart = zeroTime;
+      if (adjustedStart < 0) {
+        adjustedSourceStart = Math.max(0, adjustedSourceStart - adjustedStart);
+        adjustedStart = 0;
+      }
+      adjustedSourceStart = clampNumber(adjustedSourceStart, 0, buffer.duration);
+      const originalEnd = candidate.start + candidate.duration;
+      let newDuration = Math.max(0.01, originalEnd - adjustedStart);
+      if (adjustedSourceStart + newDuration > buffer.duration) {
+        newDuration = Math.max(0.01, buffer.duration - adjustedSourceStart);
+      }
+      return {
+        start: adjustedStart,
+        duration: newDuration,
+        sourceStart: adjustedSourceStart,
+        zeroStart: true,
+      };
+    },
+    [audioBuffers]
+  );
+
+  const snapEndToZeroCrossing = useCallback(
+    (
+      clip: ClipModel,
+      candidate: { start: number; duration: number; sourceStart: number }
+    ) => {
+      const buffer = audioBuffers?.[clip.bufferId];
+      if (!buffer) {
+        return { ...candidate, zeroEnd: false };
+      }
+      const targetEnd = candidate.sourceStart + candidate.duration;
+      const zeroTime = findNearestZeroCrossing(buffer, targetEnd, {
+        windowSec: ZERO_CROSS_WINDOW_SEC,
+        direction: "both",
+      });
+      if (zeroTime === null) {
+        return { ...candidate, zeroEnd: false };
+      }
+      const adjustment = zeroTime - targetEnd;
+      if (Math.abs(adjustment) > ZERO_CROSS_WINDOW_SEC * 1.5) {
+        return { ...candidate, zeroEnd: false };
+      }
+      let newDuration = Math.max(0.01, candidate.duration + adjustment);
+      if (candidate.sourceStart + newDuration > buffer.duration) {
+        newDuration = Math.max(0.01, buffer.duration - candidate.sourceStart);
+      }
+      return {
+        ...candidate,
+        duration: newDuration,
+        zeroEnd: true,
+      };
+    },
+    [audioBuffers]
+  );
+
   const onWheel = useCallback((e: React.WheelEvent) => {
     if (e.ctrlKey || e.metaKey) {
         e.preventDefault();
@@ -268,10 +488,20 @@ export const ArrangeWindow: React.FC<Props> = (props) => {
       const delta = e.deltaY !== 0 ? e.deltaY : e.deltaX;
       if (delta !== 0) {
         onManualScroll?.();
-        setScrollX((s: number) => Math.max(0, s + delta));
+        const nextScroll = Math.max(0, scrollX + delta);
+        setScrollX(nextScroll);
+        if (viewportWidth > 0) {
+          recordSessionProbeTimelineEvent({
+            kind: "scroll",
+            scrollX: nextScroll,
+            pixelsPerSecond,
+            viewportWidth,
+            contentWidth,
+          });
+        }
       }
     }
-  }, [scrollX, pixelsPerSecond, ppsAPI, setScrollX, onManualScroll]);
+  }, [scrollX, pixelsPerSecond, ppsAPI, setScrollX, onManualScroll, viewportWidth, contentWidth]);
 
   const onBgMouseDown = useCallback((e: React.MouseEvent) => {
     if (e.button !== 0) return;
@@ -414,30 +644,68 @@ export const ArrangeWindow: React.FC<Props> = (props) => {
         const startChange = newStart - reference.start;
         const newSourceStart = (reference.sourceStart ?? 0) + startChange;
         if (newDuration > 0.05 && newSourceStart >= 0) {
-          snapValue = newStart;
+          let finalStart = newStart;
           setClips((prev) =>
-            prev.map((clip) =>
-              clip.id === drag.primaryId
-                ? {
-                    ...clip,
-                    start: newStart,
-                    duration: newDuration,
-                    sourceStart: newSourceStart,
-                  }
-                : clip
-            )
+            prev.map((clip) => {
+              if (clip.id !== drag.primaryId) return clip;
+              let candidate = {
+                start: newStart,
+                duration: newDuration,
+                sourceStart: newSourceStart,
+              };
+              let zeroStart = false;
+              if (!(drag.disableZeroCrossing || e.shiftKey)) {
+                const snapped = snapStartToZeroCrossing(clip, candidate);
+                candidate = {
+                  start: snapped.start,
+                  duration: snapped.duration,
+                  sourceStart: snapped.sourceStart,
+                };
+                zeroStart = Boolean(snapped.zeroStart);
+              }
+              finalStart = candidate.start;
+              return {
+                ...clip,
+                ...candidate,
+                zeroStart,
+                zeroEnd: clip.zeroEnd ?? false,
+              };
+            })
           );
+          snapValue = finalStart;
         }
       } else if (drag.kind === "resize-right") {
         const reference = primaryOriginal;
         const newEnd = snapToGrid(reference.start + reference.duration + dxSec);
         const newDuration = Math.max(0.05, newEnd - reference.start);
-        snapValue = reference.start + newDuration;
+        let finalEnd = reference.start + newDuration;
         setClips((prev) =>
-          prev.map((clip) =>
-            clip.id === drag.primaryId ? { ...clip, duration: newDuration } : clip
-          )
+          prev.map((clip) => {
+            if (clip.id !== drag.primaryId) return clip;
+            let candidate = {
+              start: clip.start,
+              duration: newDuration,
+              sourceStart: clip.sourceStart ?? 0,
+            };
+            let zeroEnd = false;
+            if (!(drag.disableZeroCrossing || e.shiftKey)) {
+              const snapped = snapEndToZeroCrossing(clip, candidate);
+              candidate = {
+                ...candidate,
+                duration: snapped.duration,
+              };
+              zeroEnd = Boolean(snapped.zeroEnd);
+            }
+            finalEnd = candidate.start + candidate.duration;
+            return {
+              ...clip,
+              duration: candidate.duration,
+              zeroEnd,
+              zeroStart: clip.zeroStart ?? false,
+            };
+          })
         );
+        snapValue = finalEnd;
       } else if (drag.kind === "fade-in") {
         snapValue = null;
         const currentClip = clips.find((clip) => clip.id === drag.primaryId) ?? primaryOriginal;
@@ -457,7 +725,11 @@ export const ArrangeWindow: React.FC<Props> = (props) => {
       } else if (drag.kind === "gain") {
         snapValue = null;
         const currentClip = clips.find((clip) => clip.id === drag.primaryId) ?? primaryOriginal;
-        const newGain = Math.max(0, Math.min(2.0, (currentClip.gain ?? 1.0) - dy * 0.01));
+        const sensitivity = drag.fineAdjust || e.ctrlKey ? 0.002 : 0.01;
+        const newGain = Math.max(
+          0,
+          Math.min(2.0, (currentClip.gain ?? 1.0) - dy * sensitivity)
+        );
         onUpdateClipProperties(currentClip.id, { gain: newGain });
       }
 
@@ -475,11 +747,14 @@ export const ArrangeWindow: React.FC<Props> = (props) => {
   }, [drag, pixelsPerSecond, laneLayouts, snapToGrid, setClips, clips, draggingSelection, scrollX, setSelection, onUpdateClipProperties, resizing, onResizeTrack]);
 
   const onMouseUp = useCallback(() => {
+    if (drag) {
+      setClips((prev) => applyAutomaticCrossfades(prev));
+    }
     setDrag(null);
     setDraggingSelection(null);
     setSnapIndicator(null);
     setResizing(null);
-  }, []);
+  }, [drag, setClips]);
 
   const onRulerDown = useCallback((e: React.MouseEvent) => {
     const rect = e.currentTarget.getBoundingClientRect();
@@ -500,6 +775,7 @@ export const ArrangeWindow: React.FC<Props> = (props) => {
         case 'magenta': map.set(t.id, { color: '#d946ef', light: '#f0abfc' }); break;
         case 'blue':    map.set(t.id, { color: '#3b82f6', light: '#93c5fd' }); break;
         case 'green':   map.set(t.id, { color: '#22c55e', light: '#86efac' }); break;
+        case 'crimson': map.set(t.id, { color: '#f43f5e', light: '#fb7185' }); break;
         case 'purple':  map.set(t.id, { color: '#8b5cf6', light: '#c4b5fd' }); break;
       }
     });
@@ -658,7 +934,7 @@ export const ArrangeWindow: React.FC<Props> = (props) => {
             </div>
         </div>
 
-        <div className="absolute left-0 right-0" style={{ top: RULER_H, bottom: 0 }} onMouseDown={onBgMouseDown}>
+        <div className="absolute left-0 right-0" style={{ top: RULER_H, bottom: TIMELINE_NAVIGATOR_H }} onMouseDown={onBgMouseDown}>
             <div className="relative" style={{ width: contentWidth, transform: `translateX(-${scrollX}px)` }}>
                 {laneLayouts.map(({ track, top, laneHeight, clipHeight, isAutomationVisible, uiState, automationConfig }, index) => {
                   const automationPointsForLane = automationConfig
@@ -775,6 +1051,8 @@ export const ArrangeWindow: React.FC<Props> = (props) => {
                           originalClips,
                           ripple: Boolean(modifiers?.altKey),
                           duplicate: Boolean(modifiers?.metaKey),
+                          disableZeroCrossing: Boolean(modifiers?.shiftKey),
+                          fineAdjust: Boolean(modifiers?.ctrlKey),
                         });
                       }}
                       onSelect={(append) => {
@@ -880,6 +1158,19 @@ export const ArrangeWindow: React.FC<Props> = (props) => {
                   </div>
                 )}
             </div>
+        </div>
+        <div
+          className="absolute left-0 right-0"
+          style={{ bottom: 0, height: TIMELINE_NAVIGATOR_H }}
+        >
+          <TimelineNavigator
+            contentWidth={contentWidth}
+            viewportWidth={viewportWidth}
+            scrollX={scrollX}
+            onScroll={handleNavigatorScroll}
+            onZoomToRegion={handleNavigatorZoom}
+            followPlayhead={followPlayhead}
+          />
         </div>
       </div>
     </div>

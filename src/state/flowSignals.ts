@@ -4,7 +4,7 @@ import { TrackALSFeedback } from "../utils/ALS";
 type FlowChannel = "als" | "bloom" | "ingest";
 
 export interface AlsSignalPayload {
-  source: "mixer" | "arrange" | "prime-brain" | "ingest";
+  source: "mixer" | "arrange" | "prime-brain" | "ingest" | "sampler" | "system";
   tracks?: Record<string, TrackALSFeedback>;
   master?: TrackALSFeedback | null;
   meta?: Record<string, unknown>;

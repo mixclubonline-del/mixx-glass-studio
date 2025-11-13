@@ -71,6 +71,8 @@ const ArrangeTrackHeader: React.FC<ArrangeTrackHeaderProps> = ({
         return { base: '#3b82f6', glow: '#93c5fd' };
       case 'green':
         return { base: '#22c55e', glow: '#86efac' };
+      case 'crimson':
+        return { base: '#f43f5e', glow: '#fb7185' };
       case 'purple':
       default:
         return { base: '#8b5cf6', glow: '#c4b5fd' };

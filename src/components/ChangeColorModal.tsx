@@ -8,7 +8,7 @@ interface ChangeColorModalProps {
   onChangeColor: (newColor: TrackData['trackColor']) => void;
 }
 
-const colors: TrackData['trackColor'][] = ['cyan', 'magenta', 'blue', 'green', 'purple'];
+const colors: TrackData['trackColor'][] = ['cyan', 'magenta', 'blue', 'green', 'purple', 'crimson'];
 
 const ChangeColorModal: React.FC<ChangeColorModalProps> = ({ currentColor, onClose, onChangeColor }) => {
   const [selectedColor, setSelectedColor] = useState(currentColor);
@@ -25,12 +25,13 @@ const ChangeColorModal: React.FC<ChangeColorModalProps> = ({ currentColor, onClo
       >
         <h2 className="text-lg font-bold tracking-widest text-gray-200 mb-6 text-center">CHANGE TRACK COLOR</h2>
         
-        <div className="flex items-center justify-center space-x-4 mb-6">
+        <div className="grid grid-cols-3 gap-4 mb-6 justify-items-center">
           <div onClick={() => setSelectedColor('cyan')} className={`w-10 h-10 rounded-full bg-cyan-500 cursor-pointer transition-all ${selectedColor === 'cyan' ? 'ring-2 ring-offset-2 ring-offset-gray-800 ring-white' : ''}`}></div>
           <div onClick={() => setSelectedColor('magenta')} className={`w-10 h-10 rounded-full bg-fuchsia-500 cursor-pointer transition-all ${selectedColor === 'magenta' ? 'ring-2 ring-offset-2 ring-offset-gray-800 ring-white' : ''}`}></div>
           <div onClick={() => setSelectedColor('blue')} className={`w-10 h-10 rounded-full bg-blue-500 cursor-pointer transition-all ${selectedColor === 'blue' ? 'ring-2 ring-offset-2 ring-offset-gray-800 ring-white' : ''}`}></div>
           <div onClick={() => setSelectedColor('green')} className={`w-10 h-10 rounded-full bg-green-500 cursor-pointer transition-all ${selectedColor === 'green' ? 'ring-2 ring-offset-2 ring-offset-gray-800 ring-white' : ''}`}></div>
           <div onClick={() => setSelectedColor('purple')} className={`w-10 h-10 rounded-full bg-violet-500 cursor-pointer transition-all ${selectedColor === 'purple' ? 'ring-2 ring-offset-2 ring-offset-gray-800 ring-white' : ''}`}></div>
+          <div onClick={() => setSelectedColor('crimson')} className={`w-10 h-10 rounded-full bg-rose-500 cursor-pointer transition-all ${selectedColor === 'crimson' ? 'ring-2 ring-offset-2 ring-offset-gray-800 ring-white' : ''}`}></div>
         </div>
 
         <div className="flex justify-end space-x-4">

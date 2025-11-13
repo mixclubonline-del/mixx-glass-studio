@@ -8,7 +8,7 @@ import VelvetCurveVisualizer from './components/VelvetCurveVisualizer';
 import { getHarmonicLattice, initializeHarmonicLattice, HarmonicLatticeState } from './audio/HarmonicLattice';
 import HarmonicLatticeVisualizer from './components/HarmonicLatticeVisualizer';
 import MixxFXVisualizer from './components/MixxFXVisualizer';
-import { analyzeVelvetCurve, FourAnchors, MusicalContext, calculateVelvetScore, getVelvetColor } from './types/sonic-architecture';
+import { analyzeVelvetCurve, FourAnchors, MusicalContext, calculateVelvetScore, getVelvetColor, MASTERING_PROFILES } from './types/sonic-architecture';
 import TrackContextMenu from './components/TrackContextMenu';
 import RenameTrackModal from './components/RenameTrackModal';
 import ChangeColorModal from './components/ChangeColorModal';
@@ -18,11 +18,18 @@ import type { BloomFloatingMenuItem } from './components/BloomHUD/BloomFloatingH
 import { SaveIcon, LoadIcon, SparklesIcon, SquaresPlusIcon, MixerIcon, PlusCircleIcon, StarIcon, SplitIcon, MergeIcon, RefreshIcon, BrainIcon, AutomationIcon, ChatIcon, ImageIcon, MicrophoneIcon, LoopIcon, CopyIcon, BulbIcon } from './components/icons';
 import { useArrange, ArrangeClip, ClipId } from "./hooks/useArrange";
 import { ArrangeWindow } from "./components/ArrangeWindow";
+import FlowWelcomeHub from './components/FlowWelcomeHub';
 import ImportModal from './components/ImportModal';
 import FlowConsole from './components/mixer/Mixer';
+import VelvetComplianceHUD from './components/ALS/VelvetComplianceHUD';
 import PrimeBrainInterface from './components/PrimeBrainInterface';
 import { getMixxFXEngine, initializeMixxFXEngine } from './audio/MixxFXEngine';
 import { buildMasterChain } from './audio/masterChain';
+import type { VelvetMasterChain } from './audio/masterChain';
+import { VelvetLoudnessMeter, DEFAULT_VELVET_LOUDNESS_METRICS } from './audio/VelvetLoudnessMeter';
+import type { VelvetLoudnessMetrics } from './audio/VelvetLoudnessMeter';
+import { TranslationMatrix, type TranslationProfileKey } from './audio/TranslationMatrix';
+import { evaluateCapture } from './audio/CaptureSanityCheck';
 import { serializeAudioBuffers, deserializeAudioBuffers } from './audio/serialization';
 import { VelvetProcessor } from './audio/VelvetProcessor';
 import { PluginId, PluginConfig, getPluginRegistry, PlaceholderAudioEngine } from './audio/plugins';
@@ -31,12 +38,19 @@ import PluginBrowser from './components/PluginBrowser';
 import { IAudioEngine } from './types/audio-graph';
 import { getHushSystem } from './audio/HushSystem';
 import AIHub from './components/AIHub/AIHub'; // Import AIHub
+import FlowProbeOverlay from './components/dev/FlowProbeOverlay';
+import { useSessionProbe } from './hooks/useSessionProbe';
 import {
   PrimeBrainSnapshotInputs,
   PrimeBrainBloomEvent,
   PrimeBrainCommandLog,
   PrimeBrainGuidance,
   PrimeBrainAIFlag,
+  PrimeBrainMode,
+  PrimeBrainALSChannel,
+  PrimeBrainConversationTurn,
+  PrimeBrainModeHints,
+  derivePrimeBrainMode,
 } from './ai/PrimeBrainSnapshot';
 import { usePrimeBrainExporter } from './ai/usePrimeBrainExporter';
 import {
@@ -45,6 +59,7 @@ import {
   deriveTrackALSFeedback,
   deriveBusALSColors,
   deriveActionPulse,
+  TrackColorKey,
 } from './utils/ALS';
 import type { PulsePalette, ALSActionPulse } from './utils/ALS';
 import {
@@ -79,10 +94,17 @@ import {
   MIN_TRACK_LANE_HEIGHT,
   MAX_TRACK_LANE_HEIGHT,
 } from './types/tracks';
-import { BloomActionMeta } from './types/bloom';
+import { BloomActionMeta, BloomContext, BLOOM_CONTEXT_ACCENTS, BLOOM_CONTEXT_LABELS } from './types/bloom';
 import type { MidiNote } from './types/midi';
 import type { TrapPattern, TrapScale, GrooveTemplate } from "./types/pianoRoll";
 import { usePianoRoll } from './hooks/usePianoRoll';
+import type {
+  PrimeBrainALSChannelState,
+  PrimeBrainHealthTone,
+  PrimeBrainStatus,
+  VelvetAnchorDescriptor,
+  VelvetLensState,
+} from './types/primeBrainStatus';
 
 
 const DEFAULT_STEM_SELECTION = ['Vocals', 'Drums', 'Bass', 'Other Instruments'] as const;
@@ -124,6 +146,13 @@ const INSERT_COLOR_BY_PLUGIN: Record<string, TrackData['trackColor']> = {
   'mixx-fx': 'cyan',
   'time-warp': 'purple',
 };
+const INITIAL_RECORDING_OPTIONS = {
+  preRoll: true,
+  countIn: true,
+  inputMonitor: true,
+  hushGate: true,
+};
+type RecordingOptionKey = keyof typeof INITIAL_RECORDING_OPTIONS;
 const CURATED_INSERT_IDS: FxWindowId[] = [
   'velvet-curve',
   'harmonic-lattice',
@@ -151,17 +180,254 @@ const HUB_HORIZONTAL_GAP = 48;
 const HUB_VERTICAL_GAP = 24;
 const DOCK_STORAGE_KEY = 'mixxclub:bloom-dock:v2';
 const HUB_STORAGE_KEY = 'mixxclub:bloom-floating:v2';
+const FLOW_ENTRY_STORAGE_KEY = 'mixxclub:flow-entered:v1';
 
 type Point = { x: number; y: number };
-type BloomContext =
-  | 'arrange'
-  | 'record'
-  | 'mix'
-  | 'master'
-  | 'ai'
-  | 'ingest'
-  | 'idle';
 
+const PRIME_BRAIN_TELEMETRY_STORAGE_KEY = 'mixxclub:primebrain-telemetry-enabled';
+const PRIME_BRAIN_EXPORT_URL_STORAGE_KEY = 'mixxclub:primebrain-export-url';
+
+const clamp01 = (value: number) => Math.min(1, Math.max(0, value));
+
+const ALS_CHANNEL_STYLES: Record<
+  PrimeBrainALSChannel,
+  { accent: string; aura: string; low: string; mid: string; high: string; peak: string }
+> = {
+  temperature: {
+    accent: '#f472b6',
+    aura: 'rgba(244,114,182,0.42)',
+    low: 'Cooling',
+    mid: 'Warming',
+    high: 'Igniting',
+    peak: 'Blazing',
+  },
+  momentum: {
+    accent: '#38bdf8',
+    aura: 'rgba(56,189,248,0.38)',
+    low: 'Steady',
+    mid: 'Rising',
+    high: 'Charging',
+    peak: 'Surging',
+  },
+  pressure: {
+    accent: '#f59e0b',
+    aura: 'rgba(245,158,11,0.36)',
+    low: 'Relaxed',
+    mid: 'Tightening',
+    high: 'Pressing',
+    peak: 'Peaking',
+  },
+  harmony: {
+    accent: '#c084fc',
+    aura: 'rgba(192,132,252,0.4)',
+    low: 'Open',
+    mid: 'Layering',
+    high: 'Blending',
+    peak: 'Weaving',
+  },
+};
+
+const HEALTH_TONES: Record<
+  PrimeBrainHealthTone['overall'],
+  {
+    color: string;
+    glowColor: string;
+    temperature: PrimeBrainHealthTone['temperature'];
+    pulse: number;
+    flow: number;
+    energy: number;
+    caption: string;
+  }
+> = {
+  excellent: {
+    color: '#10b981',
+    glowColor: '#34d399',
+    temperature: 'cool',
+    pulse: 0.3,
+    flow: 1,
+    energy: 1,
+    caption: 'Prime Brain humming in serenity.',
+  },
+  good: {
+    color: '#06b6d4',
+    glowColor: '#22d3ee',
+    temperature: 'cool',
+    pulse: 0.4,
+    flow: 0.9,
+    energy: 0.9,
+    caption: 'Systems aligned and listening.',
+  },
+  fair: {
+    color: '#fbbf24',
+    glowColor: '#fcd34d',
+    temperature: 'warm',
+    pulse: 0.6,
+    flow: 0.7,
+    energy: 0.7,
+    caption: 'Adjusting flow, hold the lane steady.',
+  },
+  poor: {
+    color: '#f97316',
+    glowColor: '#fb923c',
+    temperature: 'warm',
+    pulse: 0.7,
+    flow: 0.5,
+    energy: 0.5,
+    caption: 'Prime Brain easing pressure back into range.',
+  },
+  critical: {
+    color: '#ef4444',
+    glowColor: '#f87171',
+    temperature: 'hot',
+    pulse: 0.9,
+    flow: 0.3,
+    energy: 0.3,
+    caption: 'Critical load detected—shelter the mix.',
+  },
+};
+
+const describeAlsChannel = (channel: PrimeBrainALSChannel, value: number): PrimeBrainALSChannelState => {
+  const style = ALS_CHANNEL_STYLES[channel];
+  const normalized = clamp01(value);
+  let descriptor = style.low;
+  if (normalized >= 0.85) {
+    descriptor = style.peak;
+  } else if (normalized >= 0.65) {
+    descriptor = style.high;
+  } else if (normalized >= 0.35) {
+    descriptor = style.mid;
+  }
+  return {
+    channel,
+    value: normalized,
+    descriptor,
+    accent: style.accent,
+    aura: style.aura,
+  };
+};
+
+const derivePrimeBrainHealth = (
+  metrics: PrimeBrainSnapshotInputs['audioMetrics'],
+  flags: PrimeBrainAIFlag[],
+): PrimeBrainHealthTone => {
+  const cpuLoad = metrics.cpuLoad ?? 0;
+  const dropouts = metrics.dropoutsPerMinute ?? 0;
+  const hasCritical = flags.some((flag) => flag.severity === 'critical');
+  const hasWarn = flags.some((flag) => flag.severity === 'warn');
+
+  let overall: PrimeBrainHealthTone['overall'] = 'excellent';
+
+  if (hasCritical || cpuLoad > 0.92 || dropouts > 3) {
+    overall = 'critical';
+  } else if (cpuLoad > 0.85 || dropouts > 2) {
+    overall = 'poor';
+  } else if (hasWarn || cpuLoad > 0.7 || dropouts > 1) {
+    overall = 'fair';
+  } else if (cpuLoad > 0.45) {
+    overall = 'good';
+  }
+
+  const tone = HEALTH_TONES[overall];
+  return {
+    overall,
+    color: tone.color,
+    glowColor: tone.glowColor,
+    temperature: tone.temperature,
+    pulse: tone.pulse,
+    flow: tone.flow,
+    energy: tone.energy,
+    caption: tone.caption,
+  };
+};
+
+const ANCHOR_STYLES: Record<
+  keyof FourAnchors,
+  { label: string; accents: [string, string, string]; descriptors: [string, string, string] }
+> = {
+  body: {
+    label: 'Body',
+    accents: ['#2563eb', '#38bdf8', '#f97316'],
+    descriptors: ['Featherlight', 'Grounded', 'Thunderous'],
+  },
+  soul: {
+    label: 'Soul',
+    accents: ['#7c3aed', '#c084fc', '#f472b6'],
+    descriptors: ['Muted', 'Glowing', 'Radiant'],
+  },
+  air: {
+    label: 'Air',
+    accents: ['#0ea5e9', '#38bdf8', '#a855f7'],
+    descriptors: ['Closed', 'Shining', 'Celestial'],
+  },
+  silk: {
+    label: 'Silk',
+    accents: ['#8b5cf6', '#c4b5fd', '#f9a8d4'],
+    descriptors: ['Raw', 'Polished', 'Velvet'],
+  },
+};
+
+const describeAnchor = (key: keyof FourAnchors, value: number): VelvetAnchorDescriptor => {
+  const style = ANCHOR_STYLES[key];
+  let index = 0;
+  if (value >= 72) {
+    index = 2;
+  } else if (value >= 38) {
+    index = 1;
+  }
+  return {
+    key,
+    label: style.label,
+    descriptor: style.descriptors[index],
+    accent: style.accents[index],
+  };
+};
+
+const deriveVelvetLensState = (analysis: FourAnchors | null): VelvetLensState => {
+  if (!analysis) {
+    return {
+      label: 'Listening',
+      gradient: 'from-indigo-500 via-purple-500 to-cyan-500',
+      tagline: 'Prime Brain awaiting anchors to settle.',
+      anchors: (['body', 'soul', 'air', 'silk'] as Array<keyof FourAnchors>).map((key) =>
+        describeAnchor(key, 0),
+      ),
+    };
+  }
+
+  const anchors = (['body', 'soul', 'air', 'silk'] as Array<keyof FourAnchors>).map((key) =>
+    describeAnchor(key, analysis[key]),
+  );
+  const velvetScore = calculateVelvetScore(analysis);
+  const velvetColor = getVelvetColor(velvetScore);
+
+  let label = 'Anchors Aligning';
+  let tagline = 'Mix fabric is settling into comfort.';
+
+  if (analysis.silk > 72 && analysis.soul > 64) {
+    label = 'Velvet Steady';
+    tagline = 'Silk and soul are hugging the mix fabric.';
+  } else if (analysis.body > 68) {
+    label = 'Low Anchor Driving';
+    tagline = 'Body is delivering club weight through the floor.';
+  } else if (analysis.air > 70) {
+    label = 'Air Drifting';
+    tagline = 'Air anchor is lifting the scene into glow.';
+  }
+
+  return {
+    label,
+    gradient: velvetColor.gradient,
+    tagline,
+    anchors,
+  };
+};
+
+const MODE_CAPTIONS: Record<PrimeBrainMode, string> = {
+  passive: 'Prime Brain listening for cues.',
+  active: 'Prime Brain guiding in real-time.',
+  learning: 'Prime Brain memorizing creator moves.',
+  optimizing: 'Prime Brain easing system load.',
+};
 const computeDockDefaultPosition = (): Point => {
   if (typeof window === 'undefined') {
     return { x: VIEWPORT_PADDING, y: 640 };
@@ -246,26 +512,6 @@ const clampHubPosition = (raw: Point): Point => {
   };
 };
 
-const BLOOM_CONTEXT_LABELS: Record<BloomContext, string> = {
-  arrange: 'Arrange Bloom',
-  record: 'Record Bloom',
-  mix: 'Mix Bloom',
-  master: 'Master Bloom',
-  ai: 'Prime Bloom',
-  ingest: 'Ingest Bloom',
-  idle: 'Bloom HUD',
-};
-
-const BLOOM_CONTEXT_ACCENTS: Record<BloomContext, string> = {
-  arrange: '#d6b1ff',
-  record: '#ff7b8a',
-  mix: '#7ad0ff',
-  master: '#f5a34c',
-  ai: '#f472d0',
-  ingest: '#38d9a9',
-  idle: '#94a3b8',
-};
-
 type StemKey = keyof typeof STEM_COLOR_BY_KEY;
 
 const STEM_MESSAGE_MATCHERS: Array<{ key: StemKey; keywords: string[] }> = [
@@ -300,13 +546,17 @@ type PendingStemRequest = {
   reject?: (error: Error) => void;
 };
 
+export type TrackRole = 'twoTrack' | 'hushRecord' | 'standard';
+
 export interface TrackData {
   id: string;
   trackName: string;
-  trackColor: 'cyan' | 'magenta' | 'blue' | 'green' | 'purple';
+  trackColor: 'cyan' | 'magenta' | 'blue' | 'green' | 'purple' | 'crimson';
   waveformType: 'dense' | 'sparse' | 'varied' | 'bass';
   group: 'Vocals' | 'Harmony' | 'Adlibs' | 'Bass' | 'Drums' | 'Instruments';
   isProcessing?: boolean;
+  role: TrackRole;
+  locked?: boolean;
 }
 
 export interface AutomationPoint {
@@ -344,21 +594,12 @@ export interface TrackAnalysisData {
     automationActive?: boolean;
     automationTargets?: string[];
 }
-interface MasterNodes {
-  input: BiquadFilterNode;
-  glue: DynamicsCompressorNode;
-  shaper: WaveShaperNode;
-  preLimiter: GainNode;
-  limiter: DynamicsCompressorNode;
-  panner: StereoPannerNode;
-  output: GainNode;
-  analyser: AnalyserNode;
-}
+type MasterNodes = VelvetMasterChain;
 
 
 // --- Interactive FX Visualizer Components ---
 export interface VisualizerProps<T = any> {
-  connectedColor?: 'cyan' | 'magenta' | 'blue' | 'green' | 'purple';
+  connectedColor?: 'cyan' | 'magenta' | 'blue' | 'green' | 'purple' | 'crimson';
   params: T;
   onChange: (param: string, value: any) => void;
   isPlaying?: boolean;
@@ -382,6 +623,9 @@ export type FxWindowConfig = Omit<PluginConfig, 'engineInstance'> & {
 };
 
 export type FxWindowId = PluginId;
+
+const TWO_TRACK_SIGNAL_CHAIN: FxWindowId[] = ['velvet-curve', 'mixx-glue', 'mixx-limiter'];
+const HUSH_TRACK_SIGNAL_CHAIN: FxWindowId[] = [];
 
 
 type TrackGroup = TrackData['group'];
@@ -581,15 +825,37 @@ const deriveWarpAnchorsFromNotes = (notes: MidiNote[], clipDuration: number): nu
   return Array.from(anchors).sort((a, b) => a - b);
 };
 
-const INITIAL_TRACK: TrackData = {
-  id: 'track-1',
-  trackName: 'AUDIO 1',
-  trackColor: 'cyan',
+export const TWO_TRACK_ID = 'track-two-track';
+export const HUSH_TRACK_ID = 'track-hush-record';
+
+const TWO_TRACK_TEMPLATE: TrackData = {
+  id: TWO_TRACK_ID,
+  trackName: 'TWO TRACK',
+  trackColor: 'blue',
   waveformType: 'varied',
-  group: 'Vocals',
+  group: 'Instruments',
+  role: 'twoTrack',
+  locked: true,
 };
 
-const INITIAL_TRACKS: TrackData[] = [INITIAL_TRACK];
+const HUSH_TRACK_TEMPLATE: TrackData = {
+  id: HUSH_TRACK_ID,
+  trackName: 'HUSH RECORD',
+  trackColor: 'crimson',
+  waveformType: 'varied',
+  group: 'Vocals',
+  role: 'hushRecord',
+  locked: true,
+};
+
+const cloneTrack = (track: TrackData): TrackData => ({ ...track });
+
+const BASE_TRACK_TEMPLATES: ReadonlyArray<TrackData> = [TWO_TRACK_TEMPLATE, HUSH_TRACK_TEMPLATE];
+const buildInitialTracks = (): TrackData[] => BASE_TRACK_TEMPLATES.map(cloneTrack);
+const TRACK_ROLE_TO_ID: Record<Exclude<TrackRole, 'standard'>, string> = {
+  twoTrack: TWO_TRACK_ID,
+  hushRecord: HUSH_TRACK_ID,
+};
 
 export type MixerBusId =
   | 'velvet-curve'
@@ -661,8 +927,6 @@ const MIXER_BUS_DEFINITIONS: MixerBusDefinition[] = [
   },
 ];
 
-const clamp01 = (value: number) => Math.min(1, Math.max(0, value));
-
 const createDefaultSendLevels = (
   track: TrackData
 ): Record<MixerBusId, number> => {
@@ -710,6 +974,48 @@ const createDefaultEQSettings = (track: TrackData): ChannelEQSettings => {
       return { low: 0.5, mid: 0.5, air: 0.55, tilt: 0.52 };
   }
 };
+
+const createInitialMixerSettings = (): Record<string, MixerSettings> =>
+  BASE_TRACK_TEMPLATES.reduce((acc, track) => {
+    const volume =
+      track.role === 'twoTrack'
+        ? 0.82
+        : track.role === 'hushRecord'
+        ? 0.78
+        : 0.75;
+    acc[track.id] = { volume, pan: 0, isMuted: false };
+    return acc;
+  }, {} as Record<string, MixerSettings>);
+
+const createInitialTrackSendLevels = (): Record<string, Record<MixerBusId, number>> =>
+  BASE_TRACK_TEMPLATES.reduce((acc, track) => {
+    acc[track.id] = createDefaultSendLevels(track);
+    return acc;
+  }, {} as Record<string, Record<MixerBusId, number>>);
+
+const createInitialDynamicsSettings = (): Record<string, ChannelDynamicsSettings> =>
+  BASE_TRACK_TEMPLATES.reduce((acc, track) => {
+    acc[track.id] = createDefaultDynamicsSettings(track);
+    return acc;
+  }, {} as Record<string, ChannelDynamicsSettings>);
+
+const createInitialEQSettings = (): Record<string, ChannelEQSettings> =>
+  BASE_TRACK_TEMPLATES.reduce((acc, track) => {
+    acc[track.id] = createDefaultEQSettings(track);
+    return acc;
+  }, {} as Record<string, ChannelEQSettings>);
+
+const createInitialInserts = (): Record<string, FxWindowId[]> =>
+  BASE_TRACK_TEMPLATES.reduce((acc, track) => {
+    if (track.role === 'twoTrack') {
+      acc[track.id] = [...TWO_TRACK_SIGNAL_CHAIN];
+    } else if (track.role === 'hushRecord') {
+      acc[track.id] = [...HUSH_TRACK_SIGNAL_CHAIN];
+    } else {
+      acc[track.id] = [];
+    }
+    return acc;
+  }, {} as Record<string, FxWindowId[]>);
 
 interface TrackMeterBuffers {
   timeDomain: Float32Array;
@@ -873,9 +1179,13 @@ const measureAnalyser = (
   };
 };
 
-const App: React.FC = () => {
+interface FlowRuntimeProps {
+  arrangeFocusToken: number;
+}
+
+const FlowRuntime: React.FC<FlowRuntimeProps> = ({ arrangeFocusToken }) => {
   // --- STATE MANAGEMENT ---
-  const [tracks, setTracks] = useState<TrackData[]>(INITIAL_TRACKS);
+  const [tracks, setTracks] = useState<TrackData[]>(() => buildInitialTracks());
   const stemIntegrationRef = useRef<StemSeparationIntegration | null>(null);
   const tracksRef = useRef<TrackData[]>(tracks);
   const clipsRef = useRef<ArrangeClip[]>([]);
@@ -952,6 +1262,10 @@ const App: React.FC = () => {
 
   const fxNodesRef = useRef<{[key: string]: FxNode}>({}); // This will manage instances of ALL plugins
   const masterNodesRef = useRef<MasterNodes | null>(null);
+  const translationMatrixRef = useRef<TranslationMatrix | null>(null);
+  const velvetLoudnessMeterRef = useRef<VelvetLoudnessMeter | null>(null);
+  const loudnessListenerRef = useRef<((event: Event) => void) | null>(null);
+  const translationProfileRef = useRef<TranslationProfileKey>('flat');
   const animationFrameRef = useRef<number | null>(null);
   const activeSourcesRef = useRef<{ source: AudioBufferSourceNode, gain: GainNode }[]>([]);
   const lastUpdateTimeRef = useRef<number>(0);
@@ -959,30 +1273,31 @@ const App: React.FC = () => {
   const masterMeterBufferRef = useRef<MasterMeterBuffers | null>(null);
   
   const [isAddTrackModalOpen, setIsAddTrackModalModalOpen] = useState(false);
-  const [mixerSettings, setMixerSettings] = useState<{ [key: string]: MixerSettings }>({
-    [INITIAL_TRACK.id]: { volume: 0.75, pan: 0, isMuted: false },
-  });
+  const [mixerSettings, setMixerSettings] = useState<{ [key: string]: MixerSettings }>(() => createInitialMixerSettings());
   const [soloedTracks, setSoloedTracks] = useState(new Set<string>());
   const [masterVolume, setMasterVolume] = useState(0.8);
   const [masterBalance, setMasterBalance] = useState(0);
+  const [translationProfile, setTranslationProfile] = useState<TranslationProfileKey>('flat');
+  const [recordingOptions, setRecordingOptions] = useState(() => ({ ...INITIAL_RECORDING_OPTIONS }));
   const [trackAnalysis, setTrackAnalysis] = useState<{ [key: string]: TrackAnalysisData }>({});
   const [masterAnalysis, setMasterAnalysis] = useState({ level: 0, transient: false, waveform: new Uint8Array(128) });
+  const [loudnessMetrics, setLoudnessMetrics] = useState(DEFAULT_VELVET_LOUDNESS_METRICS);
   const masterLevelAvg = useRef(0.01);
   const [analysisResult, setAnalysisResult] = useState<FourAnchors | null>(null);
-  const [trackSendLevels, setTrackSendLevels] = useState<Record<string, Record<MixerBusId, number>>>(() => ({
-    [INITIAL_TRACK.id]: createDefaultSendLevels(INITIAL_TRACK),
-  }));
-  const [channelDynamicsSettings, setChannelDynamicsSettings] = useState<Record<string, ChannelDynamicsSettings>>(() => ({
-    [INITIAL_TRACK.id]: createDefaultDynamicsSettings(INITIAL_TRACK),
-  }));
-  const [channelEQSettings, setChannelEQSettings] = useState<Record<string, ChannelEQSettings>>(() => ({
-    [INITIAL_TRACK.id]: createDefaultEQSettings(INITIAL_TRACK),
-  }));
+  const [trackSendLevels, setTrackSendLevels] = useState<Record<string, Record<MixerBusId, number>>>(() => createInitialTrackSendLevels());
+  const [channelDynamicsSettings, setChannelDynamicsSettings] = useState<Record<string, ChannelDynamicsSettings>>(() => createInitialDynamicsSettings());
+  const [channelEQSettings, setChannelEQSettings] = useState<Record<string, ChannelEQSettings>>(() => createInitialEQSettings());
   const [selectedBusId, setSelectedBusId] = useState<MixerBusId | null>(null);
+  const [armedTracks, setArmedTracks] = useState<Set<string>>(new Set());
   const fileInputRef = useRef<HTMLInputElement>(null);
   const [importMessage, setImportMessage] = useState<string | null>(null);
   const [fileInputContext, setFileInputContext] = useState<'import' | 'load' | 'reingest'>('import');
   const [importProgress, setImportProgress] = useState<ImportProgressEntry[]>([]);
+  const [mixerActionPulse, setMixerActionPulse] = useState<{
+    trackId: string;
+    pulse: ALSActionPulse;
+    message: string;
+  } | null>(null);
   const activeStemJobRef = useRef<string | null>(null);
   const ingestQueueRef = useRef<IngestQueueManager | null>(null);
   const pendingQueueHydrationRef = useRef<PersistedIngestSnapshot | null>(null);
@@ -1027,6 +1342,54 @@ const App: React.FC = () => {
     startedAt: Date.now(),
     dropoutCount: 0,
   });
+  const [primeBrainTelemetryEnabled, setPrimeBrainTelemetryEnabled] = useState<boolean>(() => {
+    if (typeof window === 'undefined') {
+      return true;
+    }
+    const stored = window.localStorage.getItem(PRIME_BRAIN_TELEMETRY_STORAGE_KEY);
+    return stored !== 'disabled';
+  });
+  const [primeBrainExportUrl] = useState<string | null>(() => {
+    if (typeof window !== 'undefined') {
+      return (
+        window.localStorage.getItem(PRIME_BRAIN_EXPORT_URL_STORAGE_KEY) ??
+        // @ts-expect-error optional runtime hook
+        (window.__MIXX_PRIME_BRAIN_EXPORT_URL ?? null)
+      );
+    }
+    if (typeof process !== 'undefined' && typeof process.env !== 'undefined') {
+      return (
+        (process.env.PRIME_BRAIN_EXPORT_URL as string | undefined) ??
+        (process.env.NEXT_PUBLIC_PRIME_BRAIN_EXPORT_URL as string | undefined) ??
+        (process.env.REACT_APP_PRIME_BRAIN_EXPORT_URL as string | undefined) ??
+        null
+      );
+    }
+    return null;
+  });
+  useEffect(() => {
+    if (typeof window === 'undefined') return;
+    window.localStorage.setItem(
+      PRIME_BRAIN_TELEMETRY_STORAGE_KEY,
+      primeBrainTelemetryEnabled ? 'enabled' : 'disabled',
+    );
+  }, [primeBrainTelemetryEnabled]);
+
+  const [musicalContext, setMusicalContext] = useState<MusicalContext>({ genre: 'Streaming', mood: 'Balanced' });
+  const [isHushActive, setIsHushActive] = useState(false);
+  const [hushFeedback, setHushFeedback] = useState({ color: '#1a1030', intensity: 0.0, isEngaged: false, noiseCount: 0 });
+  const hushSystem = useMemo(() => getHushSystem(), []);
+  const hushProcessorNodeRef = useRef<ScriptProcessorNode | null>(null);
+  const skipAudioSetupWarmupRef = useRef<boolean>(import.meta.env.DEV);
+
+  useEffect(() => {
+    if (!mixerActionPulse || typeof window === 'undefined') return;
+    const timeout = window.setTimeout(
+      () => setMixerActionPulse(null),
+      mixerActionPulse.pulse.decayMs
+    );
+    return () => window.clearTimeout(timeout);
+  }, [mixerActionPulse]);
   if (!primeBrainSessionIdRef.current && typeof window !== 'undefined') {
     const storedSession =
       window.sessionStorage.getItem('mixxclub:primebrain-session') ??
@@ -1051,6 +1414,53 @@ const App: React.FC = () => {
       }
     }
   }
+
+  useEffect(() => {
+    return () => {
+      const meter = velvetLoudnessMeterRef.current;
+      const listener = loudnessListenerRef.current;
+      if (meter && listener) {
+        meter.removeEventListener('metrics', listener as EventListener);
+      }
+    };
+  }, []);
+
+  useEffect(() => {
+    translationProfileRef.current = translationProfile;
+    const matrix = translationMatrixRef.current;
+    if (matrix) {
+      matrix.activate(translationProfile);
+    }
+  }, [translationProfile]);
+
+  const handleToggleRecordingOption = useCallback((option: RecordingOptionKey) => {
+    setRecordingOptions((prev) => {
+      const nextState = { ...prev, [option]: !prev[option] };
+      publishAlsSignal({
+        source: 'recording-option',
+        option,
+        active: nextState[option],
+      });
+      return nextState;
+    });
+  }, [publishAlsSignal]);
+
+  const handleDropTakeMarker = useCallback(() => {
+    const timestamp = new Date().toISOString();
+    const report = evaluateCapture(loudnessMetrics, masterAnalysis.waveform);
+    const summary = `Take marker • Δ${(report.integratedLUFS - (masterNodesRef.current?.getProfile()?.targetLUFS ?? -14)).toFixed(1)} LUFS • Crest ${report.crestFactor.toFixed(1)} dB`;
+    appendHistoryNote({
+      id: `take-marker-${timestamp}`,
+      timestamp: Date.now(),
+      scope: 'recording',
+      message: `${summary} • ${report.notes[0] ?? 'Monitor engaged.'}`,
+      accent: '#f97316',
+    });
+    publishAlsSignal({
+      source: 'recording',
+      marker: { timestamp, report },
+    });
+  }, [appendHistoryNote, loudnessMetrics, masterAnalysis.waveform, publishAlsSignal]);
 
   const bumpPrimeBrainTick = useCallback(() => {
     setPrimeBrainTick((prev) => prev + 1);
@@ -1115,6 +1525,245 @@ const App: React.FC = () => {
     [bumpPrimeBrainTick],
   );
 
+  const captureReport = useMemo(
+    () => evaluateCapture(loudnessMetrics, masterAnalysis.waveform),
+    [loudnessMetrics, masterAnalysis.waveform],
+  );
+
+  const handleTogglePrimeBrainTelemetry = useCallback(() => {
+    setPrimeBrainTelemetryEnabled((prev) => {
+      const next = !prev;
+      logPrimeBrainAction(next ? 'Prime Brain telemetry armed' : 'Prime Brain telemetry muted');
+      publishBloomSignal({
+        source: 'prime-brain',
+        action: next ? 'primeBrain.telemetry.enable' : 'primeBrain.telemetry.disable',
+      });
+      return next;
+    });
+  }, [logPrimeBrainAction, publishBloomSignal]);
+
+  const primeBrainSnapshotInputs = useMemo<PrimeBrainSnapshotInputs | null>(() => {
+    const sessionId = primeBrainSessionIdRef.current;
+    if (!sessionId) {
+      return null;
+    }
+
+    const captureTimestamp = new Date().toISOString();
+    const bloomTrace = [...primeBrainBloomTraceRef.current];
+    const issuedCommands = [...primeBrainCommandLogRef.current];
+    const guidance = { ...primeBrainGuidanceRef.current };
+    const recentActions = [...primeBrainRecentActionsRef.current];
+    const audioMetricsState = primeBrainAudioMetricsRef.current;
+
+    const alsTemperature = clamp01(masterAnalysis.level);
+    let momentum = isPlaying ? 0.45 + masterAnalysis.level * 0.4 : 0.18;
+    if (mixerActionPulse) {
+      momentum = Math.min(1, momentum + mixerActionPulse.pulse.intensity * 0.4);
+    }
+    const pressureBase = masterAnalysis.transient
+      ? 0.55 + masterAnalysis.level * 0.4
+      : masterAnalysis.level * 0.6;
+    const pressure = clamp01(importMessage ? Math.max(pressureBase, 0.65) : pressureBase);
+    const harmony = analysisResult
+      ? clamp01((analysisResult.soul / 100) * 0.6 + (analysisResult.silk / 100) * 0.4)
+      : 0.38;
+
+    const alsChannels: PrimeBrainSnapshotInputs['alsChannels'] = [
+      { channel: 'temperature', value: alsTemperature },
+      { channel: 'momentum', value: momentum },
+      { channel: 'pressure', value: pressure },
+      { channel: 'harmony', value: harmony },
+    ];
+
+    const aiAnalysisFlags: PrimeBrainAIFlag[] = captureReport.notes.map((note) => {
+      const severity: PrimeBrainAIFlag['severity'] = note.includes('⚠️')
+        ? note.toLowerCase().includes('clipping') || note.toLowerCase().includes('critical')
+          ? 'critical'
+          : 'warn'
+        : 'info';
+      const message = note.replace(/^[⚠️✅]\s*/, '');
+      return {
+        category: 'capture',
+        severity,
+        message,
+      };
+    });
+
+    if (importMessage) {
+      aiAnalysisFlags.push({
+        category: 'ingest',
+        severity: 'info',
+        message: importMessage,
+      });
+    }
+
+    if (isHushActive && hushFeedback.isEngaged) {
+      aiAnalysisFlags.push({
+        category: 'hush',
+        severity: 'info',
+        message: 'Hush guard absorbing noise.',
+      });
+    }
+
+    const audioMetrics: PrimeBrainSnapshotInputs['audioMetrics'] = {
+      latencyMs: audioMetricsState.latencyMs,
+      cpuLoad: audioMetricsState.cpuLoad,
+      dropoutsPerMinute: audioMetricsState.dropoutsPerMinute,
+      bufferSize: audioMetricsState.bufferSize,
+      sampleRate: audioMetricsState.sampleRate,
+    };
+
+    const harmonicState: PrimeBrainSnapshotInputs['harmonicState'] = {
+      key: musicalContext.genre.toLowerCase(),
+      scale: musicalContext.mood.toLowerCase(),
+      consonance: analysisResult
+        ? clamp01((analysisResult.silk + analysisResult.soul) / 200)
+        : 0.42,
+      tension: analysisResult
+        ? clamp01((analysisResult.body + analysisResult.air) / 200)
+        : 0.33,
+      velocityEnergy: analysisResult ? clamp01(analysisResult.air / 100) : undefined,
+    };
+
+    const bloomActiveWindowMs = 16000;
+    const now = Date.now();
+    const activeBloomActions = bloomTrace.reduce((count, event) => {
+      const eventTime = Date.parse(event.triggeredAt);
+      if (Number.isFinite(eventTime) && now - eventTime < bloomActiveWindowMs) {
+        return count + 1;
+      }
+      return count;
+    }, 0);
+
+    const modeHints: PrimeBrainModeHints = {
+      isPlaying,
+      armedTrackCount: armedTracks.size,
+      activeBloomActions,
+      cpuLoad: audioMetrics.cpuLoad,
+      dropoutsPerMinute: audioMetrics.dropoutsPerMinute,
+    };
+
+    let mode: PrimeBrainMode = 'passive';
+    if (aiAnalysisFlags.some((flag) => flag.severity === 'critical')) {
+      mode = 'optimizing';
+    } else if (modeHints.armedTrackCount > 0) {
+      mode = 'learning';
+    } else if (modeHints.isPlaying || modeHints.activeBloomActions > 0 || Boolean(importMessage)) {
+      mode = 'active';
+    }
+
+    const userMemory: PrimeBrainSnapshotInputs['userMemory'] = {
+      recentActions,
+      recallAnchors: recallHighlightClipIds.map((id) => `clip:${id}`),
+    };
+
+    const transport: PrimeBrainSnapshotInputs['transport'] = {
+      isPlaying,
+      playheadSeconds: currentTime,
+      tempo: bpm,
+      isLooping,
+      cycle: isLooping ? { startSeconds: 0, endSeconds: currentTime } : null,
+    };
+
+    const conversationTurns: PrimeBrainConversationTurn[] = [];
+
+    return {
+      sessionId,
+      captureTimestamp,
+      transport,
+      alsChannels,
+      audioMetrics,
+      harmonicState,
+      aiAnalysisFlags,
+      bloomTrace,
+      userMemory,
+      issuedCommands,
+      conversationTurns,
+      mode,
+      modeHints,
+      guidance,
+    };
+  }, [
+    primeBrainTick,
+    masterAnalysis.level,
+    masterAnalysis.transient,
+    isPlaying,
+    mixerActionPulse,
+    importMessage,
+    analysisResult,
+    captureReport,
+    armedTracks,
+    recallHighlightClipIds,
+    currentTime,
+    bpm,
+    isLooping,
+    musicalContext,
+    hushFeedback,
+    isHushActive,
+  ]);
+
+  const primeBrainStatus = useMemo<PrimeBrainStatus>(() => {
+    const velvet = deriveVelvetLensState(analysisResult);
+    if (!primeBrainSnapshotInputs) {
+      const health = derivePrimeBrainHealth(
+        {} as PrimeBrainSnapshotInputs['audioMetrics'],
+        [],
+      );
+      const alsChannels = (['temperature', 'momentum', 'pressure', 'harmony'] as PrimeBrainALSChannel[]).map(
+        (channel) => describeAlsChannel(channel, 0),
+      );
+      return {
+        mode: 'passive',
+        modeCaption: MODE_CAPTIONS.passive,
+        health,
+        alsChannels,
+        velvet,
+        aiFlags: [],
+        userMemoryAnchors: [],
+      };
+    }
+
+    const mode = derivePrimeBrainMode(primeBrainSnapshotInputs);
+    const health = derivePrimeBrainHealth(
+      primeBrainSnapshotInputs.audioMetrics,
+      primeBrainSnapshotInputs.aiAnalysisFlags,
+    );
+    const alsChannels = primeBrainSnapshotInputs.alsChannels.map((entry) =>
+      describeAlsChannel(entry.channel, entry.value),
+    );
+    const bloomTrace = primeBrainSnapshotInputs.bloomTrace;
+    const lastBloom = bloomTrace.length ? bloomTrace[bloomTrace.length - 1] : null;
+    const lastAction = primeBrainSnapshotInputs.userMemory.recentActions[0]?.action;
+    const guidanceLine =
+      primeBrainSnapshotInputs.guidance?.lastSuggestion ??
+      primeBrainSnapshotInputs.guidance?.lastCommand?.commandType?.replace(/([A-Z])/g, ' $1')?.trim();
+    const bloomSummary = lastBloom
+      ? `${lastBloom.intent} • ${
+          lastBloom.outcome === 'accepted' ? 'Bloom honored' : 'Bloom deferred'
+        }`
+      : undefined;
+
+    return {
+      mode,
+      modeCaption: MODE_CAPTIONS[mode],
+      health,
+      alsChannels,
+      velvet,
+      lastAction,
+      lastBloom,
+      bloomSummary,
+      guidanceLine,
+      userMemoryAnchors: primeBrainSnapshotInputs.userMemory.recallAnchors,
+      aiFlags: primeBrainSnapshotInputs.aiAnalysisFlags,
+    };
+  }, [analysisResult, primeBrainSnapshotInputs]);
+
+  usePrimeBrainExporter({
+    enabled: primeBrainTelemetryEnabled && Boolean(primeBrainExportUrl),
+    exportUrl: primeBrainExportUrl,
+    snapshotInputs: primeBrainSnapshotInputs,
+    intervalMs: 4000,
+  });
   const normalizeCommandPayload = useCallback((value: unknown): Record<string, unknown> => {
     if (value === null || value === undefined) return {};
     if (Array.isArray(value)) {
@@ -1207,11 +1856,20 @@ const App: React.FC = () => {
   const [contextMenu, setContextMenu] = useState<{ x: number; y: number; trackId: string } | null>(null);
   const [renameModal, setRenameModal] = useState<string | null>(null);
   const [changeColorModal, setChangeColorModal] = useState<string | null>(null);
+  const contextMenuTrack = useMemo(
+    () => (contextMenu ? tracks.find((track) => track.id === contextMenu.trackId) ?? null : null),
+    [contextMenu, tracks]
+  );
+
 
   const [viewMode, setViewMode] = useState<'arrange' | 'mixer'>('arrange');
+  useEffect(() => {
+    if (arrangeFocusToken > 0) {
+      setViewMode('arrange');
+    }
+  }, [arrangeFocusToken]);
   const [activePrimeBrainClipId, setActivePrimeBrainClipId] = useState<ClipId | null>(null);
   const [selectedTrackId, setSelectedTrackId] = useState<string | null>(null);
-  const [armedTracks, setArmedTracks] = useState<Set<string>>(new Set());
   const [trackUiState, setTrackUiState] = useState<Record<string, TrackUIState>>({});
   const pianoRollBinding = usePianoRoll({
     bpm,
@@ -1424,9 +2082,7 @@ const App: React.FC = () => {
   }, []);
 
   // --- Dynamic Inserts (Replaces useConnections for routing) ---
-  const [inserts, setInserts] = useState<Record<string, FxWindowId[]>>({
-    [INITIAL_TRACK.id]: [],
-  }); // trackId -> [pluginId1, pluginId2, ...]
+  const [inserts, setInserts] = useState<Record<string, FxWindowId[]>>(() => createInitialInserts()); // trackId -> [pluginId1, pluginId2, ...]
   const insertsRef = useRef<Record<string, FxWindowId[]>>(inserts);
   useEffect(() => {
     insertsRef.current = inserts;
@@ -1441,12 +2097,6 @@ const App: React.FC = () => {
   const [pluginPresets, setPluginPresets] = useState<Record<FxWindowId, PluginPreset[]>>(
     () => loadPluginPresets() as Record<FxWindowId, PluginPreset[]>
   );
-  const [mixerActionPulse, setMixerActionPulse] = useState<{
-    trackId: string;
-    pulse: ALSActionPulse;
-    message: string;
-  } | null>(null);
-
   useEffect(() => {
     savePluginFavorites(pluginFavorites);
   }, [pluginFavorites]);
@@ -1454,15 +2104,6 @@ const App: React.FC = () => {
   useEffect(() => {
     savePluginPresets(pluginPresets);
   }, [pluginPresets]);
-
-  useEffect(() => {
-    if (!mixerActionPulse || typeof window === 'undefined') return;
-    const timeout = window.setTimeout(
-      () => setMixerActionPulse(null),
-      mixerActionPulse.pulse.decayMs
-    );
-    return () => window.clearTimeout(timeout);
-  }, [mixerActionPulse]);
 
   // --- Automation State ---
   // automationData: { [trackId]: { [fxId | 'track']: { [paramName]: AutomationPoint[] } } }
@@ -1472,14 +2113,6 @@ const App: React.FC = () => {
   const [automationParamMenu, setAutomationParamMenu] = useState<{ x: number; y: number; trackId: string; } | null>(null);
 
   // --- CONTEXTUAL ENGINE STATE ---
-  const [musicalContext, setMusicalContext] = useState<MusicalContext>({ genre: 'Streaming', mood: 'Balanced' });
-  
-  // --- HUSH SYSTEM STATE ---
-  const [isHushActive, setIsHushActive] = useState(false);
-  const [hushFeedback, setHushFeedback] = useState({ color: '#1a1030', intensity: 0.0, isEngaged: false, noiseCount: 0 });
-  let hushSystem = useMemo(() => getHushSystem(), []);
-  const hushProcessorNodeRef = useRef<ScriptProcessorNode | null>(null);
-
   // --- AI Hub State ---
   const [isAIHubOpen, setIsAIHubOpen] = useState(false);
 
@@ -1681,9 +2314,6 @@ const App: React.FC = () => {
     setCurrentTime(time);
     if (wasPlaying) handlePlayPause(); // Then restart at new time
   };
-  
-  const handleRewind = () => handleSeek(Math.max(0, currentTime - 5));
-  const handleFastForward = () => handleSeek(Math.min(projectDuration, currentTime + 5));
 
   const deriveAllowedStemKeys = useCallback((selection: string[]) => {
     const normalized = new Set<string>();
@@ -2008,39 +2638,91 @@ const App: React.FC = () => {
       return;
     }
 
+    let targetTrackId: string;
+    let targetTrackMeta: TrackData | undefined;
+
     if (resetSession) {
       console.log(
         '%c[DAW CORE] New audio batch detected. Resetting project and starting ingestion.',
         'color: orange; font-weight: bold;'
       );
-      setAudioBuffers({ [newBufferId]: processedBuffer });
-      setClips([]);
-      setMixerSettings({});
-      setInserts({});
+      const seededTracks = buildInitialTracks();
+      const seededWithProcessing = seededTracks.map((track) =>
+        track.id === TRACK_ROLE_TO_ID.twoTrack ? { ...track, isProcessing: true } : track
+      );
+      setTracks(seededWithProcessing);
+      tracksRef.current = seededWithProcessing;
+      setMixerSettings(createInitialMixerSettings());
+      setTrackSendLevels(createInitialTrackSendLevels());
+      setChannelDynamicsSettings(createInitialDynamicsSettings());
+      setChannelEQSettings(createInitialEQSettings());
+      const initialInserts = createInitialInserts();
+      setInserts(initialInserts);
+      insertsRef.current = initialInserts;
       setAutomationData({});
       setVisibleAutomationLanes({});
       setFxBypassState({});
       setSoloedTracks(new Set<string>());
       setArmedTracks(new Set<string>());
+      setClips([]);
+      targetTrackId = TRACK_ROLE_TO_ID.twoTrack;
+      targetTrackMeta = seededWithProcessing.find((track) => track.id === targetTrackId);
+      setAudioBuffers({ [newBufferId]: processedBuffer });
     } else {
       setAudioBuffers((prev) => ({ ...prev, [newBufferId]: processedBuffer }));
+
+      const newTrackId = `track-import-${timestamp}`;
+      const newTrack: TrackData = {
+        id: newTrackId,
+        trackName: profile.trackName,
+        trackColor: profile.color,
+        waveformType: profile.waveformType,
+        group: profile.group,
+        isProcessing: true,
+        role: 'standard',
+        locked: false,
+      };
+
+      const newInsertsForTrack: FxWindowId[] = [];
+
+      setTracks((prev) => {
+        const updated = [...prev, newTrack];
+        tracksRef.current = updated;
+        return updated;
+      });
+      targetTrackId = newTrackId;
+      targetTrackMeta = newTrack;
+      setMixerSettings((prev) => ({
+        ...prev,
+        [newTrackId]: { volume: 0.75, pan: 0, isMuted: false },
+      }));
+      setInserts((prev) => {
+        const next = { ...prev, [newTrackId]: newInsertsForTrack };
+        insertsRef.current = next;
+        return next;
+      });
+      setTrackSendLevels((prev) => ({
+        ...prev,
+        [newTrackId]: createDefaultSendLevels(newTrack),
+      }));
+      setChannelDynamicsSettings((prev) => ({
+        ...prev,
+        [newTrackId]: createDefaultDynamicsSettings(newTrack),
+      }));
+      setChannelEQSettings((prev) => ({
+        ...prev,
+        [newTrackId]: createDefaultEQSettings(newTrack),
+      }));
     }
 
-    const newTrackId = `track-import-${timestamp}`;
-    const newTrack: TrackData = {
-      id: newTrackId,
-      trackName: profile.trackName,
-      trackColor: profile.color,
-      waveformType: profile.waveformType,
-      group: profile.group,
-      isProcessing: true,
-    };
+    const assignedTrackId = targetTrackId;
+    const trackBaseline = targetTrackMeta ?? tracksRef.current.find((t) => t.id === assignedTrackId);
 
     const newClip: ArrangeClip = {
       id: `clip-import-${timestamp}`,
-      trackId: newTrackId,
+      trackId: assignedTrackId,
       name: 'FULL MIX',
-      color: TRACK_COLOR_SWATCH[profile.color].base,
+      color: TRACK_COLOR_SWATCH[(trackBaseline?.trackColor ?? profile.color) as TrackColorKey].base,
       start: 0,
       duration: processedBuffer.duration,
       originalDuration: processedBuffer.duration,
@@ -2057,41 +2739,26 @@ const App: React.FC = () => {
     };
 
     if (resetSession) {
-      const initialTracks = [newTrack];
-      setTracks(initialTracks);
-      tracksRef.current = initialTracks;
       setClips([newClip]);
-      setMixerSettings({ [newTrackId]: { volume: 0.75, pan: 0, isMuted: false } });
-      setInserts({ [newTrackId]: [] });
     } else {
-      setTracks((prev) => {
-        const updated = [...prev, newTrack];
-        tracksRef.current = updated;
-        return updated;
-      });
       setClips((prev) => [...prev, newClip]);
-      setMixerSettings((prev) => ({
-        ...prev,
-        [newTrackId]: { volume: 0.75, pan: 0, isMuted: false },
-      }));
-      setInserts((prev) => ({ ...prev, [newTrackId]: [] }));
     }
 
     ingestHistoryStore.record({
       jobId,
       clipIds: [newClip.id],
-      trackIds: [newTrackId],
+      trackIds: [assignedTrackId],
       fileName,
       completedAt: Date.now(),
       context: 'import',
     });
 
-    setSelectedTrackId(newTrackId);
+    setSelectedTrackId(assignedTrackId);
     upsertImportProgress({ id: jobId, label: `${displayName} • Track seeded`, percent: 45, type: 'file' });
 
     setImportMessage('Prime Brain is analyzing stems...');
     await new Promise<void>((resolve, reject) => {
-      startBackgroundStemSeparation(newTrackId, processedBuffer, displayName, jobId, { resolve, reject });
+      startBackgroundStemSeparation(assignedTrackId, processedBuffer, displayName, jobId, { resolve, reject });
     });
   };
   
@@ -2662,6 +3329,17 @@ const App: React.FC = () => {
 
   const isAnyTrackArmed = armedTracks.size > 0; // Define isAnyTrackArmed here
   const selectedClips = useMemo(() => clips.filter((clip) => clip.selected), [clips]);
+  const selectedClipSummaries = useMemo(
+    () =>
+      selectedClips.map((clip) => ({
+        id: clip.id,
+        name: clip.name,
+        trackId: clip.trackId,
+        start: clip.start,
+        duration: clip.duration,
+      })),
+    [selectedClips]
+  );
   const selectedClipIds = useMemo(() => selectedClips.map((clip) => clip.id), [selectedClips]);
   const handleBloomPositionChange = useCallback((position: { x: number; y: number }) => {
     const clamped = clampDockPosition(position);
@@ -2720,6 +3398,16 @@ const App: React.FC = () => {
                   setIsHushActive(prev => !prev);
               }
               break;
+        case 'setTranslationProfile':
+            if (typeof payload === 'string') {
+                const profile = payload as TranslationProfileKey;
+                setTranslationProfile(profile);
+                publishAlsSignal({
+                    source: 'translation-matrix',
+                    profile,
+                });
+            }
+            break;
           case 'resetMix':
               setMixerSettings(prev => {
                   const newSettings = { ...prev };
@@ -2843,10 +3531,12 @@ const App: React.FC = () => {
       }
   };
   
-  const handleAddTrack = useCallback((newTrack: Omit<TrackData, 'id'>) => {
+  const handleAddTrack = useCallback((newTrack: Pick<TrackData, 'trackName' | 'trackColor' | 'waveformType' | 'group'>) => {
     const newTrackData: TrackData = {
         ...newTrack,
-        id: `track-${Math.random().toString(36).substring(2, 9)}`
+        id: `track-${Math.random().toString(36).substring(2, 9)}`,
+        role: 'standard',
+        locked: false,
     };
     setTracks(prev => [...prev, newTrackData]);
     setMixerSettings(prev => ({
@@ -2905,7 +3595,7 @@ const App: React.FC = () => {
 
   const resolveTrackDefaults = useCallback(
     (trackId: string): TrackData =>
-      tracksRef.current.find((track) => track.id === trackId) ?? INITIAL_TRACK,
+      tracksRef.current.find((track) => track.id === trackId) ?? TWO_TRACK_TEMPLATE,
     []
   );
 
@@ -2983,12 +3673,17 @@ const App: React.FC = () => {
   };
 
   const handleToggleArm = (trackId: string) => {
+      const trackMeta = tracksRef.current.find((track) => track.id === trackId);
       setArmedTracks(prev => {
         const newSet = new Set(prev);
-        if (newSet.has(trackId)) {
+        const wasArmed = newSet.has(trackId);
+        if (wasArmed) {
             newSet.delete(trackId);
         } else {
             newSet.add(trackId);
+        }
+        if (trackMeta?.role === 'hushRecord') {
+          setIsHushActive(!wasArmed);
         }
         return newSet;
     });
@@ -3284,6 +3979,12 @@ const App: React.FC = () => {
   };
 
   const handleDeleteTrack = (trackId: string) => {
+    const targetTrack = tracksRef.current.find((track) => track.id === trackId);
+    if (targetTrack?.locked) {
+      console.warn(`[FLOW] Attempted to delete locked track ${targetTrack.trackName}. Ignored.`);
+      setContextMenu(null);
+      return;
+    }
     const removedClipIds = clipsRef.current
       .filter((clip) => clip.trackId === trackId)
       .map((clip) => clip.id);
@@ -3321,11 +4022,23 @@ const App: React.FC = () => {
   };
   
   const handleRenameTrack = (trackId: string, newName: string) => {
+    const targetTrack = tracksRef.current.find((track) => track.id === trackId);
+    if (targetTrack?.locked) {
+      console.warn(`[FLOW] Attempted to rename locked track ${targetTrack.trackName}. Ignored.`);
+      setRenameModal(null);
+      return;
+    }
     setTracks(prev => prev.map(t => t.id === trackId ? { ...t, trackName: newName.toUpperCase() } : t));
     setRenameModal(null);
   };
 
   const handleChangeColor = (trackId: string, newColor: TrackData['trackColor']) => {
+    const targetTrack = tracksRef.current.find((track) => track.id === trackId);
+    if (targetTrack?.locked) {
+      console.warn(`[FLOW] Attempted to recolor locked track ${targetTrack.trackName}. Ignored.`);
+      setChangeColorModal(null);
+      return;
+    }
     setTracks(prev => prev.map(t => t.id === trackId ? { ...t, trackColor: newColor } : t));
     setChangeColorModal(null);
   };
@@ -3672,6 +4385,10 @@ const App: React.FC = () => {
 
   // Audio setup effect
   useEffect(() => {
+    if (skipAudioSetupWarmupRef.current) {
+      skipAudioSetupWarmupRef.current = false;
+      return;
+    }
     let isCancelled = false;
     let ctx: AudioContext | null = null;
 
@@ -3710,8 +4427,14 @@ const App: React.FC = () => {
         setAudioBuffers({ 'default': buffer });
         console.log("Default audio buffer created.");
 
-        masterNodesRef.current = buildMasterChain(createdCtx);
-        masterNodesRef.current.output.connect(createdCtx.destination);
+        masterNodesRef.current = await buildMasterChain(createdCtx);
+        if (isCancelled || createdCtx.state === "closed") {
+          return;
+        }
+        const translationMatrix = new TranslationMatrix(createdCtx);
+        translationMatrix.attach(masterNodesRef.current.output, createdCtx.destination);
+        translationMatrix.activate(translationProfileRef.current);
+        translationMatrixRef.current = translationMatrix;
         const masterAnalyser = masterNodesRef.current.analyser;
         masterAnalyser.fftSize = TRACK_ANALYSER_FFT;
         masterAnalyser.smoothingTimeConstant = MASTER_ANALYSER_SMOOTHING;
@@ -3721,8 +4444,67 @@ const App: React.FC = () => {
           masterMeterBufferRef.current,
           masterAnalyser
         );
+        if (velvetLoudnessMeterRef.current && loudnessListenerRef.current) {
+          velvetLoudnessMeterRef.current.removeEventListener(
+            "metrics",
+            loudnessListenerRef.current as EventListener
+          );
+          loudnessListenerRef.current = null;
+        }
+        velvetLoudnessMeterRef.current = new VelvetLoudnessMeter();
+        const meter = velvetLoudnessMeterRef.current;
+        if (meter) {
+          if (loudnessListenerRef.current) {
+            meter.removeEventListener('metrics', loudnessListenerRef.current as EventListener);
+          }
+          if (isCancelled || createdCtx.state === "closed") {
+            return;
+          }
+          await meter.initialize(createdCtx);
+          if (isCancelled || createdCtx.state === "closed") {
+            return;
+          }
+          meter.reset();
+          setLoudnessMetrics(DEFAULT_VELVET_LOUDNESS_METRICS);
+          const handler = (event: Event) => {
+            if (isCancelled) return;
+            const metricsEvent = event as CustomEvent<VelvetLoudnessMetrics>;
+            if (metricsEvent.detail) {
+              setLoudnessMetrics(metricsEvent.detail);
+            }
+          };
+          meter.addEventListener('metrics', handler as EventListener);
+          loudnessListenerRef.current = handler;
+
+          if (isCancelled || createdCtx.state === "closed" || !masterNodesRef.current) {
+            return;
+          }
+          const complianceTap = masterNodesRef.current.complianceTap;
+          const softLimiterNode = masterNodesRef.current.softLimiter;
+          const meterNode = meter.getNode();
+          try {
+            complianceTap.disconnect();
+          } catch (err) {
+            console.warn('[AUDIO] Compliance tap disconnect issue', err);
+          }
+          if (meterNode) {
+            try {
+              meterNode.disconnect();
+            } catch (err) {
+              // Ignore stale disconnect attempts
+            }
+            complianceTap.connect(meterNode as AudioNode);
+            (meterNode as AudioNode).connect(softLimiterNode);
+          } else {
+            complianceTap.connect(softLimiterNode);
+          }
+        }
+
         console.log("Master Chain built and connected to destination.");
         
+        if (isCancelled || createdCtx.state === "closed") {
+          return;
+        }
         const initialPluginRegistry = getPluginRegistry(createdCtx);
         if (isCancelled) {
             await createdCtx.close().catch(() => {});
@@ -3734,9 +4516,15 @@ const App: React.FC = () => {
         engineInstancesRef.current.clear();
         for (const plugin of initialPluginRegistry) {
             if (isCancelled) break;
+            if (createdCtx.state === "closed") {
+              break;
+            }
             const engine = plugin.engineInstance(createdCtx);
             engineInstancesRef.current.set(plugin.id, engine);
             if (typeof engine.initialize === 'function' && !engine.getIsInitialized()) {
+                if (isCancelled || createdCtx.state === "closed") {
+                  break;
+                }
                 await engine.initialize(createdCtx);
                 console.log(`Plugin engine for ${plugin.name} initialized.`);
             }
@@ -3838,6 +4626,8 @@ const App: React.FC = () => {
         masterNodesRef.current = null;
         masterMeterBufferRef.current = null;
         trackMeterBuffersRef.current = {};
+        translationMatrixRef.current?.dispose();
+        translationMatrixRef.current = null;
         hushProcessorNodeRef.current = null;
         micSourceNodeRef.current = null;
 
@@ -4125,6 +4915,24 @@ const App: React.FC = () => {
         hushSystem.setActive(isHushActive);
     }, [isHushActive, hushSystem]);
 
+    useEffect(() => {
+        const hushTrackId = TRACK_ROLE_TO_ID.hushRecord;
+        setArmedTracks(prev => {
+          const hasHush = prev.has(hushTrackId);
+          if (isHushActive && !hasHush) {
+            const next = new Set(prev);
+            next.add(hushTrackId);
+            return next;
+          }
+          if (!isHushActive && hasHush) {
+            const next = new Set(prev);
+            next.delete(hushTrackId);
+            return next;
+          }
+          return prev;
+        });
+    }, [isHushActive]);
+
     // Effect to get feedback from HushSystem
     useEffect(() => {
         let animationFrameId: number;
@@ -4143,6 +4951,12 @@ const App: React.FC = () => {
             }
         };
     }, [isHushActive, hushSystem]);
+
+    useEffect(() => {
+      setRecordingOptions((prev) =>
+        prev.hushGate === isHushActive ? prev : { ...prev, hushGate: isHushActive }
+      );
+    }, [isHushActive]);
 
 
     const stopPlayback = useCallback(() => {
@@ -4444,6 +5258,72 @@ const App: React.FC = () => {
         };
     }, [isPlaying, scheduleClips, stopPlayback, getAutomationValue, armedTracks]);
 
+    const seekWithoutRestart = useCallback(
+      (time: number) => {
+        const upper = projectDurationRef.current ?? 0;
+        const clamped = Math.max(0, Math.min(upper, time));
+        setCurrentTime(clamped);
+        if (isPlayingRef.current) {
+          scheduleClips(clamped);
+          const ctx = audioContextRef.current;
+          if (ctx && ctx.state === 'suspended') {
+            ctx.resume().catch(() => {});
+          }
+        }
+      },
+      [scheduleClips]
+    );
+
+    const jumpTransport = useCallback(
+      (direction: 'back' | 'forward') => {
+        const epsilon = 1e-3;
+        const boundaries = new Set<number>();
+        if (selectedClips.length > 0) {
+          selectedClips.forEach((clip) => {
+            boundaries.add(clip.start);
+            boundaries.add(clip.start + clip.duration);
+          });
+        } else {
+          const barSeconds = (60 / bpm) * 4;
+          const totalBars = Math.max(1, Math.ceil(projectDuration / barSeconds));
+          for (let i = 0; i <= totalBars; i++) {
+            boundaries.add(Math.min(projectDuration, i * barSeconds));
+          }
+        }
+        boundaries.add(0);
+        boundaries.add(projectDuration);
+        const sorted = Array.from(boundaries).sort((a, b) => a - b);
+        let target = direction === 'back' ? 0 : projectDuration;
+        if (direction === 'back') {
+          for (let i = sorted.length - 1; i >= 0; i--) {
+            if (sorted[i] < currentTime - epsilon) {
+              target = sorted[i];
+              break;
+            }
+          }
+        } else {
+          for (let i = 0; i < sorted.length; i++) {
+            if (sorted[i] > currentTime + epsilon) {
+              target = sorted[i];
+              break;
+            }
+          }
+        }
+        handleSeek(target);
+      },
+      [selectedClips, bpm, projectDuration, currentTime, handleSeek]
+    );
+
+    const nudgeTransport = useCallback(
+      (direction: 'back' | 'forward') => {
+        const secondsPerBeat = 60 / bpm;
+        const step = Math.max(0.25, secondsPerBeat / 2);
+        const delta = direction === 'forward' ? step : -step;
+        seekWithoutRestart(currentTime + delta);
+      },
+      [bpm, currentTime, seekWithoutRestart]
+    );
+
 
   const renderFxWindows = useMemo(() => {
     return fxWindows.map(fw => {
@@ -4623,6 +5503,35 @@ const App: React.FC = () => {
     viewMode,
   ]);
 
+  const pixelsPerSecond = ppsAPI.value;
+  const sessionProbeContext = useMemo(
+    () => ({
+      currentTime,
+      isPlaying,
+      isLooping,
+      selection,
+      pixelsPerSecond,
+      scrollX,
+      followPlayhead,
+      viewMode,
+      bloomContext,
+      selectedClips: selectedClipSummaries,
+    }),
+    [
+      currentTime,
+      isPlaying,
+      isLooping,
+      selection,
+      pixelsPerSecond,
+      scrollX,
+      followPlayhead,
+      viewMode,
+      bloomContext,
+      selectedClipSummaries,
+    ]
+  );
+  const sessionProbeEnabled = useSessionProbe(sessionProbeContext);
+
   const bloomLabel = useMemo(() => BLOOM_CONTEXT_LABELS[bloomContext], [bloomContext]);
   const bloomAccent = useMemo(() => BLOOM_CONTEXT_ACCENTS[bloomContext], [bloomContext]);
 
@@ -4763,6 +5672,45 @@ const App: React.FC = () => {
       };
     };
 
+    const attachSettingsMenu = (menus: Record<string, BloomFloatingMenu>) => {
+      const main = menus.main ?? { items: [] };
+      const filteredItems = main.items.filter((item) => item.subMenu !== 'prime/settings');
+      const settingsAccent = primeBrainTelemetryEnabled ? '#c084fc' : '#475569';
+      const settingsDescriptor = primeBrainTelemetryEnabled
+        ? 'Telemetry flowing to Prime Fabric.'
+        : 'Telemetry sealed inside Studio.';
+      const settingsItem: BloomFloatingMenuItem = {
+        name: 'Prime Brain Settings',
+        description: settingsDescriptor,
+        subMenu: 'prime/settings',
+        accentColor: settingsAccent,
+      };
+
+      return {
+        ...menus,
+        main: { ...main, items: [...filteredItems, settingsItem] },
+        'prime/settings': {
+          parent: 'main',
+          items: [
+            {
+              name: primeBrainTelemetryEnabled ? 'Telemetry Flowing' : 'Telemetry Resting',
+              description: primeBrainTelemetryEnabled
+                ? 'Prime Brain exports ALS orbitals to Fabric.'
+                : 'Guidance stays local; no exports leave Studio.',
+              action: handleTogglePrimeBrainTelemetry,
+              accentColor: settingsAccent,
+            },
+            {
+              name: 'Health Pulse',
+              description: primeBrainStatus.health.caption,
+              disabled: true,
+              accentColor: primeBrainStatus.health.color,
+            },
+          ],
+        },
+      };
+    };
+
     switch (bloomContext) {
       case 'arrange': {
         const arrangeItems: BloomFloatingMenuItem[] = [
@@ -4810,7 +5758,7 @@ const App: React.FC = () => {
             accentColor: '#7fffd4',
           },
         ];
-        return buildSimpleMenu(arrangeItems);
+        return attachSettingsMenu(buildSimpleMenu(arrangeItems));
       }
       case 'record': {
         const recordItems: BloomFloatingMenuItem[] = [
@@ -4852,7 +5800,7 @@ const App: React.FC = () => {
             accentColor: BLOOM_CONTEXT_ACCENTS.ai,
           },
         ];
-        return buildSimpleMenu(recordItems);
+        return attachSettingsMenu(buildSimpleMenu(recordItems));
       }
       case 'mix': {
         const mixItems: BloomFloatingMenuItem[] = [
@@ -4881,7 +5829,7 @@ const App: React.FC = () => {
             accentColor: '#59e6ff',
           },
         ];
-        return buildSimpleMenu(mixItems);
+        return attachSettingsMenu(buildSimpleMenu(mixItems));
       }
       case 'master': {
         const masterItems: BloomFloatingMenuItem[] = [
@@ -4911,7 +5859,7 @@ const App: React.FC = () => {
             accentColor: '#f7b973',
           },
         ];
-        return buildSimpleMenu(masterItems);
+        return attachSettingsMenu(buildSimpleMenu(masterItems));
       }
       case 'ai': {
         const aiItems: BloomFloatingMenuItem[] = [
@@ -4940,10 +5888,10 @@ const App: React.FC = () => {
             accentColor: '#9af2ff',
           },
         ];
-        return buildSimpleMenu(aiItems);
+        return attachSettingsMenu(buildSimpleMenu(aiItems));
       }
       case 'ingest':
-        return buildIngestMenus();
+        return attachSettingsMenu(buildIngestMenus());
       default: {
         const idleItems: BloomFloatingMenuItem[] = [
           {
@@ -4969,13 +5917,14 @@ const App: React.FC = () => {
             accentColor: '#82d0ff',
           },
         ];
-        return buildSimpleMenu(idleItems);
+        return attachSettingsMenu(buildSimpleMenu(idleItems));
       }
     }
   }, [
     bloomContext,
     bloomPulseAgent,
     handleBloomAction,
+    handleTogglePrimeBrainTelemetry,
     importProgress,
     ingestJobs,
     isAIHubOpen,
@@ -4987,6 +5936,8 @@ const App: React.FC = () => {
     canRecallLastImport,
     currentTime,
     followPlayhead,
+    primeBrainStatus.health,
+    primeBrainTelemetryEnabled,
   ]);
 
   const handleFloatingBloomPositionChange = useCallback((position: { x: number; y: number }) => {
@@ -4999,11 +5950,14 @@ const App: React.FC = () => {
     }
   }, []);
 
+  const currentMasterProfile =
+    masterNodesRef.current?.getProfile() ?? MASTERING_PROFILES.streaming;
+
   return (
     <div className="relative w-screen h-screen text-ink flex flex-col overflow-hidden" style={backgroundGlowStyle}>
         <div className="pointer-events-none absolute inset-0 bg-gradient-to-br from-[rgba(48,92,178,0.45)] via-[rgba(19,37,74,0.4)] to-transparent blur-[110px] opacity-80"></div>
         <Header 
-            analysisResult={analysisResult}
+            primeBrainStatus={primeBrainStatus}
             hushFeedback={hushFeedback}
             isPlaying={isPlaying}
         />
@@ -5117,6 +6071,7 @@ const App: React.FC = () => {
                     onLoadPluginPreset={handleLoadPluginPreset}
                     onDeletePluginPreset={handleDeletePluginPreset}
                     mixerActionPulse={mixerActionPulse}
+                tempoBpm={bpm}
                 />
             </div>
 
@@ -5129,6 +6084,11 @@ const App: React.FC = () => {
             </FXRack>
         </main>
         
+        <VelvetComplianceHUD
+          metrics={loudnessMetrics}
+          profile={currentMasterProfile}
+        />
+
         <BloomFloatingHub
             menuConfig={bloomFloatingMenu}
             alsPulseAgent={bloomPulseAgent}
@@ -5143,8 +6103,8 @@ const App: React.FC = () => {
             isPlaying={isPlaying}
             isLooping={isLooping}
             onPlayPause={handlePlayPause}
-            onRewind={handleRewind}
-            onFastForward={handleFastForward}
+            onTransportJump={jumpTransport}
+            onTransportNudge={nudgeTransport}
             onToggleLoop={handleToggleLoop}
             masterAnalysis={masterAnalysis}
             selectedClips={selectedClips}
@@ -5156,13 +6116,16 @@ const App: React.FC = () => {
             onToggleFxVisibility={handleToggleFxVisibility}
             selectedTrackId={selectedTrackId}
             viewMode={viewMode}
-            onToggleViewMode={() => setViewMode(prev => prev === 'arrange' ? 'mixer' : 'arrange')}
+            onViewModeChange={(mode) => setViewMode(mode)}
             onOpenAIHub={() => setIsAIHubOpen(true)}
             currentTime={currentTime}
             canRecallLastImport={ingestHistoryEntries.length > 0}
             followPlayhead={followPlayhead}
             contextLabel={bloomLabel}
             contextAccent={bloomAccent}
+            recordingOptions={recordingOptions}
+            onToggleRecordingOption={handleToggleRecordingOption}
+            onDropTakeMarker={handleDropTakeMarker}
         />
 
         {isAddTrackModalOpen && (
@@ -5186,6 +6149,9 @@ const App: React.FC = () => {
                 onDelete={() => handleDeleteTrack(contextMenu.trackId)}
                 onRename={() => { setRenameModal(contextMenu.trackId); setContextMenu(null); }}
                 onChangeColor={() => { setChangeColorModal(contextMenu.trackId); setContextMenu(null); }}
+                canDelete={!contextMenuTrack?.locked}
+                canRename={!contextMenuTrack?.locked}
+                canChangeColor={!contextMenuTrack?.locked}
             />
         )}
         {renameModal && (
@@ -5251,8 +6217,59 @@ const App: React.FC = () => {
           onWarpAnchors={handleApplyWarpAnchors}
           onExportMidi={handleExportPianoRollMidi}
         />
+        {sessionProbeEnabled && <FlowProbeOverlay />}
     </div>
   );
+};
+
+const App: React.FC = () => {
+  const [hasEnteredFlow, setHasEnteredFlow] = useState(() => {
+    if (typeof window === "undefined") {
+      return false;
+    }
+    try {
+      return window.sessionStorage.getItem(FLOW_ENTRY_STORAGE_KEY) === "1";
+    } catch {
+      return false;
+    }
+  });
+  const [arrangeFocusToken, setArrangeFocusToken] = useState(0);
+
+  const handleEnterFlow = useCallback(() => {
+    if (typeof window !== "undefined") {
+      try {
+        window.sessionStorage.setItem(FLOW_ENTRY_STORAGE_KEY, "1");
+      } catch {
+        // ignore storage write errors to preserve flow
+      }
+    }
+    setHasEnteredFlow(true);
+    setArrangeFocusToken((prev) => prev + 1);
+  }, []);
+
+  useEffect(() => {
+    if (!hasEnteredFlow) {
+      return;
+    }
+    publishBloomSignal({
+      source: "system",
+      action: "flowSessionOpened",
+      payload: { origin: "welcome-hub" },
+    });
+    publishAlsSignal({
+      source: "system",
+      meta: {
+        surface: "flow-welcome",
+        stage: "complete",
+      },
+    });
+  }, [hasEnteredFlow]);
+
+  if (!hasEnteredFlow) {
+    return <FlowWelcomeHub onEnterFlow={handleEnterFlow} />;
+  }
+
+  return <FlowRuntime arrangeFocusToken={arrangeFocusToken} />;
 };
 
 export default App;
