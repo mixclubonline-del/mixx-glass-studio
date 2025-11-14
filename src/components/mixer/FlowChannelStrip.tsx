@@ -18,6 +18,12 @@ import type { PluginPreset } from "../../utils/pluginState";
 import type { PluginInventoryItem } from "../../audio/pluginTypes";
 import FlowMeter from "./FlowMeter";
 import FlowFader from "./FlowFader";
+import { GlassFader } from "./GlassFader";
+import { ZMeter3D } from "./ZMeter3D";
+import { GlassPanOrb } from "./GlassPanOrb";
+import { WidthLens } from "./WidthLens";
+import { MicroTrim } from "./MicroTrim";
+import { MuteIcon, SoloIcon, ArmIcon } from "../icons";
 import {
   MIXER_STRIP_WIDTH,
   MIXER_STRIP_MIN_WIDTH,
@@ -115,6 +121,10 @@ interface FlowChannelStripProps {
     fxId: string,
     paramName: string
   ) => void;
+  /** Flow-Follow Mode: Transport state for meter animation */
+  isPlaying?: boolean;
+  currentTime?: number;
+  followPlayhead?: boolean;
 }
 
 const SendIndicator: React.FC<{
@@ -188,6 +198,11 @@ const FlowChannelStrip: React.FC<FlowChannelStripProps> = memo(
     onRenameTrack,
     inserts,
     plugins = [],
+    // Filter out core processors from displayed plugins
+    displayedPlugins = plugins.filter(plugin => {
+      const CORE_PROCESSOR_IDS: FxWindowId[] = ['velvet-curve', 'phase-weave', 'velvet-floor', 'harmonic-lattice'];
+      return !CORE_PROCESSOR_IDS.includes(plugin.id);
+    }),
     trackPrimaryColor,
     trackGlowColor,
     stageHeight,
@@ -217,6 +232,9 @@ const FlowChannelStrip: React.FC<FlowChannelStripProps> = memo(
     actionMessage,
     selectedBusId,
     onToggleAutomationLaneWithParam,
+    isPlaying = false,
+    currentTime = 0,
+    followPlayhead = false,
   }) => {
     const [mode, setMode] = useState<ChannelMode>("mix");
     const [isRenaming, setIsRenaming] = useState(false);
@@ -276,7 +294,9 @@ const FlowChannelStrip: React.FC<FlowChannelStripProps> = memo(
     }, [availableSends, sendLevels, selectedBusId]);
 
     const normalizedInventory = useMemo(() => {
-      const sorted = [...pluginInventory];
+      // Filter out core processors (engine-level only)
+      const CORE_PROCESSOR_IDS: FxWindowId[] = ['velvet-curve', 'phase-weave', 'velvet-floor', 'harmonic-lattice'];
+      const sorted = [...pluginInventory].filter(plugin => !CORE_PROCESSOR_IDS.includes(plugin.id));
       return sorted.sort((a, b) => a.name.localeCompare(b.name));
     }, [pluginInventory]);
 
@@ -324,6 +344,12 @@ const FlowChannelStrip: React.FC<FlowChannelStripProps> = memo(
 
     const handleQuickAdd = useCallback(
       (pluginId: FxWindowId) => {
+        // Prevent adding core processors through UI (engine-level only)
+        const CORE_PROCESSOR_IDS: FxWindowId[] = ['velvet-curve', 'phase-weave', 'velvet-floor', 'harmonic-lattice'];
+        if (CORE_PROCESSOR_IDS.includes(pluginId)) {
+          console.warn(`[FLOW] Core processor ${pluginId} cannot be added via UI - it's engine-level only`);
+          return;
+        }
         onAddPlugin?.(track.id, pluginId);
         setInsertSearch("");
         setIsPickerOpen(false);
@@ -366,15 +392,27 @@ const FlowChannelStrip: React.FC<FlowChannelStripProps> = memo(
     );
 
     const topPlugins = useMemo(
-      () => plugins.slice(0, 3),
-      [plugins]
+      () => {
+        return displayedPlugins
+          .slice(0, 3)
+          .map((plugin) => {
+            const inventoryMatch = pluginInventory.find((p) => p.id === plugin.id);
+            return {
+              id: plugin.id,
+              name: plugin.name,
+              color: inventoryMatch?.base ?? plugin.color,
+              glow: inventoryMatch?.glow ?? plugin.glow,
+            };
+          });
+      },
+      [displayedPlugins, pluginInventory]
     );
 
     const sidechainSources = useMemo(() => {
-      return plugins
+      return displayedPlugins
         .filter((plugin) => /comp|duck|side|gate|pump/i.test(plugin.name))
         .map((plugin) => plugin.name);
-    }, [plugins]);
+    }, [displayedPlugins]);
 
     const automationQuickTargets = useMemo(() => {
       const base: Array<{ fxId: string; paramName: string; label: string }> = [
@@ -407,11 +445,11 @@ const FlowChannelStrip: React.FC<FlowChannelStripProps> = memo(
       const primaryGlow = `radial-gradient(circle at 50% 20%, ${hexToRgba(
         channelGlow,
         0.25
-      )} 0%, transparent 70%)`;
+      )} 0%, transparent 100%)`;
       const accentGlow = `radial-gradient(circle at 50% 20%, ${hexToRgba(
         channelColor,
         0.2 + intensity * 0.2
-      )} 0%, transparent 70%)`;
+      )} 0%, transparent 100%)`;
 
       return (
         <div className="flex flex-1 gap-3">
@@ -431,31 +469,83 @@ const FlowChannelStrip: React.FC<FlowChannelStripProps> = memo(
                 />
               </div>
               <div className="relative w-full flex items-end justify-center">
+                {/* Restored FlowMeter with ALS Pulse Sync + Flow-Follow Mode */}
                 <FlowMeter
                   level={Math.min(1, Math.max(0, analysis?.rms ?? intensity))}
                   peak={Math.min(1, Math.max(analysis?.peak ?? intensity, intensity))}
                   transient={analysis?.transient ?? false}
                   color={channelColor}
                   glow={channelGlow}
+                  pulse={pulse} // ALS Pulse Sync
+                  flowFollow={(() => {
+                    // Flow-Follow Mode: 0 = idle, 0.5 = scrolling, 1.0 = playhead moving
+                    if (isPlaying) return 1.0; // Playhead moving
+                    if (followPlayhead) return 0.5; // Scrolling/following
+                    return 0; // Idle
+                  })()}
                 />
               </div>
             </div>
 
             <div
-              className="rounded-xl border border-glass-border bg-[rgba(8,18,34,0.72)] px-2 py-2"
+              className="rounded-xl border border-glass-border bg-[rgba(8,18,34,0.72)] px-2 py-2 flex items-center justify-center"
               style={{ height: `${faderHeight}px` }}
             >
+              {/* Restored FlowFader with dB bubble + keyboard control */}
               <FlowFader
                 value={settings.volume}
                 onChange={(value) => onMixerChange(track.id, "volume", value)}
                 alsFeedback={alsFeedback}
-                trackColor={trackPrimaryColor}
-                glowColor={trackGlowColor}
-                name={`fader-${track.id}`}
+                trackColor={channelColor}
+                glowColor={channelGlow}
+                name={track.trackName}
+                showDB={true}
               />
             </div>
 
-            <div className="rounded-xl border border-glass-border bg-[rgba(8,18,34,0.72)] px-2 py-2">
+            {/* Pan Control - Restored original form factor with drag interaction */}
+            <div className="rounded-xl border border-glass-border/70 bg-[rgba(8,18,34,0.72)] px-3 py-2">
+              <div 
+                className="h-1 bg-[rgba(9,18,36,0.6)] rounded-full overflow-hidden relative cursor-pointer"
+                onPointerDown={(e) => {
+                  const rect = e.currentTarget.getBoundingClientRect();
+                  const x = e.clientX - rect.left;
+                  const pan = ((x / rect.width) - 0.5) * 2; // -1 to +1
+                  onMixerChange(track.id, "pan", Math.min(1, Math.max(-1, pan)));
+                }}
+              >
+                <motion.div
+                  className="absolute left-1/2 top-0 bottom-0 w-px bg-cyan-300/40"
+                  style={{ transform: "translateX(-50%)" }}
+                />
+                <motion.div
+                  className="h-full rounded-full"
+                  style={{
+                    background: `linear-gradient(90deg, ${hexToRgba(
+                      channelColor,
+                      0.8
+                    )}, ${hexToRgba(channelGlow, 0.4)})`,
+                    width: `${Math.abs(settings.pan) * 100}%`,
+                    left:
+                      settings.pan >= 0
+                        ? "50%"
+                        : `${50 - Math.abs(settings.pan) * 50}%`,
+                    opacity: 0.45 + intensity * 0.35,
+                  }}
+                  animate={{
+                    boxShadow: [
+                      `0 0 4px ${hexToRgba(channelGlow, 0.25)}`,
+                      `0 0 10px ${hexToRgba(channelGlow, 0.45)}`,
+                      `0 0 4px ${hexToRgba(channelGlow, 0.25)}`,
+                    ],
+                  }}
+                  transition={{ duration: 2, repeat: Infinity }}
+                />
+              </div>
+            </div>
+
+            {/* Legacy pan visualization (kept for reference, can be removed later) */}
+            <div className="rounded-xl border border-glass-border bg-[rgba(8,18,34,0.72)] px-2 py-2 hidden">
               <div className="h-1 bg-[rgba(9,18,36,0.6)] rounded-full overflow-hidden relative">
                 <motion.div
                   className="absolute left-1/2 top-0 bottom-0 w-px bg-cyan-300/40"
@@ -546,7 +636,7 @@ const FlowChannelStrip: React.FC<FlowChannelStripProps> = memo(
                   Modules
                 </span>
                 <span className="text-[0.45rem] uppercase tracking-[0.3em] text-ink/50">
-                  {plugins.length}
+                  {displayedPlugins.length}
                 </span>
               </div>
               <div className="mt-1 flex flex-col gap-1">
@@ -714,10 +804,10 @@ const FlowChannelStrip: React.FC<FlowChannelStripProps> = memo(
               : "rgba(255,255,255,0.12)",
           }}
         >
-          {plugins.length ? (
-            plugins.map((plugin, index) => {
+          {displayedPlugins.length ? (
+            displayedPlugins.map((plugin, index) => {
               const isFirst = index === 0;
-              const isLast = index === plugins.length - 1;
+              const isLast = index === displayedPlugins.length - 1;
               return (
                 <div
                   key={`${plugin.id}-${plugin.index}`}
@@ -1136,39 +1226,45 @@ const FlowChannelStrip: React.FC<FlowChannelStripProps> = memo(
                     event.stopPropagation();
                     onMixerChange(track.id, "isMuted", !settings.isMuted);
                   }}
-                  className={`w-6 h-6 rounded-full text-[0.45rem] uppercase tracking-[0.3em] transition-all ${
+                  className={`w-6 h-6 rounded-full flex items-center justify-center transition-all ${
                     settings.isMuted
                       ? "bg-red-500/80 text-white"
                       : "bg-[rgba(16,50,95,0.55)] text-ink hover:bg-[rgba(22,64,122,0.7)]"
                   }`}
+                  aria-label={settings.isMuted ? "Unmute channel" : "Mute channel"}
+                  title={settings.isMuted ? "Unmute channel" : "Mute channel"}
                 >
-                  M
+                  <MuteIcon className="w-3.5 h-3.5" />
                 </button>
                 <button
                   onClick={(event) => {
                     event.stopPropagation();
                     onToggleSolo(track.id);
                   }}
-                  className={`w-6 h-6 rounded-full text-[0.45rem] uppercase tracking-[0.3em] transition-all ${
+                  className={`w-6 h-6 rounded-full flex items-center justify-center transition-all ${
                     isSoloed
                       ? "bg-amber-300/80 text-ink"
                       : "bg-[rgba(16,50,95,0.55)] text-ink/80 hover:bg-[rgba(22,64,122,0.7)]"
                   }`}
+                  aria-label={isSoloed ? "Unsolo channel" : "Solo channel"}
+                  title={isSoloed ? "Unsolo channel" : "Solo channel"}
                 >
-                  S
+                  <SoloIcon className="w-3.5 h-3.5" />
                 </button>
                 <button
                   onClick={(event) => {
                     event.stopPropagation();
                     onToggleArm(track.id);
                   }}
-                  className={`w-6 h-6 rounded-full text-[0.45rem] uppercase tracking-[0.3em] transition-all ${
+                  className={`w-6 h-6 rounded-full flex items-center justify-center transition-all ${
                     isArmed
                       ? "bg-red-500 text-white"
                       : "bg-[rgba(16,50,95,0.55)] text-ink/80 hover:bg-[rgba(22,64,122,0.7)]"
                   }`}
+                  aria-label={isArmed ? "Disarm recording" : "Arm for recording"}
+                  title={isArmed ? "Disarm recording" : "Arm for recording"}
                 >
-                  R
+                  <ArmIcon className="w-3.5 h-3.5" />
                 </button>
               </div>
             </div>

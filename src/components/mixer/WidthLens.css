@@ -1,0 +1,32 @@
+/**
+ * Flow Stereo Width Lens Styles
+ * Compression & Expansion visualization.
+ */
+
+.width-lens {
+  position: relative;
+  border-radius: 50%;
+  background: rgba(255, 255, 255, 0.04);
+  border: 1px solid rgba(255, 255, 255, 0.12);
+  overflow: hidden;
+  backdrop-filter: blur(14px) saturate(180%);
+  transition: box-shadow 0.2s ease;
+}
+
+.width-iris {
+  position: absolute;
+  inset: 0;
+  margin: auto;
+  border-radius: 50%;
+  width: 100%;
+  height: 100%;
+  background: radial-gradient(
+    circle,
+    rgba(255, 255, 255, 0.6) 0%,
+    rgba(150, 60, 255, 0.15) 60%,
+    rgba(0, 0, 0, 0) 90%
+  );
+  transition: transform 0.2s ease;
+  pointer-events: none;
+}
+

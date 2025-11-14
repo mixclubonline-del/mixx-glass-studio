@@ -1,0 +1,30 @@
+/**
+ * Flow Dream-Fade Transition Engine Styles
+ * Smooth dissolution transitions - no flicker, no layout snaps.
+ */
+
+.flow-view-container {
+  position: relative;
+  width: 100%;
+  height: 100%;
+  transition: opacity 0.18s ease, filter 0.25s ease;
+  will-change: opacity, filter;
+}
+
+/* Dream Fade States */
+.flow-view-container.fade-in {
+  opacity: 1;
+  filter: blur(0px);
+}
+
+.flow-view-container.fade-out {
+  opacity: 0;
+  filter: blur(10px);
+  pointer-events: none; /* Prevent interaction during fade-out */
+}
+
+/* Ensure smooth transitions */
+.flow-view-container * {
+  transition: inherit;
+}
+

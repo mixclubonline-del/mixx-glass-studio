@@ -4,6 +4,7 @@ import React, { useMemo } from 'react';
 import { TrackData, MixerSettings } from '../App';
 import { hexToRgba } from '../utils/ALS';
 import { TrackUIState } from '../types/tracks';
+import { MuteIcon, SoloIcon, ArmIcon } from './icons';
 
 type ArrangeTrackHeaderProps = {
   track: TrackData;
@@ -15,6 +16,9 @@ type ArrangeTrackHeaderProps = {
   isSoloed: boolean;
   alsIntensity?: number;
   onInvokeBloom?: (trackId: string) => void;
+  onToggleMute?: (trackId: string) => void;
+  onToggleSolo?: (trackId: string) => void;
+  onToggleArm?: (trackId: string) => void;
 };
 
 const ArrangeTrackHeader: React.FC<ArrangeTrackHeaderProps> = ({
@@ -27,6 +31,9 @@ const ArrangeTrackHeader: React.FC<ArrangeTrackHeaderProps> = ({
   isSoloed,
   alsIntensity,
   onInvokeBloom,
+  onToggleMute,
+  onToggleSolo,
+  onToggleArm,
 }) => {
   const fallbackSwatch = useMemo(() => {
     switch (track.trackColor) {
@@ -123,21 +130,68 @@ const ArrangeTrackHeader: React.FC<ArrangeTrackHeaderProps> = ({
             {uiState.context?.toUpperCase() ?? 'PLAYBACK'}
           </span>
         </div>
-        <div className="flex flex-col items-end gap-1">
-          <div
-            className="h-1.5 w-20 overflow-hidden rounded-full bg-white/10 shadow-inner"
-            title={`Volume ${Math.round(volume * 100)}%`}
-          >
-            <div
-              className="h-full rounded-full bg-gradient-to-r from-cyan-400 via-blue-400 to-violet-400 transition-all duration-200"
-              style={{ width: `${Math.round(volume * 100)}%` }}
-            />
+        <div className="flex items-center gap-2">
+          {/* Mute/Solo/Arm Controls */}
+          <div className="flex items-center gap-1">
+            <button
+              onClick={(e) => {
+                e.stopPropagation();
+                onToggleMute?.(track.id);
+              }}
+              className={`w-8 h-8 rounded-full border transition-all flex items-center justify-center ${
+                isMuted
+                  ? 'bg-red-500/30 border-red-400/60 text-red-200'
+                  : 'bg-white/5 border-white/10 text-ink/60 hover:bg-white/10 hover:text-ink'
+              }`}
+              title={isMuted ? 'Unmute track' : 'Mute track'}
+            >
+              <MuteIcon className="w-3.5 h-3.5" />
+            </button>
+            <button
+              onClick={(e) => {
+                e.stopPropagation();
+                onToggleSolo?.(track.id);
+              }}
+              className={`w-8 h-8 rounded-full border transition-all flex items-center justify-center ${
+                isSoloed
+                  ? 'bg-yellow-500/30 border-yellow-400/60 text-yellow-200'
+                  : 'bg-white/5 border-white/10 text-ink/60 hover:bg-white/10 hover:text-ink'
+              }`}
+              title={isSoloed ? 'Unsolo track' : 'Solo track'}
+            >
+              <SoloIcon className="w-3.5 h-3.5" />
+            </button>
+            <button
+              onClick={(e) => {
+                e.stopPropagation();
+                onToggleArm?.(track.id);
+              }}
+              className={`w-8 h-8 rounded-full border transition-all flex items-center justify-center ${
+                isArmed
+                  ? 'bg-pink-500/30 border-pink-400/60 text-pink-200'
+                  : 'bg-white/5 border-white/10 text-ink/60 hover:bg-white/10 hover:text-ink'
+              }`}
+              title={isArmed ? 'Disarm track' : 'Arm track for recording'}
+            >
+              <ArmIcon className="w-3.5 h-3.5" />
+            </button>
           </div>
-          <div
-            className="flex h-5 w-20 items-center justify-center rounded-full border border-white/10 bg-white/5 text-[10px] uppercase tracking-[0.2em] text-ink/60"
-            title={`Pan ${pan >= 0 ? 'R' : 'L'}${Math.abs(pan * 100).toFixed(0)}%`}
-          >
-            {pan === 0 ? 'CENTER' : `${pan > 0 ? 'R' : 'L'} ${Math.abs(pan * 100).toFixed(0)}%`}
+          <div className="flex flex-col items-end gap-1">
+            <div
+              className="h-1.5 w-20 overflow-hidden rounded-full bg-white/10 shadow-inner"
+              title={`Volume ${Math.round(volume * 100)}%`}
+            >
+              <div
+                className="h-full rounded-full bg-gradient-to-r from-cyan-400 via-blue-400 to-violet-400 transition-all duration-200"
+                style={{ width: `${Math.round(volume * 100)}%` }}
+              />
+            </div>
+            <div
+              className="flex h-5 w-20 items-center justify-center rounded-full border border-white/10 bg-white/5 text-[10px] uppercase tracking-[0.2em] text-ink/60"
+              title={`Pan ${pan >= 0 ? 'R' : 'L'}${Math.abs(pan * 100).toFixed(0)}%`}
+            >
+              {pan === 0 ? 'CENTER' : `${pan > 0 ? 'R' : 'L'} ${Math.abs(pan * 100).toFixed(0)}%`}
+            </div>
           </div>
         </div>
       </div>

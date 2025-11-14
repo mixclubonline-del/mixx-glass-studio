@@ -1,123 +1,121 @@
 /**
- * Stem Separation Pipeline
+ * Flow Stem Pipeline
  * 
- * The complete 9-layer pipeline that orchestrates the entire stem separation process.
- * This is the main entry point for importing audio files.
+ * The complete orchestration function that runs the entire Flow import brain.
+ * Single entry point from FileInput.tsx.
  * 
- * When someone imports a file, the DAW will:
- * - analyze
- * - classify
- * - split
- * - detect BPM/key
- * - detect vocals
- * - detect drums
- * - detect 808/sub
- * - detect percs
- * - generate metadata
- * - create track lanes
- * - tag lanes with roles
- * - prepare punch zones
- * - prepare comp buffers
- * - prep ALS with initial Flow value
- * 
- * ALL before the user even sees the timeline.
+ * This is Prime Fabric → Flow runtime pattern:
+ * - filePrep
+ * - classifier
+ * - stemEngine
+ * - analysis
+ * - metadata
+ * - trackBuilder hydration
  */
 
-import { prepAudioFile, normalizeBuffer, type PreparedAudio } from './filePrep';
+import { prepFileForImport } from './filePrep';
 import { classifyAudio, type AudioClassification } from './classifier';
 import { stemSplitEngine, determineOptimalMode, type StemResult } from './stemEngine';
 import { analyzeTiming, type TimingAnalysis } from './analysis';
-import { assembleMetadata, createMetadataSummary, type StemMetadata } from './metadata';
-import { buildTracks, prepareTracksForFlow, type TrackConfig } from './trackBuilder';
+import { assembleMetadata, type StemMetadata } from './metadata';
+import {
+  buildAndHydrateFromStem,
+  type StemImportPayload,
+} from './trackBuilder';
 
-export interface StemSeparationResult {
-  tracks: TrackConfig[];
-  metadata: StemMetadata;
+export interface FlowImportResult {
   classification: AudioClassification;
-  analysis: TimingAnalysis;
-  preparedAudio: PreparedAudio;
+  timing: TimingAnalysis;
+  metadata: StemMetadata;
+  stems: Record<string, AudioBuffer | null>;
 }
 
 /**
- * Complete stem separation pipeline.
+ * Full Flow import + stem pipeline.
+ * Single entry point from FileInput.tsx.
  * 
- * @param file - Audio file to process
- * @param mode - Optional stem separation mode (auto-detected if not provided)
- * @returns Complete separation result with tracks, metadata, and analysis
+ * @param file - File object from input
+ * @param audioContext - AudioContext instance (reuse existing)
+ * @returns Complete import result with classification, timing, metadata, and stems
  */
-export async function processStemSeparation(
+export async function runFlowStemPipeline(
   file: File,
-  mode?: 'auto' | '2track' | 'full' | 'vocal' | 'perc'
-): Promise<StemSeparationResult> {
-  // Layer 1: File Reader & Prep
-  const preparedAudio = await prepAudioFile(file);
+  audioContext: AudioContext
+): Promise<FlowImportResult> {
+  // 1) file prep
+  const prep = await prepFileForImport(file, audioContext);
   
-  // Normalize audio for better separation
-  const normalizedBuffer = await normalizeBuffer(preparedAudio.audioBuffer);
+  // 2) classify main audio
+  const classification = await classifyAudio(prep.audioBuffer);
   
-  // Layer 2: Smart Classifier
-  const classification = classifyAudio(normalizedBuffer);
+  // 3) run stem separation
+  const optimalMode = determineOptimalMode(classification);
+  const stemResult = await stemSplitEngine(prep.audioBuffer, optimalMode, classification);
   
-  // Determine optimal mode if not provided
-  const optimalMode = mode || determineOptimalMode(classification);
+  // Convert StemResult to Record<string, AudioBuffer | null>
+  const stems: Record<string, AudioBuffer | null> = {
+    vocals: stemResult.vocals,
+    drums: stemResult.drums,
+    bass: stemResult.bass,
+    music: stemResult.music,
+    perc: stemResult.perc,
+    harmonic: stemResult.harmonic,
+    sub: stemResult.sub,
+  };
   
-  // Layer 3: Multi-Mode Stem Splitter
-  const stems = await stemSplitEngine(normalizedBuffer, optimalMode, classification);
+  console.log('[FLOW IMPORT] Stem separation result:', {
+    stemsCreated: Object.entries(stems).filter(([_, buf]) => buf !== null).length,
+    stemNames: Object.entries(stems).filter(([_, buf]) => buf !== null).map(([name]) => name),
+  });
   
-  // Layer 7: BPM + Key Detection
-  const analysis = await analyzeTiming(normalizedBuffer);
+  // 4) timing / BPM / key / phrasing
+  const timing = analyzeTiming({
+    bpm: null, // you can pre-seed if something upstream knows it
+    key: 'C',
+    confidence: classification.confidence,
+  });
   
-  // Layer 8: Metadata Assembler
+  // 5) Layer 4 metadata fusion
   const metadata = assembleMetadata(
     stems,
-    analysis,
+    timing,
     classification,
-    preparedAudio.info.sampleRate,
-    preparedAudio.info.duration,
-    preparedAudio.info.channels,
-    preparedAudio.info.format
+    prep.sampleRate,
+    prep.durationMs,
+    prep.channels,
+    prep.format,
+    prep.audioBuffer
   );
   
-  // Layer 9: Track Builder (with auto-role detection)
-  let tracks = buildTracks(stems, metadata, classification);
-  tracks = prepareTracksForFlow(tracks);
+  // 6) hydrate tracks + clips into timeline
+  Object.entries(stems).forEach(([stemName, buffer], index) => {
+    if (!buffer) {
+      console.log(`[FLOW IMPORT] Skipping empty stem: ${stemName}`);
+      return;
+    }
+    
+    console.log(`[FLOW IMPORT] Hydrating stem: ${stemName} (${buffer.duration.toFixed(2)}s)`);
+    
+    const payload: StemImportPayload = {
+      name: stemName,
+      role: classification.type,
+      color: undefined,
+      audioBuffer: buffer,
+      durationMs: prep.durationMs,
+      sampleRate: prep.sampleRate,
+      channels: prep.channels,
+      format: prep.format,
+      metadata,
+      index,
+    };
+    
+    buildAndHydrateFromStem(payload);
+  });
   
   return {
-    tracks,
-    metadata,
     classification,
-    analysis,
-    preparedAudio: {
-      ...preparedAudio,
-      audioBuffer: normalizedBuffer,
-    },
+    timing,
+    metadata,
+    stems,
   };
 }
-
-/**
- * Quick import for simple cases (no stem separation).
- * Just prepares file and analyzes timing.
- */
-export async function quickImport(file: File): Promise<{
-  audioBuffer: AudioBuffer;
-  metadata: Partial<StemMetadata>;
-  analysis: TimingAnalysis;
-}> {
-  const preparedAudio = await prepAudioFile(file);
-  const normalizedBuffer = await normalizeBuffer(preparedAudio.audioBuffer);
-  const analysis = await analyzeTiming(normalizedBuffer);
-  
-  return {
-    audioBuffer: normalizedBuffer,
-    metadata: {
-      bpm: analysis.bpm,
-      key: analysis.key,
-      sampleRate: preparedAudio.info.sampleRate,
-      duration: preparedAudio.info.duration,
-      channels: preparedAudio.info.channels,
-      format: preparedAudio.info.format,
-    },
-    analysis,
-  };
-}
-

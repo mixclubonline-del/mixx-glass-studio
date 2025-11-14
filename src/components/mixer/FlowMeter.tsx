@@ -8,6 +8,10 @@ interface FlowMeterProps {
   transient: boolean;
   color: string;
   glow: string;
+  /** ALS Pulse Sync (0-1) - enhances glow based on Flow Pulse */
+  pulse?: number;
+  /** Flow-Follow Mode (0-1) - enhances glow based on transport state */
+  flowFollow?: number;
 }
 
 const clamp01 = (value: number) => Math.min(1, Math.max(0, value));
@@ -18,6 +22,8 @@ const FlowMeter: React.FC<FlowMeterProps> = ({
   transient,
   color,
   glow,
+  pulse = 0,
+  flowFollow = 0,
 }) => {
   const [peakHold, setPeakHold] = useState(peak);
 
@@ -53,16 +59,17 @@ const FlowMeter: React.FC<FlowMeterProps> = ({
       )} 60%, ${hexToRgba(color, 0.15)} 100%)`;
 
   return (
-    <div className="relative w-5 h-full flex flex-col items-center">
-      <div className="absolute inset-0 rounded-md bg-black/60 border border-white/8 shadow-inner overflow-hidden">
+    <div className="relative w-44 h-full flex flex-col items-center" style={{ height: '100%' }}>
+      <div className="absolute inset-0 rounded-md bg-black/60 border border-white/8 shadow-inner overflow-hidden" style={{ height: '100%' }}>
         <div className="absolute inset-1 rounded-md bg-gradient-to-b from-white/5 to-transparent" />
         <motion.div
-          className="absolute inset-0"
+          className="absolute inset-0 h-full"
           style={{
             background: `radial-gradient(circle at 50% 20%, ${hexToRgba(
               glow,
-              0.25
-            )} 0%, transparent 70%)`,
+              0.25 + pulse * 0.3 + flowFollow * 0.2
+            )} 0%, transparent 100%)`,
+            boxShadow: `inset 0 0 ${20 + pulse * 15 + flowFollow * 10}px ${hexToRgba(glow, 0.15 + pulse * 0.25)}`,
           }}
           animate={{ opacity: [0.6, 1, 0.6] }}
           transition={{ duration: 2.5, repeat: Infinity, ease: "easeInOut" }}
@@ -73,7 +80,7 @@ const FlowMeter: React.FC<FlowMeterProps> = ({
             style={{
               height: `${mainHeight * 100}%`,
               background: gradient,
-              boxShadow: `0 0 12px ${hexToRgba(glow, 0.45)}`,
+              boxShadow: `0 0 ${12 + pulse * 8 + flowFollow * 6}px ${hexToRgba(glow, 0.45 + pulse * 0.3)}`,
             }}
             animate={{ opacity: [0.85, 1, 0.85] }}
             transition={{ duration: 1.6, repeat: Infinity, ease: "easeInOut" }}

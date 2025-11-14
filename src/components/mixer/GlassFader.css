@@ -1,0 +1,87 @@
+/**
+ * Flow Glass Fader Styles
+ * Signature hardware-in-software aesthetic with glass physics.
+ */
+
+.glass-fader-rail {
+  width: calc(var(--flow-scale) * 42px);
+  border-radius: var(--flow-radius-2xl);
+  position: relative;
+  background: linear-gradient(
+    to bottom,
+    rgba(255, 255, 255, 0.15),
+    rgba(255, 255, 255, 0.05)
+  );
+  backdrop-filter: blur(18px) saturate(180%);
+  border: 1px solid rgba(255, 255, 255, 0.12);
+  overflow: hidden;
+  box-shadow: inset 0 0 25px rgba(120, 70, 255, 0.2);
+  cursor: pointer;
+  user-select: none;
+}
+
+.glass-fader-handle {
+  width: calc(var(--flow-scale) * 42px);
+  height: calc(var(--flow-scale) * 16px);
+  border-radius: calc(var(--flow-scale) * 16px);
+  background: rgba(255, 255, 255, 0.18);
+  backdrop-filter: blur(12px);
+  border: 1px solid rgba(255, 255, 255, 0.25);
+  position: absolute;
+  transform: translateY(50%);
+  cursor: grab;
+  transition: transform 0.1s ease;
+  will-change: bottom;
+}
+
+.glass-fader-handle:active {
+  cursor: grabbing;
+  transform: translateY(50%) scale(1.05);
+}
+
+.glass-fader-glow {
+  position: absolute;
+  inset: 0;
+  border-radius: calc(var(--flow-scale) * 16px);
+  box-shadow:
+    0 0 18px rgba(170, 100, 255, 0.6),
+    0 0 4px rgba(255, 255, 255, 0.4) inset;
+  opacity: 0;
+  transition: opacity 0.2s ease;
+  pointer-events: none;
+}
+
+.glass-fader-handle:hover .glass-fader-glow {
+  opacity: 1;
+}
+
+.glass-fader-handle:active .glass-fader-glow {
+  opacity: 0.8;
+  box-shadow:
+    0 0 24px rgba(170, 100, 255, 0.8),
+    0 0 6px rgba(255, 255, 255, 0.5) inset;
+}
+
+.glass-fader-db {
+  position: absolute;
+  left: 50%;
+  bottom: calc(var(--flow-scale) * 24px);
+  transform: translateX(-50%);
+  padding: var(--flow-spacing-xs) var(--flow-spacing-sm);
+  background: rgba(20, 20, 30, 0.6);
+  color: white;
+  font-size: var(--flow-font-sm);
+  border-radius: var(--flow-radius-md);
+  backdrop-filter: blur(6px);
+  white-space: nowrap;
+  pointer-events: none;
+  box-shadow:
+    0 0 8px rgba(140, 90, 255, 0.5),
+    inset 0 0 4px rgba(255, 255, 255, 0.15);
+  z-index: 10;
+  font-family: 'SF Mono', 'Monaco', 'Inconsolata', 'Fira Code', monospace;
+  font-weight: 500;
+  letter-spacing: 0.5px;
+  transition: opacity 0.2s ease;
+}
+

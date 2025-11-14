@@ -1,0 +1,181 @@
+.flow-dock-wrapper {
+  position: fixed;
+  bottom: 0;
+  left: 0;
+  right: 0;
+  width: 100%;
+  z-index: 1000;
+}
+
+.flow-dock {
+  display: flex;
+  width: 100%;
+  height: calc(var(--flow-scale) * 64px);
+  padding: 0 calc(var(--flow-scale) * 24px);
+  backdrop-filter: blur(20px);
+  background: rgba(255, 255, 255, 0.04);
+  border-top: 1px solid rgba(255, 255, 255, 0.06);
+  align-items: center;
+  position: relative;
+  overflow: hidden;
+  cursor: ns-resize;
+}
+
+.flow-dock-pulse-line {
+  position: absolute;
+  top: 0;
+  left: 0;
+  height: calc(var(--flow-scale) * 2px);
+  transition: width 0.1s linear, opacity 0.15s ease-out;
+  z-index: 10;
+}
+
+.dock-cluster {
+  display: flex;
+  gap: var(--flow-spacing-lg);
+  flex: 1;
+  position: relative;
+  z-index: 5;
+}
+
+.dock-center {
+  justify-content: center;
+}
+
+.dock-right {
+  justify-content: flex-end;
+}
+
+.flow-icon-btn {
+  width: calc(var(--flow-scale) * 40px);
+  height: calc(var(--flow-scale) * 40px);
+  background: rgba(255, 255, 255, 0.08);
+  backdrop-filter: blur(12px);
+  border-radius: var(--flow-radius-md);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  transition: 120ms cubic-bezier(0.4, 0.0, 0.2, 1.0);
+  border: none;
+  cursor: pointer;
+}
+
+.flow-icon-btn:hover {
+  background: rgba(255, 255, 255, 0.16);
+  transform: scale(1.05);
+}
+
+.flow-glyph {
+  width: calc(var(--flow-scale) * 20px);
+  height: calc(var(--flow-scale) * 20px);
+  stroke: currentColor;
+  fill: none;
+  color: rgba(255, 255, 255, 0.9);
+  opacity: 0.9;
+  transition: opacity 0.15s ease-out, color 0.15s ease-out;
+}
+
+.flow-glyph[fill="currentColor"] {
+  fill: currentColor;
+}
+
+.flow-icon-btn:hover .flow-glyph {
+  opacity: 1;
+  color: rgba(255, 255, 255, 1);
+}
+
+.flow-dock-transition {
+  transition: opacity 150ms cubic-bezier(0.4, 0.0, 0.2, 1.0), transform 80ms cubic-bezier(0.25, 0.46, 0.45, 0.94);
+}
+
+.dream-fade {
+  opacity: 1;
+}
+
+/* Ghost Mode Layer */
+.flow-dock-ghost {
+  position: absolute;
+  top: 0;
+  left: 0;
+  width: 100%;
+  height: calc(var(--flow-scale) * 64px);
+  display: flex;
+  padding: 0 calc(var(--flow-scale) * 24px);
+  pointer-events: none;
+  z-index: 1;
+}
+
+/* Prime Brain Overlay */
+.flow-dock-prime-brain-overlay {
+  position: absolute;
+  bottom: 100%;
+  left: 50%;
+  transform: translateX(-50%);
+  padding: var(--flow-spacing-sm) var(--flow-spacing-lg);
+  background: rgba(20, 20, 30, 0.85);
+  backdrop-filter: blur(12px);
+  border-radius: var(--flow-radius-md);
+  border: 1px solid rgba(255, 255, 255, 0.1);
+  color: rgba(255, 255, 255, 0.9);
+  font-size: var(--flow-font-sm);
+  white-space: nowrap;
+  margin-bottom: var(--flow-spacing-sm);
+  z-index: 2000;
+  animation: fadeInDown 0.2s ease-out;
+}
+
+@keyframes fadeInDown {
+  from {
+    opacity: 0;
+    transform: translateX(-50%) translateY(4px);
+  }
+  to {
+    opacity: 1;
+    transform: translateX(-50%) translateY(0);
+  }
+}
+
+/* Dock States */
+.dock-state-expanded {
+  height: calc(var(--flow-scale) * 64px);
+}
+
+.dock-state-collapsed {
+  height: calc(var(--flow-scale) * 8px);
+  padding: 0;
+  overflow: hidden;
+}
+
+.dock-state-collapsed .dock-cluster {
+  opacity: 0;
+}
+
+.dock-state-minimal {
+  height: calc(var(--flow-scale) * 4px);
+  padding: 0;
+  overflow: hidden;
+}
+
+.dock-state-minimal .dock-cluster {
+  opacity: 0;
+}
+
+/* Mode-specific styles */
+.dock-mode-record .flow-icon-btn[id*="record"] {
+  background: rgba(255, 70, 70, 0.3);
+  box-shadow: 0 0 12px rgba(255, 70, 70, 0.5);
+}
+
+.dock-mode-edit .dock-center {
+  gap: calc(var(--flow-scale) * 20px);
+}
+
+.dock-mode-nav {
+  opacity: 0.85;
+}
+
+.dock-mode-mix .flow-dock-pulse-line {
+  width: 100% !important;
+  height: calc(var(--flow-scale) * 3px);
+}
+

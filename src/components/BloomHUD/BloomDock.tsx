@@ -9,6 +9,14 @@ import type { BloomActionMeta } from '../../types/bloom';
 import type { PrimeBrainStatus } from '../../types/primeBrainStatus';
 import type { TranslationProfileKey, TranslationProfileInfo, CalibrationPreset } from '../../audio/TranslationMatrix';
 import type { IngestJobSnapshot } from '../../ingest/IngestQueueManager';
+import { detectIntent, getALSGlowState, getPrimeBrainState, formatGuidanceForDock, setGhostLayer, updateGhostLayer, getGhostLayer } from '../../core/flowdock';
+import { applyModeOverride } from '../../core/flowdock/modePriority';
+import type { DockMode } from '../../core/flowdock/types';
+import { PrimeBrainIcon } from '../flowdock/glyphs/PrimeBrainIcon';
+import { FlowDockDebug } from '../dock/debug/FlowDockDebug';
+import { FlowPulseGraph } from '../dock/debug/FlowPulseGraph';
+import { ALSEventLog } from '../dock/debug/ALSEventLog';
+import { ALSSyncMonitor } from '../dock/debug/ALSSyncMonitor';
 import './ArrangeBloomStrip.css';
 
 type ImportProgressLike = {
@@ -49,7 +57,7 @@ const MasterWaveform: React.FC<{ waveform: Uint8Array, color: string }> = ({ wav
 
 type DockViewMode = 'arrange' | 'sampler' | 'mixer' | 'piano' | 'edit';
 
-const VIEW_ORDER: DockViewMode[] = ['arrange', 'sampler', 'mixer', 'piano', 'edit'];
+const VIEW_ORDER: DockViewMode[] = ['arrange', 'mixer', 'sampler', 'piano', 'edit'];
 
 const VIEW_META: Record<DockViewMode, { label: string; icon: React.ComponentType<{ className?: string }> }> = {
     arrange: { label: 'Arrange View', icon: ArrangeViewIcon },
@@ -208,6 +216,13 @@ export const BloomDock: React.FC<BloomDockProps> = (props) => {
     const holdTimeoutRef = useRef<number | null>(null);
     const holdIntervalRef = useRef<number | null>(null);
     const hasHeldRef = useRef(false);
+    
+    // Flow Dock intent detection
+    const [flowMode, setFlowMode] = useState<DockMode>('nav');
+    const [prevFlowMode, setPrevFlowMode] = useState<DockMode>('nav');
+    const [alsGlow, setAlsGlow] = useState(getALSGlowState());
+    const [primeBrain, setPrimeBrain] = useState(getPrimeBrainState());
+    const [ghostMode, setGhostMode] = useState(getGhostLayer());
 
     const clampPosition = useCallback((rawPosition: { x: number; y: number }) => {
         if (typeof window === 'undefined') return rawPosition;
@@ -298,16 +313,64 @@ export const BloomDock: React.FC<BloomDockProps> = (props) => {
     const pulseHalo = alsPulseAgent?.halo ?? '#38bdf8';
     const pulseStrength = alsPulseAgent?.pulseStrength ?? (isPlaying ? 0.6 : 0.35);
     const pulseAccent = alsPulseAgent?.accent ?? '#06b6d4';
+    
+    // Enhanced halo with Flow Dock ALS glow
+    const enhancedGlowIntensity = Math.max(pulseStrength, alsGlow.glowIntensity);
+    const enhancedGlowColor = alsGlow.glowColor || pulseGlow;
 
     const haloStyle = useMemo(() => ({
         boxShadow: `
-            0 0 ${26 + pulseStrength * 28}px ${hexToRgba(pulseGlow, isDragging ? 0.7 : 0.5)},
-            0 0 ${60 + pulseStrength * 42}px ${hexToRgba(pulseHalo, 0.22)},
-            0 0 ${90 + pulseStrength * 48}px ${hexToRgba(contextAccent, 0.28)}
+            0 0 ${26 + enhancedGlowIntensity * 28}px ${hexToRgba(enhancedGlowColor, isDragging ? 0.7 : 0.5)},
+            0 0 ${60 + enhancedGlowIntensity * 42}px ${hexToRgba(pulseHalo, 0.22)},
+            0 0 ${90 + enhancedGlowIntensity * 48}px ${hexToRgba(contextAccent, 0.28)},
+            inset 0 0 ${20 + alsGlow.glowIntensity * 30}px ${alsGlow.glowColor}
         `,
         borderColor: hexToRgba(contextAccent, 0.55),
         background: `linear-gradient(135deg, ${hexToRgba(contextAccent, 0.22)} 0%, rgba(8,14,28,0.92) 60%, rgba(4,7,16,0.9) 100%)`,
-    }), [contextAccent, isDragging, pulseGlow, pulseHalo, pulseStrength]);
+    }), [contextAccent, isDragging, pulseGlow, pulseHalo, enhancedGlowIntensity, enhancedGlowColor, alsGlow]);
+
+    // Developer-mode ALS debug payload (reads from global ALS + current dock state)
+    const alsDebugState = useMemo(() => {
+        if (typeof window === 'undefined') {
+            return {
+                pulse: 0,
+                flow: 0,
+                energy: 'steady',
+                hush: isHushActive,
+                temperature: 'COLD',
+                bpm: 0,
+                playing: isPlaying,
+                phase: 0,
+            };
+        }
+        const als = (window.__als || {}) as any;
+        const pulse = (als.pulse ?? 0) / 100;
+        const flow = (als.flow ?? 0) / 100;
+        const temperatureRaw = String(als.temperature ?? 'cold');
+        const temperature = temperatureRaw.toUpperCase();
+        let energy: string = 'cold';
+        if (temperature === 'HOT' || temperature === 'BLAZING') energy = 'hot';
+        else if (temperature === 'WARM' || temperature === 'WARMING' || temperature === 'BALANCED') energy = 'warm';
+        const phase = typeof als.phase === 'number' ? als.phase : 0;
+        const bpm = typeof als.bpm === 'number' ? als.bpm : 0;
+        return {
+            pulse,
+            flow,
+            energy,
+            hush: isHushActive,
+            temperature,
+            bpm,
+            playing: isPlaying,
+            phase,
+        };
+    }, [isHushActive, isPlaying]);
+
+    const pulseDebugState = useMemo(
+        () => ({
+            glowStrength: enhancedGlowIntensity,
+        }),
+        [enhancedGlowIntensity],
+    );
 
     const clearSeekTimers = useCallback(() => {
         if (holdTimeoutRef.current) {
@@ -330,6 +393,50 @@ export const BloomDock: React.FC<BloomDockProps> = (props) => {
             setTransportPulse(null);
             transportPulseTimeoutRef.current = null;
         }, 220);
+    }, []);
+
+    // Flow Dock intent detection (75ms polling)
+    useEffect(() => {
+        const interval = setInterval(() => {
+            const detected = detectIntent();
+            const finalMode = applyModeOverride(detected);
+            
+            if (finalMode !== flowMode) {
+                setGhostLayer(flowMode);
+                setPrevFlowMode(flowMode);
+                setFlowMode(finalMode);
+            }
+        }, 75);
+
+        return () => clearInterval(interval);
+    }, [flowMode]);
+
+    // ALS glow sync (60fps)
+    useEffect(() => {
+        const interval = setInterval(() => {
+            setAlsGlow(getALSGlowState());
+        }, 16);
+
+        return () => clearInterval(interval);
+    }, []);
+
+    // Prime Brain sync
+    useEffect(() => {
+        const interval = setInterval(() => {
+            setPrimeBrain(getPrimeBrainState());
+        }, 100);
+
+        return () => clearInterval(interval);
+    }, []);
+
+    // Ghost mode animation
+    useEffect(() => {
+        const interval = setInterval(() => {
+            const ghost = updateGhostLayer();
+            setGhostMode(ghost);
+        }, 16);
+
+        return () => clearInterval(interval);
     }, []);
 
     useEffect(() => {
@@ -539,26 +646,47 @@ export const BloomDock: React.FC<BloomDockProps> = (props) => {
         </div>
     );
 
+    // Flow Dock adaptive cluster selection based on intent mode
     const leftSegments: React.ReactNode[] = [];
     const isArrangeSurface = viewMode === 'arrange' || viewMode === 'piano' || viewMode === 'edit';
-
-    if (isArrangeSurface) {
-        leftSegments.push(arrangeWorkflowCluster);
-        if (editingCluster) {
-            leftSegments.push(editingCluster);
-        }
-        if (recordCluster) {
-            leftSegments.push(recordCluster);
-        }
-    } else if (viewMode === 'sampler') {
-        leftSegments.push(samplerCluster);
-        if (recordCluster) {
-            leftSegments.push(recordCluster);
-        }
-    } else if (viewMode === 'mixer') {
+    
+    // Flow Dock mode-based cluster priority
+    if (flowMode === 'record' && isAnyTrackArmed) {
+        // Record mode: prioritize recording controls
+        if (recordCluster) leftSegments.push(recordCluster);
+        if (isArrangeSurface) leftSegments.push(arrangeWorkflowCluster);
+    } else if (flowMode === 'edit' && (singleSelectedClip || viewMode === 'edit')) {
+        // Edit mode: prioritize editing tools
+        if (editingCluster) leftSegments.push(editingCluster);
+        if (isArrangeSurface) leftSegments.push(arrangeWorkflowCluster);
+    } else if (flowMode === 'mix' && viewMode === 'mixer') {
+        // Mix mode: prioritize mixer controls
         leftSegments.push(mixCluster);
-        if (recordCluster) {
-            leftSegments.push(recordCluster);
+        if (recordCluster) leftSegments.push(recordCluster);
+    } else if (flowMode === 'perform' && viewMode === 'sampler') {
+        // Performance mode: prioritize sampler controls
+        leftSegments.push(samplerCluster);
+        if (recordCluster) leftSegments.push(recordCluster);
+    } else {
+        // Default: view-based clusters
+        if (isArrangeSurface) {
+            leftSegments.push(arrangeWorkflowCluster);
+            if (editingCluster) {
+                leftSegments.push(editingCluster);
+            }
+            if (recordCluster) {
+                leftSegments.push(recordCluster);
+            }
+        } else if (viewMode === 'sampler') {
+            leftSegments.push(samplerCluster);
+            if (recordCluster) {
+                leftSegments.push(recordCluster);
+            }
+        } else if (viewMode === 'mixer') {
+            leftSegments.push(mixCluster);
+            if (recordCluster) {
+                leftSegments.push(recordCluster);
+            }
         }
     }
 
@@ -644,7 +772,7 @@ export const BloomDock: React.FC<BloomDockProps> = (props) => {
                 onPointerUp={handleSeekPointerUp('back')}
                 onPointerLeave={() => clearSeekTimers()}
                 onPointerCancel={() => clearSeekTimers()}
-                className="relative w-11 h-11 rounded-full border border-white/14 bg-[rgba(12,26,48,0.65)] text-cyan-100 hover:text-white transition-all"
+                className="relative flex items-center justify-center w-11 h-11 rounded-full border border-white/14 bg-[rgba(12,26,48,0.65)] text-cyan-100 hover:text-white transition-all"
                 style={pulseGlowStyle('rewind')}
             >
                 <RewindIcon className="w-5 h-5" />
@@ -656,7 +784,7 @@ export const BloomDock: React.FC<BloomDockProps> = (props) => {
                     title={isPlaying ? 'Pause' : 'Play'}
                     onPointerDown={handlePlayPointerDown}
                     onPointerUp={() => clearSeekTimers()}
-                    className={`relative w-14 h-14 rounded-full border transition-all text-white ${
+                    className={`relative flex items-center justify-center w-14 h-14 rounded-full border transition-all text-white ${
                         isPlaying ? 'bg-[rgba(24,32,76,0.78)] border-white/18' : 'bg-[rgba(18,48,84,0.82)] border-white/14'
                     }`}
                     style={
@@ -671,7 +799,7 @@ export const BloomDock: React.FC<BloomDockProps> = (props) => {
                     {isPlaying ? (
                         <PauseIcon className="w-6 h-6 text-cyan-100" />
                     ) : (
-                        <PlayIcon className="w-6 h-6 translate-x-[1px] text-cyan-100" />
+                        <PlayIcon className="w-6 h-6 text-cyan-100" />
                     )}
                     <span
                         aria-hidden
@@ -691,7 +819,7 @@ export const BloomDock: React.FC<BloomDockProps> = (props) => {
                 onPointerUp={handleSeekPointerUp('forward')}
                 onPointerLeave={() => clearSeekTimers()}
                 onPointerCancel={() => clearSeekTimers()}
-                className="relative w-11 h-11 rounded-full border border-white/14 bg-[rgba(12,26,48,0.65)] text-cyan-100 hover:text-white transition-all"
+                className="relative flex items-center justify-center w-11 h-11 rounded-full border border-white/14 bg-[rgba(12,26,48,0.65)] text-cyan-100 hover:text-white transition-all"
                 style={pulseGlowStyle('forward')}
             >
                 <FastForwardIcon className="w-5 h-5" />
@@ -759,21 +887,60 @@ export const BloomDock: React.FC<BloomDockProps> = (props) => {
             ref={containerRef}
             className="arrange-bloom-fixed pointer-events-none select-none"
             style={{
+                left: position.x,
+                top: position.y,
                 transition: isDragging ? 'none' : 'transform 0.2s ease, opacity 0.2s ease',
             }}
         >
-            <div
-                className={`absolute -top-6 left-1/2 -translate-x-1/2 px-4 py-1.5 rounded-full border pointer-events-auto backdrop-blur-lg shadow-[0_18px_36px_rgba(4,12,26,0.45)] ${isDragging ? 'cursor-grabbing' : 'cursor-grab'}`}
-                style={{
-                    borderColor: hexToRgba(contextAccent, 0.55),
-                    background: `linear-gradient(135deg, ${hexToRgba(contextAccent, 0.25)} 0%, rgba(9,15,32,0.85) 100%)`,
-                    color: hexToRgba(contextAccent, 0.9),
-                    letterSpacing: '0.42em',
-                    fontSize: '10px',
-                }}
-                onPointerDown={handleDragPointerDown}
-            >
-                {contextLabel.toUpperCase()}
+            {/* Prime Brain Overlay */}
+            {primeBrain.showOverlay && (
+                <div
+                    className="absolute -top-12 left-1/2 -translate-x-1/2 px-4 py-2 rounded-full border pointer-events-none backdrop-blur-lg shadow-[0_18px_36px_rgba(4,12,26,0.45)] flex items-center gap-2"
+                    style={{
+                        borderColor: hexToRgba(contextAccent, 0.3),
+                        background: 'rgba(20, 20, 30, 0.85)',
+                        color: 'rgba(255, 255, 255, 0.9)',
+                        fontSize: '11px',
+                        whiteSpace: 'nowrap',
+                    }}
+                >
+                    <div className="flex h-5 w-5 items-center justify-center rounded-full bg-white/5">
+                        <PrimeBrainIcon className="w-3.5 h-3.5 text-indigo-200" />
+                    </div>
+                    <span>{formatGuidanceForDock(primeBrain.guidance)}</span>
+                </div>
+            )}
+            
+            {/* Flow Mode Label with ALS Pulse Line */}
+            <div className="relative">
+                <div
+                    className={`absolute -top-6 left-1/2 -translate-x-1/2 px-4 py-1.5 rounded-full border pointer-events-auto backdrop-blur-lg shadow-[0_18px_36px_rgba(4,12,26,0.45)] flex items-center gap-2 ${isDragging ? 'cursor-grabbing' : 'cursor-grab'}`}
+                    style={{
+                        borderColor: hexToRgba(contextAccent, 0.55),
+                        background: `linear-gradient(135deg, ${hexToRgba(contextAccent, 0.25)} 0%, rgba(9,15,32,0.85) 100%)`,
+                        color: hexToRgba(contextAccent, 0.9),
+                        letterSpacing: '0.42em',
+                        fontSize: '10px',
+                    }}
+                    onPointerDown={handleDragPointerDown}
+                >
+                    {viewMode === 'sampler' && (
+                      <span className="flex h-4 w-4 items-center justify-center rounded-full bg-black/40">
+                        <SamplerIcon className="w-3 h-3 text-indigo-200" />
+                      </span>
+                    )}
+                    <span>{contextLabel.toUpperCase()}</span>
+                </div>
+                {/* ALS Pulse Line */}
+                <div
+                    className="absolute -top-6 left-1/2 -translate-x-1/2 h-0.5 rounded-full pointer-events-none transition-all duration-100"
+                    style={{
+                        width: `${alsGlow.pulse * 100}%`,
+                        background: alsGlow.glowColor,
+                        opacity: alsGlow.glowIntensity,
+                        transform: 'translateX(-50%) translateY(100%)',
+                    }}
+                />
             </div>
             <div
                 className="pointer-events-auto"
@@ -836,6 +1003,25 @@ export const BloomDock: React.FC<BloomDockProps> = (props) => {
                     </div>
                 </div>
             </div>
+            {/* Developer diagnostics (dev-only, gated by global flag) */}
+            {typeof window !== 'undefined' && (window as any).__ALS_DEBUG__ && (
+                <>
+                    <FlowDockDebug als={alsDebugState} pulse={pulseDebugState} />
+                    <FlowPulseGraph pulseHistory={[]} />
+                    <ALSEventLog logs={[]} />
+                    <ALSSyncMonitor
+                        sync={{
+                            phase: alsDebugState.phase || 0,
+                            driftMs: 0,
+                            tempoLinked: alsDebugState.bpm > 0,
+                            pulseRatio:
+                                alsDebugState.bpm > 0
+                                    ? (alsDebugState.pulse * 100) / alsDebugState.bpm
+                                    : 0,
+                        }}
+                    />
+                </>
+            )}
         </div>
     );
 };

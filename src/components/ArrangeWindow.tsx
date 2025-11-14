@@ -41,6 +41,11 @@ import { CompGhost } from "./timeline/CompGhost";
 import { FlowPulseBar } from "./visualizers/FlowPulseBar";
 import { PlayheadPulse } from "./timeline/PlayheadPulse";
 import { BreathingPlayhead } from "./timeline/BreathingPlayhead";
+import { ZoomInIcon } from "./flowdock/glyphs/ZoomInIcon";
+import { ZoomOutIcon } from "./flowdock/glyphs/ZoomOutIcon";
+import { FitIcon } from "./flowdock/glyphs/FitIcon";
+import { FitSelectionIcon } from "./flowdock/glyphs/FitSelectionIcon";
+import { PlusIcon, MinusIcon } from "./icons";
 import { getStemHeatColor, getStemHeatState, computeStemEnergy } from "../core/als/stemHeat";
 import "../components/lane/StemLaneHeat.css";
 
@@ -131,6 +136,9 @@ type Props = {
   onOpenPianoRoll: (clip: ClipModel) => void;
   audioBuffers: Record<string, AudioBuffer | undefined>;
   onInvokeTrackBloom?: (trackId: string) => void;
+  onToggleMute?: (trackId: string) => void;
+  onToggleSolo?: (trackId: string) => void;
+  onToggleArm?: (trackId: string) => void;
 };
 
 const BASE_CLIP_LANE_H = DEFAULT_TRACK_LANE_HEIGHT;
@@ -261,6 +269,9 @@ export const ArrangeWindow: React.FC<Props> = (props) => {
     onOpenPianoRoll,
     onInvokeTrackBloom,
     audioBuffers = {},
+    onToggleMute,
+    onToggleSolo,
+    onToggleArm,
   } = props;
 
   const flowContext = useFlowContext();
@@ -1556,7 +1567,7 @@ export const ArrangeWindow: React.FC<Props> = (props) => {
               className="w-7 h-7 flex items-center justify-center rounded-full bg-white/10 hover:bg-white/20 transition"
               title="Decrease waveform height"
             >
-              –
+              <MinusIcon className="w-3.5 h-3.5" />
             </button>
             <button
               type="button"
@@ -1564,7 +1575,7 @@ export const ArrangeWindow: React.FC<Props> = (props) => {
               className="w-7 h-7 flex items-center justify-center rounded-full bg-white/10 hover:bg-white/20 transition"
               title="Increase waveform height"
             >
-              +
+              <PlusIcon className="w-3.5 h-3.5" />
             </button>
             <span className="mx-1 text-[9px] uppercase tracking-[0.3em]">
               {Math.round(waveformOptions.heightMultiplier * 100)}%
@@ -1577,7 +1588,7 @@ export const ArrangeWindow: React.FC<Props> = (props) => {
               className="w-7 h-7 flex items-center justify-center rounded-full bg-white/10 hover:bg-white/20 transition"
               title="Zoom out waveform"
             >
-              ◂
+              <ZoomOutIcon className="w-3.5 h-3.5" />
             </button>
             <button
               type="button"
@@ -1585,7 +1596,7 @@ export const ArrangeWindow: React.FC<Props> = (props) => {
               className="w-7 h-7 flex items-center justify-center rounded-full bg-white/10 hover:bg-white/20 transition"
               title="Zoom in waveform"
             >
-              ▸
+              <ZoomInIcon className="w-3.5 h-3.5" />
             </button>
           </div>
         </div>
@@ -1596,7 +1607,7 @@ export const ArrangeWindow: React.FC<Props> = (props) => {
             className="w-8 h-7 flex items-center justify-center rounded-full bg-white/10 hover:bg-white/20 transition text-white/70 text-sm"
             title="Zoom out (Cmd/Ctrl + -)"
           >
-            –
+            <ZoomOutIcon className="w-3.5 h-3.5" />
           </button>
           <button
             type="button"
@@ -1604,7 +1615,7 @@ export const ArrangeWindow: React.FC<Props> = (props) => {
             className="w-8 h-7 flex items-center justify-center rounded-full bg-white/10 hover:bg-white/20 transition text-white/70 text-sm"
             title="Zoom in (Cmd/Ctrl + +)"
           >
-            +
+            <ZoomInIcon className="w-3.5 h-3.5" />
           </button>
           <button
             type="button"
@@ -1612,7 +1623,7 @@ export const ArrangeWindow: React.FC<Props> = (props) => {
             className="px-2 py-1 text-[10px] uppercase tracking-[0.32em] rounded-full bg-white/10 hover:bg-white/20 transition text-white/70"
             title="Zoom to selection (Cmd/ Ctrl + Shift + Z)"
           >
-            Sel
+            <FitSelectionIcon className="w-3.5 h-3.5" />
           </button>
           <button
             type="button"
@@ -1620,7 +1631,7 @@ export const ArrangeWindow: React.FC<Props> = (props) => {
             className="px-2 py-1 text-[10px] uppercase tracking-[0.32em] rounded-full bg-white/10 hover:bg-white/20 transition text-white/70"
             title="Zoom to fit (Cmd/ Ctrl + 0)"
           >
-            Fit
+            <FitIcon className="w-3.5 h-3.5" />
           </button>
         </div>
       </div>
@@ -1651,6 +1662,9 @@ export const ArrangeWindow: React.FC<Props> = (props) => {
                 isSoloed={soloedTracks.has(track.id)}
                 alsIntensity={alsIntensity}
                 onInvokeBloom={onInvokeTrackBloom}
+                onToggleMute={onToggleMute}
+                onToggleSolo={onToggleSolo}
+                onToggleArm={onToggleArm}
               />
               {!uiState.collapsed && (
                 <div

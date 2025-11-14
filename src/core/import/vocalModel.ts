@@ -60,9 +60,14 @@ async function fallbackVocalExtraction(audioBuffer: AudioBuffer): Promise<AudioB
   eq.connect(hp);
   hp.connect(ctx.destination);
   
-  source.start();
+  source.start(0);
   
-  return ctx.startRendering();
+  try {
+    return await ctx.startRendering();
+  } catch (error) {
+    console.warn('[FLOW IMPORT] Vocal extraction failed, returning original buffer:', error);
+    return audioBuffer;
+  }
 }
 
 /**
@@ -99,17 +104,25 @@ export async function subtract(
   const instGain = ctx.createGain();
   instGain.gain.value = -1.0; // Invert
   
-  // Mix them together
-  const merger = ctx.createChannelMerger(fullMix.numberOfChannels);
+  // Mix them together using gain nodes (simpler than merger)
+  const mixGain = ctx.createGain();
+  const instGainNode = ctx.createGain();
   
-  mixSource.connect(merger);
+  mixSource.connect(mixGain);
   instSource.connect(instGain);
-  instGain.connect(merger);
-  merger.connect(ctx.destination);
+  instGain.connect(instGainNode);
   
-  mixSource.start();
-  instSource.start();
+  mixGain.connect(ctx.destination);
+  instGainNode.connect(ctx.destination);
   
-  return ctx.startRendering();
+  mixSource.start(0);
+  instSource.start(0);
+  
+  try {
+    return await ctx.startRendering();
+  } catch (error) {
+    console.warn('[FLOW IMPORT] Vocal subtraction failed, returning full mix:', error);
+    return fullMix;
+  }
 }
 

@@ -423,6 +423,10 @@ useEffect(() => {
     <div
       ref={containerRef}
       className="bloom-hud-fixed select-none pointer-events-none"
+      style={{
+        left: position.x,
+        top: position.y,
+      }}
     >
       <div className="relative flex flex-col items-end space-y-3 pointer-events-auto">
         {hoveredItem && (

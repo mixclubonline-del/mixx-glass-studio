@@ -22,6 +22,49 @@ export interface PreparedAudio {
   info: AudioFileInfo;
 }
 
+export interface FilePrepResult {
+  file: File;
+  arrayBuffer: ArrayBuffer;
+  audioBuffer: AudioBuffer;
+  sampleRate: number;
+  durationMs: number;
+  channels: number;
+  format: string | undefined;
+}
+
+/**
+ * Prepare a File object for the Flow import pipeline.
+ * Browser-only, Web Audio safe.
+ * 
+ * @param file - File object from input
+ * @param audioContext - AudioContext instance (reuse existing or create new)
+ * @returns FilePrepResult with all audio metadata
+ */
+export async function prepFileForImport(
+  file: File,
+  audioContext: AudioContext
+): Promise<FilePrepResult> {
+  const arrayBuffer = await file.arrayBuffer();
+  const audioBuffer = await audioContext.decodeAudioData(arrayBuffer.slice(0)); // copy for Safari safety
+  
+  const sampleRate = audioBuffer.sampleRate;
+  const durationMs = audioBuffer.duration * 1000;
+  const channels = audioBuffer.numberOfChannels;
+  const name = file.name || '';
+  const dotIndex = name.lastIndexOf('.');
+  const format = dotIndex !== -1 ? name.substring(dotIndex + 1).toLowerCase() : undefined;
+  
+  return {
+    file,
+    arrayBuffer,
+    audioBuffer,
+    sampleRate,
+    durationMs,
+    channels,
+    format,
+  };
+}
+
 /**
  * Prepare audio file for stem separation.
  * 
@@ -30,6 +73,7 @@ export interface PreparedAudio {
  * 
  * @param file - File object from input
  * @returns Prepared audio buffer and metadata
+ * @deprecated Use prepFileForImport instead for better browser safety
  */
 export async function prepAudioFile(file: File): Promise<PreparedAudio> {
   const arrayBuffer = await file.arrayBuffer();
@@ -72,12 +116,6 @@ export async function toMono(audioBuffer: AudioBuffer): Promise<AudioBuffer> {
     audioBuffer.sampleRate
   );
   
-  // Ensure context is in valid state before rendering
-  if (ctx.state === 'closed') {
-    console.warn('[FLOW IMPORT] OfflineAudioContext was closed in toMono, returning original buffer');
-    return audioBuffer;
-  }
-  
   const source = ctx.createBufferSource();
   source.buffer = audioBuffer;
   
@@ -86,17 +124,18 @@ export async function toMono(audioBuffer: AudioBuffer): Promise<AudioBuffer> {
   source.connect(merger);
   merger.connect(ctx.destination);
   
-  source.start();
+  source.start(0);
   
   try {
     return await ctx.startRendering();
   } catch (error) {
-    // If context is stopped/closed, return original buffer
-    if (ctx.state === 'closed' || ctx.state === 'suspended') {
-      console.warn('[FLOW IMPORT] OfflineAudioContext in invalid state in toMono:', ctx.state);
+    // If context is interrupted, return original buffer
+    if (ctx.state === 'interrupted') {
+      console.warn('[FLOW IMPORT] OfflineAudioContext interrupted in toMono, returning original buffer');
       return audioBuffer;
     }
-    throw error;
+    console.warn('[FLOW IMPORT] toMono rendering error, returning original buffer:', error);
+    return audioBuffer;
   }
 }
 
@@ -139,12 +178,6 @@ export async function normalizeBuffer(
     audioBuffer.sampleRate
   );
   
-  // Ensure context is in 'suspended' state before rendering
-  if (ctx.state === 'closed') {
-    console.warn('[FLOW IMPORT] OfflineAudioContext was closed, returning original buffer');
-    return audioBuffer;
-  }
-  
   const source = ctx.createBufferSource();
   source.buffer = audioBuffer;
   
@@ -154,17 +187,18 @@ export async function normalizeBuffer(
   source.connect(gainNode);
   gainNode.connect(ctx.destination);
   
-  source.start();
+  source.start(0);
   
   // Add timeout protection with cancellation
   let timeoutId: ReturnType<typeof setTimeout> | null = null;
   const renderPromise = ctx.startRendering().catch((error) => {
-    // If context is stopped/closed, return original buffer
-    if (ctx.state === 'closed' || ctx.state === 'suspended') {
-      console.warn('[FLOW IMPORT] OfflineAudioContext in invalid state for rendering:', ctx.state);
+    // If context is interrupted, return original buffer
+    if (ctx.state === 'interrupted') {
+      console.warn('[FLOW IMPORT] OfflineAudioContext interrupted during normalization, returning original buffer');
       return audioBuffer;
     }
-    throw error;
+    console.warn('[FLOW IMPORT] Normalization rendering error:', error);
+    return audioBuffer;
   });
   const timeoutPromise = new Promise<AudioBuffer>((_, reject) => {
     timeoutId = setTimeout(() => {

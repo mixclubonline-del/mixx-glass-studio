@@ -1,6 +1,7 @@
 import React, { useLayoutEffect, useMemo, useRef } from "react";
 import clsx from "clsx";
 import type { PrimeBrainStatus } from "../types/primeBrainStatus";
+import { PrimeBrainIcon } from "./flowdock/glyphs/PrimeBrainIcon";
 
 interface HeaderProps {
   primeBrainStatus: PrimeBrainStatus;
@@ -61,8 +62,15 @@ const Header: React.FC<HeaderProps> = ({
     >
       <div className="flex flex-wrap items-center gap-5">
         <div className="flex min-w-[220px] flex-col">
-          <span className="text-[11px] uppercase tracking-[0.45em] text-white/50">Prime Brain · ALS</span>
-          <div className="flex items-baseline gap-3">
+          <div className="flex items-center gap-2">
+            <div className="flex h-7 w-7 items-center justify-center rounded-full bg-white/10 shadow-[0_0_18px_rgba(148,163,255,0.55)]">
+              <PrimeBrainIcon className="w-4 h-4 text-indigo-200" />
+            </div>
+            <span className="text-[11px] uppercase tracking-[0.45em] text-white/50">
+              Prime Brain · ALS
+            </span>
+          </div>
+          <div className="mt-1 flex items-baseline gap-3">
             <span className="text-2xl font-semibold tracking-wide">{mode}</span>
             <span className="text-sm uppercase tracking-[0.4em] text-white/50">{modeCaption}</span>
           </div>

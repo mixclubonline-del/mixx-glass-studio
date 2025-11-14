@@ -1,0 +1,127 @@
+{
+  "FlowDock": {
+    "modes": {
+      "record": {
+        "trigger": [
+          "recordEnabledTrack",
+          "inputMonitor",
+          "hushArmed",
+          "recordPressed",
+          "takeLaneActive",
+          "autoPunchPending"
+        ],
+        "clusters": {
+          "left": ["addTrack", "inputMonitor", "countIn"],
+          "center": ["record", "play", "stop", "punchIn", "punchOut", "autoPunch"],
+          "right": ["hushMeter", "takeList", "primeBrain", "bloom"]
+        },
+        "behavior": {
+          "fadeOthers": 0.2,
+          "pulseSync": true,
+          "priority": 100
+        }
+      },
+      "edit": {
+        "trigger": [
+          "clipSelected",
+          "clipEdgeDrag",
+          "clipSplit",
+          "warpActive"
+        ],
+        "clusters": {
+          "left": ["split", "trim", "timeStretch"],
+          "center": ["gainLine", "warp", "nudgeLeft", "nudgeRight"],
+          "right": ["undo", "redo", "consolidate"]
+        },
+        "behavior": {
+          "minimizeTransport": true,
+          "centerTools": true,
+          "priority": 90
+        }
+      },
+      "nav": {
+        "trigger": [
+          "scrolling",
+          "zooming",
+          "markerJump",
+          "playheadMove"
+        ],
+        "clusters": {
+          "left": ["zoomOut", "zoomIn", "fit", "fitSelection"],
+          "center": ["scrollMode", "markerPrev", "markerNext"],
+          "right": ["loopRegion", "miniMap"]
+        },
+        "behavior": {
+          "narrow": true,
+          "priority": 50
+        }
+      },
+      "mix": {
+        "trigger": [
+          "mixViewOpen",
+          "faderTouched",
+          "soloTouched",
+          "muteTouched",
+          "panTouched"
+        ],
+        "clusters": {
+          "left": ["solo", "mute", "arm"],
+          "center": ["pan", "inserts", "routing"],
+          "right": ["sends", "automation", "masterMeter"]
+        },
+        "behavior": {
+          "minimizeTransport": true,
+          "widePulse": true,
+          "priority": 95
+        }
+      },
+      "perform": {
+        "trigger": [
+          "midiInput",
+          "pianoRollAudition",
+          "padHit",
+          "drumGridActive"
+        ],
+        "clusters": {
+          "left": ["quantize", "scaleLock", "repeatRate"],
+          "center": ["arp", "chordMemory"],
+          "right": ["padLayer", "performanceSettings"]
+        },
+        "behavior": {
+          "gamingHudFeel": true,
+          "priority": 80
+        }
+      },
+      "compose": {
+        "trigger": [
+          "trackAdd",
+          "instrumentBrowse",
+          "dragSongSection",
+          "createMidiClip"
+        ],
+        "clusters": {
+          "left": ["addTrack", "addInstrument"],
+          "center": ["browseSounds", "addMidiPattern"],
+          "right": ["harmonyTools", "chordPalette", "sections"]
+        },
+        "behavior": {
+          "songwritingView": true,
+          "priority": 60
+        }
+      }
+    },
+    "transitions": {
+      "style": "dreamFade",
+      "duration": 150,
+      "pulseCarryover": true,
+      "ghostMode": 200
+    },
+    "icons": {
+      "style": "flow-glyph",
+      "stroke": "single",
+      "color": "glass-white",
+      "theme": "pulse-reactive"
+    }
+  }
+}
+

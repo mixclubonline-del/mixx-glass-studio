@@ -1,0 +1,28 @@
+/**
+ * Flow Micro Trim MiniMeter Styles
+ * Subtle dB readouts for precision engineering.
+ */
+
+.micro-trim {
+  position: relative;
+  width: calc(var(--flow-scale) * 48px);
+  height: calc(var(--flow-scale) * 4px);
+  background: rgba(255, 255, 255, 0.05);
+  border-radius: var(--flow-radius-sm);
+  overflow: hidden;
+  backdrop-filter: blur(4px);
+}
+
+.micro-trim-bar {
+  position: absolute;
+  top: 0;
+  width: calc(var(--flow-scale) * 2px);
+  height: 100%;
+  background: rgba(255, 255, 255, 0.85);
+  border-radius: calc(var(--flow-scale) * 2px);
+  transition: left 0.15s ease;
+  box-shadow: 0 0 4px rgba(255, 255, 255, 0.5);
+  pointer-events: none;
+  transform: translateX(-50%);
+}
+

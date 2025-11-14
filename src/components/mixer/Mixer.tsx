@@ -1,4 +1,4 @@
-import React, { useEffect, useMemo, useState } from 'react';
+import React, { useEffect, useMemo, useState, useRef, useCallback } from 'react';
 import type {
   MixerSettings,
   TrackAnalysisData,
@@ -99,6 +99,10 @@ interface FlowConsoleProps {
     fxId: string,
     paramName: string
   ) => void;
+  /** Flow-Follow Mode: Transport state for meter animation */
+  isPlaying?: boolean;
+  currentTime?: number;
+  followPlayhead?: boolean;
 }
 
 const computeStageHeights = () => {
@@ -161,13 +165,25 @@ const FlowConsole: React.FC<FlowConsoleProps> = ({
   buses = [],
   onSelectBus,
   onToggleAutomationLaneWithParam,
+  isPlaying = false,
+  currentTime = 0,
+  followPlayhead = false,
 }) => {
   const [stageHeights, setStageHeights] = useState(computeStageHeights);
+  const scrollContainerRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
     const handleResize = () => setStageHeights(computeStageHeights());
     window.addEventListener('resize', handleResize);
     return () => window.removeEventListener('resize', handleResize);
+  }, []);
+
+  // Convert vertical mouse wheel to horizontal scroll
+  const handleWheel = useCallback((e: React.WheelEvent<HTMLDivElement>) => {
+    if (scrollContainerRef.current) {
+      e.preventDefault();
+      scrollContainerRef.current.scrollLeft += e.deltaY;
+    }
   }, []);
 
   const trackFeedbackMap = useMemo<Record<string, TrackALSFeedback>>(() => {
@@ -225,7 +241,11 @@ const FlowConsole: React.FC<FlowConsoleProps> = ({
           <div className="absolute inset-y-0 right-0 w-20 bg-gradient-to-l from-[rgba(12,28,58,0.75)] via-[rgba(12,28,58,0.2)] to-transparent" />
           <div className="absolute left-1/2 top-8 h-1 w-2/3 -translate-x-1/2 rounded-full bg-gradient-to-r from-[rgba(64,120,210,0.45)] via-[rgba(126,162,235,0.35)] to-[rgba(64,120,210,0.45)] blur-sm" />
         </div>
-        <div className="relative h-full w-full overflow-x-auto">
+        <div 
+          ref={scrollContainerRef}
+          className="relative h-full w-full overflow-x-auto"
+          onWheel={handleWheel}
+        >
           <div
             className="relative mx-auto flex h-full flex-col"
             style={{ width: stageWidth, height: stageHeights.stageHeight }}

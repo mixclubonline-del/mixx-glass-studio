@@ -30,7 +30,7 @@
   content: "";
   position: absolute;
   inset: 0;
-  border-radius: 24px;
+  border-radius: var(--flow-radius-2xl);
   background: var(--als-thermal-glow, rgba(120, 160, 255, 0.25));
   filter: blur(32px);
   opacity: 0.55;
@@ -69,9 +69,9 @@
 
 .flow-import-glass {
   position: relative;
-  width: 520px;
-  padding: 42px 48px;
-  border-radius: 28px;
+  width: clamp(320px, calc(var(--flow-scale) * 520px), 90vw);
+  padding: calc(var(--flow-scale) * 42px) calc(var(--flow-scale) * 48px);
+  border-radius: calc(var(--flow-scale) * 28px);
   background: rgba(30, 25, 55, 0.45);
   backdrop-filter: blur(26px);
   border: 1px solid rgba(163, 131, 255, 0.22);
@@ -85,58 +85,58 @@
 .flow-import-als-bar {
   display: flex;
   align-items: center;
-  gap: 12px;
-  margin-bottom: 32px;
-  padding-bottom: 16px;
+  gap: var(--flow-spacing-md);
+  margin-bottom: calc(var(--flow-scale) * 32px);
+  padding-bottom: var(--flow-spacing-lg);
   border-bottom: 1px solid rgba(163, 131, 255, 0.15);
 }
 
 .flow-import-als-label {
-  font-size: 11px;
+  font-size: var(--flow-font-sm);
   font-weight: 600;
   color: #c4b5fd;
   letter-spacing: 0.3em;
   text-transform: uppercase;
-  min-width: 50px;
+  min-width: calc(var(--flow-scale) * 50px);
 }
 
 .flow-import-als-meter {
   flex: 1;
-  height: 4px;
+  height: calc(var(--flow-scale) * 4px);
   background: rgba(163, 131, 255, 0.1);
-  border-radius: 2px;
+  border-radius: calc(var(--flow-scale) * 2px);
   overflow: hidden;
   position: relative;
 }
 
 .flow-import-als-fill {
   height: 100%;
-  border-radius: 2px;
+  border-radius: calc(var(--flow-scale) * 2px);
   transition: width 0.3s ease, background 0.3s ease, box-shadow 0.3s ease;
 }
 
 .flow-import-als-temp {
-  font-size: 10px;
+  font-size: var(--flow-font-xs);
   color: #c4b5fd;
   letter-spacing: 0.2em;
   text-transform: uppercase;
   opacity: 0.7;
-  min-width: 80px;
+  min-width: calc(var(--flow-scale) * 80px);
   text-align: right;
 }
 
 /* Title */
 .flow-import-title {
-  font-size: 32px;
+  font-size: clamp(var(--flow-font-2xl), calc(var(--flow-scale) * 32px), var(--flow-font-3xl));
   font-weight: 500;
   color: #c4b5fd;
   text-align: center;
-  margin-bottom: 32px;
+  margin-bottom: calc(var(--flow-scale) * 32px);
   letter-spacing: 1px;
   display: flex;
   align-items: center;
   justify-content: center;
-  gap: 8px;
+  gap: var(--flow-spacing-sm);
 }
 
 .flow-watermark {
@@ -154,16 +154,16 @@
 .flow-import-steps {
   display: flex;
   flex-direction: column;
-  gap: 18px;
-  margin-bottom: 32px;
+  gap: calc(var(--flow-scale) * 18px);
+  margin-bottom: calc(var(--flow-scale) * 32px);
 }
 
 .flow-step {
   display: flex;
   align-items: center;
-  gap: 16px;
+  gap: var(--flow-spacing-lg);
   color: #e5e5f5;
-  font-size: 16px;
+  font-size: var(--flow-font-lg);
   opacity: 0.6;
   transition: opacity 0.3s ease, color 0.3s ease;
   position: relative;
@@ -180,8 +180,8 @@
 }
 
 .flow-step-indicator {
-  width: 20px;
-  height: 20px;
+  width: calc(var(--flow-scale) * 20px);
+  height: calc(var(--flow-scale) * 20px);
   display: flex;
   align-items: center;
   justify-content: center;
@@ -189,8 +189,8 @@
 }
 
 .flow-step-dot {
-  width: 12px;
-  height: 12px;
+  width: calc(var(--flow-scale) * 12px);
+  height: calc(var(--flow-scale) * 12px);
   border-radius: 50%;
   background: rgba(203, 170, 255, 0.5);
   transition: background 0.3s ease, box-shadow 0.3s ease;
@@ -206,15 +206,15 @@
 }
 
 .flow-step-check {
-  width: 20px;
-  height: 20px;
+  width: calc(var(--flow-scale) * 20px);
+  height: calc(var(--flow-scale) * 20px);
   border-radius: 50%;
   background: #a78bfa;
   color: rgba(9, 8, 25, 0.9);
   display: flex;
   align-items: center;
   justify-content: center;
-  font-size: 12px;
+  font-size: var(--flow-font-sm);
   font-weight: 600;
   box-shadow: 0 0 18px #a78bfa;
 }
@@ -226,10 +226,10 @@
 }
 
 .flow-step-progress {
-  width: 80px;
-  height: 2px;
+  width: calc(var(--flow-scale) * 80px);
+  height: calc(var(--flow-scale) * 2px);
   background: rgba(163, 131, 255, 0.1);
-  border-radius: 1px;
+  border-radius: calc(var(--flow-scale) * 1px);
   overflow: hidden;
   margin-left: auto;
 }
@@ -244,17 +244,17 @@
 
 /* Guidance */
 .flow-import-guidance {
-  margin-top: 32px;
-  padding-top: 24px;
+  margin-top: calc(var(--flow-scale) * 32px);
+  padding-top: calc(var(--flow-scale) * 24px);
   border-top: 1px solid rgba(163, 131, 255, 0.15);
   text-align: center;
-  font-size: 15px;
+  font-size: var(--flow-font-md);
   color: #c4b5fd;
   opacity: 0.8;
   font-weight: 300;
   letter-spacing: 0.02em;
   line-height: 1.6;
-  min-height: 24px;
+  min-height: calc(var(--flow-scale) * 24px);
 }
 
 /* Orbital glow rings */

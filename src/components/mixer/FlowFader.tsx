@@ -10,6 +10,8 @@ interface FlowFaderProps {
   trackColor: string;
   glowColor: string;
   name: string;
+  /** Show dB bubble on drag */
+  showDB?: boolean;
 }
 
 const clamp = (value: number, min: number, max: number) =>
@@ -22,9 +24,11 @@ const FlowFader: React.FC<FlowFaderProps> = ({
   trackColor,
   glowColor,
   name,
+  showDB = true,
 }) => {
   const containerRef = useRef<HTMLDivElement>(null);
   const [isDragging, setIsDragging] = useState(false);
+  const [showDBBubble, setShowDBBubble] = useState(false);
 
   const handlePointerValue = useCallback(
     (clientY: number) => {
@@ -37,14 +41,18 @@ const FlowFader: React.FC<FlowFaderProps> = ({
     [onChange]
   );
 
+  const valueToDB = (v: number) =>
+    v === 0 ? "-∞" : `${(20 * Math.log10(v)).toFixed(1)} dB`;
+
   const handlePointerDown = useCallback(
     (event: React.PointerEvent<HTMLDivElement>) => {
       event.preventDefault();
       containerRef.current?.setPointerCapture(event.pointerId);
       setIsDragging(true);
+      if (showDB) setShowDBBubble(true);
       handlePointerValue(event.clientY);
     },
-    [handlePointerValue]
+    [handlePointerValue, showDB]
   );
 
   useEffect(() => {
@@ -56,6 +64,9 @@ const FlowFader: React.FC<FlowFaderProps> = ({
 
     const handlePointerUp = () => {
       setIsDragging(false);
+      if (showDB) {
+        setTimeout(() => setShowDBBubble(false), 400);
+      }
     };
 
     window.addEventListener("pointermove", handlePointerMove);
@@ -71,11 +82,32 @@ const FlowFader: React.FC<FlowFaderProps> = ({
   const intensity = alsFeedback?.intensity ?? 0;
   const pulse = alsFeedback?.pulse ?? 0;
 
+  // Keyboard control
+  const handleKeyDown = useCallback(
+    (e: React.KeyboardEvent) => {
+      let delta = 0;
+      if (e.key === "ArrowUp") delta = 0.005;
+      if (e.key === "ArrowDown") delta = -0.005;
+      if (e.shiftKey) delta *= 0.25;
+      if (e.altKey) delta *= 6;
+      if (delta !== 0) {
+        onChange(clamp(value + delta, 0, 1.2));
+        if (showDB) {
+          setShowDBBubble(true);
+          setTimeout(() => setShowDBBubble(false), 600);
+        }
+      }
+    },
+    [value, onChange, showDB]
+  );
+
   return (
     <div
       ref={containerRef}
       className="relative w-full h-full cursor-pointer select-none"
       onPointerDown={handlePointerDown}
+      tabIndex={0}
+      onKeyDown={handleKeyDown}
     >
       <div className="absolute inset-0 rounded-xl bg-gradient-to-b from-black/70 via-black/60 to-black/80 border border-white/5 shadow-inner overflow-hidden">
         <motion.div
@@ -84,7 +116,7 @@ const FlowFader: React.FC<FlowFaderProps> = ({
             background: `radial-gradient(circle at 50% 20%, ${hexToRgba(
               glowColor,
               0.25 + intensity * 0.35
-            )} 0%, transparent 65%)`,
+            )} 0%, transparent 100%)`,
           }}
           animate={{ opacity: [0.6, 1, 0.6] }}
           transition={{ duration: 2.2, repeat: Infinity, ease: "easeInOut" }}
@@ -120,7 +152,19 @@ const FlowFader: React.FC<FlowFaderProps> = ({
           scale: [1, 1 + pulse * 0.05, 1],
         }}
         transition={{ duration: 1.8, repeat: Infinity, ease: "easeInOut" }}
-      />
+      >
+        {showDB && showDBBubble && (
+          <div
+            className="absolute left-1/2 bottom-4 -translate-x-1/2 px-2 py-1 rounded-md text-[10px] font-mono text-white/90 whitespace-nowrap pointer-events-none backdrop-blur-md"
+            style={{
+              background: `rgba(20, 20, 30, 0.85)`,
+              boxShadow: `0 0 8px ${hexToRgba(glowColor, 0.5)}, inset 0 0 4px rgba(255,255,255,0.15)`,
+            }}
+          >
+            {valueToDB(value)}
+          </div>
+        )}
+      </motion.div>
 
       <div className="absolute inset-y-3 left-2 flex flex-col justify-between pointer-events-none">
         {[0, 1, 2, 3].map((index) => (

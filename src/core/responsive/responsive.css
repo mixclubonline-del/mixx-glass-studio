@@ -1,0 +1,178 @@
+/**
+ * Flow Responsive Design System CSS
+ * 
+ * Provides CSS custom properties and utilities for consistent scaling
+ * across all screen resolutions and sizes.
+ */
+
+:root {
+  /* Base scale factor (updated by JavaScript) */
+  --flow-scale: 1;
+  --flow-breakpoint: xl;
+  --flow-dpr: 1;
+  
+  /* Spacing scale (scaled based on viewport) */
+  --flow-spacing-xs: 0.125rem;
+  --flow-spacing-sm: 0.25rem;
+  --flow-spacing-md: 0.5rem;
+  --flow-spacing-lg: 1rem;
+  --flow-spacing-xl: 1.5rem;
+  --flow-spacing-2xl: 2rem;
+  
+  /* Font scale (scaled based on viewport) */
+  --flow-font-xs: 0.625rem;
+  --flow-font-sm: 0.75rem;
+  --flow-font-md: 0.875rem;
+  --flow-font-lg: 1rem;
+  --flow-font-xl: 1.125rem;
+  --flow-font-2xl: 1.5rem;
+  --flow-font-3xl: 2rem;
+  
+  /* Border radius scale */
+  --flow-radius-sm: 0.25rem;
+  --flow-radius-md: 0.5rem;
+  --flow-radius-lg: 0.75rem;
+  --flow-radius-xl: 1rem;
+  --flow-radius-2xl: 1.5rem;
+  --flow-radius-full: 9999px;
+  
+  /* Component sizes */
+  --flow-button-height-sm: 2rem;
+  --flow-button-height-md: 2.5rem;
+  --flow-button-height-lg: 3rem;
+  
+  --flow-input-height-sm: 2rem;
+  --flow-input-height-md: 2.5rem;
+  --flow-input-height-lg: 3rem;
+  
+  /* Icon sizes */
+  --flow-icon-xs: 0.75rem;
+  --flow-icon-sm: 1rem;
+  --flow-icon-md: 1.25rem;
+  --flow-icon-lg: 1.5rem;
+  --flow-icon-xl: 2rem;
+}
+
+/* Responsive typography utilities */
+.flow-text-xs { font-size: var(--flow-font-xs); }
+.flow-text-sm { font-size: var(--flow-font-sm); }
+.flow-text-md { font-size: var(--flow-font-md); }
+.flow-text-lg { font-size: var(--flow-font-lg); }
+.flow-text-xl { font-size: var(--flow-font-xl); }
+.flow-text-2xl { font-size: var(--flow-font-2xl); }
+.flow-text-3xl { font-size: var(--flow-font-3xl); }
+
+/* Responsive spacing utilities */
+.flow-spacing-xs { gap: var(--flow-spacing-xs); }
+.flow-spacing-sm { gap: var(--flow-spacing-sm); }
+.flow-spacing-md { gap: var(--flow-spacing-md); }
+.flow-spacing-lg { gap: var(--flow-spacing-lg); }
+.flow-spacing-xl { gap: var(--flow-spacing-xl); }
+.flow-spacing-2xl { gap: var(--flow-spacing-2xl); }
+
+/* Responsive padding utilities */
+.flow-p-xs { padding: var(--flow-spacing-xs); }
+.flow-p-sm { padding: var(--flow-spacing-sm); }
+.flow-p-md { padding: var(--flow-spacing-md); }
+.flow-p-lg { padding: var(--flow-spacing-lg); }
+.flow-p-xl { padding: var(--flow-spacing-xl); }
+.flow-p-2xl { padding: var(--flow-spacing-2xl); }
+
+.flow-px-xs { padding-left: var(--flow-spacing-xs); padding-right: var(--flow-spacing-xs); }
+.flow-px-sm { padding-left: var(--flow-spacing-sm); padding-right: var(--flow-spacing-sm); }
+.flow-px-md { padding-left: var(--flow-spacing-md); padding-right: var(--flow-spacing-md); }
+.flow-px-lg { padding-left: var(--flow-spacing-lg); padding-right: var(--flow-spacing-lg); }
+.flow-px-xl { padding-left: var(--flow-spacing-xl); padding-right: var(--flow-spacing-xl); }
+
+.flow-py-xs { padding-top: var(--flow-spacing-xs); padding-bottom: var(--flow-spacing-xs); }
+.flow-py-sm { padding-top: var(--flow-spacing-sm); padding-bottom: var(--flow-spacing-sm); }
+.flow-py-md { padding-top: var(--flow-spacing-md); padding-bottom: var(--flow-spacing-md); }
+.flow-py-lg { padding-top: var(--flow-spacing-lg); padding-bottom: var(--flow-spacing-lg); }
+.flow-py-xl { padding-top: var(--flow-spacing-xl); padding-bottom: var(--flow-spacing-xl); }
+
+/* Responsive margin utilities */
+.flow-m-xs { margin: var(--flow-spacing-xs); }
+.flow-m-sm { margin: var(--flow-spacing-sm); }
+.flow-m-md { margin: var(--flow-spacing-md); }
+.flow-m-lg { margin: var(--flow-spacing-lg); }
+.flow-m-xl { margin: var(--flow-spacing-xl); }
+.flow-m-2xl { margin: var(--flow-spacing-2xl); }
+
+/* Responsive border radius utilities */
+.flow-rounded-sm { border-radius: var(--flow-radius-sm); }
+.flow-rounded-md { border-radius: var(--flow-radius-md); }
+.flow-rounded-lg { border-radius: var(--flow-radius-lg); }
+.flow-rounded-xl { border-radius: var(--flow-radius-xl); }
+.flow-rounded-2xl { border-radius: var(--flow-radius-2xl); }
+.flow-rounded-full { border-radius: var(--flow-radius-full); }
+
+/* Responsive component sizes */
+.flow-button-sm { height: var(--flow-button-height-sm); }
+.flow-button-md { height: var(--flow-button-height-md); }
+.flow-button-lg { height: var(--flow-button-height-lg); }
+
+.flow-input-sm { height: var(--flow-input-height-sm); }
+.flow-input-md { height: var(--flow-input-height-md); }
+.flow-input-lg { height: var(--flow-input-height-lg); }
+
+/* Responsive icon sizes */
+.flow-icon-xs { width: var(--flow-icon-xs); height: var(--flow-icon-xs); }
+.flow-icon-sm { width: var(--flow-icon-sm); height: var(--flow-icon-sm); }
+.flow-icon-md { width: var(--flow-icon-md); height: var(--flow-icon-md); }
+.flow-icon-lg { width: var(--flow-icon-lg); height: var(--flow-icon-lg); }
+.flow-icon-xl { width: var(--flow-icon-xl); height: var(--flow-icon-xl); }
+
+/* High-DPI display optimizations */
+@media (-webkit-min-device-pixel-ratio: 2), (min-resolution: 192dpi) {
+  /* Slightly increase font rendering quality on high-DPI displays */
+  body {
+    -webkit-font-smoothing: antialiased;
+    -moz-osx-font-smoothing: grayscale;
+    text-rendering: optimizeLegibility;
+  }
+}
+
+/* Breakpoint-specific adjustments */
+@media (max-width: 640px) {
+  /* Small screens: reduce some spacing */
+  :root {
+    --flow-spacing-xl: 1rem;
+    --flow-spacing-2xl: 1.5rem;
+  }
+}
+
+@media (min-width: 1920px) {
+  /* Large displays: slightly increase spacing for better use of space */
+  :root {
+    --flow-spacing-lg: 1.25rem;
+    --flow-spacing-xl: 2rem;
+    --flow-spacing-2xl: 2.5rem;
+  }
+}
+
+@media (min-width: 2560px) {
+  /* Ultra-wide / 4K: further increase spacing */
+  :root {
+    --flow-spacing-lg: 1.5rem;
+    --flow-spacing-xl: 2.5rem;
+    --flow-spacing-2xl: 3rem;
+  }
+}
+
+/* Zoom level awareness */
+@media (min-resolution: 144dpi) {
+  /* High-DPI displays: ensure UI doesn't become too small */
+  :root {
+    --flow-scale: calc(var(--flow-scale) * 1.05);
+  }
+}
+
+/* Print styles (if needed) */
+@media print {
+  :root {
+    --flow-scale: 1;
+    --flow-spacing-md: 0.25rem;
+    --flow-spacing-lg: 0.5rem;
+  }
+}
+

@@ -1,0 +1,22 @@
+import React from "react";
+
+interface NudgeRightIconProps {
+  className?: string;
+}
+
+export const NudgeRightIcon: React.FC<NudgeRightIconProps> = ({ className }) => (
+  <svg
+    viewBox="0 0 24 24"
+    fill="none"
+    stroke="currentColor"
+    strokeWidth="2"
+    strokeLinecap="round"
+    strokeLinejoin="round"
+    className={className}
+  >
+    <path d="M 21 7 L 21 3 L 17 3" />
+    <path d="M 3 12 A 9 9 0 0 1 18 5 L 21 8" />
+    <line x1="12" y1="12" x2="12" y2="12" />
+  </svg>
+);
+

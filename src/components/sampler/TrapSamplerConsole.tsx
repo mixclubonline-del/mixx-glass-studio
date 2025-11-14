@@ -5,6 +5,7 @@ import Multi808FusionPanel from "./Multi808FusionPanel";
 import { useTrapSampler } from "../../hooks/useTrapSampler";
 import type { TrapSamplerLayerId } from "../../types/sampler";
 import { hexToRgba } from "../../utils/ALS";
+import { SamplerIcon } from "../icons";
 
 interface TrapSamplerConsoleProps {
   tempoBpm: number;
@@ -30,9 +31,14 @@ const TrapSamplerConsole: React.FC<TrapSamplerConsoleProps> = ({ tempoBpm }) => 
     <aside className="flex w-full flex-col gap-8 rounded-[48px] border border-white/12 bg-[rgba(4,8,18,0.92)] px-10 py-9 shadow-[0_60px_160px_rgba(4,12,26,0.78)] backdrop-blur-[36px]">
       <header className="flex items-center justify-between">
         <div>
-          <p className="text-[12px] uppercase tracking-[0.42em] text-ink/55">
-            Mixx Drum Grid
-          </p>
+          <div className="flex items-center gap-2">
+            <div className="flex h-7 w-7 items-center justify-center rounded-full bg-white/10 shadow-[0_0_18px_rgba(148,163,255,0.6)]">
+              <SamplerIcon className="w-4 h-4 text-indigo-200" />
+            </div>
+            <p className="text-[12px] uppercase tracking-[0.42em] text-ink/55">
+              Mixx Drum Grid
+            </p>
+          </div>
           <h2 className="pt-1 text-xl font-semibold tracking-[0.24em] text-ink">
             Trap Pad Matrix
           </h2>

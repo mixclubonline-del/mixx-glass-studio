@@ -31,6 +31,14 @@ interface MultiBandStage {
   high: { filter: BiquadFilterNode; enhancer: WaveShaperNode; gain: GainNode };
 }
 
+export interface MasterMeterStack {
+  full: AnalyserNode; // Full-band analyser
+  body: AnalyserNode; // Low-end (Body) - < 200Hz
+  soul: AnalyserNode; // Mid-range (Soul) - ~800Hz
+  air: AnalyserNode;  // High-mid (Air) - ~6kHz
+  silk: AnalyserNode; // High-end (Silk) - > 12kHz
+}
+
 export interface VelvetMasterChain {
   input: AudioNode;
   output: GainNode;
@@ -53,6 +61,7 @@ export interface VelvetMasterChain {
   postLimiterAnalyser: AnalyserNode;
   panner: StereoPannerNode;
   masterGain: GainNode;
+  meters: MasterMeterStack; // Flow Meter Stack - Multi-band meters (STEP 2)
   setProfile: (profile: MasteringProfile | MasterProfileKey) => void;
   getProfile: () => MasteringProfile;
   setOutputCeiling: (ceilingDb: number) => void;
@@ -95,6 +104,69 @@ export async function buildMasterChain(
   const postLimiterAnalyser = createAnalyser(ctx, 2048, 0.75);
   const panner = ctx.createStereoPanner();
   const masterGain = ctx.createGain();
+
+  // Flow Meter Stack - Master Multi-Band Meters (STEP 2)
+  const masterAnalyzerFull = ctx.createAnalyser();
+  masterAnalyzerFull.fftSize = 4096;
+  masterAnalyzerFull.smoothingTimeConstant = 0.85;
+
+  // Body (Low-end) - < 200Hz
+  const masterBody = ctx.createBiquadFilter();
+  masterBody.type = "lowshelf";
+  masterBody.frequency.value = 200;
+  masterBody.gain.value = 0;
+  const bodyMeter = ctx.createAnalyser();
+  bodyMeter.fftSize = 2048;
+  bodyMeter.smoothingTimeConstant = 0.85;
+
+  // Soul (Mid-range) - ~800Hz
+  const masterSoul = ctx.createBiquadFilter();
+  masterSoul.type = "peaking";
+  masterSoul.frequency.value = 800;
+  masterSoul.Q.value = 1;
+  masterSoul.gain.value = 0;
+  const soulMeter = ctx.createAnalyser();
+  soulMeter.fftSize = 2048;
+  soulMeter.smoothingTimeConstant = 0.85;
+
+  // Air (High-mid) - ~6kHz
+  const masterAir = ctx.createBiquadFilter();
+  masterAir.type = "highshelf";
+  masterAir.frequency.value = 6000;
+  masterAir.gain.value = 0;
+  const airMeter = ctx.createAnalyser();
+  airMeter.fftSize = 2048;
+  airMeter.smoothingTimeConstant = 0.85;
+
+  // Silk (High-end) - > 12kHz
+  const masterSilk = ctx.createBiquadFilter();
+  masterSilk.type = "highshelf";
+  masterSilk.frequency.value = 12000;
+  masterSilk.gain.value = 0;
+  const silkMeter = ctx.createAnalyser();
+  silkMeter.fftSize = 2048;
+  silkMeter.smoothingTimeConstant = 0.85;
+
+  // Route master input to multi-band meters
+  dc.connect(masterAnalyzerFull);
+  dc.connect(masterBody);
+  dc.connect(masterSoul);
+  dc.connect(masterAir);
+  dc.connect(masterSilk);
+
+  // Each band gets its own analyser
+  masterBody.connect(bodyMeter);
+  masterSoul.connect(soulMeter);
+  masterAir.connect(airMeter);
+  masterSilk.connect(silkMeter);
+
+  const masterMeters: MasterMeterStack = {
+    full: masterAnalyzerFull,
+    body: bodyMeter,
+    soul: soulMeter,
+    air: airMeter,
+    silk: silkMeter,
+  };
 
   masterGain.gain.value = gainForLUFS(profile.targetLUFS);
 
@@ -185,6 +257,7 @@ export async function buildMasterChain(
     postLimiterAnalyser,
     panner,
     masterGain,
+    meters: masterMeters, // Flow Meter Stack - Multi-band meters
     setProfile,
     getProfile,
     setOutputCeiling,

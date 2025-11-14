@@ -1,0 +1,71 @@
+.flow-meter {
+  position: relative;
+  background: rgba(255, 255, 255, 0.03);
+  border-radius: 8px;
+  overflow: hidden;
+  backdrop-filter: blur(8px);
+}
+
+/* RMS (body) */
+.rms-bar {
+  position: absolute;
+  bottom: 0;
+  left: 0;
+  width: 100%;
+  background: linear-gradient(
+    to top,
+    rgba(135, 92, 255, 0.65),
+    rgba(135, 92, 255, 0.15)
+  );
+  transition: height 0.08s ease-out;
+}
+
+/* Peak (sharp top) */
+.peak-bar {
+  position: absolute;
+  bottom: 0;
+  left: 0;
+  width: 100%;
+  background: rgba(255, 255, 255, 0.8);
+  filter: drop-shadow(0 0 6px rgba(255, 255, 255, 0.6));
+  transition: height 0.05s cubic-bezier(0.16, 1, 0.3, 1);
+}
+
+.peak-bar.clip {
+  background: #ff3b3b;
+  filter: drop-shadow(0 0 8px rgba(255, 0, 0, 0.8));
+}
+
+/* transient tick */
+.transient-spark {
+  position: absolute;
+  left: 0;
+  width: 100%;
+  height: 8px;
+  background: rgba(255, 255, 255, 0.9);
+  animation: sparkFade 0.2s ease-out forwards;
+}
+
+@keyframes sparkFade {
+  0% {
+    opacity: 0.9;
+  }
+  100% {
+    opacity: 0;
+  }
+}
+
+/* master variant */
+.flow-meter.master .peak-bar {
+  background: rgba(255, 255, 255, 1);
+}
+
+.flow-meter.master .rms-bar {
+  background: linear-gradient(
+    to top,
+    rgba(108, 58, 255, 0.85),
+    rgba(108, 58, 255, 0.25)
+  );
+}
+
+

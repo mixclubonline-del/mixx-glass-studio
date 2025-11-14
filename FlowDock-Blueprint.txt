@@ -1,0 +1,340 @@
+# 🧠 **1) TEXT BLUEPRINT — Adaptive Contextual Flow Dock (Full Spec)**
+
+---
+
+## 🔥 FLOW DOCK — THE INTENT ENGINE
+
+The Flow Dock is not a static transport bar.
+
+It shifts based on what the user is *trying to do*, not what screen they're on.
+
+It adapts based on **intent detection**, using real-time cues from:
+
+* selected track type
+
+* active tool
+
+* what the user touched last
+
+* transport state
+
+* input monitoring
+
+* recording engagement
+
+* clip selection
+
+* editing gestures
+
+* MIDI input
+
+* HUSH activity
+
+* insert activity
+
+* dock overrides
+
+Flow always tries to show:
+
+**"What controls do you need for the next 10 seconds?"**
+
+---
+
+# 🎯 **INTENT STATES (Primary Dock Modes)**
+
+Flow has **6 primary modes**, each with a unique dock layout:
+
+---
+
+## 🎤 **1. RECORD MODE ("Redline Flow")**
+
+Triggered when:
+
+* record-enabled track selected
+
+* any input monitor active
+
+* HUSH is armed
+
+* record button pressed
+
+* take lane active
+
+* auto-punch pending
+
+Dock shows:
+
+* Add Track (+)
+
+* Record (big, glowing, ALS-synced)
+
+* Play / Stop
+
+* Count-in toggle
+
+* Input monitor toggle
+
+* Punch In/Out
+
+* Auto-punch toggle
+
+* HUSH meter
+
+* Take selector
+
+Behavior:
+
+* Spacing widens around RECORD
+
+* Other mode elements fade to 20% opacity
+
+---
+
+## ✂️ **2. EDIT MODE ("Surgery Flow")**
+
+Triggered when:
+
+* a clip is selected
+
+* clip edges dragged
+
+* split performed
+
+* warp activated
+
+Dock shows:
+
+* Split
+
+* Trim
+
+* Time Stretch
+
+* Gain Line
+
+* Warp Mode toggle
+
+* Nudge Left/Right
+
+* Undo / Redo
+
+* Consolidate
+
+Behavior:
+
+* Transport minimized
+
+* All edit tools centered
+
+---
+
+## 🧭 **3. NAVIGATION MODE ("Travel Flow")**
+
+Triggered when:
+
+* user scrolls timeline
+
+* zooms continuously
+
+* moves playhead without editing
+
+* marker jumps
+
+Dock shows:
+
+* Zoom cluster
+
+* Fit / Selection / Full
+
+* Scroll modes
+
+* Marker jump
+
+* Loop region
+
+* Mini-map
+
+Behavior:
+
+* Dock becomes narrow + wide-spaced
+
+* Tools disappear
+
+---
+
+## 🎚️ **4. MIX MODE ("Console Flow")**
+
+Triggered when:
+
+* user opens mix view
+
+* touches a fader
+
+* solo/mute/pan engaged
+
+Dock shows:
+
+* Solo / Mute / Arm
+
+* Pan
+
+* Insert FX
+
+* Routing
+
+* Sends
+
+* Automation
+
+* Master meter quick-view
+
+Behavior:
+
+* Transport tiny
+
+* ALS pulse line spans width
+
+---
+
+## 🎛️ **5. PERFORMANCE MODE ("Live Flow")**
+
+Triggered when:
+
+* MIDI is active
+
+* pads are hit
+
+* piano roll auditioning
+
+* drum grid interaction
+
+Dock shows:
+
+* Quantize
+
+* Scale Lock
+
+* Repeat Rate
+
+* Arp
+
+* Chord memory
+
+* Pad layer selector
+
+Behavior:
+
+* Dock takes on "gaming HUD" feel
+
+* Pad-highlight pulse
+
+---
+
+## 🎼 **6. COMPOSE MODE ("Arrangement Flow")**
+
+Triggered when:
+
+* user adds tracks
+
+* drags song sections
+
+* pulls in instruments
+
+* creates clips
+
+Dock shows:
+
+* Add Track
+
+* Add Instrument
+
+* Browse Sounds
+
+* Add MIDI Pattern
+
+* Harmony Tools
+
+* Chord Palette
+
+* Song Sections (Verse/Hook/Bridge)
+
+Behavior:
+
+* Wide, soft, songwriting-focused
+
+---
+
+# 🔄 **Transition Behavior**
+
+Flow transitions between modes using:
+
+* **Dream Fade** (150ms opacity + 80ms scale blend)
+
+* **Pulse Carryover** (ALS pulse preserved across modes)
+
+* **Weight Shift** (central elements expand/contract)
+
+* **Ghost Mode** (previous mode fades behind current for 200ms)
+
+---
+
+# 🎨 **ICON SYSTEM (Flow Glyphs)**
+
+All glyphs must be:
+
+* single-stroke
+
+* white or translucent glass
+
+* pulse-reactive outline
+
+* scalable
+
+* SVG-based
+
+* consistent weight
+
+---
+
+# 📐 **STRUCTURAL RULES**
+
+* Dock has left/center/right clusters
+
+* Each mode provides its own cluster sets
+
+* FlowDock chooses clusters through intent detection
+
+* Prime Brain + ALS strip float above dock for meta-feedback
+
+* Mode transitions must never disrupt the creative flow
+
+---
+
+# 🧩 **React Component Architecture**
+
+```
+
+<FlowDock>
+
+  <DockCluster position="left" />
+
+  <DockCluster position="center" />
+
+  <DockCluster position="right" />
+
+</FlowDock>
+
+```
+
+FlowDock receives:
+
+```
+
+mode: "record" | "edit" | "nav" | "mix" | "perform" | "compose"
+
+intent: IntentSignature
+
+clusters: DockLayout
+
+```
+

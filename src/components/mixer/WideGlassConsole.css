@@ -1,0 +1,57 @@
+/**
+ * Wide Glass Console Styles
+ * Mixx Glass DNA: atmospheric, frosted, light-purple, elevation glow.
+ */
+
+.wide-glass-console {
+  position: absolute;
+  z-index: 9999;
+  width: 88vw;
+  height: 52vh;
+  background: rgba(255, 255, 255, 0.06);
+  backdrop-filter: blur(22px) saturate(180%);
+  border: 1px solid rgba(255, 255, 255, 0.12);
+  border-radius: var(--flow-radius-2xl);
+  transition: transform 0.25s ease, opacity 0.2s ease;
+  box-shadow:
+    0 0 25px rgba(150, 90, 255, 0.35),
+    inset 0 0 35px rgba(255, 255, 255, 0.04);
+  pointer-events: auto;
+  will-change: transform, opacity;
+}
+
+.console-body {
+  width: 100%;
+  height: 100%;
+  overflow: hidden;
+  display: flex;
+  flex-direction: row;
+  gap: calc(var(--flow-scale) * 22px);
+  padding: calc(var(--flow-scale) * 22px);
+}
+
+.console-placeholder {
+  width: 100%;
+  height: 100%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  color: rgba(255, 255, 255, 0.3);
+  font-size: var(--flow-font-md);
+  text-transform: uppercase;
+  letter-spacing: 0.2em;
+}
+
+/* Glass physics - subtle hover effect */
+.wide-glass-console:hover {
+  box-shadow:
+    0 0 35px rgba(150, 90, 255, 0.45),
+    inset 0 0 45px rgba(255, 255, 255, 0.06);
+  border-color: rgba(255, 255, 255, 0.18);
+}
+
+/* Ensure console doesn't interfere with other UI */
+.wide-glass-console * {
+  pointer-events: auto;
+}
+

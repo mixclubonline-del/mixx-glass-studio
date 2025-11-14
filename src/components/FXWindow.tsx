@@ -57,16 +57,31 @@ const FXWindow: React.FC<FXWindowProps> = (props) => {
     >
       <header className="flex items-center justify-between p-2 pl-6 text-sm font-bold text-gray-300 cursor-move bg-white/5 flex-shrink-0">
         <div className="flex items-center space-x-2">
-            <button onClick={() => onToggleBypass(id)} className={`w-4 h-4 rounded-full transition-colors ${!isBypassed && connectedColor ? colorStyles[connectedColor].bg : 'bg-gray-600'}`}>
+            <button
+              onClick={() => onToggleBypass(id)}
+              className={`w-4 h-4 rounded-full transition-colors ${!isBypassed && connectedColor ? colorStyles[connectedColor].bg : 'bg-gray-600'}`}
+              aria-label={isBypassed ? "Enable effect" : "Bypass effect"}
+              title={isBypassed ? "Enable effect" : "Bypass effect"}
+            >
                 <PowerIcon className="w-4 h-4 text-black/50 p-0.5" />
             </button>
             <span>{title}</span>
         </div>
         <div className="flex items-center">
-            <button onClick={() => onToggleBypass(id)} title="Bypass Effect" className={`p-1 rounded-md text-xs transition-colors ${isBypassed ? 'bg-amber-500/50 text-amber-200' : 'text-gray-500 hover:bg-white/10 hover:text-gray-300'}`}>
+            <button
+              onClick={() => onToggleBypass(id)}
+              aria-label={isBypassed ? "Enable effect (A/B)" : "Bypass effect (A/B)"}
+              title={isBypassed ? "Enable effect (A/B)" : "Bypass effect (A/B)"}
+              className={`p-1 rounded-md text-xs transition-colors ${isBypassed ? 'bg-amber-500/50 text-amber-200' : 'text-gray-500 hover:bg-white/10 hover:text-gray-300'}`}
+            >
                 <ABIcon className="w-4 h-4"/>
             </button>
-            <button onClick={onClose} className="p-1 rounded-full hover:bg-white/10">
+            <button
+              onClick={onClose}
+              aria-label="Close plugin window"
+              title="Close plugin window"
+              className="p-1 rounded-full hover:bg-white/10"
+            >
               <XIcon className="w-4 h-4" />
             </button>
         </div>

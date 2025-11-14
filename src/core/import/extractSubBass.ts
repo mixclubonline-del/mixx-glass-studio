@@ -41,9 +41,14 @@ export async function extractSubBass(
   lp.connect(gain);
   gain.connect(ctx.destination);
   
-  source.start();
+  source.start(0);
   
-  return ctx.startRendering();
+  try {
+    return await ctx.startRendering();
+  } catch (error) {
+    console.warn('[FLOW IMPORT] Sub-bass extraction failed, returning original buffer:', error);
+    return audioBuffer;
+  }
 }
 
 /**
@@ -72,9 +77,14 @@ export async function extractBass(
   source.connect(bp);
   bp.connect(ctx.destination);
   
-  source.start();
+  source.start(0);
   
-  return ctx.startRendering();
+  try {
+    return await ctx.startRendering();
+  } catch (error) {
+    console.warn('[FLOW IMPORT] Bass extraction failed, returning original buffer:', error);
+    return audioBuffer;
+  }
 }
 
 /**

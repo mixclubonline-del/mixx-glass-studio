@@ -145,22 +145,96 @@ export async function stemSplitEngine(
     return result;
   }
   
-  // FULL MODE (low/high demo split)
-  result.bass = await renderPass((ctx, src) => {
-    const f = ctx.createBiquadFilter();
-    f.type = 'lowpass';
-    f.frequency.value = 240;
-    src.connect(f);
-    return f;
-  });
-  
-  result.music = await renderPass((ctx, src) => {
-    const f = ctx.createBiquadFilter();
-    f.type = 'highpass';
-    f.frequency.value = 3000;
-    src.connect(f);
-    return f;
-  });
+  // FULL MODE - Use HPSS + vocal extraction for proper stem separation
+  try {
+    console.log('[FLOW IMPORT] Starting HPSS-based stem separation...');
+    
+    // Use HPSS for harmonic/percussive separation
+    const hpssResult = await hpss(audioBuffer);
+    console.log('[FLOW IMPORT] HPSS complete, extracting additional stems...');
+    
+    // Extract vocals using AI model (or fallback)
+    const vocals = await aiVocalModel(audioBuffer);
+    console.log('[FLOW IMPORT] Vocals extracted');
+    
+    // Extract bass from harmonic content (or original if harmonic failed)
+    const bass = await extractBass(hpssResult.harmonic || audioBuffer);
+    console.log('[FLOW IMPORT] Bass extracted');
+    
+    // Extract sub-bass (808s)
+    const sub = await extractSubBass(audioBuffer);
+    console.log('[FLOW IMPORT] Sub-bass extracted');
+    
+    // Assign stems
+    result.vocals = vocals;
+    result.drums = hpssResult.percussive;
+    result.harmonic = hpssResult.harmonic;
+    result.music = hpssResult.harmonic; // Music = harmonic content (will refine below)
+    result.bass = bass;
+    result.sub = sub;
+    
+    // If we have vocals, subtract them from harmonic to get instrumental
+    if (vocals && hpssResult.harmonic) {
+      try {
+        result.music = await subtract(hpssResult.harmonic, vocals);
+        console.log('[FLOW IMPORT] Instrumental (music) extracted via vocal subtraction');
+      } catch (error) {
+        console.warn('[FLOW IMPORT] Could not subtract vocals from harmonic, using harmonic as music:', error);
+        result.music = hpssResult.harmonic;
+      }
+    }
+    
+    // Ensure we have at least some stems
+    const stemCount = Object.values(result).filter(b => b !== null).length;
+    console.log('[FLOW IMPORT] Stem separation complete:', {
+      stemCount,
+      vocals: result.vocals !== null,
+      drums: result.drums !== null,
+      bass: result.bass !== null,
+      music: result.music !== null,
+      sub: result.sub !== null,
+      harmonic: result.harmonic !== null,
+    });
+    
+    // If no stems were created, fall back to frequency filtering
+    if (stemCount === 0) {
+      throw new Error('HPSS produced no stems, falling back to frequency filtering');
+    }
+  } catch (error) {
+    console.error('[FLOW IMPORT] HPSS separation failed, falling back to frequency filtering:', error);
+    
+    // Fallback: frequency-based split (at least create some stems)
+    try {
+      result.bass = await renderPass((ctx, src) => {
+        const f = ctx.createBiquadFilter();
+        f.type = 'lowpass';
+        f.frequency.value = 240;
+        src.connect(f);
+        return f;
+      });
+      
+      result.music = await renderPass((ctx, src) => {
+        const f = ctx.createBiquadFilter();
+        f.type = 'highpass';
+        f.frequency.value = 3000;
+        src.connect(f);
+        return f;
+      });
+      
+      // Also create a full mix stem
+      result.harmonic = await renderPass((ctx, src) => src);
+      
+      console.log('[FLOW IMPORT] Fallback separation complete:', {
+        bass: result.bass !== null,
+        music: result.music !== null,
+        harmonic: result.harmonic !== null,
+      });
+    } catch (fallbackError) {
+      console.error('[FLOW IMPORT] Fallback separation also failed:', fallbackError);
+      // Last resort: return original buffer as single stem
+      result.music = audioBuffer;
+    }
+  }
   
   return result;
 }
