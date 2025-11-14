@@ -1,0 +1,128 @@
+/**
+ * Flow Layout Styles
+ * 
+ * Permanent anchoring system for Flow's geometry.
+ * Three-tier grid layout: HUD, Timeline, Dock
+ */
+
+.flow-root {
+  display: grid;
+  grid-template-rows: auto 1fr auto; /* Header, timeline, dock */
+  height: 100vh;
+  width: 100vw;
+  overflow: hidden;
+  position: relative;
+  background: transparent; /* Let parent handle background */
+  backdrop-filter: blur(18px);
+}
+
+/* HEADER ZONE */
+.flow-header {
+  position: relative;
+  z-index: 100; /* Above everything */
+  flex-shrink: 0;
+  grid-row: 1; /* First row */
+}
+
+/* Header uses fixed positioning, so account for its height */
+.flow-header > header {
+  position: fixed;
+  top: 0;
+  left: 0;
+  right: 0;
+  z-index: 100;
+}
+
+/* BLOOM HUD ZONE (Top) - Absolute overlay on top of header */
+.flow-hud {
+  position: absolute;
+  top: 0;
+  left: 0;
+  right: 0;
+  height: 100px; /* Enough space for header + bloom */
+  overflow: visible;
+  pointer-events: none; /* HUD doesn't steal timeline clicks */
+  z-index: 50; /* Above timeline, below header */
+  /* Not in grid - absolute overlay */
+}
+
+.bloom-anchor {
+  position: absolute;
+  top: 10px;
+  right: 20px;
+  width: 380px;
+  height: 300px;
+  pointer-events: none; /* No timeline interference */
+  z-index: 50;
+}
+
+.bloom-anchor > * {
+  pointer-events: auto; /* Bloom itself can be clicked */
+}
+
+/* TIMELINE ZONE (Middle - Protected Creative Zone) */
+.flow-content {
+  overflow: hidden; /* Prevents HUD from leaking downward */
+  position: relative;
+  z-index: 1; /* Over HUD & under Dock */
+  padding-bottom: 0; /* No padding - dock is in grid */
+  padding-top: 0; /* Header is fixed, content starts at grid row 2 */
+  min-height: 0; /* Allows grid to shrink */
+  grid-row: 2; /* Second row */
+  display: flex;
+  flex-direction: column;
+  height: 100%; /* Fill available grid space */
+  overflow-y: auto; /* Allow scrolling if content exceeds */
+}
+
+/* DOCK ZONE (Bottom - Never Moves) */
+.flow-dock {
+  position: relative;
+  width: 100%;
+  min-height: 84px;
+  flex-shrink: 0;
+  backdrop-filter: blur(16px);
+  background: rgba(0, 0, 0, 0.25);
+  border-top: 1px solid rgba(255, 255, 255, 0.08);
+  z-index: 40; /* Above timeline, below header */
+  grid-row: 3; /* Third row */
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  overflow: visible; /* Allow dock content to overflow if needed */
+  padding: 8px 16px; /* Padding for dock content */
+}
+
+/* Override BloomDock's fixed positioning when inside FlowLayout */
+.flow-dock > div[class*="fixed"] {
+  position: relative !important;
+  left: auto !important;
+  top: auto !important;
+  width: 100%;
+  max-width: 100%;
+  transform: none !important; /* Remove any transforms */
+}
+
+/* Ensure dock inner content is properly sized */
+.flow-dock > div > div {
+  width: 100%;
+  max-width: 100%;
+}
+
+/* Bloom Avoidance Zone - Prevents Bloom from dropping below 180px */
+.bloom-container {
+  transform-origin: top right;
+  max-height: 180px;
+  overflow: hidden;
+}
+
+/* Ensure Import Inspector stays on top when active */
+.flow-import-overlay {
+  z-index: 999999 !important;
+}
+
+/* Ensure FX Rack stays above timeline but below Import Inspector */
+.fx-rack-overlay {
+  z-index: 1000;
+}
+

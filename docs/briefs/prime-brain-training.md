@@ -81,3 +81,107 @@
 - `src/App.tsx` instruments audio metrics, logs Bloom actions, and streams sanitized records every 2 s. Export target resolves via `window.__PRIME_FABRIC_EXPORT_URL`, `VITE_PRIME_FABRIC_EXPORT_URL`, or `PRIME_FABRIC_EXPORT_URL`.
 - Snapshot builder enforces doctrine guardrails (no raw numbers in UI, ALS/Bloom channel mapping, mode derivation) and limits memory windows to Mixx Recall expectations.
 
+---
+
+## Studio Snapshot Export (Detailed)
+
+**Implementation:**
+- `src/ai/PrimeBrainSnapshot.ts` defines `PrimeBrainRawSnapshot` schema and `buildPrimeBrainRawSnapshot()` builder.
+- `src/ai/usePrimeBrainExporter.ts` handles queue management, retry logic, and export scheduling.
+- `src/App.tsx` wires Flow Context, Session Probe, ALS feedback, Bloom trace, and audio metrics into snapshot inputs.
+
+**Export Configuration:**
+- Default interval: 4 seconds (configurable via `VITE_PRIME_BRAIN_EXPORT_SAMPLE_RATE`).
+- Export target resolves via `window.__MIXX_PRIME_BRAIN_EXPORT_URL`, `VITE_PRIME_BRAIN_EXPORT_URL`, or `PRIME_BRAIN_EXPORT_URL`.
+- Debug logging controlled by `VITE_PRIME_BRAIN_EXPORT_DEBUG=1`.
+
+**Snapshot Schema (`PrimeBrainRawSnapshot`):**
+See `src/ai/PrimeBrainSnapshot.ts` for full TypeScript interface. Key fields:
+- `snapshotId`: UUID v4 string
+- `sessionId`: Persistent session identifier
+- `mode`: `'passive' | 'active' | 'learning' | 'optimizing'`
+- `transport`: Playback state, tempo, playhead, cycle
+- `alsChannels`: Array with `channel`, `value`, `normalized` (0-1)
+- `audioMetrics`: Latency, CPU load, dropouts, buffer size
+- `harmonicState`: Key, scale, consonance, tension, velocity energy
+- `aiAnalysisFlags`: Array with `category`, `severity`, `message` (ALS-safe)
+- `userMemorySummary`: Optional, max 10 recent actions
+- `bloomTrace`: Array, max 24 events
+- `issuedCommands`: Optional, max 20 commands
+- `conversationTurns`: Array, max 10 turns
+- `guidance`: Optional guidance object
+
+**Privacy & Redaction:**
+- All clip/track names are redacted via Session Probe privacy guard.
+- User-identifying text is sanitized to neutral descriptors.
+- Raw filenames and paths are excluded from payloads.
+- Export respects `VITE_SESSION_PROBE_ALLOW_EXPORT=1` consent flag.
+
+**Queue Management:**
+- Max queue size: 20 snapshots.
+- Retry attempts: 5 per snapshot before dropping.
+- Automatic flush on page visibility change and beforeunload (via `sendBeacon`).
+
+---
+
+## Training Loop Entry Points
+
+### Studio → Fabric Pipeline
+
+**1. Snapshot Collection (Studio Runtime)**
+Studio exports snapshots via HTTP POST to configured endpoint:
+- Method: `POST`
+- Headers: `Content-Type: application/json`, `X-Prime-Fabric-Channel: prime-brain`
+- Body: `PrimeBrainRawSnapshot` JSON
+
+**2. Fabric Ingestion (`sanitize` command)**
+```bash
+pnpm --dir prime-fabric/prime-brain cli sanitize \
+  --input-dir ./snapshots/raw \
+  --output-dir ./snapshots/sanitized \
+  --schema ./src/schema.ts
+```
+Validates structure, normalizes values, verifies no PII, filters invalid snapshots.
+
+**3. Dataset Building (`dataset` command)**
+```bash
+pnpm --dir prime-fabric/prime-brain cli dataset \
+  --input-dir ./snapshots/sanitized \
+  --output-file ./datasets/prime-brain-v1.jsonl \
+  --window-size 10 \
+  --augment-mode
+```
+Creates JSONL format with sliding windows of 10 consecutive snapshots per training example.
+
+**4. Model Training (`train` command)**
+```bash
+pnpm --dir prime-fabric/prime-brain cli train \
+  --dataset ./datasets/prime-brain-v1.jsonl \
+  --output-dir ./models/prime-brain-v1 \
+  --base-model gemini-2.5-flash \
+  --epochs 3 \
+  --learning-rate 1e-5
+```
+Instruction tuning with mode-aware loss weighting and doctrine enforcement.
+
+**5. Evaluation (`evaluate` command)**
+```bash
+pnpm --dir prime-fabric/prime-brain cli evaluate \
+  --model-dir ./models/prime-brain-v1 \
+  --test-dataset ./datasets/prime-brain-v1-test.jsonl \
+  --output-report ./reports/eval-v1.md
+```
+Measures command accuracy, mode compliance, tone audit, Flow impact simulation.
+
+**6. Deployment (`run` command)**
+```bash
+pnpm --dir prime-fabric/prime-brain cli run \
+  --snapshots-dir ./snapshots/raw \
+  --output-model ./models/prime-brain-v1 \
+  --dry-run false
+```
+Full pipeline: sanitize → dataset → train → evaluate.
+
+**Schema Alignment:**
+Studio snapshots match Fabric schema exactly. Array limits (10/20/24) enforced in `buildPrimeBrainRawSnapshot()`. Optional fields handled gracefully.
+

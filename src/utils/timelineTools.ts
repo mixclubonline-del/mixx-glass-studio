@@ -16,19 +16,23 @@ export interface UseTimelineToolsOptions {
   activeTool: TimelineTool;
   /** Optional overrides for tool palette ordering */
   tools?: TimelineTool[];
+  /** Tools to highlight based on Prime Brain suggestions */
+  highlightedTools?: string[];
 }
 
 /**
  * Returns a memoized palette of tools with metadata for UI rendering.
+ * Includes Prime Brain-driven highlighting for subtle guidance.
  */
 export function useTimelineToolPalette(options: UseTimelineToolsOptions) {
-  const { activeTool, tools = TIMELINE_TOOLS.map((tool) => tool.id) } = options;
+  const { activeTool, tools = TIMELINE_TOOLS.map((tool) => tool.id), highlightedTools = [] } = options;
   return useMemo(() => {
     return TIMELINE_TOOLS.filter((tool) => tools.includes(tool.id)).map((tool) => ({
       ...tool,
       active: tool.id === activeTool,
+      highlighted: highlightedTools.includes(tool.id) || highlightedTools.includes(tool.label.toLowerCase()),
     }));
-  }, [activeTool, tools]);
+  }, [activeTool, tools, highlightedTools]);
 }
 
 export function isTrimTool(tool: TimelineTool) {

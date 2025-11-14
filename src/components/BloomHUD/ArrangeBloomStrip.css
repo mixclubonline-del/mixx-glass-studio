@@ -1,0 +1,17 @@
+/**
+ * Arrange Bloom Strip Anchor
+ * 
+ * Non-destructive fixed positioning for Arrange Bloom strip (Dock).
+ * Keeps it centered at lower third - no drift, no overlap.
+ */
+
+.arrange-bloom-fixed {
+  position: fixed;
+  bottom: 130px;  /* Adjust by + or - 10 as needed */
+  left: 50%;
+  transform: translateX(-50%);
+  z-index: 150;
+  /* Optional: soft entrance animation */
+  transition: transform 0.3s ease, opacity 0.3s ease;
+}
+

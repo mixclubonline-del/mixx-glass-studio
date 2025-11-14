@@ -1,0 +1,53 @@
+/**
+ * Flow Glass Skin
+ * 
+ * Part A of Full Flow Physiology Expansion Pack.
+ * Global thermal color filters for glass containers.
+ */
+
+.flow-thermal-glow {
+  transition: background-color 0.45s ease, filter 0.45s ease;
+  backdrop-filter: blur(24px) saturate(150%);
+  background-color: var(--als-thermal-glow, rgba(120, 160, 255, 0.25));
+}
+
+/* Thermal state transitions */
+.flow-thermal-glow.cold {
+  background-color: rgba(120, 160, 255, 0.25);
+}
+
+.flow-thermal-glow.warming {
+  background-color: rgba(150, 180, 255, 0.33);
+}
+
+.flow-thermal-glow.warm {
+  background-color: rgba(255, 180, 120, 0.35);
+}
+
+.flow-thermal-glow.hot {
+  background-color: rgba(255, 120, 90, 0.45);
+}
+
+.flow-thermal-glow.blazing {
+  background-color: rgba(255, 70, 70, 0.55);
+}
+
+/* Glass blur effect */
+.flow-glass {
+  backdrop-filter: blur(24px) saturate(150%);
+  background: rgba(30, 25, 55, 0.45);
+  border: 1px solid rgba(163, 131, 255, 0.22);
+}
+
+/* Thermal glow overlay */
+.flow-thermal-overlay {
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+  background: var(--als-thermal-glow, rgba(120, 160, 255, 0.25));
+  opacity: 0.55;
+  filter: blur(32px);
+  transition: background 0.35s ease, opacity 0.3s ease;
+  z-index: -1;
+}
+

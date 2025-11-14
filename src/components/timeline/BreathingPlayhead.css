@@ -1,0 +1,63 @@
+/**
+ * Breathing Playhead Styles
+ * 
+ * Anchor-safe playhead that breathes with ALS Pulse.
+ * Never intrudes into Bloom HUD, Dock, or protected zones.
+ */
+
+.flow-breathing-playhead {
+  position: absolute;
+  top: 0;
+  bottom: 0;
+  width: 2px;
+  
+  /* Flow signature gradient */
+  background: linear-gradient(
+    to bottom,
+    #ffffff 0%,
+    #e5d2ff 35%,
+    #b78eff 70%,
+    #8c5aff 100%
+  );
+  
+  border-radius: 4px;
+  pointer-events: none; /* Never blocks clip drag */
+  
+  /* Smooth breathing */
+  transition:
+    transform 0.12s ease-out,
+    box-shadow 0.15s ease-out;
+  
+  z-index: 40; /* Above clips, below HUD */
+  
+  /* Transform origin at center for clean scaling */
+  transform-origin: center;
+}
+
+/* Pulse intensity variations */
+.flow-breathing-playhead.calm {
+  opacity: 0.85;
+}
+
+.flow-breathing-playhead.active {
+  opacity: 1;
+}
+
+.flow-breathing-playhead.energetic {
+  opacity: 1;
+  filter: brightness(1.15);
+}
+
+/* Ensure playhead stays within timeline bounds */
+.flow-breathing-playhead::before {
+  content: "";
+  position: absolute;
+  top: -2px;
+  bottom: -2px;
+  left: -1px;
+  right: -1px;
+  border-radius: 4px;
+  background: transparent;
+  pointer-events: none;
+}
+

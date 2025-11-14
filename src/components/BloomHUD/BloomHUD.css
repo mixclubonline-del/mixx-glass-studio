@@ -1,0 +1,15 @@
+/**
+ * Bloom HUD Orb Anchor
+ * 
+ * Non-destructive fixed positioning for Bloom HUD orb.
+ * Keeps it exactly where it's placed - no drift, no overlap.
+ */
+
+.bloom-hud-fixed {
+  position: fixed;
+  top: 240px;       /* Adjust to match your screenshot */
+  right: 90px;      /* Aligns with exact placed location */
+  z-index: 200;
+  pointer-events: auto;
+}
+

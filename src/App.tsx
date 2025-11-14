@@ -41,8 +41,8 @@ import PluginBrowser from './components/PluginBrowser';
 import { IAudioEngine } from './types/audio-graph';
 import { getHushSystem } from './audio/HushSystem';
 import AIHub from './components/AIHub/AIHub'; // Import AIHub
-import FlowProbeOverlay from './components/dev/FlowProbeOverlay';
 import { useSessionProbe } from './hooks/useSessionProbe';
+import { getSessionProbeSnapshot } from './state/sessionProbe';
 import {
   PrimeBrainSnapshotInputs,
   PrimeBrainBloomEvent,
@@ -56,6 +56,15 @@ import {
   derivePrimeBrainMode,
 } from './ai/PrimeBrainSnapshot';
 import { usePrimeBrainExporter } from './ai/usePrimeBrainExporter';
+import { recordPrimeBrainEvent, subscribeToPrimeBrainEvents, type PrimeBrainEvent } from './ai/primeBrainEvents';
+import { PrimeBrainDebugOverlay } from './components/dev/PrimeBrainDebugOverlay';
+import { FlowLoopWrapper } from './core/loop/FlowLoopWrapper';
+import { recordViewSwitch, updatePlaybackState, updateRecordState } from './core/loop/flowLoopEvents';
+import { initThermalSync } from './core/als/thermalSync';
+import { monitorHush } from './core/performance/hushMonitor';
+import { recordPunchEvent, recordRecordTap, detectPunchType } from './core/performance/punchMode';
+import { recordTakeMemory } from './core/performance/takeMemory';
+import { analyzeTakeForComp } from './core/performance/compBrain';
 import {
   TRACK_COLOR_SWATCH,
   derivePulsePalette,
@@ -83,6 +92,7 @@ import IngestQueueManager, {
 } from './ingest/IngestQueueManager';
 import StemSeparationIntegration from './audio/StemSeparationIntegration';
 import StemSeparationModal from './components/modals/StemSeparationModal';
+import { FileInput } from './components/import/FileInput';
 import TrackCapsule from './components/TrackCapsule';
 import PianoRollPanel from './components/piano/PianoRollPanel';
 import { ingestHistoryStore, IngestHistoryEntry } from './state/ingestHistory';
@@ -1202,6 +1212,13 @@ const FlowRuntime: React.FC<FlowRuntimeProps> = ({ arrangeFocusToken }) => {
   const [bpm, setBpm] = useState(120);
   const audioContextRef = useRef<AudioContext | null>(null);
   const trackNodesRef = useRef<{ [key: string]: AudioNodes }>({});
+  
+  // Initialize Thermal Sync (Part A) - Global thermal color filters
+  useEffect(() => {
+    const cleanup = initThermalSync(100); // Update every 100ms
+    return cleanup;
+  }, []);
+  
   useEffect(() => {
     tracksRef.current = tracks;
   }, [tracks]);
@@ -1328,6 +1345,26 @@ const FlowRuntime: React.FC<FlowRuntimeProps> = ({ arrangeFocusToken }) => {
   const primeBrainRecentActionsRef = useRef<Array<{ action: string; timestamp: string }>>([]);
   const primeBrainCommandLogRef = useRef<PrimeBrainCommandLog[]>([]);
   const primeBrainGuidanceRef = useRef<PrimeBrainGuidance>({});
+
+  // Define bumpPrimeBrainTick early so it can be used in useEffect hooks
+  const bumpPrimeBrainTick = useCallback(() => {
+    setPrimeBrainTick((prev) => prev + 1);
+  }, []);
+
+  // Subscribe to Prime Brain events to feed into userMemory
+  useEffect(() => {
+    const unsubscribe = subscribeToPrimeBrainEvents((event: PrimeBrainEvent) => {
+      // Convert event to userMemory action format
+      const actionLabel = `${event.type}${event.outcome ? ` • ${event.outcome}` : ''}`;
+      const entry = { action: actionLabel, timestamp: event.timestamp };
+      primeBrainRecentActionsRef.current = [
+        entry,
+        ...primeBrainRecentActionsRef.current.slice(0, 9), // Keep last 10
+      ];
+      bumpPrimeBrainTick();
+    });
+    return unsubscribe;
+  }, [bumpPrimeBrainTick]);
   const primeBrainAudioMetricsRef = useRef<{
     latencyMs?: number;
     cpuLoad: number;
@@ -1481,10 +1518,6 @@ const FlowRuntime: React.FC<FlowRuntimeProps> = ({ arrangeFocusToken }) => {
     });
   }, [appendHistoryNote, loudnessMetrics, masterAnalysis.waveform, publishAlsSignal]);
 
-  const bumpPrimeBrainTick = useCallback(() => {
-    setPrimeBrainTick((prev) => prev + 1);
-  }, []);
-
   const logPrimeBrainAction = useCallback(
     (label: string) => {
       const entry = { action: label, timestamp: new Date().toISOString() };
@@ -1562,10 +1595,11 @@ const FlowRuntime: React.FC<FlowRuntimeProps> = ({ arrangeFocusToken }) => {
   }, [logPrimeBrainAction, publishBloomSignal]);
 
   const primeBrainSnapshotInputs = useMemo<PrimeBrainSnapshotInputs | null>(() => {
-    const sessionId = primeBrainSessionIdRef.current;
-    if (!sessionId) {
-      return null;
-    }
+    try {
+      const sessionId = primeBrainSessionIdRef.current;
+      if (!sessionId) {
+        return null;
+      }
 
     const captureTimestamp = new Date().toISOString();
     const bloomTrace = [...primeBrainBloomTraceRef.current];
@@ -1574,6 +1608,11 @@ const FlowRuntime: React.FC<FlowRuntimeProps> = ({ arrangeFocusToken }) => {
     const recentActions = [...primeBrainRecentActionsRef.current];
     const audioMetricsState = primeBrainAudioMetricsRef.current;
 
+    // Get Session Probe context for richer snapshot data
+    const sessionProbeState = getSessionProbeSnapshot();
+    const sessionProbeContext = sessionProbeState?.context ?? null;
+
+    // Enhanced ALS channel calculation with Flow Context integration
     const alsTemperature = clamp01(masterAnalysis.level);
     let momentum = Math.max(flowContext.momentum, isPlaying ? 0.45 + masterAnalysis.level * 0.4 : 0.18);
     if (mixerActionPulse) {
@@ -1597,6 +1636,13 @@ const FlowRuntime: React.FC<FlowRuntimeProps> = ({ arrangeFocusToken }) => {
           ? 0.04
           : 0)
     );
+
+    // Incorporate Flow Context activity level into momentum calculation
+    if (flowContext.sessionContext?.activityLevel === 'intense') {
+      momentum = Math.min(1, momentum + 0.15);
+    } else if (flowContext.sessionContext?.activityLevel === 'active') {
+      momentum = Math.min(1, momentum + 0.08);
+    }
 
     const alsChannels: PrimeBrainSnapshotInputs['alsChannels'] = [
       { channel: 'temperature', value: alsTemperature },
@@ -1635,6 +1681,15 @@ const FlowRuntime: React.FC<FlowRuntimeProps> = ({ arrangeFocusToken }) => {
       });
     }
 
+    // Add Flow Context-derived flags
+    if (flowContext.sessionContext?.activityLevel === 'intense' && !isPlaying) {
+      aiAnalysisFlags.push({
+        category: 'flow',
+        severity: 'info',
+        message: 'High activity detected.',
+      });
+    }
+
     const audioMetrics: PrimeBrainSnapshotInputs['audioMetrics'] = {
       latencyMs: audioMetricsState.latencyMs,
       cpuLoad: audioMetricsState.cpuLoad,
@@ -1665,6 +1720,7 @@ const FlowRuntime: React.FC<FlowRuntimeProps> = ({ arrangeFocusToken }) => {
       return count;
     }, 0);
 
+    // Enhanced mode hints with Flow Context activity level
     const modeHints: PrimeBrainModeHints = {
       isPlaying,
       armedTrackCount: armedTracks.size,
@@ -1673,6 +1729,7 @@ const FlowRuntime: React.FC<FlowRuntimeProps> = ({ arrangeFocusToken }) => {
       dropoutsPerMinute: audioMetrics.dropoutsPerMinute,
     };
 
+    // Mode derivation considers Flow Context activity
     let mode: PrimeBrainMode = 'passive';
     if (aiAnalysisFlags.some((flag) => flag.severity === 'critical')) {
       mode = 'optimizing';
@@ -1680,12 +1737,28 @@ const FlowRuntime: React.FC<FlowRuntimeProps> = ({ arrangeFocusToken }) => {
       mode = 'learning';
     } else if (modeHints.isPlaying || modeHints.activeBloomActions > 0 || Boolean(importMessage)) {
       mode = 'active';
+    } else if (flowContext.sessionContext?.activityLevel === 'intense') {
+      mode = 'active';
     }
 
+    // Enhanced user memory with Session Probe context
     const userMemory: PrimeBrainSnapshotInputs['userMemory'] = {
       recentActions,
       recallAnchors: recallHighlightClipIds.map((id) => `clip:${id}`),
     };
+
+    // Add Session Probe context to user memory if available
+    if (sessionProbeContext) {
+      const clipCount = sessionProbeContext.selectedClips.length;
+      if (clipCount > 0) {
+        userMemory.recentActions.unshift({
+          action: `Selected ${clipCount} clip${clipCount > 1 ? 's' : ''}`,
+          timestamp: new Date(sessionProbeContext.timestamp).toISOString(),
+        });
+        // Keep only last 10 actions
+        userMemory.recentActions = userMemory.recentActions.slice(0, 10);
+      }
+    }
 
     const transport: PrimeBrainSnapshotInputs['transport'] = {
       isPlaying,
@@ -1697,7 +1770,7 @@ const FlowRuntime: React.FC<FlowRuntimeProps> = ({ arrangeFocusToken }) => {
 
     const conversationTurns: PrimeBrainConversationTurn[] = [];
 
-    return {
+    const snapshot = {
       sessionId,
       captureTimestamp,
       transport,
@@ -1713,6 +1786,28 @@ const FlowRuntime: React.FC<FlowRuntimeProps> = ({ arrangeFocusToken }) => {
       modeHints,
       guidance,
     };
+
+    // Dev-only snapshot logging for validation
+    if (import.meta.env.DEV && primeBrainTick % 10 === 0) {
+      console.debug('[PrimeBrain] Snapshot preview:', {
+        mode: snapshot.mode,
+        alsChannels: snapshot.alsChannels.map((c) => `${c.channel}:${c.value.toFixed(2)}`),
+        activityLevel: flowContext.sessionContext?.activityLevel,
+        adaptiveSuggestions: flowContext.adaptiveSuggestions,
+        sessionContext: sessionProbeContext ? {
+          viewMode: sessionProbeContext.viewMode,
+          isPlaying: sessionProbeContext.isPlaying,
+          clipCount: sessionProbeContext.selectedClips.length,
+        } : null,
+      });
+    }
+
+      return snapshot;
+    } catch (error) {
+      // Ensure Prime Brain failures never block core DAW operation
+      console.warn('[PrimeBrain] Snapshot build failed, using fallback', error);
+      return null;
+    }
   }, [
     primeBrainTick,
     masterAnalysis.level,
@@ -1733,11 +1828,14 @@ const FlowRuntime: React.FC<FlowRuntimeProps> = ({ arrangeFocusToken }) => {
     flowContext.intensity,
     flowContext.momentum,
     flowContext.momentumTrend,
+    flowContext.sessionContext,
+    flowContext.adaptiveSuggestions,
   ]);
 
   const primeBrainStatus = useMemo<PrimeBrainStatus>(() => {
-    const velvet = deriveVelvetLensState(analysisResult);
-    if (!primeBrainSnapshotInputs) {
+    try {
+      const velvet = deriveVelvetLensState(analysisResult);
+      if (!primeBrainSnapshotInputs) {
       const health = derivePrimeBrainHealth(
         {} as PrimeBrainSnapshotInputs['audioMetrics'],
         [],
@@ -1767,9 +1865,28 @@ const FlowRuntime: React.FC<FlowRuntimeProps> = ({ arrangeFocusToken }) => {
     const bloomTrace = primeBrainSnapshotInputs.bloomTrace;
     const lastBloom = bloomTrace.length ? bloomTrace[bloomTrace.length - 1] : null;
     const lastAction = primeBrainSnapshotInputs.userMemory.recentActions[0]?.action;
-    const guidanceLine =
+    // Enhanced guidance line with Flow Context suggestions
+    let guidanceLine =
       primeBrainSnapshotInputs.guidance?.lastSuggestion ??
       primeBrainSnapshotInputs.guidance?.lastCommand?.commandType?.replace(/([A-Z])/g, ' $1')?.trim();
+    
+    // Incorporate Flow Context adaptive suggestions into guidance
+    if (!guidanceLine && flowContext.adaptiveSuggestions.suggestViewSwitch) {
+      guidanceLine = `Consider switching to ${flowContext.adaptiveSuggestions.suggestViewSwitch} view.`;
+    }
+    
+    // Add activity-based guidance hints
+    if (!guidanceLine && flowContext.sessionContext?.activityLevel === 'intense') {
+      guidanceLine = 'High activity detected. Flow is intense.';
+    } else if (!guidanceLine && flowContext.sessionContext?.activityLevel === 'active') {
+      guidanceLine = 'Flow is active.';
+    }
+    
+    // Fallback to default if still empty
+    if (!guidanceLine) {
+      guidanceLine = 'Flow is standing by.';
+    }
+    
     const bloomSummary = lastBloom
       ? `${lastBloom.intent} • ${
           lastBloom.outcome === 'accepted' ? 'Bloom honored' : 'Bloom deferred'
@@ -1789,13 +1906,35 @@ const FlowRuntime: React.FC<FlowRuntimeProps> = ({ arrangeFocusToken }) => {
       userMemoryAnchors: primeBrainSnapshotInputs.userMemory.recallAnchors,
       aiFlags: primeBrainSnapshotInputs.aiAnalysisFlags,
     };
-  }, [analysisResult, primeBrainSnapshotInputs]);
+    } catch (error) {
+      // Ensure Prime Brain failures never block core DAW operation
+      console.warn('[PrimeBrain] Status derivation failed, using fallback', error);
+      const health = derivePrimeBrainHealth(
+        {} as PrimeBrainSnapshotInputs['audioMetrics'],
+        [],
+      );
+      const alsChannels = (['temperature', 'momentum', 'pressure', 'harmony'] as PrimeBrainALSChannel[]).map(
+        (channel) => describeAlsChannel(channel, 0),
+      );
+      return {
+        mode: 'passive',
+        modeCaption: MODE_CAPTIONS.passive,
+        health,
+        alsChannels,
+        velvet: deriveVelvetLensState(analysisResult),
+        aiFlags: [],
+        userMemoryAnchors: [],
+        guidanceLine: 'Flow is standing by.',
+      };
+    }
+  }, [analysisResult, primeBrainSnapshotInputs, flowContext.adaptiveSuggestions, flowContext.sessionContext]);
 
   usePrimeBrainExporter({
     enabled: primeBrainTelemetryEnabled && Boolean(primeBrainExportUrl),
     exportUrl: primeBrainExportUrl,
     snapshotInputs: primeBrainSnapshotInputs,
     intervalMs: 4000,
+    debug: import.meta.env.DEV && import.meta.env.VITE_PRIME_BRAIN_EXPORT_DEBUG === '1',
   });
   const normalizeCommandPayload = useCallback((value: unknown): Record<string, unknown> => {
     if (value === null || value === undefined) return {};
@@ -1901,6 +2040,13 @@ const FlowRuntime: React.FC<FlowRuntimeProps> = ({ arrangeFocusToken }) => {
       setViewMode('arrange');
     }
   }, [arrangeFocusToken]);
+  
+  // Wrap setViewMode to record Prime Brain events
+  const handleViewModeChange = useCallback((mode: 'arrange' | 'sampler' | 'mixer') => {
+    setViewMode(mode);
+    recordViewSwitch(mode);
+    recordPrimeBrainEvent('view-switch', { viewMode: mode }, 'success');
+  }, []);
   const [activePrimeBrainClipId, setActivePrimeBrainClipId] = useState<ClipId | null>(null);
   const [selectedTrackId, setSelectedTrackId] = useState<string | null>(null);
   const [trackUiState, setTrackUiState] = useState<Record<string, TrackUIState>>({});
@@ -2148,7 +2294,6 @@ const FlowRuntime: React.FC<FlowRuntimeProps> = ({ arrangeFocusToken }) => {
   // --- CONTEXTUAL ENGINE STATE ---
   // --- AI Hub State ---
   const [isAIHubOpen, setIsAIHubOpen] = useState(false);
-
 
   const { clips, setClips, selection, setSelection, clearSelection, ppsAPI, scrollX, setScrollX, moveClip, resizeClip, onSplitAt, setClipsSelect, duplicateClips, updateClipProperties, undo, redo, canUndo, canRedo } = useArrange({
     clips: []
@@ -2561,7 +2706,15 @@ const FlowRuntime: React.FC<FlowRuntimeProps> = ({ arrangeFocusToken }) => {
     );
   }, [pendingStemRequest, removeImportProgressByPrefix, setImportMessage, setTracks]);
 
-  const handleToggleLoop = () => setIsLooping(!isLooping);
+  const handleToggleLoop = useCallback(() => {
+    setIsLooping((prev) => {
+      const newValue = !prev;
+      // Update playback state for Flow Loop
+      updatePlaybackState({ looping: newValue });
+      recordPrimeBrainEvent('transport-loop-toggle', { isLooping: newValue }, 'success');
+      return newValue;
+    });
+  }, []);
 
   const startBackgroundStemSeparation = useCallback(
     (
@@ -3181,6 +3334,11 @@ const FlowRuntime: React.FC<FlowRuntimeProps> = ({ arrangeFocusToken }) => {
   };
 
   const handlePlayPause = useCallback(async () => {
+    // Record record button tap for double-tap detection (if armed)
+    if (armedTracks.size > 0) {
+      recordRecordTap();
+    }
+    
     const isTauri = typeof window !== 'undefined' && typeof (window as unknown as { __TAURI__?: unknown }).__TAURI__ !== 'undefined';
     
     setIsPlaying((prevIsPlaying) => {
@@ -3225,6 +3383,20 @@ const FlowRuntime: React.FC<FlowRuntimeProps> = ({ arrangeFocusToken }) => {
               console.warn('[FLOW] Failed to pause engine:', error);
             });
         }
+      }
+      
+      // Update playback state for Flow Loop
+      const currentPlayCount = window.__mixx_playbackState?.playCount || 0;
+      updatePlaybackState({
+        playing: newIsPlaying,
+        playCount: newIsPlaying ? currentPlayCount + 1 : currentPlayCount,
+      });
+      
+      // Record Prime Brain event
+      if (newIsPlaying) {
+        recordPrimeBrainEvent('transport-play', { isTauri }, 'success');
+      } else {
+        recordPrimeBrainEvent('transport-pause', { isTauri }, 'success');
       }
       
       return newIsPlaying;
@@ -3443,6 +3615,10 @@ const FlowRuntime: React.FC<FlowRuntimeProps> = ({ arrangeFocusToken }) => {
         action,
         payload: meta?.context ? { data: payload, context: meta.context } : payload,
       });
+      
+      // Record Prime Brain event for Bloom actions
+      recordPrimeBrainEvent('bloom-action', { action, source: meta?.source }, 'success');
+      
       switch (action) {
           case 'addTrack':
               setIsAddTrackModalModalOpen(true);
@@ -3633,6 +3809,7 @@ const FlowRuntime: React.FC<FlowRuntimeProps> = ({ arrangeFocusToken }) => {
     });
     setSelectedTrackId(newTrackData.id); // UX improvement: select the new track
     setIsAddTrackModalModalOpen(false);
+    recordPrimeBrainEvent('track-create', { trackId: newTrackData.id, group: newTrackData.group }, 'success');
   }, []);
 
   const handleMixerChange = useCallback((trackId: string, setting: keyof MixerSettings, value: number | boolean) => {
@@ -3737,22 +3914,31 @@ const FlowRuntime: React.FC<FlowRuntimeProps> = ({ arrangeFocusToken }) => {
     });
   };
 
-  const handleToggleArm = (trackId: string) => {
+  const handleToggleArm = useCallback((trackId: string) => {
       const trackMeta = tracksRef.current.find((track) => track.id === trackId);
       setArmedTracks(prev => {
         const newSet = new Set(prev);
         const wasArmed = newSet.has(trackId);
         if (wasArmed) {
             newSet.delete(trackId);
+            recordPrimeBrainEvent('track-disarm', { trackId }, 'success');
         } else {
             newSet.add(trackId);
+            recordPrimeBrainEvent('track-arm', { trackId }, 'success');
         }
         if (trackMeta?.role === 'hushRecord') {
           setIsHushActive(!wasArmed);
+          recordPrimeBrainEvent('hush-toggle', { isActive: !wasArmed }, 'success');
         }
+        
+        // Update recording state for Flow Loop
+        updateRecordState({
+          armedTrack: newSet.size > 0,
+        });
+        
         return newSet;
     });
-  }
+  }, []);
 
   const handleTrackContextChange = useCallback(
     (trackId: string, nextContext: TrackContextMode) => {
@@ -4854,39 +5040,52 @@ const FlowRuntime: React.FC<FlowRuntimeProps> = ({ arrangeFocusToken }) => {
       const ctx = audioContextRef.current;
       if (!ctx || pluginRegistry.length === 0) return;
       
+      // Guard: Only run if context state is running or suspended (not closed)
+      if (ctx.state === 'closed') return;
+      
       pluginRegistry.forEach(plugin => {
         const id = plugin.id;
         if (!fxNodesRef.current[id]) {
-          const input = ctx.createGain(); // Main input for this FX node wrapper
-          const bypass = ctx.createGain(); // WET path gain (signal goes through engine)
-          const direct = ctx.createGain(); // DRY path gain (signal bypasses engine)
-          const output = ctx.createGain(); // Output from this FX node wrapper
-          
-          const engine = engineInstancesRef.current.get(id);
+          try {
+            const input = ctx.createGain(); // Main input for this FX node wrapper
+            const bypass = ctx.createGain(); // WET path gain (signal goes through engine)
+            const direct = ctx.createGain(); // DRY path gain (signal bypasses engine)
+            const output = ctx.createGain(); // Output from this FX node wrapper
+            
+            const engine = engineInstancesRef.current.get(id);
 
-          // Connect dry path
-          input.connect(direct);
-          direct.connect(output);
+            // Connect dry path
+            input.connect(direct);
+            direct.connect(output);
 
-          // Connect wet path
-          input.connect(bypass); 
-          if (engine && engine.input && engine.output) {
-            // If an IAudioEngine is available, connect it into the wet path
-            // FIX: Ensure engine.makeup is used in the wet path
-            bypass.connect(engine.input); // Audio from input wrapper goes to engine's input
-            engine.output.connect(engine.makeup); // Engine's actual output to its makeup gain
-            engine.makeup.connect(output); // Engine's makeup gain to wrapper's output
-            console.log(`%c[FX] Initialized engine for plugin: ${id}`, "color: lightgreen");
-          } else {
-             // If no engine or no proper input/output, wet path is still there but passes directly
-             bypass.connect(output);
-             console.warn(`%c[FX] Plugin '${id}' has no IAudioEngine, or engine missing input/output. Wet path will be direct.`, "color: yellow");
+            // Connect wet path
+            input.connect(bypass); 
+            if (engine && engine.input && engine.output) {
+              // Guard: Ensure engine nodes belong to the same context
+              if (engine.input.context === ctx && engine.output.context === ctx) {
+                // If an IAudioEngine is available, connect it into the wet path
+                // FIX: Ensure engine.makeup is used in the wet path
+                bypass.connect(engine.input); // Audio from input wrapper goes to engine's input
+                engine.output.connect(engine.makeup); // Engine's actual output to its makeup gain
+                engine.makeup.connect(output); // Engine's makeup gain to wrapper's output
+                console.log(`%c[FX] Initialized engine for plugin: ${id}`, "color: lightgreen");
+              } else {
+                console.warn(`%c[FX] Plugin '${id}' engine nodes belong to different context, skipping connection.`, "color: orange");
+                bypass.connect(output);
+              }
+            } else {
+               // If no engine or no proper input/output, wet path is still there but passes directly
+               bypass.connect(output);
+               console.warn(`%c[FX] Plugin '${id}' has no IAudioEngine, or engine missing input/output. Wet path will be direct.`, "color: yellow");
+            }
+            
+            fxNodesRef.current[id] = { input, output, bypass, direct, engine };
+          } catch (error) {
+            console.error(`[FX] Failed to initialize plugin '${id}':`, error);
           }
-          
-          fxNodesRef.current[id] = { input, output, bypass, direct, engine };
         }
       });
-    }, [pluginRegistry, audioContextRef.current]);
+    }, [pluginRegistry]); // Removed audioContextRef.current from deps - refs don't trigger re-renders
 
     // Update FX bypass state
     const handleToggleBypass = useCallback((fxId: FxWindowId, trackId?: string) => {
@@ -5050,12 +5249,26 @@ const FlowRuntime: React.FC<FlowRuntimeProps> = ({ arrangeFocusToken }) => {
         let animationFrameId: number;
         if (isHushActive) {
             const updateFeedback = () => {
-                setHushFeedback(hushSystem.getALSFeedback());
+                const feedback = hushSystem.getALSFeedback();
+                setHushFeedback(feedback);
+                
+                // Monitor HUSH noise floor and update recording state
+                const threshold = 0.22; // Default threshold
+                const hushDetected = monitorHush(feedback.intensity, threshold);
+                
+                // Update recording state with noise floor for Flow Loop
+                updateRecordState({
+                    noiseFloor: feedback.intensity,
+                    threshold,
+                    hush: hushDetected,
+                });
+                
                 animationFrameId = requestAnimationFrame(updateFeedback);
             };
             updateFeedback();
         } else {
             setHushFeedback({ color: '#1a1030', intensity: 0.0, isEngaged: false, noiseCount: 0 });
+            updateRecordState({ noiseFloor: 0, hush: false });
         }
         return () => {
             if (animationFrameId) {
@@ -5690,11 +5903,51 @@ const FlowRuntime: React.FC<FlowRuntimeProps> = ({ arrangeFocusToken }) => {
     const accent = BLOOM_CONTEXT_ACCENTS[bloomContext];
     const meta = { source: 'bloom-floating' as const, context: { bloomContext } };
 
-    const attachAccent = (items: BloomFloatingMenuItem[]): BloomFloatingMenuItem[] =>
-      items.map((item) => ({
+    // Apply Prime Brain suggestions to menu items
+    const applyPrimeBrainGuidance = (items: BloomFloatingMenuItem[]): BloomFloatingMenuItem[] => {
+      const suggestions = flowContext.adaptiveSuggestions;
+      const primeMode = primeBrainStatus.mode;
+      
+      return items.map((item) => {
+        let enhanced = { ...item };
+        
+        // Subtle highlighting based on Prime Brain mode and suggestions
+        // Only show hints when mode is active or learning (not passive)
+        if (primeMode !== 'passive') {
+          // Highlight items that match suggested view switch
+          if (suggestions.suggestViewSwitch && item.name.toLowerCase().includes(suggestions.suggestViewSwitch.toLowerCase())) {
+            enhanced = {
+              ...enhanced,
+              accentColor: enhanced.accentColor ?? accent,
+              // Add subtle glow effect via description
+              description: enhanced.description ? `${enhanced.description} • Suggested` : 'Suggested',
+            };
+          }
+          
+          // Reorder items based on Prime Brain guidance (subtle, only in active mode)
+          if (primeMode === 'active' && suggestions.showBloomMenu && item.name.toLowerCase().includes('analyze')) {
+            // Boost "Analyze" items when tension is high
+            if (primeBrainSnapshotInputs?.harmonicState.tension > 0.6) {
+              enhanced = {
+                ...enhanced,
+                description: enhanced.description ? `${enhanced.description} • High tension detected` : 'High tension detected',
+              };
+            }
+          }
+        }
+        
+        return enhanced;
+      });
+    };
+
+    const attachAccent = (items: BloomFloatingMenuItem[]): BloomFloatingMenuItem[] => {
+      const accented = items.map((item) => ({
         ...item,
         accentColor: item.accentColor ?? accent,
       }));
+      // Apply Prime Brain guidance after accenting
+      return applyPrimeBrainGuidance(accented);
+    };
 
     const buildSimpleMenu = (items: BloomFloatingMenuItem[]): Record<string, BloomFloatingMenu> => ({
       main: { items: attachAccent(items) },
@@ -6118,6 +6371,8 @@ const FlowRuntime: React.FC<FlowRuntimeProps> = ({ arrangeFocusToken }) => {
     followPlayhead,
     primeBrainStatus,
     primeBrainTelemetryEnabled,
+    flowContext.adaptiveSuggestions,
+    primeBrainSnapshotInputs,
   ]);
 
   const handleFloatingBloomPositionChange = useCallback((position: { x: number; y: number }) => {
@@ -6134,7 +6389,96 @@ const FlowRuntime: React.FC<FlowRuntimeProps> = ({ arrangeFocusToken }) => {
     masterNodesRef.current?.getProfile() ?? MASTERING_PROFILES.streaming;
   const contentHeight = Math.max(420, viewportHeight - headerHeight);
 
+  // Initialize window globals for flow loop
+  useEffect(() => {
+    // Initialize window globals if they don't exist
+    if (typeof window !== 'undefined') {
+      if (!window.__mixx_editEvents) window.__mixx_editEvents = [];
+      if (!window.__mixx_toolSwitches) window.__mixx_toolSwitches = [];
+      if (!window.__mixx_zoomEvents) window.__mixx_zoomEvents = [];
+      if (!window.__mixx_playbackState) window.__mixx_playbackState = { playing: false, looping: false };
+      if (!window.__mixx_recordState) window.__mixx_recordState = { recording: false, armedTrack: false, noiseFloor: 0 };
+      if (!window.__mixx_viewSwitches) window.__mixx_viewSwitches = [];
+    }
+  }, []);
+
+  // Update window globals with current state (for Flow Loop)
+  useEffect(() => {
+    if (typeof window === 'undefined') return;
+    
+    // Update playback state
+    updatePlaybackState({
+      playing: isPlaying,
+      looping: isLooping,
+      playCount: isLooping ? Math.floor(currentTime / (60 / bpm)) : 0,
+      cursor: currentTime,
+      regionLength: isLooping ? (60 / bpm) * 4 : undefined, // Assume 4-bar loop
+      cursorLock: isLooping && isPlaying, // Cursor locked when looping
+    });
+    
+    // Update recording state
+    const isRecording = isPlaying && armedTracks.size > 0;
+    const wasRecording = window.__mixx_recordState?.recording || false;
+    
+    updateRecordState({
+      recording: isRecording,
+      armedTrack: armedTracks.size > 0,
+      noiseFloor: hushFeedback.intensity,
+      threshold: 0.2,
+    });
+    
+    // Record punch events and take memory when recording starts/stops
+    if (isRecording && !wasRecording) {
+      // Recording started - record punch event and set record start time
+      recordRecordTap(); // Record tap for double-tap detection
+      recordPunchEvent(currentTime, undefined, undefined); // Record punch start
+      
+      // Set record start time for take memory
+      if (!window.__mixx_recordState) {
+        window.__mixx_recordState = { recording: false, armedTrack: false, noiseFloor: 0 };
+      }
+      window.__mixx_recordState.recordStart = performance.now();
+    } else if (!isRecording && wasRecording) {
+      // Recording stopped - record punch end with duration and take memory
+      const punchHistory = window.__mixx_punchHistory || [];
+      if (punchHistory.length > 0) {
+        const lastPunch = punchHistory[punchHistory.length - 1];
+        const duration = (performance.now() - lastPunch.ts) / 1000; // Convert to seconds
+        // Update last punch with duration
+        lastPunch.duration = duration;
+        // Detect punch type
+        const punchType = detectPunchType(punchHistory);
+        if (punchType) {
+          lastPunch.type = punchType;
+        }
+      }
+      
+      // Record take memory (crown jewel of Punch Mode)
+      const takeMemory = recordTakeMemory();
+      if (takeMemory) {
+        // Analyze take for comping (Comping Brain)
+        const compData = analyzeTakeForComp(takeMemory);
+        
+        if (import.meta.env.DEV) {
+          console.log('[TAKE MEMORY] Take recorded:', {
+            duration: `${(takeMemory.duration / 1000).toFixed(2)}s`,
+            barPosition: takeMemory.barPosition.toFixed(1),
+            flow: (takeMemory.flowDuringTake * 100).toFixed(0) + '%',
+            hushEvents: takeMemory.hushEvents,
+          });
+          console.log('[COMPING BRAIN] Take scored:', {
+            score: (compData.score * 100).toFixed(0) + '%',
+            timing: (compData.timingAccuracy * 100).toFixed(0) + '%',
+            noise: (compData.noiseScore * 100).toFixed(0) + '%',
+            energy: (compData.energySlope * 100).toFixed(0) + '%',
+          });
+        }
+      }
+    }
+  }, [isPlaying, isLooping, currentTime, bpm, armedTracks, hushFeedback.intensity]);
+
   return (
+    <FlowLoopWrapper primeBrainStatus={primeBrainStatus}>
     <div className="relative w-screen h-screen text-ink overflow-hidden" style={backgroundGlowStyle}>
         <div className="pointer-events-none absolute inset-0 bg-gradient-to-br from-[rgba(48,92,178,0.45)] via-[rgba(19,37,74,0.4)] to-transparent blur-[110px] opacity-80"></div>
         <Header
@@ -6340,7 +6684,7 @@ const FlowRuntime: React.FC<FlowRuntimeProps> = ({ arrangeFocusToken }) => {
             onToggleFxVisibility={handleToggleFxVisibility}
             selectedTrackId={selectedTrackId}
             viewMode={viewMode}
-            onViewModeChange={(mode) => setViewMode(mode)}
+            onViewModeChange={handleViewModeChange}
             onOpenAIHub={() => setIsAIHubOpen(true)}
             currentTime={currentTime}
             canRecallLastImport={ingestHistoryEntries.length > 0}
@@ -6419,13 +6763,221 @@ const FlowRuntime: React.FC<FlowRuntimeProps> = ({ arrangeFocusToken }) => {
             />
           </div>
         )}
-        <input
-          type="file"
+        
+        {/* Prime Brain Debug Overlay (dev only) */}
+        <PrimeBrainDebugOverlay
+          primeBrainStatus={primeBrainStatus}
+          flowContext={flowContext}
+          snapshotInputs={primeBrainSnapshotInputs}
+        />
+        
+        <FileInput
           ref={fileInputRef}
           className="hidden"
-          onChange={handleFileLoad}
           accept=".json,.wav,.aiff,.aif,.mp3,.flac,.ogg,.m4a,.aac,audio/*"
           multiple
+          onImportComplete={async (result) => {
+            // Flow import complete - add tracks and clips to timeline
+            try {
+              // Convert TrackConfig to TrackData and create clips
+              const newTracks: TrackData[] = [];
+              const newClips: ArrangeClip[] = [];
+              const newBuffers: Record<string, AudioBuffer> = {};
+              
+              const baseTimestamp = Date.now();
+              result.tracks.forEach((trackConfig, index) => {
+                // Generate unique track ID with timestamp + index + random
+                const trackId = `track-${baseTimestamp}-${index}-${Math.random().toString(36).substring(2, 7)}`;
+                const bufferId = `buffer-${baseTimestamp}-${index}-${Math.random().toString(36).substring(2, 7)}`;
+                
+                // Map TrackConfig color to TrackData color
+                const colorMap: Record<string, TrackData['trackColor']> = {
+                  '#A78BFA': 'purple', // VOCAL_MAIN
+                  '#C084FC': 'purple', // VOCAL_ADLIB
+                  '#D8B4FE': 'purple', // VOCAL_HARMONY
+                  '#60A5FA': 'blue',   // DRUMS
+                  '#38BDF8': 'cyan',    // BASS_808
+                  '#34D399': 'green',   // MUSIC
+                  '#FBBF24': 'crimson', // PERC
+                  '#F472B6': 'magenta', // FX
+                  '#94A3B8': 'cyan',    // MISC
+                };
+                
+                const trackColor = trackConfig.color 
+                  ? (colorMap[trackConfig.color] || 'cyan')
+                  : 'cyan';
+                
+                // Map group from trackConfig.group or autoRole
+                const groupMap: Record<string, TrackData['group']> = {
+                  'vocals': 'Vocals',
+                  'rhythm': 'Drums',
+                  'bass': 'Bass',
+                  'music': 'Instruments',
+                  'fx': 'Instruments',
+                  'other': 'Instruments',
+                };
+                
+                // Determine group from autoRole if available
+                let group: TrackData['group'] = 'Instruments';
+                if (trackConfig.autoRole) {
+                  if (trackConfig.autoRole.startsWith('VOCAL_')) {
+                    group = 'Vocals';
+                  } else if (trackConfig.autoRole === 'DRUMS' || trackConfig.autoRole === 'PERC') {
+                    group = 'Drums';
+                  } else if (trackConfig.autoRole === 'BASS_808') {
+                    group = 'Bass';
+                  } else if (trackConfig.autoRole === 'MUSIC') {
+                    group = 'Instruments';
+                  }
+                } else if (trackConfig.group) {
+                  group = groupMap[trackConfig.group] || 'Instruments';
+                }
+                
+                // Determine waveform type from track type
+                const waveformTypeMap: Record<string, TrackData['waveformType']> = {
+                  'vocal': 'varied',
+                  'drums': 'dense',
+                  'bass': 'bass',
+                  'sub': 'bass',
+                  'music': 'sparse',
+                  'perc': 'dense',
+                  'harmonic': 'sparse',
+                  'other': 'varied',
+                };
+                
+                const waveformType = waveformTypeMap[trackConfig.type] || 'varied';
+                
+                // Create TrackData
+                const trackData: TrackData = {
+                  id: trackId,
+                  trackName: trackConfig.name,
+                  trackColor,
+                  waveformType,
+                  group,
+                  role: 'standard', // TrackRole is 'standard' | 'hushRecord', no 'master'
+                  locked: false,
+                };
+                
+                newTracks.push(trackData);
+                
+                // Store audio buffer
+                newBuffers[bufferId] = trackConfig.buffer;
+                
+                // Create clip for this track
+                const clip: ArrangeClip = {
+                  id: `clip-${baseTimestamp}-${index}-${Math.random().toString(36).substring(2, 7)}`,
+                  trackId,
+                  name: trackConfig.name,
+                  color: trackConfig.color || '#60A5FA',
+                  start: 0,
+                  duration: trackConfig.buffer.duration,
+                  sourceStart: 0,
+                  bufferId,
+                  selected: false,
+                  gain: 1.0,
+                };
+                
+                newClips.push(clip);
+              });
+              
+              // Add tracks to state
+              setTracks(prev => [...prev, ...newTracks]);
+              
+              // Add clips to state
+              setClips(prev => [...prev, ...newClips]);
+              
+              // Store audio buffers
+              setAudioBuffers(prev => ({ ...prev, ...newBuffers }));
+              
+              // Initialize mixer settings for new tracks
+              setMixerSettings(prev => {
+                const next = { ...prev };
+                newTracks.forEach(track => {
+                  if (!next[track.id]) {
+                    next[track.id] = { volume: 0.75, pan: 0, isMuted: false };
+                  }
+                });
+                return next;
+              });
+              
+              // Initialize inserts for new tracks
+              setInserts(prev => {
+                const updated = { ...prev };
+                newTracks.forEach(track => {
+                  if (!updated[track.id]) {
+                    updated[track.id] = [];
+                  }
+                });
+                return updated;
+              });
+              
+              // Initialize send levels for new tracks
+              setTrackSendLevels(prev => {
+                const updated = { ...prev };
+                newTracks.forEach(track => {
+                  if (!updated[track.id]) {
+                    updated[track.id] = createDefaultSendLevels(track);
+                  }
+                });
+                return updated;
+              });
+              
+              // Initialize dynamics settings for new tracks
+              setChannelDynamicsSettings(prev => {
+                const updated = { ...prev };
+                newTracks.forEach(track => {
+                  if (!updated[track.id]) {
+                    updated[track.id] = createDefaultDynamicsSettings(track);
+                  }
+                });
+                return updated;
+              });
+              
+              // Initialize EQ settings for new tracks
+              setChannelEQSettings(prev => {
+                const updated = { ...prev };
+                newTracks.forEach(track => {
+                  if (!updated[track.id]) {
+                    updated[track.id] = createDefaultEQSettings(track);
+                  }
+                });
+                return updated;
+              });
+              
+              // Wake ALS + Prime Brain
+              if (typeof window !== 'undefined') {
+                const brain = window.__primeBrainInstance as any;
+                if (brain?.updateFromImport) {
+                  brain.updateFromImport(result.metadata);
+                }
+                
+                const als = window.__als as any;
+                if (als) {
+                  als.flow = 65;
+                  als.temperature = 'warming';
+                  als.guidance = 'Preparing arrangement...';
+                }
+                
+                // Trigger Bloom HUD ready state
+                window.__bloom_ready = true;
+              }
+              
+              // Log completion
+              if ((import.meta as any).env?.DEV) {
+                console.log('[FLOW IMPORT] Complete', {
+                  tracks: newTracks.length,
+                  clips: newClips.length,
+                  buffers: Object.keys(newBuffers).length,
+                  metadata: result.metadata,
+                });
+              }
+            } catch (error) {
+              console.error('[FLOW IMPORT] Error adding tracks to timeline:', error);
+              if (typeof window !== 'undefined' && window.alert) {
+                window.alert(`Failed to add tracks to timeline: ${error instanceof Error ? error.message : 'Unknown error'}`);
+              }
+            }
+          }}
           aria-label="Load audio or project file"
         />
 
@@ -6455,8 +7007,8 @@ const FlowRuntime: React.FC<FlowRuntimeProps> = ({ arrangeFocusToken }) => {
           onWarpAnchors={handleApplyWarpAnchors}
           onExportMidi={handleExportPianoRollMidi}
         />
-        {sessionProbeEnabled && <FlowProbeOverlay />}
     </div>
+    </FlowLoopWrapper>
   );
 };
 

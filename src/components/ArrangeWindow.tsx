@@ -35,6 +35,14 @@ import {
   shouldSnap,
 } from "../utils/snapSystem";
 import { registerShortcut, unregisterShortcut } from "../utils/keyboardShortcuts";
+import { recordEditEvent, recordToolSwitch, recordZoomEvent } from "../core/loop/flowLoopEvents";
+import { AutoPunchGhost } from "./timeline/AutoPunchGhost";
+import { CompGhost } from "./timeline/CompGhost";
+import { FlowPulseBar } from "./visualizers/FlowPulseBar";
+import { PlayheadPulse } from "./timeline/PlayheadPulse";
+import { BreathingPlayhead } from "./timeline/BreathingPlayhead";
+import { getStemHeatColor, getStemHeatState, computeStemEnergy } from "../core/als/stemHeat";
+import "../components/lane/StemLaneHeat.css";
 
 type DragKind = "move" | "resize-left" | "resize-right" | "fade-in" | "fade-out" | "gain";
 
@@ -268,7 +276,12 @@ export const ArrangeWindow: React.FC<Props> = (props) => {
   const [resizing, setResizing] = useState<null | { trackId: string; startY: number; startHeight: number }>(null);
   const [resizingHeader, setResizingHeader] = useState<null | { startX: number; startWidth: number }>(null);
   const [activeTool, setActiveTool] = useState<TimelineTool>(DEFAULT_TIMELINE_TOOL);
-  const toolPalette = useTimelineToolPalette({ activeTool });
+  // Use Flow Context for Prime Brain tool highlighting (flowContext already declared above)
+  const highlightedTools = flowContext.adaptiveSuggestions.highlightTools || [];
+  const toolPalette = useTimelineToolPalette({ 
+    activeTool, 
+    highlightedTools: highlightedTools.map(t => t.toLowerCase()),
+  });
   const [snapSettings, setSnapSettings] = useState<SnapSettings>(DEFAULT_SNAP_SETTINGS);
   const [snapCandidates, setSnapCandidates] = useState<SnapCandidate[]>([]);
   const [boxSelection, setBoxSelection] = useState<BoxSelection | null>(null);
@@ -440,12 +453,14 @@ export const ArrangeWindow: React.FC<Props> = (props) => {
   const handleClipSplit = useCallback(
     (clipId: ClipId, splitTime: number) => {
       onSplitAt(clipId, splitTime);
+      recordEditEvent(0); // Split is a precision edit
     },
     [onSplitAt]
   );
 
   const handleSetTool = useCallback((tool: TimelineTool) => {
     setActiveTool(tool);
+    recordToolSwitch(tool);
   }, []);
 
   const handleToggleSnap = useCallback(
@@ -480,13 +495,15 @@ export const ArrangeWindow: React.FC<Props> = (props) => {
     const viewport = timelineViewportRef.current;
     const anchorX = viewport ? viewport.clientWidth / 2 : 0;
     zoomAroundPoint(1.15, anchorX);
-  }, [zoomAroundPoint]);
+    recordZoomEvent(1.15, (scrollX + anchorX) / pixelsPerSecond);
+  }, [zoomAroundPoint, scrollX, pixelsPerSecond]);
 
   const handleZoomOut = useCallback(() => {
     const viewport = timelineViewportRef.current;
     const anchorX = viewport ? viewport.clientWidth / 2 : 0;
     zoomAroundPoint(1 / 1.15, anchorX);
-  }, [zoomAroundPoint]);
+    recordZoomEvent(1 / 1.15, (scrollX + anchorX) / pixelsPerSecond);
+  }, [zoomAroundPoint, scrollX, pixelsPerSecond]);
 
   const handleZoomFit = useCallback(() => {
     zoomToFit(Math.max(projectDuration, 1));
@@ -753,6 +770,9 @@ export const ArrangeWindow: React.FC<Props> = (props) => {
 
     ppsAPI.set(newPps);
     setScrollX(newScroll);
+    const zoomDelta = newPps / pixelsPerSecond;
+    const zoomPos = (startSec + endSec) / 2;
+    recordZoomEvent(zoomDelta, zoomPos);
     recordSessionProbeTimelineEvent({
       kind: "zoom",
       scrollX: newScroll,
@@ -1292,6 +1312,15 @@ export const ArrangeWindow: React.FC<Props> = (props) => {
   const onMouseUp = useCallback(() => {
     if (drag) {
       setClips((prev) => applyAutomaticCrossfades(prev));
+      // Record edit event - calculate distance from drag start
+      // Distance is approximate based on pixel movement
+      const dragDistance = drag.startX !== undefined && drag.startY !== undefined 
+        ? Math.sqrt(Math.pow((drag.startX || 0), 2) + Math.pow((drag.startY || 0), 2))
+        : 0;
+      recordEditEvent(dragDistance);
+    }
+    if (resizing) {
+      recordEditEvent(0); // Resize is a precision edit
     }
     setDrag(null);
     setDraggingSelection(null);
@@ -1304,7 +1333,7 @@ export const ArrangeWindow: React.FC<Props> = (props) => {
     if (scrubState.isScrubbing) {
       setScrubState({ isScrubbing: false, originX: 0, originTime: 0 });
     }
-  }, [drag, scrubState.isScrubbing, setBoxSelection, setClips, setResizingHeader]);
+  }, [drag, resizing, scrubState.isScrubbing, setBoxSelection, setClips, setResizingHeader]);
 
   const onRulerDown = useCallback((e: React.MouseEvent) => {
     if (e.button !== 0) return;
@@ -1638,6 +1667,20 @@ export const ArrangeWindow: React.FC<Props> = (props) => {
         ref={timelineViewportRef}
         className="relative flex-grow h-full overflow-hidden"
        >
+        {/* Auto-Punch Ghost Region */}
+        <AutoPunchGhost
+          pixelsPerSecond={pixelsPerSecond}
+          scrollX={scrollX}
+          viewportWidth={viewportWidth}
+          timelineHeight={height - RULER_H - TIMELINE_NAVIGATOR_H}
+        />
+        {/* Comp Ghost Region (Best Take) */}
+        <CompGhost
+          pixelsPerSecond={pixelsPerSecond}
+          scrollX={scrollX}
+          viewportWidth={viewportWidth}
+          timelineHeight={height - RULER_H - TIMELINE_NAVIGATOR_H}
+        />
         <div className="absolute left-0 right-0 top-0 h-[24px] bg-glass-surface-soft border-b border-glass-border select-none backdrop-blur-lg" onMouseDown={onRulerDown}>
             <div className="relative" style={{ width: contentWidth, transform: `translateX(-${scrollX}px)` }}>
               {microGuides.map(({ x }, i) => (
@@ -1660,7 +1703,14 @@ export const ArrangeWindow: React.FC<Props> = (props) => {
             </div>
         </div>
 
-        <div className="absolute left-0 right-0" style={{ top: RULER_H, bottom: TIMELINE_NAVIGATOR_H }} onMouseDown={onBgMouseDown}>
+        {/* Flow Pulse Bar (Part B) - Heartbeat of Flow */}
+        <div className="absolute left-0 right-0" style={{ top: RULER_H, height: 14 }}>
+          <div style={{ transform: `translateX(${scrollX}px)` }}>
+            <FlowPulseBar />
+          </div>
+        </div>
+        
+        <div className="absolute left-0 right-0" style={{ top: RULER_H + 14, bottom: TIMELINE_NAVIGATOR_H }} onMouseDown={onBgMouseDown}>
             <div className="relative" style={{ width: contentWidth, transform: `translateX(-${scrollX}px)` }}>
                 {laneLayouts.map(({ track, top, laneHeight, clipHeight, isAutomationVisible, uiState, automationConfig }, index) => {
                   const automationPointsForLane = automationConfig
@@ -1668,8 +1718,25 @@ export const ArrangeWindow: React.FC<Props> = (props) => {
                     : [];
                   const feedback = alsFeedbackByTrack.get(track.id);
 
+                  // Compute stem heat for thermal glow (Part B)
+                  // Find audio buffer from clips on this track
+                  const trackClips = clips.filter(c => c.trackId === track.id);
+                  const firstClip = trackClips[0];
+                  const audioBuffer = firstClip ? (audioBuffers[firstClip.bufferId] || null) : null;
+                  const stemEnergy = computeStemEnergy(audioBuffer);
+                  const stemHeatColor = getStemHeatColor(stemEnergy);
+                  const stemHeatState = getStemHeatState(stemEnergy);
+                  
                   return (
-                    <div key={track.id} className="absolute left-0 right-0" style={{ top, height: laneHeight }}>
+                    <div 
+                      key={track.id} 
+                      className={`absolute left-0 right-0 stem-lane ${stemHeatState}`}
+                      style={{ 
+                        top, 
+                        height: laneHeight,
+                        ['--stem-heat' as any]: stemHeatColor,
+                      }}
+                    >
                       {feedback && (
                         <div
                           className="absolute left-0 right-0 top-0 h-[80px] pointer-events-none transition-opacity duration-200"
@@ -1842,16 +1909,23 @@ export const ArrangeWindow: React.FC<Props> = (props) => {
                     </div>
                   </div>
                 )}
-                 {/* --- Living Playhead --- */}
+                 {/* --- Living Playhead (Anchor-Safe) --- */}
                 {playheadVisible && (
                   <div
                     className="absolute top-0 pointer-events-none z-30"
-                    style={{ left: playheadX, height: totalLaneHeight, ...playheadStyle }}
+                    style={{ left: 0, height: totalLaneHeight, width: '100%' }}
                   >
+                    {/* Breathing Playhead (Anchor-Safe Version) */}
+                    <BreathingPlayhead 
+                      x={playheadX} 
+                      className={isPlaying ? 'active' : 'calm'}
+                    />
+                    
+                    {/* Legacy glow effects (kept for visual continuity) */}
                     <div
                       className="absolute top-0 w-[120px] h-full transition-all duration-300"
                       style={{
-                        left: '-60px',
+                        left: playheadX - 60,
                         opacity: isPlaying ? 0.7 : 0.4,
                         background: isPlaying
                           ? `radial-gradient(circle, ${hexToRgba(playheadColor?.light ?? '#67e8f9', 0.55)} 0%, transparent 70%)`

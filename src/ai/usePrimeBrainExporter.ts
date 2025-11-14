@@ -21,10 +21,42 @@ interface PendingSnapshot {
 
 const DEFAULT_INTERVAL_MS = 2000;
 const MAX_QUEUE_SIZE = 20;
+const MAX_RETRY_ATTEMPTS = 5;
+
+// Resolve debug flag from env
+const resolveDebugFlag = (): boolean => {
+  if (typeof import.meta === 'undefined') return false;
+  try {
+    const env = (import.meta as unknown as { env?: Record<string, string | undefined> }).env;
+    return env?.VITE_PRIME_BRAIN_EXPORT_DEBUG === '1';
+  } catch {
+    return false;
+  }
+};
+
+// Resolve sample rate override from env
+const resolveSampleRateOverride = (): number | null => {
+  if (typeof import.meta === 'undefined') return null;
+  try {
+    const env = (import.meta as unknown as { env?: Record<string, string | undefined> }).env;
+    const override = env?.VITE_PRIME_BRAIN_EXPORT_SAMPLE_RATE;
+    if (override) {
+      const parsed = parseInt(override, 10);
+      if (!Number.isNaN(parsed) && parsed > 0) {
+        return parsed;
+      }
+    }
+  } catch {
+    // ignore
+  }
+  return null;
+};
 
 export function usePrimeBrainExporter(options: PrimeBrainExporterOptions) {
-  const { enabled, exportUrl, intervalMs = DEFAULT_INTERVAL_MS, snapshotInputs, debug = false } =
-    options;
+  const envDebug = resolveDebugFlag();
+  const sampleRateOverride = resolveSampleRateOverride();
+  const effectiveIntervalMs = sampleRateOverride ?? options.intervalMs ?? DEFAULT_INTERVAL_MS;
+  const { enabled, exportUrl, snapshotInputs, debug = envDebug } = options;
 
   const latestInputsRef = useRef<PrimeBrainSnapshotInputs | null>(snapshotInputs);
   const queueRef = useRef<PendingSnapshot[]>([]);
@@ -53,14 +85,21 @@ export function usePrimeBrainExporter(options: PrimeBrainExporterOptions) {
             }
           } else {
             pending.attempts += 1;
-            if (pending.attempts >= 5) {
+            if (pending.attempts >= MAX_RETRY_ATTEMPTS) {
               queueRef.current.shift();
               if (debug) {
                 console.warn(
                   '[PrimeBrain] Dropping snapshot after repeated failures',
                   pending.snapshot.snapshotId,
+                  `(${pending.attempts} attempts)`,
                 );
               }
+            } else if (debug) {
+              console.debug(
+                '[PrimeBrain] Snapshot send failed, will retry',
+                pending.snapshot.snapshotId,
+                `(attempt ${pending.attempts}/${MAX_RETRY_ATTEMPTS})`,
+              );
             }
             break;
           }
@@ -94,7 +133,20 @@ export function usePrimeBrainExporter(options: PrimeBrainExporterOptions) {
 
         queueRef.current.push({ payload, snapshot, attempts: 0 });
         if (queueRef.current.length > MAX_QUEUE_SIZE) {
-          queueRef.current.shift();
+          const dropped = queueRef.current.shift();
+          if (debug && dropped) {
+            console.warn(
+              '[PrimeBrain] Queue overflow, dropping oldest snapshot',
+              dropped.snapshot.snapshotId,
+            );
+          }
+        }
+        if (debug) {
+          console.debug(
+            '[PrimeBrain] Snapshot queued',
+            snapshot.snapshotId,
+            `(queue size: ${queueRef.current.length}/${MAX_QUEUE_SIZE})`,
+          );
         }
         void flushQueue(exportUrl);
       } catch (error) {
@@ -104,7 +156,7 @@ export function usePrimeBrainExporter(options: PrimeBrainExporterOptions) {
       }
     };
 
-    const intervalId = window.setInterval(pushSnapshot, intervalMs);
+    const intervalId = window.setInterval(pushSnapshot, effectiveIntervalMs);
     const visibilityHandler = () => {
       if (document.visibilityState === 'hidden') {
         void flushQueue(exportUrl);
@@ -135,7 +187,7 @@ export function usePrimeBrainExporter(options: PrimeBrainExporterOptions) {
       document.removeEventListener('visibilitychange', visibilityHandler);
       window.removeEventListener('beforeunload', beforeUnloadHandler);
     };
-  }, [enabled, exportUrl, intervalMs, flushQueue, debug]);
+  }, [enabled, exportUrl, effectiveIntervalMs, flushQueue, debug]);
 }
 
 async function sendSnapshot(url: string, payload: string) {

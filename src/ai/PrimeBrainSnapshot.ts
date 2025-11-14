@@ -1,5 +1,43 @@
 import { v4 as uuid } from 'uuid';
 
+/**
+ * Prime Brain Orchestration Contract
+ * 
+ * Prime Brain consumes unified Studio state snapshots and orchestrates subtle Flow behaviors.
+ * 
+ * **Inputs (per tick):**
+ * - `alsChannels`: Temperature, momentum, pressure, harmony (0-1 normalized)
+ * - `modeHints`: Transport state, armed tracks, active Bloom actions, CPU/performance
+ * - `bloomTrace`: Recent Bloom action outcomes (max 24)
+ * - `userMemory`: Recent workflow actions and recall anchors (max 10 actions)
+ * - `audioMetrics`: Latency, CPU load, dropouts, buffer size
+ * - `harmonicState`: Key, scale, consonance, tension, velocity energy
+ * - `aiAnalysisFlags`: Mix warnings, performance issues, ingest status
+ * - `transport`: Playback state, tempo, playhead, loop range
+ * 
+ * **Outputs (authoritative vs advisory):**
+ * - **Authoritative:**
+ *   - ALS bar mode, health, channels, guidance text (via `PrimeBrainStatus`)
+ *   - Mode derivation (`passive` | `active` | `learning` | `optimizing`)
+ * 
+ * - **Advisory (never forced):**
+ *   - Bloom menu item highlighting/reordering (via `flowContext.adaptiveSuggestions`)
+ *   - Timeline tool highlighting (via `adaptiveSuggestions.highlightTools`)
+ *   - View switch suggestions (via `adaptiveSuggestions.suggestViewSwitch`)
+ *   - UI density hints (`minimal` | `normal` | `rich`)
+ * 
+ * **Mode Behavior:**
+ * - `passive`: Minimal visual nudges; ALS bar is quiet indicator
+ * - `active`: Focused hints tied to recent actions
+ * - `learning`: Stronger cues around recording/performance, still non-blocking
+ * - `optimizing`: Performance-focused guidance, critical issue warnings
+ * 
+ * **Privacy & Redaction:**
+ * - All snapshots respect ALS Privacy Guard (no raw clip names, filenames, user identifiers)
+ * - Export requires explicit consent (`VITE_SESSION_PROBE_ALLOW_EXPORT=1`)
+ * - User memory uses neutral descriptors and IDs only
+ */
+
 export type PrimeBrainMode = 'passive' | 'active' | 'learning' | 'optimizing';
 
 export type PrimeBrainALSChannel = 'temperature' | 'momentum' | 'pressure' | 'harmony';

@@ -1,4 +1,5 @@
 import { useCallback, useEffect, useRef } from "react";
+import { recordZoomEvent } from "../core/loop/flowLoopEvents";
 
 interface TimelineInteractionsArgs {
   scrollX: number;
@@ -213,6 +214,11 @@ export function useTimelineInteractions({
         const anchorX = event.clientX - node.getBoundingClientRect().left;
         const factor = direction > 0 ? 1.1 : 1 / 1.1;
         zoomAroundPoint(factor, anchorX);
+        // Record zoom event for Flow Loop
+        const currentPps = getPixelsPerSecond();
+        const zoomDelta = factor;
+        const zoomPos = (scrollX + anchorX) / currentPps;
+        recordZoomEvent(zoomDelta, zoomPos);
         return;
       }
       handleWheel(event);
@@ -221,7 +227,7 @@ export function useTimelineInteractions({
     return () => {
       node.removeEventListener("wheel", wheelHandler);
     };
-  }, [handleWheel, viewportRef, zoomAroundPoint]);
+  }, [handleWheel, viewportRef, zoomAroundPoint, getPixelsPerSecond, scrollX]);
 
   useEffect(() => {
     return () => {

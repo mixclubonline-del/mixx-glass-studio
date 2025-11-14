@@ -9,6 +9,7 @@ import type { BloomActionMeta } from '../../types/bloom';
 import type { PrimeBrainStatus } from '../../types/primeBrainStatus';
 import type { TranslationProfileKey, TranslationProfileInfo, CalibrationPreset } from '../../audio/TranslationMatrix';
 import type { IngestJobSnapshot } from '../../ingest/IngestQueueManager';
+import './ArrangeBloomStrip.css';
 
 type ImportProgressLike = {
     id: string;
@@ -756,11 +757,9 @@ export const BloomDock: React.FC<BloomDockProps> = (props) => {
     return (
         <div
             ref={containerRef}
-            className="fixed z-40 pointer-events-none select-none"
+            className="arrange-bloom-fixed pointer-events-none select-none"
             style={{
-                left: position.x,
-                top: position.y,
-                transition: isDragging ? 'none' : 'left 0.2s ease, top 0.2s ease',
+                transition: isDragging ? 'none' : 'transform 0.2s ease, opacity 0.2s ease',
             }}
         >
             <div

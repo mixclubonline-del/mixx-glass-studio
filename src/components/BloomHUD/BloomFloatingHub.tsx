@@ -2,6 +2,13 @@ import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { hexToRgba } from '../../utils/ALS';
 import { useFlowContext } from '../../state/flowContextService';
 import type { PulsePalette } from '../../utils/ALS';
+import {
+  bloomChargeFromFlow,
+  getBloomScale,
+  getBloomGlow,
+  getBloomColor,
+} from '../../core/bloom/bloomCharge';
+import './BloomHUD.css';
 
 export interface BloomFloatingMenuItem {
   name: string;
@@ -149,13 +156,35 @@ export const BloomFloatingHub: React.FC<BloomFloatingHubProps> = ({
     [haloColor, pulseStrength]
   );
 
+  // Dynamic Bloom Charge (Part D)
+  const bloomCharge = useMemo(() => {
+    if (typeof window === 'undefined' || !window.__als) {
+      return 0.5; // Default charge
+    }
+    const flow = window.__als.flow || 0;
+    const temp = (window.__als.temperature || 'cold') as any;
+    return bloomChargeFromFlow(flow, temp);
+  }, [flowContext, isOpen]);
+  
+  const bloomScale = useMemo(() => getBloomScale(bloomCharge), [bloomCharge]);
+  const bloomGlowRadius = useMemo(() => getBloomGlow(bloomCharge), [bloomCharge]);
+  const bloomChargeColor = useMemo(() => {
+    if (typeof window === 'undefined' || !window.__als) {
+      return flowGlowColor;
+    }
+    const temp = (window.__als.temperature || 'cold') as any;
+    return getBloomColor(bloomCharge, temp);
+  }, [bloomCharge, flowGlowColor]);
+  
   const containerGlow = useMemo(
     () => ({
-      boxShadow: `0 0 ${42 + pulseStrength * 40}px ${flowGlowColor}, inset 0 0 ${
+      boxShadow: `0 0 ${bloomGlowRadius}px ${bloomChargeColor}, inset 0 0 ${
         24 + pulseStrength * 26
       }px ${hexToRgba(FLOW_ACCENT, 0.28)}, 0 0 ${110 + pulseStrength * 70}px ${flowHaloColor}`,
+      transform: `scale(${bloomScale})`,
+      transition: 'transform 0.3s ease-out, box-shadow 0.3s ease-out',
     }),
-    [flowGlowColor, flowHaloColor, pulseStrength]
+    [bloomChargeColor, flowHaloColor, pulseStrength, bloomGlowRadius, bloomScale]
   );
 
   const scheduleAnimation = useCallback(() => {
@@ -393,11 +422,7 @@ useEffect(() => {
   return (
     <div
       ref={containerRef}
-      className="fixed z-40 select-none pointer-events-none"
-      style={{
-        left: renderPosition.x,
-        top: renderPosition.y,
-      }}
+      className="bloom-hud-fixed select-none pointer-events-none"
     >
       <div className="relative flex flex-col items-end space-y-3 pointer-events-auto">
         {hoveredItem && (

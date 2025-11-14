@@ -1,0 +1,57 @@
+/**
+ * Stem Lane Heat Styles
+ * 
+ * Part B of Flow Physiology Expansion Pack.
+ * Thermal glow per lane based on stem energy.
+ */
+
+.stem-lane {
+  position: relative;
+}
+
+.stem-lane::before {
+  content: "";
+  position: absolute;
+  inset: 0;
+  background: var(--stem-heat, rgba(120, 160, 255, 0.18));
+  filter: blur(22px);
+  border-radius: 8px;
+  opacity: 0.55;
+  z-index: -1;
+  transition:
+    background 0.25s ease,
+    opacity 0.25s ease;
+  pointer-events: none;
+}
+
+/* Heat intensity variations */
+.stem-lane.cold::before {
+  opacity: 0.4;
+}
+
+.stem-lane.warming::before {
+  opacity: 0.5;
+}
+
+.stem-lane.warm::before {
+  opacity: 0.6;
+}
+
+.stem-lane.hot::before {
+  opacity: 0.7;
+}
+
+.stem-lane.blazing::before {
+  opacity: 0.8;
+  animation: stem-heat-pulse 2s ease-in-out infinite;
+}
+
+@keyframes stem-heat-pulse {
+  0%, 100% {
+    opacity: 0.8;
+  }
+  50% {
+    opacity: 0.95;
+  }
+}
+
