@@ -93,6 +93,7 @@ import IngestQueueManager, {
 import StemSeparationIntegration from './audio/StemSeparationIntegration';
 import StemSeparationModal from './components/modals/StemSeparationModal';
 import { FileInput } from './components/import/FileInput';
+import { useTimelineStore } from './state/timelineStore';
 import TrackCapsule from './components/TrackCapsule';
 import PianoRollPanel from './components/piano/PianoRollPanel';
 import { ingestHistoryStore, IngestHistoryEntry } from './state/ingestHistory';
@@ -5119,10 +5120,23 @@ const FlowRuntime: React.FC<FlowRuntimeProps> = ({ arrangeFocusToken }) => {
     // --- Dynamic Audio Routing (Inserts based, Including Mic Input) ---
     useEffect(() => {
         const ctx = audioContextRef.current;
-        if (!ctx || !masterNodesRef.current) return;
+        if (!ctx) {
+          console.warn('[MIXER] Audio context not available');
+          return;
+        }
+        
+        if (!masterNodesRef.current) {
+          console.warn('[MIXER] Master chain not initialized, cannot route tracks');
+          return;
+        }
 
         console.log(">>> Rebuilding audio routing graph (Inserts-based)...");
         const masterInput = masterNodesRef.current.input;
+        
+        if (!masterInput) {
+          console.error('[MIXER] Master input node not found in master chain');
+          return;
+        }
 
         // Clear ALL existing connections to prevent doubling or stale paths
         Object.values(trackNodesRef.current).forEach(node => { 
@@ -5180,7 +5194,21 @@ const FlowRuntime: React.FC<FlowRuntimeProps> = ({ arrangeFocusToken }) => {
 
         // Post-inserts: connect to analyser for monitoring and then to master
         currentOutput.connect(trackNodes.analyser);
-        currentOutput.connect(masterInput);
+        
+        // Connect to master input (verify master chain is initialized)
+        if (masterInput) {
+          currentOutput.connect(masterInput);
+          if ((import.meta as any).env?.DEV && track.id === tracks[0]?.id) {
+            console.log('[MIXER] Track connected to master:', {
+              trackId: track.id,
+              trackName: track.trackName,
+              masterInputExists: !!masterInput,
+              insertsCount: trackInserts.length,
+            });
+          }
+        } else {
+          console.warn('[MIXER] Master input not available, track not connected:', track.id);
+        }
     });
 
 }, [tracks, armedTracks, pluginRegistry]);
@@ -6777,9 +6805,65 @@ const FlowRuntime: React.FC<FlowRuntimeProps> = ({ arrangeFocusToken }) => {
           accept=".json,.wav,.aiff,.aif,.mp3,.flac,.ogg,.m4a,.aac,audio/*"
           multiple
           onImportComplete={async (result) => {
-            // Flow import complete - add tracks and clips to timeline
+            // Flow import complete - sync Zustand state to React state
             try {
-              // Convert TrackConfig to TrackData and create clips
+              // FLOW GOLDEN PATH: Read from Zustand store (source of truth)
+              const zustandState = useTimelineStore.getState();
+              const zustandTracks = zustandState.getTracks();
+              const zustandClips = zustandState.getClips();
+              const zustandBuffers = zustandState.getAudioBuffers();
+              
+              // Sync Zustand tracks/clips to React state
+              if (zustandTracks.length > 0 || zustandClips.length > 0) {
+                console.log('[FLOW IMPORT] Syncing Zustand to React state:', {
+                  tracks: zustandTracks.length,
+                  clips: zustandClips.length,
+                  buffers: Object.keys(zustandBuffers).length,
+                });
+                
+                // Update React state from Zustand
+                setTracks(zustandTracks);
+                setClips(zustandClips);
+                setAudioBuffers(zustandBuffers);
+                
+                // Initialize mixer settings for new tracks from Zustand
+                setMixerSettings(prev => {
+                  const next = { ...prev };
+                  zustandTracks.forEach(track => {
+                    if (!next[track.id]) {
+                      next[track.id] = { volume: 0.75, pan: 0, isMuted: false };
+                    }
+                  });
+                  return next;
+                });
+                
+                // Initialize inserts for new tracks
+                setInserts(prev => {
+                  const updated = { ...prev };
+                  zustandTracks.forEach(track => {
+                    if (!updated[track.id]) {
+                      updated[track.id] = [];
+                    }
+                  });
+                  return updated;
+                });
+                
+                // Initialize send levels for new tracks
+                setTrackSendLevels(prev => {
+                  const updated = { ...prev };
+                  zustandTracks.forEach(track => {
+                    if (!updated[track.id]) {
+                      updated[track.id] = createDefaultSendLevels(track);
+                    }
+                  });
+                  return updated;
+                });
+                
+                console.log('[FLOW IMPORT] React state synced from Zustand');
+                return; // Early return - Zustand is source of truth
+              }
+              
+              // Fallback: Convert TrackConfig to TrackData (legacy path)
               const newTracks: TrackData[] = [];
               const newClips: ArrangeClip[] = [];
               const newBuffers: Record<string, AudioBuffer> = {};
@@ -6880,16 +6964,22 @@ const FlowRuntime: React.FC<FlowRuntimeProps> = ({ arrangeFocusToken }) => {
                 newClips.push(clip);
               });
               
-              // Add tracks to state
-              setTracks(prev => [...prev, ...newTracks]);
+              // CRITICAL: Batch all state updates together to ensure React sees the changes
+              // This ensures ArrangeWindow re-renders with all new data at once
               
-              // Add clips to state
-              setClips(prev => [...prev, ...newClips]);
+              console.log('[FLOW IMPORT] Before state update:', {
+                currentTracksCount: tracks.length,
+                currentClipsCount: clips.length,
+                newTracksCount: newTracks.length,
+                newClipsCount: newClips.length,
+                newTrackIds: newTracks.map(t => t.id),
+                newClipTrackIds: newClips.map(c => c.trackId),
+                newClipIds: newClips.map(c => c.id),
+                bufferIds: Object.keys(newBuffers),
+              });
               
-              // Store audio buffers
-              setAudioBuffers(prev => ({ ...prev, ...newBuffers }));
-              
-              // Initialize mixer settings for new tracks
+              // CRITICAL: Initialize mixer settings FIRST before adding tracks
+              // This prevents ArrangeTrackHeader from receiving undefined mixerSettings
               setMixerSettings(prev => {
                 const next = { ...prev };
                 newTracks.forEach(track => {
@@ -6897,7 +6987,59 @@ const FlowRuntime: React.FC<FlowRuntimeProps> = ({ arrangeFocusToken }) => {
                     next[track.id] = { volume: 0.75, pan: 0, isMuted: false };
                   }
                 });
+                console.log('[FLOW IMPORT] Mixer settings initialized for tracks:', {
+                  trackIds: newTracks.map(t => t.id),
+                });
                 return next;
+              });
+              
+              // React 18+ automatically batches these, but we ensure immutability
+              // Add tracks to state (immutable update - new array reference)
+              setTracks(prev => {
+                const updated = [...prev, ...newTracks];
+                console.log('[FLOW IMPORT] setTracks called:', {
+                  prevCount: prev.length,
+                  newCount: updated.length,
+                  allTrackIds: updated.map(t => t.id),
+                });
+                return updated;
+              });
+              
+              // Add clips to state (immutable update - new array reference)
+              setClips(prev => {
+                const updated = [...prev, ...newClips];
+                console.log('[FLOW IMPORT] setClips called:', {
+                  prevCount: prev.length,
+                  newCount: updated.length,
+                  allClipIds: updated.map(c => c.id),
+                  allClipTrackIds: updated.map(c => c.trackId),
+                });
+                return updated;
+              });
+              
+              // Store audio buffers (immutable update - new object reference)
+              setAudioBuffers(prev => {
+                const updated = { ...prev, ...newBuffers };
+                console.log('[FLOW IMPORT] setAudioBuffers called:', {
+                  prevCount: Object.keys(prev).length,
+                  newCount: Object.keys(updated).length,
+                  bufferIds: Object.keys(newBuffers),
+                });
+                return updated;
+              });
+              
+              // Log for debugging - this confirms state updates are firing
+              console.log('[FLOW IMPORT] State hydration complete - all updates queued');
+              
+              // Force a microtask delay to ensure React has processed state updates
+              // This guarantees ArrangeWindow receives the new props
+              await new Promise(resolve => setTimeout(resolve, 100));
+              
+              // Verify state was actually updated
+              console.log('[FLOW IMPORT] After state update delay:', {
+                tracksState: tracks.length,
+                clipsState: clips.length,
+                note: 'These may still show old values due to closure - check ArrangeWindow props',
               });
               
               // Initialize inserts for new tracks

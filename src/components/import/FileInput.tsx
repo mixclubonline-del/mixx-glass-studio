@@ -18,16 +18,17 @@
 import React, { useRef, forwardRef, useImperativeHandle, useState, useEffect } from 'react';
 import { prepAudioFile, normalizeBuffer } from '../../core/import/filePrep';
 import { classifyAudio } from '../../core/import/classifier';
-import { stemSplitEngine, determineOptimalMode } from '../../core/import/stemEngine';
+import { stemSplitEngine, determineOptimalMode, type StemResult } from '../../core/import/stemEngine';
 import { analyzeTiming } from '../../core/import/analysis';
 import { assembleMetadata } from '../../core/import/metadata';
-import { buildTracks, prepareTracksForFlow } from '../../core/import/trackBuilder';
+import { buildAndHydrateFromStem } from '../../core/import/trackBuilder';
+import { useTimelineStore } from '../../state/timelineStore';
+import type { StemMetadata } from '../../core/import/metadata';
+import type { AudioClassification } from '../../core/import/classifier';
 import { computeFlowPulse } from '../../core/pulse/flowPulseEngine';
 import { syncALSToPulseResult, syncALSToPulse, updateGlobalALS } from '../../core/als/alsSync';
 import { ImportInspector, type ImportStep } from './ImportInspector';
-import type { StemMetadata } from '../../core/import/metadata';
 import type { FlowPulseResult } from '../../core/pulse/flowPulseEngine';
-import type { TrackConfig } from '../../core/import/trackBuilder';
 
 declare global {
   interface Window {
@@ -79,6 +80,8 @@ interface FileInputProps {
   onImportComplete?: (result: {
     tracks: TrackConfig[];
     metadata: StemMetadata;
+    stems?: StemResult;
+    audioBuffers?: Record<string, AudioBuffer>;
   }) => void;
   accept?: string;
   multiple?: boolean;
@@ -277,6 +280,70 @@ export const FileInput = forwardRef<FileInputHandle, FileInputProps>(({
         audioBuffer // Pass main buffer for Layer 4 intelligence analysis
       );
       
+      // FLOW GOLDEN PATH: Hydrate stems to timeline with full Flow intelligence
+      // This happens AFTER metadata is assembled so we have punch zones, harmonics, headroom
+      function hydrateStemsToTimeline(
+        stems: Record<string, AudioBuffer | null>,
+        metadata: StemMetadata,
+        classification: AudioClassification,
+        sampleRate: number,
+        durationMs: number,
+        channels: number,
+        format?: string
+      ) {
+        const entries = Object.entries(stems);
+        const hydratedTrackIds: string[] = [];
+        
+        entries.forEach(([stemName, buffer], index) => {
+          if (!buffer) return;
+          
+          // Map stem name to role
+          const role = classification.type;
+          
+          const result = buildAndHydrateFromStem({
+            name: stemName,
+            role,
+            color: undefined,        // optional – auto-color will handle it
+            audioBuffer: buffer,
+            durationMs,
+            sampleRate,
+            channels,
+            format,
+            metadata,
+            index,
+          });
+          
+          hydratedTrackIds.push(result.trackId);
+        });
+        
+        if ((import.meta as any).env?.DEV) {
+          console.log('[FLOW IMPORT] Zustand hydration complete with Flow intelligence:', {
+            trackIds: hydratedTrackIds,
+            stemsHydrated: entries.filter(([_, b]) => b !== null).length,
+            metadata: {
+              bpm: metadata.bpm,
+              key: metadata.key,
+              punchZones: metadata.punchZones.length,
+              headroom: metadata.headroom,
+              harmonics: metadata.harmonics.length > 0,
+            },
+          });
+        }
+        
+        return hydratedTrackIds;
+      }
+      
+      // Hydrate all stems with full Flow intelligence
+      const hydratedTrackIds = hydrateStemsToTimeline(
+        stems,
+        metadata,
+        classification,
+        info.sampleRate,
+        info.duration,
+        info.channels,
+        info.format
+      );
+      
       // Compute Flow Pulse (Layer 5)
       const pulseResult = computeFlowPulse(audioBuffer, metadata);
       setFlowPulse(pulseResult);
@@ -310,8 +377,8 @@ export const FileInput = forwardRef<FileInputHandle, FileInputProps>(({
         }
       }, 30); // Update every 30ms for smooth animation
       
-      let tracks = buildTracks(stems, metadata, classification);
-      tracks = prepareTracksForFlow(tracks);
+      // Tracks are already hydrated via buildAndHydrateFromStem above
+      // No need to build tracks again - they're in Zustand
       markStepDone(3);
       await new Promise(resolve => setTimeout(resolve, 150)); // Breathing delay
       
@@ -330,17 +397,31 @@ export const FileInput = forwardRef<FileInputHandle, FileInputProps>(({
       }
       
       // Load tracks into session (if session API exists)
+      // Note: Tracks are already in Zustand, but we can sync to session API if needed
       if (typeof window !== 'undefined' && window.__mixx_session) {
-        tracks.forEach(trackConfig => {
-          const track = window.__mixx_session!.addTrack(trackConfig);
+        const zustandTracks = useTimelineStore.getState().getTracks();
+        const zustandClips = useTimelineStore.getState().getClips();
+        const zustandBuffers = useTimelineStore.getState().getAudioBuffers();
+        
+        zustandTracks.forEach(track => {
+          const clip = zustandClips.find(c => c.trackId === track.id);
+          const buffer = clip ? zustandBuffers[clip.bufferId] : null;
           
-          // Auto-insert timeline clip
-          window.__mixx_session!.addClip({
-            trackId: track.id,
-            buffer: trackConfig.buffer,
-            start: 0,
-            metadata,
-          });
+          if (buffer && window.__mixx_session) {
+            const sessionTrack = window.__mixx_session.addTrack({
+              name: track.trackName,
+              buffer,
+              metadata,
+            } as any);
+            
+            // Auto-insert timeline clip
+            window.__mixx_session.addClip({
+              trackId: sessionTrack.id,
+              buffer,
+              start: 0,
+              metadata,
+            });
+          }
         });
       }
       
@@ -416,9 +497,35 @@ export const FileInput = forwardRef<FileInputHandle, FileInputProps>(({
         });
       }
       
-      // Call completion callback
+      // Call completion callback with full result including stems
       if (onImportComplete) {
-        onImportComplete({ tracks, metadata });
+        // Get tracks and buffers from Zustand for callback
+        const zustandTracks = useTimelineStore.getState().getTracks();
+        const zustandClips = useTimelineStore.getState().getClips();
+        const zustandBuffers = useTimelineStore.getState().getAudioBuffers();
+        
+        // Convert Zustand tracks to TrackConfig format for compatibility
+        const trackConfigs = zustandTracks.map(track => {
+          const clip = zustandClips.find(c => c.trackId === track.id);
+          const buffer = clip ? zustandBuffers[clip.bufferId] : null;
+          
+          return {
+            name: track.trackName,
+            type: 'other' as const,
+            buffer: buffer || audioBuffer, // Fallback to main buffer
+            metadata,
+            readyForPunch: track.group === 'Vocals',
+            readyForComp: track.group === 'Vocals',
+            color: track.trackColor,
+          };
+        });
+        
+        onImportComplete({ 
+          tracks: trackConfigs, 
+          metadata,
+          stems, // Include stems for direct hydration
+          audioBuffers: zustandBuffers, // Include buffers from Zustand
+        });
       }
       
       // Reset input for next import

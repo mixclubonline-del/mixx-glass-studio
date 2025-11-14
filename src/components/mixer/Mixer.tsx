@@ -21,6 +21,7 @@ import {
   MIXER_HUD_OFFSET,
   MIXER_MASTER_PADDING,
   MIXER_METER_HEIGHT_RATIO,
+  MIXER_MASTER_METER_HEIGHT_RATIO,
   MIXER_STRIP_WIDTH,
 } from './mixerConstants';
 import {
@@ -110,6 +111,7 @@ const computeStageHeights = () => {
   return {
     stageHeight,
     meterHeight: Math.round(stageHeight * MIXER_METER_HEIGHT_RATIO),
+    masterMeterHeight: Math.round(stageHeight * MIXER_MASTER_METER_HEIGHT_RATIO),
     faderHeight: Math.round(stageHeight * MIXER_FADER_HEIGHT_RATIO),
   };
 };
@@ -329,7 +331,7 @@ const FlowConsole: React.FC<FlowConsoleProps> = ({
                 onBalanceChange={onBalanceChange}
                 analysis={masterAnalysis}
                 stageHeight={stageHeights.stageHeight}
-                meterHeight={stageHeights.meterHeight}
+                meterHeight={stageHeights.masterMeterHeight || stageHeights.meterHeight}
                 faderHeight={stageHeights.faderHeight}
               />
             </div>

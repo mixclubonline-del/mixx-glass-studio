@@ -10,7 +10,7 @@ type ArrangeTrackHeaderProps = {
   uiState: TrackUIState;
   selectedTrackId: string | null;
   onSelectTrack: (trackId: string | null) => void;
-  mixerSettings: MixerSettings;
+  mixerSettings: MixerSettings | undefined;
   isArmed: boolean;
   isSoloed: boolean;
   alsIntensity?: number;
@@ -53,8 +53,10 @@ const ArrangeTrackHeader: React.FC<ArrangeTrackHeaderProps> = ({
 
   const isSelected = selectedTrackId === track.id;
   const collapsed = uiState.collapsed;
-  const volume = typeof mixerSettings.volume === 'number' ? mixerSettings.volume : 0.75;
-  const pan = typeof mixerSettings.pan === 'number' ? mixerSettings.pan : 0;
+  // Safe access to mixerSettings with fallback defaults
+  const volume = mixerSettings?.volume ?? 0.75;
+  const pan = mixerSettings?.pan ?? 0;
+  const isMuted = mixerSettings?.isMuted ?? false;
 
   const rootStyle: React.CSSProperties = {
     borderLeft: `4px solid ${hexToRgba(glowColor, 0.85)}`,
@@ -76,7 +78,7 @@ const ArrangeTrackHeader: React.FC<ArrangeTrackHeaderProps> = ({
   }
 
   const statusChips = [
-    mixerSettings.isMuted
+    isMuted
       ? { label: 'Mute', accent: '#f87171', description: 'Track is muted from mix bus.' }
       : null,
     isSoloed ? { label: 'Solo', accent: '#fde047', description: 'Solo isolating this lane.' } : null,

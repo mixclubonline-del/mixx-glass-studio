@@ -20,6 +20,7 @@ import { detectKey } from './key';
 import { detectTransients } from './transients';
 import { harmonicFingerprint } from './harmonics';
 import { computeHeadroom } from './headroom';
+import { predictPunchZones } from './analysis';
 import type { AudioClassification } from './classifier';
 import type { TimingAnalysis } from './analysis';
 
@@ -88,7 +89,6 @@ export function assembleMetadata(
     (availableStems.length > 0 ? stems[availableStems[0]] : null);
   
   // Predict punch zones based on BPM
-  const { predictPunchZones } = require('./analysis');
   const punchZones = predictPunchZones(analysis.bpm);
   
   // Layer 4 Intelligence Analysis

@@ -72,6 +72,12 @@ export async function stemSplitEngine(
       sampleRate
     );
     
+    // Ensure context is in 'suspended' state before rendering
+    if (offline.state === 'closed') {
+      console.warn('[FLOW IMPORT] OfflineAudioContext was closed, returning original buffer');
+      return audioBuffer;
+    }
+    
     const src = offline.createBufferSource();
     src.buffer = audioBuffer;
     
@@ -86,7 +92,14 @@ export async function stemSplitEngine(
     
     // Add timeout protection with cancellation
     let timeoutId: ReturnType<typeof setTimeout> | null = null;
-    const renderPromise = offline.startRendering();
+    const renderPromise = offline.startRendering().catch((error) => {
+      // If context is stopped/closed, return original buffer
+      if (offline.state === 'closed' || offline.state === 'suspended') {
+        console.warn('[FLOW IMPORT] OfflineAudioContext in invalid state for rendering:', offline.state);
+        return audioBuffer;
+      }
+      throw error;
+    });
     const timeoutPromise = new Promise<AudioBuffer>((_, reject) => {
       timeoutId = setTimeout(() => {
         reject(new Error(`Stem separation timeout after ${timeoutMs}ms (file may be too large)`));
