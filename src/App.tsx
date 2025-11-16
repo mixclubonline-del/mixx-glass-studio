@@ -4941,6 +4941,12 @@ const FlowRuntime: React.FC<FlowRuntimeProps> = ({ arrangeFocusToken }) => {
             }
           });
           stemIntegrationRef.current = integration;
+          // Pre-warm stem model worker immediately
+          try {
+            integration.prewarm();
+          } catch (err) {
+            console.warn('[STEMS] prewarm not available', err);
+          }
         }
     };
     setupAudio();

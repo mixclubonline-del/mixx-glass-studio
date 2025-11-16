@@ -54,6 +54,19 @@ class StemSeparationEngine {
     this.initializeWorker();
   }
 
+  prewarm() {
+    try {
+      if (this.processingWorker) {
+        // eslint-disable-next-line no-console
+        console.log('[STEMS] INIT_MODEL → worker pre-warm');
+        this.processingWorker.postMessage({ type: 'INIT_MODEL' });
+      }
+    } catch (err) {
+      // eslint-disable-next-line no-console
+      console.warn('[STEMS] prewarm failed', err);
+    }
+  }
+
   private async ensureInit() {
     if (this.initialized) return;
     try {
