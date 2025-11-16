@@ -2,7 +2,7 @@
  * Audio Test Loader - Quick test component for loading and playing sample audio
  */
 
-import { useState, useRef } from 'react';
+import { useState, useRef, useEffect } from 'react';
 import { Button } from '@/components/ui/button';
 import { Card } from '@/components/ui/card';
 import { Label } from '@/components/ui/label';
@@ -15,8 +15,10 @@ export const AudioTestLoader = () => {
   const { audioEngine, transport, play, pause, stop, masterVolume, setMasterVolume } = useProject();
   const { toast } = useToast();
   const fileInputRef = useRef<HTMLInputElement>(null);
+  const canvasRef = useRef<HTMLCanvasElement>(null);
   const [loadedFiles, setLoadedFiles] = useState<string[]>([]);
   const [isLoading, setIsLoading] = useState(false);
+  const [currentBuffer, setCurrentBuffer] = useState<AudioBuffer | null>(null);
 
   const handleLoadFile = async (file: File) => {
     if (!audioEngine) return;
@@ -34,6 +36,7 @@ export const AudioTestLoader = () => {
       
       if (loadedTrack?.buffer) {
         setLoadedFiles(prev => [...prev, `${file.name} (${loadedTrack.buffer!.duration.toFixed(2)}s)`]);
+        setCurrentBuffer(loadedTrack.buffer);
         
         toast({
           title: "✅ Audio Loaded",
@@ -101,6 +104,62 @@ export const AudioTestLoader = () => {
     console.log(`🎵 Test: Master volume set to ${(value * 100).toFixed(0)}%`);
   };
 
+  // Draw waveform when buffer changes
+  useEffect(() => {
+    if (!canvasRef.current || !currentBuffer) return;
+
+    const canvas = canvasRef.current;
+    const ctx = canvas.getContext('2d');
+    if (!ctx) return;
+
+    // Set canvas size
+    const dpr = window.devicePixelRatio || 1;
+    const rect = canvas.getBoundingClientRect();
+    canvas.width = rect.width * dpr;
+    canvas.height = rect.height * dpr;
+    ctx.scale(dpr, dpr);
+
+    // Clear canvas
+    ctx.clearRect(0, 0, rect.width, rect.height);
+
+    // Get audio data from first channel
+    const channelData = currentBuffer.getChannelData(0);
+    const step = Math.ceil(channelData.length / rect.width);
+    const amp = rect.height / 2;
+
+    // Create gradient
+    const gradient = ctx.createLinearGradient(0, 0, 0, rect.height);
+    gradient.addColorStop(0, 'hsl(var(--prime))');
+    gradient.addColorStop(0.5, 'hsl(var(--prime-glow))');
+    gradient.addColorStop(1, 'hsl(var(--prime))');
+
+    ctx.fillStyle = gradient;
+    ctx.strokeStyle = 'hsl(var(--prime))';
+    ctx.lineWidth = 1;
+
+    // Draw waveform
+    ctx.beginPath();
+    ctx.moveTo(0, amp);
+
+    for (let i = 0; i < rect.width; i++) {
+      let min = 1.0;
+      let max = -1.0;
+
+      for (let j = 0; j < step; j++) {
+        const datum = channelData[(i * step) + j];
+        if (datum < min) min = datum;
+        if (datum > max) max = datum;
+      }
+
+      const yMin = (1 + min) * amp;
+      const yMax = (1 + max) * amp;
+
+      ctx.fillRect(i, yMin, 1, yMax - yMin);
+    }
+
+    ctx.stroke();
+  }, [currentBuffer]);
+
   return (
     <Card className="glass p-6 space-y-4 border-prime/20">
       <div className="flex items-center justify-between">
@@ -131,6 +190,20 @@ export const AudioTestLoader = () => {
         <Upload size={16} className="mr-2" />
         {isLoading ? 'Loading...' : 'Load Test Audio'}
       </Button>
+
+      {/* Waveform Display */}
+      {currentBuffer && (
+        <div className="space-y-2">
+          <Label className="text-xs text-muted-foreground">Waveform</Label>
+          <div className="glass-inset rounded overflow-hidden">
+            <canvas
+              ref={canvasRef}
+              className="w-full h-24"
+              style={{ display: 'block' }}
+            />
+          </div>
+        </div>
+      )}
 
       {/* Loaded Files List */}
       {loadedFiles.length > 0 && (
