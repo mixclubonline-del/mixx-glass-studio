@@ -23,6 +23,35 @@ import {
   type StemImportPayload,
 } from './trackBuilder';
 
+/**
+ * Sanitize stems to avoid discarding very quiet content.
+ * Keeps low-level stems instead of nulling them out.
+ */
+function sanitizeStem(name: string, buffer: AudioBuffer | null): AudioBuffer | null {
+  if (!buffer) {
+    console.warn('[FLOW IMPORT] Empty stem buffer:', name);
+    return null;
+  }
+  if (buffer.length === 0) {
+    console.warn('[FLOW IMPORT] Zero-length stem buffer:', name);
+    return null;
+  }
+  // Compute peak on first channel (fast heuristic)
+  const channelData = buffer.getChannelData(0);
+  let peak = 0;
+  for (let i = 0; i < channelData.length; i += 1) {
+    const v = Math.abs(channelData[i]);
+    if (v > peak) peak = v;
+  }
+  // Old thresholds may have been too high; keep quiet stems
+  const MIN_PEAK = 0.00001;
+  if (peak < MIN_PEAK) {
+    console.warn('[FLOW IMPORT] Stem too quiet, but keeping:', name, 'peak=', peak.toExponential(2));
+    return buffer;
+  }
+  return buffer;
+}
+
 export interface FlowImportResult {
   classification: AudioClassification;
   timing: TimingAnalysis;
@@ -54,13 +83,13 @@ export async function runFlowStemPipeline(
   
   // Convert StemResult to Record<string, AudioBuffer | null>
   const stems: Record<string, AudioBuffer | null> = {
-    vocals: stemResult.vocals,
-    drums: stemResult.drums,
-    bass: stemResult.bass,
-    music: stemResult.music,
-    perc: stemResult.perc,
-    harmonic: stemResult.harmonic,
-    sub: stemResult.sub,
+    vocals: sanitizeStem('vocals', stemResult.vocals),
+    drums: sanitizeStem('drums', stemResult.drums),
+    bass: sanitizeStem('bass', stemResult.bass),
+    music: sanitizeStem('music', stemResult.music),
+    perc: sanitizeStem('perc', stemResult.perc),
+    harmonic: sanitizeStem('harmonic', stemResult.harmonic),
+    sub: sanitizeStem('sub', stemResult.sub),
   };
   
   console.log('[FLOW IMPORT] Stem separation result:', {
