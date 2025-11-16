@@ -317,7 +317,8 @@ class StemSeparationEngine {
       other[i] = this.clamp(sample - bass[i] - drums[i] - vocals[i], -1, 1);
     }
 
-    const output: Float32Array[] = [bass, drums, vocals, other];
+    // Order must match convertToAudioBuffers mapping: [vocals, drums, bass, other, (guitar), (piano)]
+    const output: Float32Array[] = [vocals, drums, bass, other];
 
     if (stemCount > 4) {
       const guitar = new Float32Array(length);
