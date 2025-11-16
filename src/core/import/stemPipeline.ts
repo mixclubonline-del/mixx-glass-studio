@@ -18,6 +18,8 @@ import { classifyAudio, type AudioClassification } from './classifier';
 import { stemSplitEngine, determineOptimalMode, type StemResult } from './stemEngine';
 import { analyzeTiming, type TimingAnalysis } from './analysis';
 import { assembleMetadata, type StemMetadata } from './metadata';
+import { ensureStemTrackLayout, STEM_ORDER, stemTrackIdFor } from '../tracks/stemLayout';
+import { useTimelineStore } from '../../state/timelineStore';
 import {
   buildAndHydrateFromStem,
   type StemImportPayload,
@@ -86,11 +88,14 @@ export async function runFlowStemPipeline(
     vocals: sanitizeStem('vocals', stemResult.vocals),
     drums: sanitizeStem('drums', stemResult.drums),
     bass: sanitizeStem('bass', stemResult.bass),
-    music: sanitizeStem('music', stemResult.music),
     perc: sanitizeStem('perc', stemResult.perc),
     harmonic: sanitizeStem('harmonic', stemResult.harmonic),
     sub: sanitizeStem('sub', stemResult.sub),
   };
+  // Treat "music" as harmonic if provided
+  if (!stems.harmonic && stemResult.music) {
+    stems.harmonic = sanitizeStem('harmonic', stemResult.music);
+  }
   
   console.log('[FLOW IMPORT] Stem separation result:', {
     stemsCreated: Object.entries(stems).filter(([_, buf]) => buf !== null).length,
@@ -116,29 +121,39 @@ export async function runFlowStemPipeline(
     prep.audioBuffer
   );
   
-  // 6) hydrate tracks + clips into timeline
-  Object.entries(stems).forEach(([stemName, buffer], index) => {
-    if (!buffer) {
-      console.log(`[FLOW IMPORT] Skipping empty stem: ${stemName}`);
-      return;
-    }
-    
-    console.log(`[FLOW IMPORT] Hydrating stem: ${stemName} (${buffer.duration.toFixed(2)}s)`);
-    
-    const payload: StemImportPayload = {
-      name: stemName,
-      role: classification.type,
-      color: undefined,
-      audioBuffer: buffer,
-      durationMs: prep.durationMs,
-      sampleRate: prep.sampleRate,
-      channels: prep.channels,
-      format: prep.format,
-      metadata,
-      index,
-    };
-    
-    buildAndHydrateFromStem(payload);
+  // 6) Ensure deterministic stem lanes exist, then place clips on their lanes
+  ensureStemTrackLayout();
+  const { setAudioBuffer, addClip, getTracks } = useTimelineStore.getState();
+  const tracks = getTracks();
+  const validKeys = new Set<string>(STEM_ORDER as unknown as string[]);
+  let placed = 0;
+  (Object.entries(stems) as Array<[string, AudioBuffer | null]>).forEach(([stemName, buffer]) => {
+    if (!buffer) return;
+    if (!validKeys.has(stemName)) return;
+    const targetId = stemTrackIdFor(stemName as any);
+    const duration = buffer.duration;
+    const bufferId = `buffer-stem-${stemName}-${Date.now()}-${placed}`;
+    const clipId = `clip-stem-${stemName}-${Date.now()}-${placed}`;
+    placed += 1;
+    // Register buffer
+    setAudioBuffer(bufferId, buffer);
+    // Place clip aligned at start on target track
+    addClip(targetId, {
+      id: clipId,
+      trackId: targetId,
+      name: stemName.toUpperCase(),
+      color: '#ffffff',
+      start: 0,
+      duration,
+      originalDuration: duration,
+      timeStretchRate: 1.0,
+      sourceStart: 0,
+      fadeIn: 0,
+      fadeOut: 0,
+      gain: 1.0,
+      selected: false,
+      bufferId,
+    } as any);
   });
   
   return {
