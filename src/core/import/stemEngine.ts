@@ -236,60 +236,9 @@ export async function stemSplitEngine(
     }
   }
 
-  // Finalization: guarantee full-stem set where possible before pipeline placement
-  // Create simple band filters for any missing critical stems to avoid single-lane placement.
-  const ensureFiltered = async (
-    type: BiquadFilterType,
-    freq: number,
-    q: number = 0.707
-  ) => {
-    return renderPass((ctx, src) => {
-      const f = ctx.createBiquadFilter();
-      f.type = type;
-      f.frequency.value = freq;
-      f.Q.value = q;
-      src.connect(f);
-      return f;
-    });
-  };
-
-  // Vocals: mid band emphasis if AI vocal failed
-  if (!result.vocals) {
-    try {
-      // Bandpass ~ 250 Hz – 4 kHz via highpass then lowpass
-      const mid = await renderPass((ctx, src) => {
-        const hp = ctx.createBiquadFilter();
-        hp.type = 'highpass';
-        hp.frequency.value = 250;
-        const lp = ctx.createBiquadFilter();
-        lp.type = 'lowpass';
-        lp.frequency.value = 4000;
-        src.connect(hp);
-        hp.connect(lp);
-        return lp;
-      });
-      result.vocals = mid;
-    } catch {}
-  }
-
-  // Drums: use percussive or a highpass with transient bias
-  if (!result.drums) {
-    try {
-      result.drums = await ensureFiltered('highpass', 3000);
-    } catch {}
-  }
-
-  // Bass: ensure a lowpass fallback
-  if (!result.bass) {
-    try {
-      result.bass = await ensureFiltered('lowpass', 180);
-    } catch {}
-  }
-
-  // Music: ensure we have an instrumental backing
-  if (!result.music) {
-    result.music = result.harmonic ?? audioBuffer;
-  }
+  // Do not synthesize band-filter fallbacks here; return true separation results only
+  // Music fallback still defaults to harmonic/original to preserve timeline context
+  if (!result.music) result.music = result.harmonic ?? audioBuffer;
 
   return result;
 }

@@ -79,64 +79,7 @@ export async function runFlowStemPipeline(
   
   // 3) run stem separation
   const optimalMode = determineOptimalMode(classification);
-  let stemResult = await stemSplitEngine(prep.audioBuffer, optimalMode, classification);
-  
-  // Guarantee at least multiple lanes: synthesize minimal stems if engine returned too few
-  const nonNullCount = Object.values(stemResult).filter((b) => b !== null).length;
-  if (nonNullCount < 2) {
-    console.warn('[FLOW IMPORT] Few stems produced; synthesizing minimal stems for placement');
-    try {
-      const offline = new OfflineAudioContext(2, prep.audioBuffer.length, prep.sampleRate);
-      const src = offline.createBufferSource();
-      src.buffer = prep.audioBuffer;
-      
-      const low = offline.createBiquadFilter();
-      low.type = 'lowpass';
-      low.frequency.value = 240;
-      
-      const high = offline.createBiquadFilter();
-      high.type = 'highpass';
-      high.frequency.value = 3000;
-      
-      const splitGainA = offline.createGain();
-      const splitGainB = offline.createGain();
-      splitGainA.gain.value = 1;
-      splitGainB.gain.value = 1;
-      
-      src.connect(splitGainA);
-      src.connect(splitGainB);
-      splitGainA.connect(low);
-      splitGainB.connect(high);
-      
-      const merger = offline.createChannelMerger(2);
-      low.connect(merger, 0, 0);
-      high.connect(merger, 0, 1);
-      merger.connect(offline.destination);
-      
-      src.start(0);
-      const rendered = await offline.startRendering();
-      
-      // Extract channel 0/1 as separate buffers for simple stems
-      const makeMono = (channelIndex: number) => {
-        const out = new AudioBuffer({ length: rendered.length, sampleRate: rendered.sampleRate, numberOfChannels: 1 });
-        out.getChannelData(0).set(rendered.getChannelData(channelIndex));
-        return out;
-      };
-      
-      const bass = makeMono(0);
-      const drums = makeMono(1);
-      const music = prep.audioBuffer; // original as backing
-      
-      stemResult = {
-        ...stemResult,
-        bass,
-        drums,
-        music,
-      };
-    } catch (synthErr) {
-      console.warn('[FLOW IMPORT] Minimal stem synthesis failed; keeping original result', synthErr);
-    }
-  }
+  const stemResult = await stemSplitEngine(prep.audioBuffer, optimalMode, classification);
   
   // Convert StemResult to Record<string, AudioBuffer | null>
   const stems: Record<string, AudioBuffer | null> = {
