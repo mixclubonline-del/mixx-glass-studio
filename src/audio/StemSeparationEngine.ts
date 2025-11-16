@@ -43,6 +43,7 @@ class StemSeparationEngine {
   private modelLoaded = false;
   private currentModel = 'htdemucs';
   private processingWorker: Worker | null = null;
+  private initialized = false;
   private progressCallbacks: ((progress: SeparationProgress) => void)[] = [];
   private workerRequestId = 0;
   private workerResolvers = new Map<number, (value: Float32Array[]) => void>();
@@ -51,6 +52,20 @@ class StemSeparationEngine {
   constructor(audioContext: AudioContext) {
     this.audioContext = audioContext;
     this.initializeWorker();
+  }
+
+  private async ensureInit() {
+    if (this.initialized) return;
+    try {
+      await this.loadModel(this.currentModel);
+      this.initialized = true;
+      // eslint-disable-next-line no-console
+      console.log('[STEMS] Model initialized:', this.currentModel);
+    } catch (err) {
+      // eslint-disable-next-line no-console
+      console.error('[STEMS] Model load failed, continuing with fallback DSP', err);
+      this.initialized = false;
+    }
   }
 
   private initializeWorker() {
@@ -111,6 +126,7 @@ class StemSeparationEngine {
     const startTime = performance.now();
     this.notifyProgress({ phase: 'loading', progress: 10, currentStem: 'Loading model…' });
 
+    await this.ensureInit();
     const model = await this.loadModel(options.model).catch((error) => {
       console.warn('[STEMS] model load failed, using fallback filters:', error);
       return null;
