@@ -96,6 +96,36 @@ export async function runFlowStemPipeline(
   if (!stems.harmonic && stemResult.music) {
     stems.harmonic = sanitizeStem('harmonic', stemResult.music);
   }
+
+  // Debug: compute quick peaks for each stem to verify content presence
+  try {
+    const peakOf = (buf: AudioBuffer | null) => {
+      if (!buf || buf.length === 0) return 0;
+      const chan = buf.getChannelData(0);
+      const limit = Math.min(5000, chan.length);
+      let peak = 0;
+      for (let i = 0; i < limit; i += 1) {
+        const v = Math.abs(chan[i]);
+        if (v > peak) peak = v;
+      }
+      return Number(peak.toFixed(6));
+    };
+    const debugPeaks = Object.fromEntries(
+      Object.entries(stems).map(([k, v]) => [k, peakOf(v)])
+    );
+    // eslint-disable-next-line no-console
+    console.log('[DEBUG STEMS][pipeline]', debugPeaks);
+    if (typeof window !== 'undefined') {
+      (window as any).__flow_debug_last_stems = {
+        ...(window as any).__flow_debug_last_stems,
+        source: 'pipeline',
+        peaks: debugPeaks,
+        keys: Object.keys(stems),
+      };
+    }
+  } catch {
+    // ignore debug failures
+  }
   
   console.log('[FLOW IMPORT] Stem separation result:', {
     stemsCreated: Object.entries(stems).filter(([_, buf]) => buf !== null).length,

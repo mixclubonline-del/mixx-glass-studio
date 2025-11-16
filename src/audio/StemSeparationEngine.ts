@@ -148,6 +148,32 @@ class StemSeparationEngine {
       options.overlap || 0.25
     );
 
+    // Debug: peak per stem (first 5k samples) to verify non-silent outputs
+    try {
+      const peakPerStem = stems.map((arr) => {
+        if (!arr || arr.length === 0) return 0;
+        const limit = Math.min(5000, arr.length);
+        let peak = 0;
+        for (let i = 0; i < limit; i += 1) {
+          const v = Math.abs(arr[i]);
+          if (v > peak) peak = v;
+        }
+        return Number(peak.toFixed(6));
+      });
+      // eslint-disable-next-line no-console
+      console.log('[DEBUG STEMS][engine]', { model: this.currentModel, peaks: peakPerStem });
+      if (typeof window !== 'undefined') {
+        (window as any).__flow_debug_last_stems = {
+          source: 'engine',
+          model: this.currentModel,
+          peaks: peakPerStem,
+          lengths: stems.map((a) => a?.length ?? 0),
+        };
+      }
+    } catch {
+      // ignore debug failures
+    }
+
     this.notifyProgress({ phase: 'encoding', progress: 85, currentStem: 'Encoding stems…' });
     const result = await this.convertToAudioBuffers(stems, audioBuffer.sampleRate);
     result.metadata.processingTime = performance.now() - startTime;
