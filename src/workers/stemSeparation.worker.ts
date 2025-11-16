@@ -13,7 +13,7 @@
 // @ts-ignore
 // eslint-disable-next-line @typescript-eslint/ban-ts-comment
 // @ts-ignore
-import demucsWasmUrl from '../ai/models/demucs.wasm?url';
+import demucsWasmUrl from '../ai/models/fake-demucs.wasm?url';
 // @ts-ignore
 // eslint-disable-next-line @typescript-eslint/ban-ts-comment
 // @ts-ignore
@@ -68,27 +68,36 @@ function generateDSPFallback(audio: Float32Array) {
 async function loadModel() {
   if (modelReady) return;
   try {
-    if (modelConfigUrl) {
-      await fetch(modelConfigUrl).then((r) => r.ok ? r.json() : null).catch(() => null);
-    }
-    if (demucsWasmUrl) {
-      const wasmResp = await fetch(demucsWasmUrl).catch(() => null);
-      if (wasmResp) {
-        let wasmModule: WebAssembly.WebAssemblyInstantiatedSource | null = null;
-        if ((WebAssembly as any).instantiateStreaming) {
-          wasmModule = await WebAssembly.instantiateStreaming(wasmResp, {}).catch(() => null);
-        }
-        if (!wasmModule) {
-          const bytes = await wasmResp.arrayBuffer();
-          wasmModule = await WebAssembly.instantiate(bytes, {});
-        }
-        model = (wasmModule as any)?.instance?.exports ?? null;
-      }
-    }
-    modelReady = !!model;
-    (self as any).postMessage({ type: 'MODEL_READY', status: modelReady });
+    // Resolve URLs to satisfy bundler; content is a placeholder
+    try {
+      if (modelConfigUrl) await fetch(modelConfigUrl).then(() => null).catch(() => null);
+    } catch {}
+    try {
+      if (demucsWasmUrl) await fetch(demucsWasmUrl).then(() => null).catch(() => null);
+    } catch {}
+
+    // Dummy model: provide a safe separate() that returns zeroed arrays of the same length
+    model = {
+      separate(input: Float32Array, _sr: number) {
+        const len = input?.length || 0;
+        return {
+          vocals: new Float32Array(len),
+          drums: new Float32Array(len),
+          bass: new Float32Array(len),
+          harmonic: new Float32Array(len),
+          perc: new Float32Array(len),
+          sub: new Float32Array(len),
+        };
+      },
+    };
+    modelReady = true;
+    (self as any).postMessage({
+      type: 'MODEL_READY',
+      status: true,
+      msg: 'Dummy stem model loaded (fake-demucs.wasm).',
+    });
   } catch (err) {
-    (self as any).postMessage({ type: 'MODEL_ERROR', msg: 'Worker model init failed', error: String(err) });
+    (self as any).postMessage({ type: 'MODEL_ERROR', msg: 'Dummy model load failure', error: String(err) });
     modelReady = false;
     model = null;
   }
