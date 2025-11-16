@@ -148,23 +148,23 @@ export async function stemSplitEngine(
   // FULL MODE - Use HPSS + vocal extraction for proper stem separation
   try {
     console.log('[FLOW IMPORT] Starting HPSS-based stem separation...');
-    
+
     // Use HPSS for harmonic/percussive separation
     const hpssResult = await hpss(audioBuffer);
     console.log('[FLOW IMPORT] HPSS complete, extracting additional stems...');
-    
+
     // Extract vocals using AI model (or fallback)
     const vocals = await aiVocalModel(audioBuffer);
     console.log('[FLOW IMPORT] Vocals extracted');
-    
+
     // Extract bass from harmonic content (or original if harmonic failed)
     const bass = await extractBass(hpssResult.harmonic || audioBuffer);
     console.log('[FLOW IMPORT] Bass extracted');
-    
+
     // Extract sub-bass (808s)
     const sub = await extractSubBass(audioBuffer);
     console.log('[FLOW IMPORT] Sub-bass extracted');
-    
+
     // Assign stems
     result.vocals = vocals;
     result.drums = hpssResult.percussive;
@@ -172,7 +172,7 @@ export async function stemSplitEngine(
     result.music = hpssResult.harmonic; // Music = harmonic content (will refine below)
     result.bass = bass;
     result.sub = sub;
-    
+
     // If we have vocals, subtract them from harmonic to get instrumental
     if (vocals && hpssResult.harmonic) {
       try {
@@ -183,7 +183,7 @@ export async function stemSplitEngine(
         result.music = hpssResult.harmonic;
       }
     }
-    
+
     // Ensure we have at least some stems
     const stemCount = Object.values(result).filter(b => b !== null).length;
     console.log('[FLOW IMPORT] Stem separation complete:', {
@@ -195,7 +195,7 @@ export async function stemSplitEngine(
       sub: result.sub !== null,
       harmonic: result.harmonic !== null,
     });
-    
+
     // If no stems were created, fall back to frequency filtering
     if (stemCount === 0) {
       throw new Error('HPSS produced no stems, falling back to frequency filtering');
@@ -235,7 +235,62 @@ export async function stemSplitEngine(
       result.music = audioBuffer;
     }
   }
-  
+
+  // Finalization: guarantee full-stem set where possible before pipeline placement
+  // Create simple band filters for any missing critical stems to avoid single-lane placement.
+  const ensureFiltered = async (
+    type: BiquadFilterType,
+    freq: number,
+    q: number = 0.707
+  ) => {
+    return renderPass((ctx, src) => {
+      const f = ctx.createBiquadFilter();
+      f.type = type;
+      f.frequency.value = freq;
+      f.Q.value = q;
+      src.connect(f);
+      return f;
+    });
+  };
+
+  // Vocals: mid band emphasis if AI vocal failed
+  if (!result.vocals) {
+    try {
+      // Bandpass ~ 250 Hz – 4 kHz via highpass then lowpass
+      const mid = await renderPass((ctx, src) => {
+        const hp = ctx.createBiquadFilter();
+        hp.type = 'highpass';
+        hp.frequency.value = 250;
+        const lp = ctx.createBiquadFilter();
+        lp.type = 'lowpass';
+        lp.frequency.value = 4000;
+        src.connect(hp);
+        hp.connect(lp);
+        return lp;
+      });
+      result.vocals = mid;
+    } catch {}
+  }
+
+  // Drums: use percussive or a highpass with transient bias
+  if (!result.drums) {
+    try {
+      result.drums = await ensureFiltered('highpass', 3000);
+    } catch {}
+  }
+
+  // Bass: ensure a lowpass fallback
+  if (!result.bass) {
+    try {
+      result.bass = await ensureFiltered('lowpass', 180);
+    } catch {}
+  }
+
+  // Music: ensure we have an instrumental backing
+  if (!result.music) {
+    result.music = result.harmonic ?? audioBuffer;
+  }
+
   return result;
 }
 
