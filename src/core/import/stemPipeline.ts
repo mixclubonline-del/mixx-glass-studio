@@ -19,6 +19,7 @@ import { stemSplitEngine, determineOptimalMode, type StemResult } from './stemEn
 import { analyzeTiming, type TimingAnalysis } from './analysis';
 import { assembleMetadata, type StemMetadata } from './metadata';
 import { ensureStemTrackLayout, STEM_ORDER, stemTrackIdFor } from '../tracks/stemLayout';
+import { STEM_PRIORITY_ORDER } from '../audio/ai/stemTrackMap';
 import { useTimelineStore } from '../../state/timelineStore';
 import {
   buildAndHydrateFromStem,
@@ -97,6 +98,17 @@ export async function runFlowStemPipeline(
     stems.harmonic = sanitizeStem('harmonic', stemResult.music);
   }
 
+  // Normalize, filter and order stems using MixxClub priority
+  const normalizeStemSet = (input: Record<string, AudioBuffer | null>) => {
+    const ordered: Record<string, AudioBuffer> = {} as any;
+    (STEM_PRIORITY_ORDER as unknown as string[]).forEach((stem) => {
+      const buf = input[stem];
+      if (buf && buf.length > 0) ordered[stem] = buf;
+    });
+    return ordered;
+  };
+  const normalizedStems = normalizeStemSet(stems);
+
   // Debug: compute quick peaks for each stem to verify content presence
   try {
     const peakOf = (buf: AudioBuffer | null) => {
@@ -157,7 +169,7 @@ export async function runFlowStemPipeline(
   const tracks = getTracks();
   const validKeys = new Set<string>(STEM_ORDER as unknown as string[]);
   let placed = 0;
-  (Object.entries(stems) as Array<[string, AudioBuffer | null]>).forEach(([stemName, buffer]) => {
+  (Object.entries(normalizedStems) as Array<[string, AudioBuffer]>).forEach(([stemName, buffer]) => {
     if (!buffer) return;
     if (!validKeys.has(stemName)) return;
     const targetId = stemTrackIdFor(stemName as any);
