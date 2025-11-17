@@ -188,32 +188,50 @@ export const AudioTestLoader = () => {
         disabled={isLoading}
         variant="prime"
         className="w-full"
+        aria-label="Load audio test files"
+        aria-describedby="audio-loader-description"
       >
-        <Upload size={16} className="mr-2" />
+        <Upload size={16} className="mr-2" aria-hidden="true" />
         {isLoading ? 'Loading...' : 'Load Test Audio'}
       </Button>
+      <span id="audio-loader-description" className="sr-only">
+        Click to open file picker and select audio files for testing
+      </span>
 
       {/* Waveform Display */}
       {currentBuffer && (
-        <div className="space-y-2">
-          <Label className="text-xs text-muted-foreground">Waveform</Label>
+        <div className="space-y-2" role="region" aria-label="Audio waveform visualization">
+          <Label className="text-xs text-muted-foreground" id="waveform-label">Waveform</Label>
           <div className="glass-inset rounded overflow-hidden">
             <canvas
               ref={canvasRef}
               className="w-full h-24"
               style={{ display: 'block' }}
+              role="img"
+              aria-labelledby="waveform-label"
+              aria-describedby="waveform-description"
             />
+            <span id="waveform-description" className="sr-only">
+              Visual representation of the audio waveform showing amplitude over time
+            </span>
           </div>
         </div>
       )}
 
       {/* Loaded Files List */}
       {loadedFiles.length > 0 && (
-        <div className="space-y-2">
-          <Label className="text-xs text-muted-foreground">Loaded Files ({loadedFiles.length})</Label>
-          <div className="max-h-32 overflow-y-auto space-y-1 glass-inset rounded p-2">
+        <div className="space-y-2" role="region" aria-label="Loaded audio files">
+          <Label className="text-xs text-muted-foreground" id="loaded-files-label">
+            Loaded Files ({loadedFiles.length})
+          </Label>
+          <div 
+            className="max-h-32 overflow-y-auto space-y-1 glass-inset rounded p-2"
+            role="list"
+            aria-labelledby="loaded-files-label"
+            aria-live="polite"
+          >
             {loadedFiles.map((file, idx) => (
-              <div key={idx} className="text-xs text-foreground font-mono">
+              <div key={idx} className="text-xs text-foreground font-mono" role="listitem">
                 {idx + 1}. {file}
               </div>
             ))}
@@ -222,32 +240,40 @@ export const AudioTestLoader = () => {
       )}
 
       {/* Transport Controls */}
-      <div className="flex items-center gap-2">
+      <div className="flex items-center gap-2" role="group" aria-label="Playback controls">
         <Button
           onClick={handlePlayPause}
           disabled={loadedFiles.length === 0}
           variant={transport.isPlaying ? 'destructive' : 'glass'}
           size="icon"
+          aria-label={transport.isPlaying ? 'Pause playback' : 'Play audio'}
+          aria-pressed={transport.isPlaying}
         >
-          {transport.isPlaying ? <Pause size={16} /> : <Play size={16} />}
+          {transport.isPlaying ? <Pause size={16} aria-hidden="true" /> : <Play size={16} aria-hidden="true" />}
         </Button>
         <Button
           onClick={handleStop}
           disabled={!transport.isPlaying && transport.currentTime === 0}
           variant="glass"
           size="icon"
+          aria-label="Stop playback and reset to beginning"
         >
-          <Square size={16} />
+          <Square size={16} aria-hidden="true" />
         </Button>
-        <div className="flex-1 text-xs font-mono text-muted-foreground text-center">
+        <div 
+          className="flex-1 text-xs font-mono text-muted-foreground text-center"
+          role="timer"
+          aria-live="off"
+          aria-label={`Current playback time: ${transport.currentTime.toFixed(2)} seconds`}
+        >
           {transport.currentTime.toFixed(2)}s
         </div>
       </div>
 
       {/* Master Volume */}
-      <div className="space-y-2">
+      <div className="space-y-2" role="region" aria-label="Master volume control">
         <Label htmlFor="master-volume-fader" className="text-xs flex items-center gap-2">
-          <Volume2 size={14} />
+          <Volume2 size={14} aria-hidden="true" />
           Master Volume
         </Label>
         <div className="flex items-center gap-3">
@@ -259,19 +285,31 @@ export const AudioTestLoader = () => {
               height={60}
               width={24}
               showScale={false}
+              ariaLabel={`Master volume: ${(masterVolume * 100).toFixed(0)} percent`}
+              ariaValueText={`${(masterVolume * 100).toFixed(0)}%`}
             />
           </div>
-          <span className="text-xs font-mono text-muted-foreground w-12">
+          <span 
+            className="text-xs font-mono text-muted-foreground w-12"
+            role="status"
+            aria-live="polite"
+            aria-atomic="true"
+          >
             {(masterVolume * 100).toFixed(0)}%
           </span>
         </div>
       </div>
 
       {/* Debug Info */}
-      <div className="text-xs text-muted-foreground space-y-1 pt-2 border-t border-border/30">
-        <div>Tracks: {audioEngine.getTracks().length}</div>
-        <div>Playing: {transport.isPlaying ? 'Yes' : 'No'}</div>
-        <div>Time: {transport.currentTime.toFixed(2)}s</div>
+      <div 
+        className="text-xs text-muted-foreground space-y-1 pt-2 border-t border-border/30"
+        role="region"
+        aria-label="Debug information"
+        aria-live="polite"
+      >
+        <div role="status">Tracks: {audioEngine.getTracks().length}</div>
+        <div role="status">Playing: {transport.isPlaying ? 'Yes' : 'No'}</div>
+        <div role="status">Time: {transport.currentTime.toFixed(2)}s</div>
       </div>
     </Card>
   );

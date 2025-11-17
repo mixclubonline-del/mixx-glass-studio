@@ -14,6 +14,8 @@ interface IceFireFaderProps {
   showScale?: boolean;
   label?: string;
   id?: string;
+  ariaLabel?: string;
+  ariaValueText?: string;
 }
 
 export const IceFireFader: React.FC<IceFireFaderProps> = ({
@@ -23,7 +25,9 @@ export const IceFireFader: React.FC<IceFireFaderProps> = ({
   width = 24,
   showScale = true,
   label,
-  id
+  id,
+  ariaLabel,
+  ariaValueText
 }) => {
   const faderRef = useRef<HTMLDivElement>(null);
   const [isDragging, setIsDragging] = useState(false);
@@ -132,6 +136,29 @@ export const IceFireFader: React.FC<IceFireFaderProps> = ({
             }}
             onMouseDown={handleMouseDown}
             onDoubleClick={handleDoubleClick}
+            role="slider"
+            aria-label={ariaLabel || label || 'Volume fader'}
+            aria-valuemin={0}
+            aria-valuemax={100}
+            aria-valuenow={Math.round(value * 100)}
+            aria-valuetext={ariaValueText || `${Math.round(value * 100)}%`}
+            aria-orientation="vertical"
+            tabIndex={0}
+            onKeyDown={(e) => {
+              if (e.key === 'ArrowUp' || e.key === 'ArrowRight') {
+                e.preventDefault();
+                onChange(Math.min(1, value + 0.05));
+              } else if (e.key === 'ArrowDown' || e.key === 'ArrowLeft') {
+                e.preventDefault();
+                onChange(Math.max(0, value - 0.05));
+              } else if (e.key === 'Home') {
+                e.preventDefault();
+                onChange(0);
+              } else if (e.key === 'End') {
+                e.preventDefault();
+                onChange(1);
+              }
+            }}
           >
             {/* Filled portion with temperature gradient */}
             <div
