@@ -13,6 +13,7 @@ interface IceFireFaderProps {
   width?: number;
   showScale?: boolean;
   label?: string;
+  id?: string;
 }
 
 export const IceFireFader: React.FC<IceFireFaderProps> = ({
@@ -21,7 +22,8 @@ export const IceFireFader: React.FC<IceFireFaderProps> = ({
   height = 300,
   width = 24,
   showScale = true,
-  label
+  label,
+  id
 }) => {
   const faderRef = useRef<HTMLDivElement>(null);
   const [isDragging, setIsDragging] = useState(false);
@@ -90,7 +92,7 @@ export const IceFireFader: React.FC<IceFireFaderProps> = ({
   const dbMarkers = [-60, -48, -36, -24, -18, -12, -6, 0, 6, 12];
   
   return (
-    <div className="flex flex-col items-center gap-2">
+    <div id={id} className="flex flex-col items-center gap-2">
       {label && (
         <div className="text-[10px] text-muted-foreground font-medium">{label}</div>
       )}
