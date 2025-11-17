@@ -178,6 +178,8 @@ export const AudioTestLoader = () => {
         multiple
         onChange={handleFileSelect}
         className="hidden"
+        id="audio-file-input"
+        name="audioFile"
       />
 
       {/* Load Button */}
@@ -244,13 +246,14 @@ export const AudioTestLoader = () => {
 
       {/* Master Volume */}
       <div className="space-y-2">
-        <Label className="text-xs flex items-center gap-2">
+        <Label htmlFor="master-volume-fader" className="text-xs flex items-center gap-2">
           <Volume2 size={14} />
           Master Volume
         </Label>
         <div className="flex items-center gap-3">
           <div className="flex-1">
             <IceFireFader
+              id="master-volume-fader"
               value={masterVolume}
               onChange={handleMasterVolumeChange}
               height={60}
