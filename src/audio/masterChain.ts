@@ -2,13 +2,13 @@ import { MasteringProfile, MASTERING_PROFILES } from '../types/sonic-architectur
 import {
   createHarmonicLatticeStage,
   createPhaseWeaveStage,
-  createVelvetCurveStage,
   createVelvetFloorStage,
   createSaturationCurve,
 } from './fivePillars';
 import { createDcBlocker } from './utils';
 import { createTruePeakLimiterNode } from './VelvetTruePeakLimiter';
 import { createDitherNode } from './DitherNode';
+import { getVelvetCurveEngine, initializeVelvetCurveEngine } from './VelvetCurveEngine';
 
 type MasterProfileKey = keyof typeof MASTERING_PROFILES;
 
@@ -49,7 +49,7 @@ export interface VelvetMasterChain {
   velvetFloor: ReturnType<typeof createVelvetFloorStage>;
   harmonicLattice: ReturnType<typeof createHarmonicLatticeStage>;
   phaseWeave: ReturnType<typeof createPhaseWeaveStage>;
-  velvetCurve: ReturnType<typeof createVelvetCurveStage>;
+  velvetCurve: ReturnType<typeof getVelvetCurveEngine>; // Real VelvetCurveEngine instance
   glue: DynamicsCompressorNode;
   colorDrive: GainNode;
   colorShaper: WaveShaperNode;
@@ -73,44 +73,58 @@ export async function buildMasterChain(
 ): Promise<VelvetMasterChain> {
   const profile = MASTERING_PROFILES[DEFAULT_PROFILE_KEY];
 
+  // 🔹 CREATE MASTER INPUT (tracks connect here)
+  // Add headroom to prevent clipping from hot tracks
+  const masterInput = ctx.createGain();
+  masterInput.gain.value = 0.85; // -1.4 dB headroom to prevent distortion
+
+  // 🔹 CREATE NODES
   const dc = createDcBlocker(ctx);
   const velvetFloor = createVelvetFloorStage(ctx, profile.velvetFloor);
   const harmonicLattice = createHarmonicLatticeStage(ctx, profile.harmonicLattice);
   const phaseWeave = createPhaseWeaveStage(ctx, profile.phaseWeave);
-  const velvetCurve = createVelvetCurveStage(ctx);
+  
+  // Initialize and use the real VelvetCurveEngine
+  await initializeVelvetCurveEngine(ctx);
+  const velvetCurve = getVelvetCurveEngine(ctx);
+  velvetCurve.setActive(true); // Enable the engine
+  console.log('[MASTER CHAIN] Velvet Curve Engine integrated and active');
+  
   const midSideStage = createMidSideStage(ctx);
   const multiBandStage = createMultiBandStage(ctx);
 
-  const glue = createGlueCompressor(ctx);
+  // Glue with safe defaults (prevent distortion)
+  const glue = ctx.createDynamicsCompressor();
+  glue.threshold.value = -6; // More headroom to prevent distortion
+  glue.ratio.value = 2.0; // Gentler ratio
+  glue.attack.value = 0.01;
+  glue.release.value = 0.15; // Slightly longer release for smoother sound
+  glue.knee.value = 3; // Softer knee
+
   const { drive: colorDrive, shaper: colorShaper } = createVelvetSaturator(ctx);
 
-  const preLimiterTap = ctx.createGain();
-  preLimiterTap.gain.value = 1;
-  const complianceTap = ctx.createGain();
-  complianceTap.gain.value = 1;
-
-  const preLimiterAnalyser = createAnalyser(ctx, 512, 0.6);
-  const softLimiter = createLimiter(ctx, {
-    threshold: -6,
-    ratio: 6,
-    attack: 0.01,
-    release: 0.1,
-    knee: 4,
-  });
+  // Soft limiter with safe defaults (prevent crackling)
+  const softLimiter = ctx.createDynamicsCompressor();
+  softLimiter.threshold.value = 0; // More headroom - only limit peaks
+  softLimiter.ratio.value = 3; // Gentler ratio to prevent distortion
+  softLimiter.attack.value = 0.005; // Slightly slower attack to prevent clicks
+  softLimiter.release.value = 0.1; // Longer release for smoother sound
+  softLimiter.knee.value = 6; // Softer knee to prevent harshness
 
   const truePeakLimiter = await createTruePeakLimiterNode(ctx, -1);
   const dither = await createDitherNode(ctx);
 
   const postLimiterAnalyser = createAnalyser(ctx, 2048, 0.75);
   const panner = ctx.createStereoPanner();
+  panner.pan.value = 0;
   const masterGain = ctx.createGain();
 
-  // Flow Meter Stack - Master Multi-Band Meters (STEP 2)
+  // Flow Meter Stack - Master Multi-Band Meters (for monitoring only - parallel tap)
+  // These are monitoring taps, NOT in the signal path
   const masterAnalyzerFull = ctx.createAnalyser();
   masterAnalyzerFull.fftSize = 4096;
   masterAnalyzerFull.smoothingTimeConstant = 0.85;
 
-  // Body (Low-end) - < 200Hz
   const masterBody = ctx.createBiquadFilter();
   masterBody.type = "lowshelf";
   masterBody.frequency.value = 200;
@@ -119,7 +133,6 @@ export async function buildMasterChain(
   bodyMeter.fftSize = 2048;
   bodyMeter.smoothingTimeConstant = 0.85;
 
-  // Soul (Mid-range) - ~800Hz
   const masterSoul = ctx.createBiquadFilter();
   masterSoul.type = "peaking";
   masterSoul.frequency.value = 800;
@@ -129,7 +142,6 @@ export async function buildMasterChain(
   soulMeter.fftSize = 2048;
   soulMeter.smoothingTimeConstant = 0.85;
 
-  // Air (High-mid) - ~6kHz
   const masterAir = ctx.createBiquadFilter();
   masterAir.type = "highshelf";
   masterAir.frequency.value = 6000;
@@ -138,7 +150,6 @@ export async function buildMasterChain(
   airMeter.fftSize = 2048;
   airMeter.smoothingTimeConstant = 0.85;
 
-  // Silk (High-end) - > 12kHz
   const masterSilk = ctx.createBiquadFilter();
   masterSilk.type = "highshelf";
   masterSilk.frequency.value = 12000;
@@ -147,17 +158,15 @@ export async function buildMasterChain(
   silkMeter.fftSize = 2048;
   silkMeter.smoothingTimeConstant = 0.85;
 
-  // Route master input to multi-band meters
-  dc.connect(masterAnalyzerFull);
-  dc.connect(masterBody);
-  dc.connect(masterSoul);
-  dc.connect(masterAir);
-  dc.connect(masterSilk);
-
-  // Each band gets its own analyser
+  // Meter taps (parallel monitoring - does not affect signal path)
+  masterGain.connect(masterAnalyzerFull);
+  masterGain.connect(masterBody);
   masterBody.connect(bodyMeter);
+  masterGain.connect(masterSoul);
   masterSoul.connect(soulMeter);
+  masterGain.connect(masterAir);
   masterAir.connect(airMeter);
+  masterGain.connect(masterSilk);
   masterSilk.connect(silkMeter);
 
   const masterMeters: MasterMeterStack = {
@@ -172,26 +181,64 @@ export async function buildMasterChain(
 
   const currentProfile = { value: profile };
 
+  // 🔥 HARD RESET: Disconnect everything first (safety)
+  // Note: We don't disconnect masterGain here because TranslationMatrix handles that connection
+  // Disconnecting masterGain would break the connection to destination
+  try {
+    masterInput.disconnect();
+    dc.disconnect();
+    if (velvetFloor.input) (velvetFloor.input as any).disconnect?.();
+    if (velvetFloor.output) (velvetFloor.output as any).disconnect?.();
+    if (harmonicLattice.input) (harmonicLattice.input as any).disconnect?.();
+    if (harmonicLattice.output) (harmonicLattice.output as any).disconnect?.();
+    if (phaseWeave.input) (phaseWeave.input as any).disconnect?.();
+    if (phaseWeave.output) (phaseWeave.output as any).disconnect?.();
+    if (velvetCurve.input) (velvetCurve.input as any).disconnect?.();
+    if (velvetCurve.output) (velvetCurve.output as any).disconnect?.();
+    if (midSideStage.input) midSideStage.input.disconnect?.();
+    if (midSideStage.output) midSideStage.output.disconnect?.();
+    if (multiBandStage.input) multiBandStage.input.disconnect?.();
+    if (multiBandStage.output) multiBandStage.output.disconnect?.();
+    glue.disconnect();
+    colorDrive.disconnect();
+    colorShaper.disconnect();
+    softLimiter.disconnect();
+    if (truePeakLimiter) (truePeakLimiter as AudioNode).disconnect?.();
+    postLimiterAnalyser.disconnect();
+    if (dither) (dither as AudioNode).disconnect?.();
+    panner.disconnect();
+    // DO NOT disconnect masterGain - TranslationMatrix manages that connection
+    // masterGain.disconnect(); // REMOVED - breaks TranslationMatrix connection
+  } catch (e) {
+    // Ignore disconnect errors on first build
+  }
+
+  // ✅ LINEAR MASTER CHAIN — ONE PATH ONLY
+  // Tracks → masterInput → dc → velvetFloor → harmonicLattice → phaseWeave → velvetCurve → midSide → multiBand → glue → colorDrive → colorShaper → softLimiter → truePeakLimiter → postLimiterAnalyser → dither → panner → masterGain
+
+  masterInput.connect(dc);
   dc.connect(velvetFloor.input);
   velvetFloor.output.connect(harmonicLattice.input);
   harmonicLattice.output.connect(phaseWeave.input);
-  phaseWeave.output.connect(velvetCurve.input);
+  phaseWeave.output.connect(velvetCurve.input); // Connect to real VelvetCurveEngine
   velvetCurve.output.connect(midSideStage.input);
   midSideStage.output.connect(multiBandStage.input);
   multiBandStage.output.connect(glue);
   glue.connect(colorDrive);
   colorDrive.connect(colorShaper);
-  colorShaper.connect(preLimiterTap);
-
-  preLimiterTap.connect(preLimiterAnalyser);
-  preLimiterTap.connect(complianceTap);
-  complianceTap.connect(softLimiter);
-
-  softLimiter.connect(truePeakLimiter);
-  truePeakLimiter.connect(postLimiterAnalyser);
-  postLimiterAnalyser.connect(dither);
-  dither.connect(panner);
+  colorShaper.connect(softLimiter);
+  softLimiter.connect(truePeakLimiter as AudioNode);
+  (truePeakLimiter as AudioNode).connect(postLimiterAnalyser);
+  postLimiterAnalyser.connect(dither as AudioNode);
+  (dither as AudioNode).connect(panner);
   panner.connect(masterGain);
+  // Note: masterGain connects to TranslationMatrix in App.tsx (line 4800)
+
+  console.log('[MASTER-CHAIN] Signal path wired (linear):', {
+    from: 'masterInput',
+    through: 'VelvetCurve → Mid/Side → Multi-Band → Glue → Limiters',
+    to: 'masterGain',
+  });
 
   const setProfile = (next: MasteringProfile | MasterProfileKey) => {
     const resolved =
@@ -235,9 +282,14 @@ export async function buildMasterChain(
 
   setOutputCeiling(profile.truePeakCeiling);
 
+  // Create compliance tap for monitoring (parallel, doesn't affect signal)
+  const complianceTap = ctx.createGain();
+  complianceTap.gain.value = 1;
+  masterGain.connect(complianceTap);
+
   return {
-    input: dc,
-    output: masterGain,
+    input: masterInput, // Tracks connect here
+    output: masterGain, // TranslationMatrix attaches here in App.tsx
     analyser: postLimiterAnalyser,
     complianceTap,
     midSideStage,
@@ -252,12 +304,12 @@ export async function buildMasterChain(
     softLimiter,
     truePeakLimiter,
     dither,
-    preLimiterTap,
-    preLimiterAnalyser,
+    preLimiterTap: complianceTap, // For compatibility
+    preLimiterAnalyser: postLimiterAnalyser, // For compatibility
     postLimiterAnalyser,
     panner,
     masterGain,
-    meters: masterMeters, // Flow Meter Stack - Multi-band meters
+    meters: masterMeters, // Flow Meter Stack - Multi-band meters (parallel taps)
     setProfile,
     getProfile,
     setOutputCeiling,
@@ -265,24 +317,14 @@ export async function buildMasterChain(
   };
 }
 
-function createGlueCompressor(
-  ctx: AudioContext | OfflineAudioContext
-): DynamicsCompressorNode {
-  const glue = ctx.createDynamicsCompressor();
-  glue.threshold.value = -18;
-  glue.ratio.value = 2.2;
-  glue.attack.value = 0.015;
-  glue.release.value = 0.25;
-  glue.knee.value = 2;
-  return glue;
-}
+// createGlueCompressor removed - glue is now created inline with sane defaults in buildMasterChain
 
 function createVelvetSaturator(ctx: AudioContext | OfflineAudioContext) {
   const drive = ctx.createGain();
-  drive.gain.value = 1.0;
+  drive.gain.value = 0.9; // Reduce drive to prevent distortion
 
   const shaper = ctx.createWaveShaper();
-  shaper.curve = createSaturationCurve(0.45);
+  shaper.curve = createSaturationCurve(0.3); // Less aggressive saturation (was 0.45)
 
   return { drive, shaper };
 }
@@ -471,8 +513,9 @@ function recalibrateGlue(
   profile: MasteringProfile
 ) {
   const isClub = profile.targetLUFS >= -10;
-  const threshold = isClub ? -14 : -18;
-  const ratio = isClub ? 2.5 : 2.2;
+  // Safe defaults - prevent distortion while maintaining glue
+  const threshold = isClub ? -8 : -6; // More headroom to prevent distortion
+  const ratio = isClub ? 2.2 : 2.0; // Gentler ratios
 
   glue.threshold.setTargetAtTime(threshold, glue.context.currentTime, 0.02);
   glue.ratio.setTargetAtTime(ratio, glue.context.currentTime, 0.02);

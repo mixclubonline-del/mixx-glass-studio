@@ -2,7 +2,7 @@ mod engine;
 mod ffi;
 
 pub use engine::{
-    current_stats, init_engine, pop_metric, shutdown_engine, start_engine, stop_engine,
+    current_stats, init_engine, init_engine_with_queue, pop_metric, shutdown_engine, start_engine, stop_engine,
     EngineConfig, EngineError, EngineMetric, EngineStats,
 };
 pub use ffi::{

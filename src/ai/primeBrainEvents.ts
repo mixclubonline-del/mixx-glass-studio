@@ -31,6 +31,9 @@ export type PrimeBrainEventType =
   | 'plugin-remove'
   | 'plugin-parameter-change'
   | 'view-switch'
+  | 'routing-rebuild'
+  | 'routing-track-connect'
+  | 'routing-track-disconnect'
   | 'error';
 
 export interface PrimeBrainEvent {

@@ -97,10 +97,12 @@ struct EngineState {
 unsafe impl Send for EngineState {}
 
 struct MixxEngine {
+    #[allow(dead_code)]
     config: EngineConfig,
     input_stream: Option<Stream>,
     output_stream: Stream,
     running_since: Arc<LastStart>,
+    #[allow(dead_code)]
     shared_buffer: Arc<ArrayQueue<f32>>,
     metrics_queue: Arc<ArrayQueue<EngineMetric>>,
     stats: Arc<EngineStatsInner>,
@@ -121,6 +123,14 @@ struct LastStart {
 }
 
 pub fn init_engine(config: Option<EngineConfig>) -> Result<(), EngineError> {
+    init_engine_with_queue(config, None)
+}
+
+/// Initialize engine with optional external audio queue (from audio bridge)
+pub fn init_engine_with_queue(
+    config: Option<EngineConfig>,
+    external_queue: Option<Arc<ArrayQueue<f32>>>,
+) -> Result<(), EngineError> {
     let mut guard = ENGINE_STATE
         .lock()
         .expect("MixxEngine global mutex poisoned");
@@ -130,7 +140,7 @@ pub fn init_engine(config: Option<EngineConfig>) -> Result<(), EngineError> {
     }
 
     let config = config.unwrap_or_default();
-    let engine = MixxEngine::new(config)?;
+    let engine = MixxEngine::new_with_queue(config, external_queue)?;
     *guard = Some(EngineState { engine });
     info!(
         "MixxEngine initialized ({} Hz, {} frames, {} channels)",
@@ -194,7 +204,16 @@ pub fn pop_metric() -> Option<EngineMetric> {
 }
 
 impl MixxEngine {
+    #[allow(dead_code)] // Public API, may be used directly
     fn new(config: EngineConfig) -> Result<Self, EngineError> {
+        Self::new_with_queue(config, None)
+    }
+
+    /// Create engine with optional external audio queue (from audio bridge)
+    fn new_with_queue(
+        config: EngineConfig,
+        external_queue: Option<Arc<ArrayQueue<f32>>>,
+    ) -> Result<Self, EngineError> {
         let host = cpal::default_host();
 
         let output_device = host
@@ -207,9 +226,20 @@ impl MixxEngine {
 
         let output_config = Self::configure_stream_config(&output_supported, &config);
 
-        let shared_buffer = Arc::new(ArrayQueue::<f32>::new(
-            (config.buffer_size as usize * config.channels as usize * 16).max(1024),
-        ));
+        // Use external queue from audio bridge if provided, otherwise create our own
+        let using_external_queue = external_queue.is_some();
+        let shared_buffer = external_queue.unwrap_or_else(|| {
+            Arc::new(ArrayQueue::<f32>::new(
+                (config.buffer_size as usize * config.channels as usize * 16).max(1024),
+            ))
+        });
+        
+        if using_external_queue {
+            info!("MixxEngine: Using external audio queue from audio bridge");
+        } else {
+            info!("MixxEngine: Using internal audio queue (no bridge connected)");
+        }
+        
         let metrics_queue = Arc::new(ArrayQueue::<EngineMetric>::new(1024));
         let stats = Arc::new(EngineStatsInner::default());
         let running_since = Arc::new(LastStart::default());
@@ -644,6 +674,7 @@ fn handle_output_error(err: cpal::StreamError) {
     warn!("MixxEngine output stream error: {err}");
 }
 
+#[allow(dead_code)]
 pub fn engine_error_message(err: EngineError) -> String {
     err.message
 }

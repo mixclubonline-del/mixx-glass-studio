@@ -1,10 +1,12 @@
 use mixx_core::{
-    current_stats as mixx_current_stats, init_engine as mixx_init_engine,
+    current_stats as mixx_current_stats,
+    init_engine_with_queue as mixx_init_engine_with_queue,
     start_engine as mixx_start_engine, stop_engine as mixx_stop_engine, EngineConfig as MixxEngineConfig,
 };
 use serde_json;
 use std::sync::atomic::{AtomicBool, AtomicU32, AtomicU64, Ordering};
 use std::sync::Arc;
+use crate::audio_bridge;
 
 // Simplified F.L.O.W. Engine for testing
 pub struct FlowEngine {
@@ -52,7 +54,21 @@ impl FlowEngine {
                 self.engine_config.sample_rate, 
                 self.engine_config.buffer_size, 
                 self.engine_config.channels);
-            mixx_init_engine(Some(self.engine_config))
+            
+            // Initialize audio bridge for JavaScript → Rust audio streaming
+            audio_bridge::init_audio_bridge(
+                self.engine_config.sample_rate,
+                self.engine_config.channels,
+                self.engine_config.buffer_size as usize,
+            )
+            .map_err(|e| format!("Audio bridge init failed: {}", e))?;
+            
+            // Get the audio bridge queue and pass it to the engine
+            let bridge_queue = audio_bridge::get_audio_queue()
+                .ok_or_else(|| "Audio bridge queue not available".to_string())?;
+            
+            // Initialize engine with the bridge's queue
+            mixx_core::init_engine_with_queue(Some(self.engine_config), Some(bridge_queue))
                 .map_err(|err| format!("MixxEngine init failed: {}", err.message()))?;
             println!("✅ MixxEngine initialized");
         } else {

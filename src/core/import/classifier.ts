@@ -115,7 +115,7 @@ export function classifyAudio(audioBuffer: AudioBuffer): AudioClassification {
     type = 'twotrack';
     confidence = 0.65;
   } else {
-    type = 'full';
+    type = 'stems'; // Fixed: should be 'stems' not 'full'
     confidence = 0.6;
   }
   

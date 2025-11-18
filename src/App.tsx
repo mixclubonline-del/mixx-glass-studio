@@ -31,6 +31,9 @@ import PrimeBrainInterface from './components/PrimeBrainInterface';
 import { getMixxFXEngine, initializeMixxFXEngine } from './audio/MixxFXEngine';
 import { buildMasterChain } from './audio/masterChain';
 import type { VelvetMasterChain } from './audio/masterChain';
+import { verifyMasterChainRouting, logVerificationResults, verifyTrackConnections } from './audio/routingVerification';
+import { diagnoseAudioSystem, logAudioDiagnostics, createTestTone } from './utils/audioDiagnostics';
+import { createNativeAudioBridge, createNativeAudioStreamNode } from './utils/nativeAudioBridge';
 import { VelvetLoudnessMeter, DEFAULT_VELVET_LOUDNESS_METRICS } from './audio/VelvetLoudnessMeter';
 import type { VelvetLoudnessMetrics } from './audio/VelvetLoudnessMeter';
 import { TranslationMatrix, type TranslationProfileKey } from './audio/TranslationMatrix';
@@ -1221,8 +1224,19 @@ const FlowRuntime: React.FC<FlowRuntimeProps> = ({ arrangeFocusToken }) => {
           try {
             outputNode.connect(masterInput);
             console.log('[MIXER] Route flushed for:', trackId);
+            
+            // Prime Brain: Queued route successfully connected
+            recordPrimeBrainEvent('routing-track-connect', {
+              trackId,
+              source: 'queued-route',
+            }, 'success');
           } catch (err) {
             console.error('[MIXER] Failed to flush route:', trackId, err);
+            recordPrimeBrainEvent('routing-track-connect', {
+              trackId,
+              source: 'queued-route',
+              error: 'flush-failed',
+            }, 'failure');
           }
         });
         queuedRoutesRef.current = [];
@@ -1292,6 +1306,8 @@ const FlowRuntime: React.FC<FlowRuntimeProps> = ({ arrangeFocusToken }) => {
   const fxNodesRef = useRef<{[key: string]: FxNode}>({}); // This will manage instances of ALL plugins
   const masterNodesRef = useRef<MasterNodes | null>(null);
   const translationMatrixRef = useRef<TranslationMatrix | null>(null);
+  const nativeAudioStreamNodeRef = useRef<AudioWorkletNode | null>(null);
+  const nativeBridgeRef = useRef<ReturnType<typeof createNativeAudioBridge> | null>(null);
   const velvetLoudnessMeterRef = useRef<VelvetLoudnessMeter | null>(null);
   const loudnessListenerRef = useRef<((event: Event) => void) | null>(null);
   const translationProfileRef = useRef<TranslationProfileKey>('flat');
@@ -3376,69 +3392,104 @@ const FlowRuntime: React.FC<FlowRuntimeProps> = ({ arrangeFocusToken }) => {
       recordRecordTap();
     }
     
+    const ctx = audioContextRef.current;
+    if (!ctx) {
+      console.error('[AUDIO] AudioContext is null - cannot play');
+      return;
+    }
+    
+    if (ctx.state === 'closed') {
+      console.error('[AUDIO] AudioContext is closed - cannot play');
+      return;
+    }
+    
+    const newIsPlaying = !isPlaying;
+    
+    // CRITICAL: Resume AudioContext if suspended (required for audio output)
+    if (newIsPlaying && ctx.state === 'suspended') {
+      try {
+        await ctx.resume();
+        console.log('[AUDIO] AudioContext resumed - audio should now work');
+        console.log('[AUDIO] AudioContext state after resume:', ctx.state);
+        
+        // Run diagnostics after resume
+        if ((import.meta as any).env?.DEV && masterNodesRef.current) {
+          const diagnostics = diagnoseAudioSystem(
+            ctx,
+            masterNodesRef.current,
+            trackNodesRef.current,
+            audioBuffers,
+            translationMatrixRef.current
+          );
+          logAudioDiagnostics(diagnostics);
+          
+          // Play test tone to verify signal path (will auto-resume if needed)
+          if (masterNodesRef.current.input) {
+            createTestTone(ctx, masterNodesRef.current.input, 0.3, 440).catch(console.error);
+          }
+        }
+      } catch (error) {
+        console.error('[AUDIO] Failed to resume AudioContext:', error);
+        alert('Audio permission required. Please allow audio in your browser settings and try again.');
+        return; // Don't change state if resume fails
+      }
+    } else if (!newIsPlaying && ctx.state === 'running') {
+      // Pause: suspend the context to save resources
+      try {
+        await ctx.suspend();
+        console.log('[AUDIO] AudioContext suspended');
+      } catch (error) {
+        console.warn('[AUDIO] Failed to suspend context:', error);
+      }
+    }
+    
+    setIsPlaying(newIsPlaying);
+    
     const isTauri = typeof window !== 'undefined' && typeof (window as unknown as { __TAURI__?: unknown }).__TAURI__ !== 'undefined';
     
-    setIsPlaying((prevIsPlaying) => {
-      const newIsPlaying = !prevIsPlaying;
-      const ctx = audioContextRef.current;
-      if (ctx && (ctx.state as string) !== 'closed') {
-        if (newIsPlaying) {
-          ctx.resume().catch((error) => {
-            console.warn('[AUDIO] Failed to resume context:', error);
-          });
-        } else {
-          ctx.suspend().catch((error) => {
-            console.warn('[AUDIO] Failed to suspend context:', error);
-          });
-        }
-      }
+    // Initialize and control Tauri Flow Engine
+    if (isTauri) {
+      const tauriInvoke = (window as unknown as { __TAURI__: { invoke: <T>(cmd: string, args?: unknown) => Promise<T> } }).__TAURI__.invoke;
       
-      // Initialize and control Tauri Flow Engine
-      if (isTauri) {
-        const tauriInvoke = (window as unknown as { __TAURI__: { invoke: <T>(cmd: string, args?: unknown) => Promise<T> } }).__TAURI__.invoke;
-        
-        if (newIsPlaying) {
-          // Initialize engine if not already done, then start playback
-          tauriInvoke('initialize_flow_engine')
-            .then(() => {
-              console.log('✅ Flow Engine initialized');
-              return tauriInvoke('flow_play');
-            })
-            .then(() => {
-              console.log('▶️ Flow Engine: PLAY');
-            })
-            .catch((error) => {
-              console.warn('[FLOW] Failed to start engine:', error);
-            });
-        } else {
-          // Pause the engine
-          tauriInvoke('flow_pause')
-            .then(() => {
-              console.log('⏸️ Flow Engine: PAUSE');
-            })
-            .catch((error) => {
-              console.warn('[FLOW] Failed to pause engine:', error);
-            });
-        }
-      }
-      
-      // Update playback state for Flow Loop
-      const currentPlayCount = window.__mixx_playbackState?.playCount || 0;
-      updatePlaybackState({
-        playing: newIsPlaying,
-        playCount: newIsPlaying ? currentPlayCount + 1 : currentPlayCount,
-      });
-      
-      // Record Prime Brain event
       if (newIsPlaying) {
-        recordPrimeBrainEvent('transport-play', { isTauri }, 'success');
+        // Initialize engine if not already done, then start playback
+        tauriInvoke('initialize_flow_engine')
+          .then(() => {
+            console.log('✅ Flow Engine initialized');
+            return tauriInvoke('flow_play');
+          })
+          .then(() => {
+            console.log('▶️ Flow Engine: PLAY');
+          })
+          .catch((error) => {
+            console.warn('[FLOW] Failed to start engine:', error);
+          });
       } else {
-        recordPrimeBrainEvent('transport-pause', { isTauri }, 'success');
+        // Pause the engine
+        tauriInvoke('flow_pause')
+          .then(() => {
+            console.log('⏸️ Flow Engine: PAUSE');
+          })
+          .catch((error) => {
+            console.warn('[FLOW] Failed to pause engine:', error);
+          });
       }
-      
-      return newIsPlaying;
+    }
+    
+    // Update playback state for Flow Loop
+    const currentPlayCount = window.__mixx_playbackState?.playCount || 0;
+    updatePlaybackState({
+      playing: newIsPlaying,
+      playCount: newIsPlaying ? currentPlayCount + 1 : currentPlayCount,
     });
-  }, []);
+    
+    // Record Prime Brain event
+    if (newIsPlaying) {
+      recordPrimeBrainEvent('transport-play', { isTauri }, 'success');
+    } else {
+      recordPrimeBrainEvent('transport-pause', { isTauri }, 'success');
+    }
+  }, [isPlaying, armedTracks]);
 
   const splitAutomationAt = useCallback(
     (clipId: ClipId, time: number) => {
@@ -4744,6 +4795,12 @@ const FlowRuntime: React.FC<FlowRuntimeProps> = ({ arrangeFocusToken }) => {
         console.log("Setting up AudioContext and FX engines...");
         const AudioCtx = (window.AudioContext || (window as any).webkitAudioContext) as typeof AudioContext;
         const createdCtx = new AudioCtx();
+        
+        // Log initial state (will be 'suspended' until user interaction)
+        console.log(`[AUDIO] AudioContext created, state: ${createdCtx.state}`);
+        if (createdCtx.state === 'suspended') {
+          console.log('[AUDIO] AudioContext is suspended - will resume on first user interaction (play button)');
+        }
 
         if (isCancelled) {
             await createdCtx.close().catch(() => {});
@@ -4781,10 +4838,40 @@ const FlowRuntime: React.FC<FlowRuntimeProps> = ({ arrangeFocusToken }) => {
         if (isCancelled || createdCtx.state === "closed") {
           return;
         }
+        
+        // Add VelvetCurveEngine to engine instances for clock sync
+        // Note: VelvetCurveEngine is a singleton, so we'll set its clock directly in the clock sync effect
+        
         const translationMatrix = new TranslationMatrix(createdCtx);
         translationMatrix.attach(masterNodesRef.current.output, createdCtx.destination);
         translationMatrix.activate(translationProfileRef.current);
         translationMatrixRef.current = translationMatrix;
+        
+        // Setup native audio bridge if in Tauri
+        const isTauri = typeof window !== 'undefined' && typeof (window as unknown as { __TAURI__?: unknown }).__TAURI__ !== 'undefined';
+        if (isTauri) {
+          try {
+            const bridge = createNativeAudioBridge();
+            if (bridge) {
+              nativeBridgeRef.current = bridge;
+              console.log('[NATIVE AUDIO] Bridge created, setting up stream node...');
+              
+              // Create AudioWorkletNode to stream master output to native engine
+              const streamNode = await createNativeAudioStreamNode(createdCtx, bridge);
+              if (streamNode) {
+                nativeAudioStreamNodeRef.current = streamNode;
+                // Connect master output to native stream node
+                masterNodesRef.current.output.connect(streamNode);
+                console.log('[NATIVE AUDIO] Stream node connected to master chain');
+                console.log('[NATIVE AUDIO] Audio will stream from Flow DSP → Native Engine → Hardware');
+              } else {
+                console.warn('[NATIVE AUDIO] Failed to create stream node');
+              }
+            }
+          } catch (error) {
+            console.error('[NATIVE AUDIO] Failed to setup native audio bridge:', error);
+          }
+        }
         const masterAnalyser = masterNodesRef.current.analyser;
         masterAnalyser.fftSize = TRACK_ANALYSER_FFT;
         masterAnalyser.smoothingTimeConstant = MASTER_ANALYSER_SMOOTHING;
@@ -4851,7 +4938,35 @@ const FlowRuntime: React.FC<FlowRuntimeProps> = ({ arrangeFocusToken }) => {
         }
 
         console.log("[MIXER] Master Chain built and connected to destination.");
+        
+        // Verify master chain routing integrity
+        if (masterNodesRef.current && createdCtx) {
+          const verification = verifyMasterChainRouting(masterNodesRef.current, createdCtx);
+          logVerificationResults(verification);
+          
+          if (!verification.isValid) {
+            console.error('[ROUTING] Master chain verification failed - check errors above');
+          }
+        }
+        
+        // Mark master as ready - this will trigger the routing effect to run
         setMasterReady(true);
+        console.log('[MIXER] Master chain ready - routing can proceed');
+        
+        // Run comprehensive audio diagnostics
+        if ((import.meta as any).env?.DEV) {
+          const diagnostics = diagnoseAudioSystem(
+            createdCtx,
+            masterNodesRef.current,
+            trackNodesRef.current,
+            audioBuffers,
+            translationMatrix
+          );
+          logAudioDiagnostics(diagnostics);
+          
+          // Note: Test tone will be played when user clicks play button (after resume)
+          // Don't auto-play here as AudioContext starts suspended
+        }
         
         if (isCancelled || createdCtx.state === "closed") {
           return;
@@ -5002,11 +5117,18 @@ const FlowRuntime: React.FC<FlowRuntimeProps> = ({ arrangeFocusToken }) => {
       return (currentTime % beatDuration) / beatDuration;
     };
 
+    // Set clock for all plugin engines
     engineInstancesRef.current.forEach(engine => {
         if (engine && typeof engine.setClock === 'function') {
             engine.setClock(getBeatPhase);
         }
     });
+    
+    // Set clock for VelvetCurveEngine (master chain engine)
+    const velvetCurveEngine = getVelvetCurveEngine(audioContextRef.current);
+    if (velvetCurveEngine && typeof velvetCurveEngine.setClock === 'function') {
+      velvetCurveEngine.setClock(getBeatPhase);
+    }
 
   }, [isPlaying, currentTime, pluginRegistry, bpm]);
 
@@ -5065,7 +5187,18 @@ const FlowRuntime: React.FC<FlowRuntimeProps> = ({ arrangeFocusToken }) => {
               nodes.panner.disconnect();
               nodes.analyser.disconnect();
               nodes.preFaderMeter.disconnect(); // Flow Meter Stack cleanup
-            } catch (e) { console.warn(`Error disconnecting nodes for track ${id}:`, e); }
+              
+              // Prime Brain: Track disconnected from routing
+              recordPrimeBrainEvent('routing-track-disconnect', {
+                trackId: id,
+              }, 'success');
+            } catch (e) { 
+              console.warn(`Error disconnecting nodes for track ${id}:`, e);
+              recordPrimeBrainEvent('routing-track-disconnect', {
+                trackId: id,
+                error: 'disconnect-failed',
+              }, 'failure');
+            }
             delete trackNodesRef.current[id];
             delete trackMeterBuffersRef.current[id];
             console.log(`%c[AUDIO] Disposed nodes for track: ${id}`, "color: grey");
@@ -5183,17 +5316,26 @@ const FlowRuntime: React.FC<FlowRuntimeProps> = ({ arrangeFocusToken }) => {
     useEffect(() => {
         const ctx = audioContextRef.current;
         if (!ctx) {
-          console.warn('[MIXER] Audio context not available');
+          // Audio context not ready yet - this is normal during initialization
+          if ((import.meta as any).env?.DEV) {
+            console.debug('[MIXER] Audio context not available yet (initializing...)');
+          }
           return;
         }
         
         if (!masterNodesRef.current) {
-          console.warn('[MIXER] Master chain not initialized, cannot route tracks');
+          // Master chain not built yet - this is normal during initialization
+          if ((import.meta as any).env?.DEV) {
+            console.debug('[MIXER] Master chain not initialized yet (building...)');
+          }
           return;
         }
         
         if (!masterReady) {
-          console.warn('[MIXER] Master not ready – queuing routing for', tracks.length, 'tracks');
+          // Master chain built but not marked ready yet - queue tracks for routing
+          if ((import.meta as any).env?.DEV && tracks.length > 0) {
+            console.debug('[MIXER] Master not ready – queuing routing for', tracks.length, 'tracks');
+          }
           // Queue all tracks for routing when master becomes ready
           tracks.forEach(track => {
             const trackNodes = trackNodesRef.current[track.id];
@@ -5223,6 +5365,28 @@ const FlowRuntime: React.FC<FlowRuntimeProps> = ({ arrangeFocusToken }) => {
           console.error('[MIXER] Master input node not found in master chain');
           return;
         }
+
+        // 🔒 CRITICAL: Ensure masterInput is the ONLY entry point
+        // Tracks MUST connect to masterInput, NOT to destination
+        
+        // Verify track connections (dev mode only)
+        if ((import.meta as any).env?.DEV) {
+          const trackVerification = verifyTrackConnections(trackNodesRef.current, masterInput);
+          if (!trackVerification.isValid || trackVerification.disconnectedTracks.length > 0) {
+            console.warn('[ROUTING] Track connection verification:', {
+              connected: trackVerification.connectedTracks.length,
+              disconnected: trackVerification.disconnectedTracks.length,
+              errors: trackVerification.errors,
+            });
+          }
+        }
+
+        // Prime Brain: Notify that routing graph is rebuilding
+        recordPrimeBrainEvent('routing-rebuild', {
+          trackCount: tracks.length,
+          armedTrackCount: armedTracks.size,
+          insertCount: Object.values(insertsRef.current).reduce((sum, arr) => sum + arr.length, 0),
+        }, 'success');
 
         // Clear ALL existing connections to prevent doubling or stale paths
         Object.values(trackNodesRef.current).forEach(node => { 
@@ -5287,6 +5451,15 @@ const FlowRuntime: React.FC<FlowRuntimeProps> = ({ arrangeFocusToken }) => {
         if (masterInput && masterReady) {
           try {
             currentOutput.connect(masterInput);
+            
+            // Prime Brain: Track successfully connected to routing
+            recordPrimeBrainEvent('routing-track-connect', {
+              trackId: track.id,
+              trackRole: track.role || 'unknown',
+              insertCount: trackInserts.length,
+              hasInserts: trackInserts.length > 0,
+            }, 'success');
+            
             if ((import.meta as any).env?.DEV && track.id === tracks[0]?.id) {
               console.log('[MIXER] Track connected to master:', {
                 trackId: track.id,
@@ -5297,6 +5470,10 @@ const FlowRuntime: React.FC<FlowRuntimeProps> = ({ arrangeFocusToken }) => {
             }
           } catch (err) {
             console.error('[MIXER] Failed to connect track to master:', track.id, err);
+            recordPrimeBrainEvent('routing-track-connect', {
+              trackId: track.id,
+              error: 'connection-failed',
+            }, 'failure');
           }
         } else if (!masterReady) {
           // Queue this track for routing when master becomes ready
@@ -5444,8 +5621,23 @@ const FlowRuntime: React.FC<FlowRuntimeProps> = ({ arrangeFocusToken }) => {
             const trackNodes = trackNodesRef.current[clip.trackId];
             const audioBuffer = audioBuffers[clip.bufferId];
             if (!trackNodes || !audioBuffer) {
-                console.warn(`[AUDIO] Skipping clip ${clip.id}: missing nodes or buffer.`);
+                console.warn(`[AUDIO] Skipping clip ${clip.id}: missing nodes or buffer.`, {
+                    hasTrackNodes: !!trackNodes,
+                    hasAudioBuffer: !!audioBuffer,
+                    bufferId: clip.bufferId,
+                    availableBuffers: Object.keys(audioBuffers),
+                });
                 return;
+            }
+            
+            // Debug: Log clip scheduling
+            if ((import.meta as any).env?.DEV) {
+                console.log(`[AUDIO] Scheduling clip: ${clip.name} on track ${clip.trackId}`, {
+                    start: clip.start,
+                    duration: clip.duration,
+                    transportTime,
+                    bufferDuration: audioBuffer.duration,
+                });
             }
     
             const clipAbsoluteEnd = clip.start + clip.duration;
@@ -5460,6 +5652,11 @@ const FlowRuntime: React.FC<FlowRuntimeProps> = ({ arrangeFocusToken }) => {
             clipGainNode.gain.value = clip.gain ?? 1.0;
             source.connect(clipGainNode);
             clipGainNode.connect(trackNodes.input);
+            
+            // Debug: Verify connection
+            if ((import.meta as any).env?.DEV) {
+                console.log(`[AUDIO] Clip connected: ${clip.name} → track ${clip.trackId} → master chain`);
+            }
     
             // Calculate when this clip should start playing relative to ctx.currentTime
             const timeUntilClipStarts = Math.max(0, clip.start - transportTime);
@@ -6609,6 +6806,8 @@ const FlowRuntime: React.FC<FlowRuntimeProps> = ({ arrangeFocusToken }) => {
     <div className="relative w-screen h-screen text-ink overflow-hidden" style={backgroundGlowStyle}>
         <div className="pointer-events-none absolute inset-0 bg-gradient-to-br from-[rgba(48,92,178,0.45)] via-[rgba(19,37,74,0.4)] to-transparent blur-[110px] opacity-80"></div>
         <Header
+          audioContext={audioContextRef.current}
+          masterInput={masterNodesRef.current?.input || null}
           primeBrainStatus={primeBrainStatus}
           hushFeedback={hushFeedback}
           isPlaying={isPlaying}

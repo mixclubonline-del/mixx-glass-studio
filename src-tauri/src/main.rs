@@ -3,9 +3,11 @@
 
 mod flow_engine;
 mod quantum;
+mod audio_bridge;
 
 use flow_engine::FlowEngine;
 use quantum::superposition::{SuperpositionEngine, MeasurementBasis, CollapsePolicy};
+use audio_bridge::{init_audio_bridge, push_audio_samples, get_audio_bridge_status};
 use std::sync::{Arc, Mutex};
 use once_cell::sync::Lazy;
 use serde_json;
@@ -257,6 +259,9 @@ fn main() {
             flow_set_bpm,
             flow_set_space_pad,
             flow_arm_recording,
+            // Audio Bridge Commands
+            push_audio_samples,
+            get_audio_bridge_status,
             // Quantum Superposition Engine Commands
             quantum_create_superposition,
             quantum_measure_superposition,

@@ -2,11 +2,14 @@ import React, { useLayoutEffect, useMemo, useRef } from "react";
 import clsx from "clsx";
 import type { PrimeBrainStatus } from "../types/primeBrainStatus";
 import { PrimeBrainIcon } from "./flowdock/glyphs/PrimeBrainIcon";
+import AudioStatusIndicator from "./AudioStatusIndicator";
 
 interface HeaderProps {
   primeBrainStatus: PrimeBrainStatus;
   hushFeedback: { color: string; intensity: number; isEngaged: boolean; noiseCount?: number };
   isPlaying: boolean;
+  audioContext: AudioContext | null;
+  masterInput?: AudioNode | null;
   onHeightChange?: (height: number) => void;
   className?: string;
 }
@@ -17,6 +20,8 @@ const Header: React.FC<HeaderProps> = ({
   primeBrainStatus,
   hushFeedback,
   isPlaying,
+  audioContext,
+  masterInput,
   onHeightChange,
   className,
 }) => {
@@ -92,6 +97,11 @@ const Header: React.FC<HeaderProps> = ({
             <span className="text-[10px] text-white/50">Health</span>
             <span>{health.caption}</span>
           </div>
+
+          <AudioStatusIndicator 
+            audioContext={audioContext} 
+            masterInput={masterInput}
+          />
 
           <div
             className={clsx(
