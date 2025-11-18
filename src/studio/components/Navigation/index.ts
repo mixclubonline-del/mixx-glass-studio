@@ -6,3 +6,4 @@ export { UnifiedTransportBar } from './UnifiedTransportBar';
 export { CreativeHeader } from './CreativeHeader';
 export { ProductionToolsMenu } from './ProductionToolsMenu';
 export { ResizableSplitView } from './ResizableSplitView';
+export { RecoveryDialog } from './RecoveryDialog';
