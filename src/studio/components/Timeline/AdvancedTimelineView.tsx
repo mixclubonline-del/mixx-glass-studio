@@ -451,7 +451,15 @@ export const AdvancedTimelineView: React.FC<AdvancedTimelineViewProps> = ({
   }, [currentTime, zoom, autoScrollEnabled]);
   
   return (
-    <div className="h-full flex flex-col relative bg-background">
+    <div 
+      className="h-full flex flex-col relative" 
+      style={{
+        background: `
+          var(--gradient-mesh),
+          linear-gradient(180deg, hsl(240 15% 3% / 0.95), hsl(240 20% 2% / 0.98))
+        `
+      }}
+    >
       {/* Ripple Edit Indicator */}
       <RippleEditIndicator active={rippleEdit} />
       

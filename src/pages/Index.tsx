@@ -1,5 +1,6 @@
 import { useState, useEffect, useRef } from "react";
 import { AudioEngine } from "@/audio/AudioEngine";
+import { useProject, useTransport } from "@/contexts/ProjectContext";
 import {
   ViewContainer,
   AdvancedTimelineView,
@@ -43,8 +44,19 @@ import { useBloomStore } from "@/store/bloomStore";
 import { BloomHUD, createMenuConfig } from "@/components/BloomMenu";
 
 const IndexContent = () => {
-  const engineRef = useRef<AudioEngine | null>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
+  
+  // Use ProjectContext for unified audio engine
+  const { audioEngine } = useProject();
+  const { transport, play, pause, stop, seek } = useTransport();
+  
+  // Create a ref wrapper for components that still expect engineRef
+  const engineRef = useRef(audioEngine);
+  
+  // Keep engineRef in sync with audioEngine
+  useEffect(() => {
+    engineRef.current = audioEngine;
+  }, [audioEngine]);
   const [audioBuffers, setAudioBuffers] = useState<Map<string, AudioBuffer>>(new Map());
   const [isExporting, setIsExporting] = useState(false);
   const [showAIAssistant, setShowAIAssistant] = useState(false);
@@ -73,7 +85,7 @@ const IndexContent = () => {
   
   // Global stores
   const { currentView, isPanelOpen, togglePanel } = useViewStore();
-  const { currentTime, isPlaying, setCurrentTime, setIsPlaying, setDuration } = useTimelineStore();
+  const { currentTime, setCurrentTime, setDuration } = useTimelineStore();
   const { tracks, regions, addTrack, addRegion } = useTracksStore();
 
   // Track view changes for Prime Brain
@@ -115,35 +127,25 @@ const IndexContent = () => {
     updateBus
   } = useMixerStore();
 
-  // Initialize audio engine
-  useEffect(() => {
-    const engine = new AudioEngine();
-    engineRef.current = engine;
-    
-    return () => {
-      if (engineRef.current) {
-        engineRef.current.stop();
-      }
-    };
-  }, []);
+  // Audio engine is now managed by ProjectContext - no local initialization needed
 
   // Update playback time
   useEffect(() => {
-    if (!isPlaying || !engineRef.current) return;
+    if (!transport.isPlaying || !audioEngine) return;
     
     const interval = setInterval(() => {
-      const time = engineRef.current?.getCurrentTime() || 0;
+      const time = audioEngine.getCurrentTime() || 0;
       setCurrentTime(time);
       
       // Update prediction engine with current bar
-      const bpm = engineRef.current?.bpm || 120;
+      const bpm = audioEngine.bpm || 120;
       const barDuration = (60 / bpm) * 4; // 4 beats per bar
       const currentBar = Math.floor(time / barDuration);
       predictionEngine.updatePosition(currentBar, bpm);
     }, 50);
     
     return () => clearInterval(interval);
-  }, [isPlaying, setCurrentTime]);
+  }, [transport.isPlaying, setCurrentTime, audioEngine]);
 
   // No metering loop needed - meters read directly from AnalyserNodes with their own RAF loops
 
@@ -170,15 +172,15 @@ const IndexContent = () => {
   };
 
   const handleLoadTrack = async (file: File) => {
-    if (!engineRef.current) return;
+    if (!audioEngine) return;
 
     try {
       // Unique IDs (prevents collisions on fast multi-imports)
       const trackId = genId("track");
 
       // Load into engine first so buffer/duration is real
-      await engineRef.current.loadTrack(trackId, file.name, file);
-      const loaded = engineRef.current.getTracks().find(t => t.id === trackId);
+      await audioEngine.loadTrack(trackId, file.name, file);
+      const loaded = audioEngine.getTracks().find(t => t.id === trackId);
       const buffer = loaded?.buffer;
       if (!buffer) throw new Error("No audio buffer after load");
 
@@ -233,7 +235,7 @@ const IndexContent = () => {
         color,
         peakLevel: { left: -60, right: -60 },
       });
-      engineRef.current.setTrackVolume(trackId, 0.75);
+      audioEngine.setTrackVolume(trackId, 0.75);
 
       // 5) Update song duration conservatively
       const newEnd = 0 + buffer.duration;
@@ -247,9 +249,9 @@ const IndexContent = () => {
           const ts = AudioAnalyzer.inferTimeSignature(bpm, buffer);
           setDetectedBPM(bpm);
           setDetectedKey(`${key} ${scale}`);
-          if (engineRef.current) {
-            engineRef.current.bpm = bpm;
-            engineRef.current.timeSignature = ts;
+          if (audioEngine) {
+            audioEngine.bpm = bpm;
+            audioEngine.timeSignature = ts;
           }
         } catch {}
       }, 120);
@@ -278,15 +280,15 @@ const IndexContent = () => {
   };
 
   const handleRemoveTrack = (id: string) => {
-    engineRef.current?.removeTrack(id);
+    audioEngine?.removeTrack(id);
     useTracksStore.getState().removeTrack?.(id);
     useMixerStore.getState().removeChannel?.(id);
     if (selectedTrackId === id) setSelectedTrackId(null);
   };
 
   const handleVolumeChange = (id: string, volume: number) => {
-    if (engineRef.current) {
-      engineRef.current.setTrackVolume(id, volume);
+    if (audioEngine) {
+      audioEngine.setTrackVolume(id, volume);
       // Sync to mixer store
       const channel = channels.get(id);
       if (channel) {
@@ -305,8 +307,8 @@ const IndexContent = () => {
   };
   
   const handlePanChange = (id: string, pan: number) => {
-    if (engineRef.current) {
-      engineRef.current.setTrackPan(id, pan);
+    if (audioEngine) {
+      audioEngine.setTrackPan(id, pan);
       
       // Send to Prime Brain
       primeBrain.processControlEvent({
@@ -319,10 +321,10 @@ const IndexContent = () => {
   };
   
   const handleSoloToggle = (id: string) => {
-    if (engineRef.current) {
+    if (audioEngine) {
       const channel = channels.get(id);
       if (channel) {
-        engineRef.current.setTrackSolo(id, !channel.solo);
+        audioEngine.setTrackSolo(id, !channel.solo);
         useMixerStore.getState().updateChannel(id, { solo: !channel.solo });
       }
     }
@@ -330,8 +332,8 @@ const IndexContent = () => {
   
   // Plugin management
   const handleLoadPlugin = (trackId: string, slotNumber: number, pluginId: string) => {
-    if (engineRef.current) {
-      const instanceId = engineRef.current.loadPluginToTrack(trackId, pluginId, slotNumber);
+    if (audioEngine) {
+      const instanceId = audioEngine.loadPluginToTrack(trackId, pluginId, slotNumber);
       
       if (instanceId) {
         // Update tracks store with plugin info
@@ -361,8 +363,8 @@ const IndexContent = () => {
   };
   
   const handleUnloadPlugin = (trackId: string, slotNumber: number) => {
-    if (engineRef.current) {
-      engineRef.current.unloadPluginFromTrack(trackId, slotNumber);
+    if (audioEngine) {
+      audioEngine.unloadPluginFromTrack(trackId, slotNumber);
       
       // Update tracks store
       const { tracks: tracksArray, updateTrack } = useTracksStore.getState();
@@ -390,8 +392,8 @@ const IndexContent = () => {
   };
   
   const handleBypassPlugin = (trackId: string, slotNumber: number, bypass: boolean) => {
-    if (engineRef.current) {
-      engineRef.current.bypassPluginOnTrack(trackId, slotNumber, bypass);
+    if (audioEngine) {
+      audioEngine.bypassPluginOnTrack(trackId, slotNumber, bypass);
       
       // Update tracks store
       const { tracks: tracksArray, updateTrack } = useTracksStore.getState();
@@ -410,8 +412,8 @@ const IndexContent = () => {
   
   // Send management
   const handleSendChange = (trackId: string, busId: string, amount: number) => {
-    if (engineRef.current) {
-      const track = engineRef.current.getTracks().find(t => t.id === trackId);
+    if (audioEngine) {
+      const track = audioEngine.getTracks().find(t => t.id === trackId);
       if (track) {
         track.channelStrip.setSendAmount(busId, amount);
         
@@ -430,7 +432,7 @@ const IndexContent = () => {
     // Use selectedTrackForPlugin if set (from mixer), otherwise use selectedTrackId (from timeline)
     const targetTrack = selectedTrackForPlugin || selectedTrackId;
     
-    if (targetTrack && engineRef.current) {
+    if (targetTrack && audioEngine) {
       handleLoadPlugin(targetTrack, selectedSlotForPlugin, pluginId);
       toast({
         title: "Plugin Loaded",
@@ -471,8 +473,8 @@ const IndexContent = () => {
   };
   
   const handlePluginParameterChange = (trackId: string, slotNumber: number, paramName: string, value: number) => {
-    if (engineRef.current) {
-      const pluginInstance = engineRef.current.getPluginInstance(trackId, slotNumber);
+    if (audioEngine) {
+      const pluginInstance = audioEngine.getPluginInstance(trackId, slotNumber);
       if (pluginInstance && 'setParams' in pluginInstance) {
         // Call setParams if the plugin has this method
         (pluginInstance as any).setParams({ [paramName]: value });
@@ -482,13 +484,13 @@ const IndexContent = () => {
   
   // Bus management  
   const handleCreateBus = (name: string, color: string, type: 'aux' | 'group') => {
-    if (engineRef.current) {
+    if (audioEngine) {
       const busId = `bus-${Date.now()}`;
       
       if (type === 'aux') {
-        engineRef.current.createAuxBus(busId, name);
+        audioEngine.createAuxBus(busId, name);
       } else {
-        engineRef.current.createGroupBus(busId, name);
+        audioEngine.createGroupBus(busId, name);
       }
       
       addBus({
@@ -521,7 +523,7 @@ const IndexContent = () => {
   };
   
   const handlePrevBar = () => {
-    if (engineRef.current) {
+    if (audioEngine) {
       const bpm = 120;
       const barDuration = (60 / bpm) * 4;
       const currentBar = Math.floor(currentTime / barDuration);
@@ -531,7 +533,7 @@ const IndexContent = () => {
   };
   
   const handleNextBar = () => {
-    if (engineRef.current) {
+    if (audioEngine) {
       const bpm = 120;
       const barDuration = (60 / bpm) * 4;
       const currentBar = Math.floor(currentTime / barDuration);
@@ -541,11 +543,11 @@ const IndexContent = () => {
   };
 
   const handleMuteToggle = (id: string) => {
-    if (engineRef.current) {
+    if (audioEngine) {
       const channel = channels.get(id);
       if (channel) {
         const newMuted = !channel.muted;
-        engineRef.current.setTrackMute(id, newMuted);
+        audioEngine.setTrackMute(id, newMuted);
         // Sync to stores
         useMixerStore.getState().updateChannel(id, { muted: newMuted });
         useTracksStore.getState().updateTrack(id, { muted: newMuted });
@@ -553,63 +555,44 @@ const IndexContent = () => {
     }
   };
 
-  const handlePlay = () => {
-    if (engineRef.current) {
-      // Resume from current timeline position
-      engineRef.current.play(currentTime);
-      setIsPlaying(true);
-      
-      // Verify AudioContext unlocked
-      const masterAnalyser = engineRef.current.getMasterAnalyser();
-      if (masterAnalyser?.context) {
-        console.info('🎵 AudioContext state:', masterAnalyser.context.state);
-        if (masterAnalyser.context.state === 'running') {
-          console.info('✅ Audio unlocked and ready');
-        }
-      }
-    }
+  const handlePlay = async () => {
+    console.log('🎵 Index: handlePlay called');
+    await play(currentTime);
   };
   
   const handlePause = () => {
-    if (engineRef.current) {
-      engineRef.current.pause();
-      setIsPlaying(false);
-    }
+    console.log('⏸️ Index: handlePause called');
+    pause();
   };
   
   const handleStop = () => {
-    if (engineRef.current) {
-      engineRef.current.stop();
-      setIsPlaying(false);
-      setCurrentTime(0);
-    }
+    console.log('⏹️ Index: handleStop called');
+    stop();
+    setCurrentTime(0);
   };
   
   const handleSeek = (time: number) => {
-    if (engineRef.current) {
-      const wasPlaying = isPlaying;
-      engineRef.current.stop();
+    if (audioEngine) {
+      const wasPlaying = transport.isPlaying;
+      stop();
       setCurrentTime(time);
       
       // If we were playing, resume playback from new position
       if (wasPlaying) {
         setTimeout(() => {
-          if (engineRef.current) {
-            engineRef.current.play(time);
-            setIsPlaying(true);
-          }
+          play(time);
         }, 10);
       }
     }
   };
 
   const handleExport = async () => {
-    if (!engineRef.current) return;
+    if (!audioEngine) return;
     
     setIsExporting(true);
     
     try {
-      const blob = await engineRef.current.exportMix();
+      const blob = await audioEngine.exportMix();
       const url = URL.createObjectURL(blob);
       const a = document.createElement('a');
       a.href = url;
@@ -822,17 +805,17 @@ const IndexContent = () => {
                 <>
                   <MeteringDashboard
                     masterPeakLevel={masterPeakLevel}
-                    analyser={engineRef.current?.getMasterAnalyser()}
+                    analyser={audioEngine?.getMasterAnalyser()}
                     engineRef={engineRef}
                   />
                   
                   {/* VelvetFloor Panel - Sub-harmonic monitoring */}
-                  {engineRef.current && (
+                  {audioEngine && (
                     <VelvetFloorPanel
-                      getVelvetFloorState={() => engineRef.current!.getVelvetFloorEngine().getVelvetFloorState()}
-                      getHarmonicLattice={() => engineRef.current!.getVelvetFloorEngine().getHarmonicLattice()}
-                      getALSColor={() => engineRef.current!.getVelvetFloorEngine().getALSColor()}
-                      isPlaying={isPlaying}
+                      getVelvetFloorState={() => audioEngine.getVelvetFloorEngine().getVelvetFloorState()}
+                      getHarmonicLattice={() => audioEngine.getVelvetFloorEngine().getHarmonicLattice()}
+                      getALSColor={() => audioEngine.getVelvetFloorEngine().getALSColor()}
+                      isPlaying={transport.isPlaying}
                     />
                   )}
                 </>
@@ -883,25 +866,9 @@ const IndexContent = () => {
               },
               onTogglePluginBrowser: () => togglePanel('browser'),
               onToggleAIAssistant: () => setShowAIAssistant(!showAIAssistant),
-              onPlay: () => {
-                if (engineRef.current) {
-                  engineRef.current.play();
-                  setIsPlaying(true);
-                }
-              },
-              onPause: () => {
-                if (engineRef.current) {
-                  engineRef.current.pause();
-                  setIsPlaying(false);
-                }
-              },
-              onStop: () => {
-                if (engineRef.current) {
-                  engineRef.current.stop();
-                  setIsPlaying(false);
-                  setCurrentTime(0);
-                }
-              },
+              onPlay: handlePlay,
+              onPause: handlePause,
+              onStop: handleStop,
               onRecord: () => {
                 toast({
                   title: "Recording",
