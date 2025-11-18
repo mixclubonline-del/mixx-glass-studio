@@ -112,7 +112,7 @@
     --error-foreground: 0 0% 98%;
     
     /* ========== BASE TOKENS ========== */
-    --background: 240 20% 2%;
+    --background: 240 20% 4%;
     --foreground: 0 0% 98%;
     
     --card: 240 10% 5%;
@@ -287,6 +287,7 @@
   .glass {
     background: hsl(var(--glass-bg));
     backdrop-filter: blur(20px) saturate(180%);
+    -webkit-backdrop-filter: blur(20px) saturate(180%);
     border: 1px solid hsl(var(--glass-border));
     box-shadow: 
       0 8px 32px 0 rgba(0, 0, 0, 0.37),
