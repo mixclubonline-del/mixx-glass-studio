@@ -1,10 +1,11 @@
 /**
- * Timeline Toolbar - 8 professional cursor tools
+ * Timeline Toolbar - 8 professional cursor tools + autosave indicator
  * Selection, Range, Split, Trim, Fade, Pencil, Zoom, Multi-Tool
  */
 
 import React from 'react';
 import { useTimelineStore } from '@/store/timelineStore';
+import { AutosaveIndicator } from './AutosaveIndicator';
 import { 
   MousePointer2, 
   Square, 
@@ -75,27 +76,33 @@ export const TimelineToolbar: React.FC = () => {
   }, [currentTool, setCurrentTool]);
   
   return (
-    <div className="flex items-center gap-1 glass-ultra border-gradient rounded-lg p-1.5">
-      {tools.map((tool) => (
-        <button
-          key={tool.id}
-          onClick={() => setCurrentTool(tool.id)}
-          className={`flex items-center gap-1.5 px-3 py-2 rounded-md transition-all group relative micro-interact ${
-            currentTool === tool.id
-              ? 'glass-light text-gradient-subtle shadow-[0_0_12px_hsl(var(--prime-500)/0.4)]'
-              : 'text-muted-foreground hover:text-foreground chromatic-hover'
-          }`}
-          title={`${tool.label} (${tool.shortcut})`}
-        >
-          {tool.icon}
-          <span className="text-xs font-medium hidden lg:inline">{tool.label}</span>
-          
-          {/* Tooltip with shortcut */}
-          <div className="absolute bottom-full left-1/2 -translate-x-1/2 mb-2 px-2 py-1 bg-popover text-popover-foreground text-xs rounded opacity-0 group-hover:opacity-100 transition-opacity pointer-events-none whitespace-nowrap">
-            {tool.label} ({tool.shortcut})
-          </div>
-        </button>
-      ))}
+    <div className="flex items-center justify-between gap-4 glass-ultra border-gradient rounded-lg p-1.5">
+      {/* Tool selector */}
+      <div className="flex items-center gap-1">
+        {tools.map((tool) => (
+          <button
+            key={tool.id}
+            onClick={() => setCurrentTool(tool.id)}
+            className={`flex items-center gap-1.5 px-3 py-2 rounded-md transition-all group relative micro-interact ${
+              currentTool === tool.id
+                ? 'glass-light text-gradient-subtle shadow-[0_0_12px_hsl(var(--prime-500)/0.4)]'
+                : 'text-muted-foreground hover:text-foreground chromatic-hover'
+            }`}
+            title={`${tool.label} (${tool.shortcut})`}
+          >
+            {tool.icon}
+            <span className="text-xs font-medium hidden lg:inline">{tool.label}</span>
+            
+            {/* Tooltip with shortcut */}
+            <div className="absolute bottom-full left-1/2 -translate-x-1/2 mb-2 px-2 py-1 bg-popover text-popover-foreground text-xs rounded opacity-0 group-hover:opacity-100 transition-opacity pointer-events-none whitespace-nowrap">
+              {tool.label} ({tool.shortcut})
+            </div>
+          </button>
+        ))}
+      </div>
+      
+      {/* Autosave indicator */}
+      <AutosaveIndicator />
     </div>
   );
 };

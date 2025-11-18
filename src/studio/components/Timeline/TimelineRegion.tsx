@@ -1,10 +1,11 @@
 /**
- * Timeline Region - Individual audio region with waveform and handles
+ * Timeline Region - Individual audio region with enhanced waveform and real-time playback
  */
 
 import React, { useState, useRef } from 'react';
 import { Region } from '@/types/timeline';
 import { WaveformRenderer } from './WaveformRenderer';
+import { EnhancedWaveformRenderer } from './EnhancedWaveformRenderer';
 import { useTimelineStore } from '@/store/timelineStore';
 import { RegionContextMenu } from './RegionContextMenu';
 import { useTracksStore } from '@/store/tracksStore';
@@ -19,6 +20,7 @@ interface TimelineRegionProps {
   onSplit: (id: string, splitTime: number) => void;
   isSelected: boolean;
   onChopSample?: (regionId: string) => void;
+  useEnhancedWaveform?: boolean; // Enable real-time visualization
 }
 
 export const TimelineRegion: React.FC<TimelineRegionProps> = ({
@@ -29,7 +31,8 @@ export const TimelineRegion: React.FC<TimelineRegionProps> = ({
   onSelect,
   onSplit,
   isSelected,
-  onChopSample
+  onChopSample,
+  useEnhancedWaveform = true, // Default to enhanced for better experience
 }) => {
   const [isDragging, setIsDragging] = useState(false);
   const [isTrimming, setIsTrimming] = useState<'left' | 'right' | null>(null);
@@ -271,18 +274,32 @@ export const TimelineRegion: React.FC<TimelineRegionProps> = ({
           filter: 'blur(1px)',
         }}
       />
-      {/* Waveform */}
+      {/* Waveform - Use enhanced renderer for real-time playback visualization */}
       {audioBuffer && (
-        <WaveformRenderer
-          audioBuffer={audioBuffer}
-          width={width}
-          height={80}
-          color={region.color}
-          startTime={region.bufferOffset}
-          duration={region.bufferDuration}
-          zoom={zoom}
-          displayMode="peak"
-        />
+        useEnhancedWaveform ? (
+          <EnhancedWaveformRenderer
+            audioBuffer={audioBuffer}
+            width={width}
+            height={80}
+            color={region.color}
+            regionStartTime={region.startTime}
+            regionDuration={region.duration}
+            bufferOffset={region.bufferOffset}
+            zoom={zoom}
+            displayMode="peak"
+          />
+        ) : (
+          <WaveformRenderer
+            audioBuffer={audioBuffer}
+            width={width}
+            height={80}
+            color={region.color}
+            startTime={region.bufferOffset}
+            duration={region.bufferDuration}
+            zoom={zoom}
+            displayMode="peak"
+          />
+        )
       )}
       
       {/* Region name */}

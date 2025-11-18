@@ -10,6 +10,8 @@ export { CollapsibleTimelineToolbar } from './CollapsibleTimelineToolbar';
 export { AddTrackDialog } from './AddTrackDialog';
 export { TimelineContainer } from './TimelineContainer';
 export { WaveformRenderer } from './WaveformRenderer';
+export { EnhancedWaveformRenderer } from './EnhancedWaveformRenderer';
+export { AutosaveIndicator } from './AutosaveIndicator';
 export { TrackHeader } from './TrackHeader';
 export { TrackLane } from './TrackLane';
 

@@ -1,8 +1,9 @@
 /**
- * Playhead component - vertical line following playback
+ * Playhead component - vertical line following playback with smooth animation
  */
 
 import { useTimelineStore } from '@/store/timelineStore';
+import { useEffect, useRef } from 'react';
 
 interface PlayheadProps {
   containerWidth: number;
@@ -11,6 +12,8 @@ interface PlayheadProps {
 
 export function Playhead({ containerWidth, containerHeight }: PlayheadProps) {
   const { currentTime, duration, zoom, scrollX, isPlaying } = useTimelineStore();
+  const playheadRef = useRef<HTMLDivElement>(null);
+  const animationRef = useRef<number>();
   
   if (duration === 0) return null;
   
@@ -20,12 +23,35 @@ export function Playhead({ containerWidth, containerHeight }: PlayheadProps) {
   // Don't render if off-screen
   if (playheadX < -50 || playheadX > containerWidth + 50) return null;
   
+  // Smooth animation using RAF when playing
+  useEffect(() => {
+    if (!isPlaying || !playheadRef.current) return;
+    
+    const animate = () => {
+      if (playheadRef.current) {
+        const x = (currentTime * zoom) - scrollX;
+        playheadRef.current.style.transform = `translateX(${x}px)`;
+      }
+      animationRef.current = requestAnimationFrame(animate);
+    };
+    
+    animate();
+    
+    return () => {
+      if (animationRef.current) {
+        cancelAnimationFrame(animationRef.current);
+      }
+    };
+  }, [isPlaying, currentTime, zoom, scrollX]);
+  
   return (
     <div
-      className="absolute top-0 pointer-events-none z-30"
+      ref={playheadRef}
+      className="absolute top-0 pointer-events-none z-30 transition-all duration-100"
       style={{
-        left: `${playheadX}px`,
+        left: isPlaying ? 0 : `${playheadX}px`,
         height: `${containerHeight}px`,
+        transform: isPlaying ? `translateX(${playheadX}px)` : 'none',
       }}
     >
       {/* Glow effect with enhanced trail */}
@@ -42,19 +68,19 @@ export function Playhead({ containerWidth, containerHeight }: PlayheadProps) {
       {/* Motion blur trail when playing */}
       {isPlaying && (
         <div
-          className="absolute top-0 h-full animate-playhead-trail"
+          className="absolute top-0 h-full animate-fade-in"
           style={{
-            left: '-40px',
-            right: '100%',
+            left: '-60px',
+            width: '60px',
             background: 'linear-gradient(90deg, transparent 0%, hsl(var(--neon-pink) / 0.3) 100%)',
             filter: 'blur(8px)',
           }}
         />
       )}
       
-      {/* Playhead line with glow */}
+      {/* Playhead line with glow and pulse */}
       <div
-        className="absolute top-0 w-[3px] h-full"
+        className={`absolute top-0 w-[3px] h-full ${isPlaying ? 'animate-pulse' : ''}`}
         style={{
           left: '-1.5px',
           background: isPlaying 
@@ -66,16 +92,31 @@ export function Playhead({ containerWidth, containerHeight }: PlayheadProps) {
         }}
       />
       
-      {/* Top handle */}
+      {/* Top handle with pulse animation */}
       <div
-        className="absolute -top-1 left-0 w-3 h-3 -translate-x-1/2 rounded-full"
+        className={`absolute -top-1 left-0 w-3 h-3 -translate-x-1/2 rounded-full ${isPlaying ? 'animate-pulse' : ''}`}
         style={{
           background: isPlaying ? 'hsl(var(--neon-pink))' : 'hsl(var(--neon-blue))',
           boxShadow: isPlaying
-            ? '0 0 6px hsl(var(--neon-pink))'
+            ? '0 0 6px hsl(var(--neon-pink)), 0 0 12px hsl(var(--neon-pink) / 0.5)'
             : '0 0 6px hsl(var(--neon-blue))',
         }}
       />
+      
+      {/* Peak indicator when playing */}
+      {isPlaying && (
+        <div
+          className="absolute top-2 left-0 -translate-x-1/2 animate-fade-in"
+          style={{
+            width: '6px',
+            height: '6px',
+            borderRadius: '50%',
+            background: 'hsl(var(--neon-pink))',
+            boxShadow: '0 0 10px hsl(var(--neon-pink))',
+            animation: 'pulse 1s cubic-bezier(0.4, 0, 0.6, 1) infinite',
+          }}
+        />
+      )}
     </div>
   );
 }

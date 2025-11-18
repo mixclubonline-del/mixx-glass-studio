@@ -12,9 +12,11 @@ import {
 } from "@/studio/components";
 import { AudioTestLoader } from "@/studio/components/Audio";
 import { CentralCommandHub } from "@/studio/components/Navigation/CentralCommandHub";
+import { RecoveryDialog } from "@/studio/components/Navigation/RecoveryDialog";
 import { PluginBrowser } from "@/studio/components/Plugins/PluginBrowser";
 import { PluginWindowManager } from "@/studio/components/Plugins/PluginWindowManager";
 import { useKeyboardShortcuts } from "@/hooks/useKeyboardShortcuts";
+import { useAutosave } from "@/hooks/useAutosave";
 import { useViewStore } from "@/store/viewStore";
 import { useTimelineStore } from "@/store/timelineStore";
 import { useTracksStore } from "@/store/tracksStore";
@@ -57,6 +59,9 @@ const IndexContent = () => {
   useEffect(() => {
     engineRef.current = audioEngine;
   }, [audioEngine]);
+  
+  // Enable autosave
+  const { save, lastSaveTime } = useAutosave(true);
   const [audioBuffers, setAudioBuffers] = useState<Map<string, AudioBuffer>>(new Map());
   const [isExporting, setIsExporting] = useState(false);
   const [showAIAssistant, setShowAIAssistant] = useState(false);
@@ -679,6 +684,9 @@ const IndexContent = () => {
         className="hidden"
         onChange={handleFileSelect}
       />
+      
+      {/* Recovery Dialog */}
+      <RecoveryDialog />
       
       {/* Mixx Ambient Lighting Overlays */}
       <MixxAmbientOverlay />
