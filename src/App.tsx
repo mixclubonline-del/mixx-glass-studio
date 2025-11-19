@@ -32,8 +32,8 @@ import { getMixxFXEngine, initializeMixxFXEngine } from './audio/MixxFXEngine';
 import { buildMasterChain } from './audio/masterChain';
 import type { VelvetMasterChain } from './audio/masterChain';
 import { verifyMasterChainRouting, logVerificationResults, verifyTrackConnections } from './audio/routingVerification';
-import { diagnoseAudioSystem, logAudioDiagnostics } from './utils/audioDiagnostics';
-import { auditMixerConsole, logMixerAudit, type MixerAuditContext } from './utils/mixerAudit';
+import { diagnoseAudioSystem as _diagnoseAudioSystem, logAudioDiagnostics as _logAudioDiagnostics } from './utils/audioDiagnostics';
+import { auditMixerConsole as _auditMixerConsole, logMixerAudit as _logMixerAudit, type MixerAuditContext } from './utils/mixerAudit';
 import { createNativeAudioBridge, createNativeAudioStreamNode } from './utils/nativeAudioBridge';
 import { VelvetLoudnessMeter, DEFAULT_VELVET_LOUDNESS_METRICS } from './audio/VelvetLoudnessMeter';
 import type { VelvetLoudnessMetrics } from './audio/VelvetLoudnessMeter';
@@ -112,6 +112,7 @@ import PianoRollPanel from './components/piano/PianoRollPanel';
 import { ingestHistoryStore, IngestHistoryEntry } from './state/ingestHistory';
 import { publishAlsSignal, publishBloomSignal, publishIngestSignal } from './state/flowSignals';
 import { useFlowContext } from './state/flowContextService';
+import { createSoftPrimeBootConfig, type PrimeBootConfig } from './flow-kernel/mixxos';
 import {
   TrackUIState,
   TrackContextMode,
@@ -1189,6 +1190,10 @@ interface FlowRuntimeProps {
 }
 
 const FlowRuntime: React.FC<FlowRuntimeProps> = ({ arrangeFocusToken }) => {
+  // --- MIXXOS / PRIME BOOT ---
+  // Soft Prime Boot: Prime-only dev profile for FlowRuntime.
+  const primeBoot = React.useMemo<PrimeBootConfig>(() => createSoftPrimeBootConfig(), []);
+
   // --- STATE MANAGEMENT ---
   const [tracks, setTracks] = useState<TrackData[]>(() => buildInitialTracks());
   const stemIntegrationRef = useRef<FlowStemIntegration | null>(null);
@@ -1470,7 +1475,26 @@ const FlowRuntime: React.FC<FlowRuntimeProps> = ({ arrangeFocusToken }) => {
   );
   const hushSystem = useMemo(() => getHushSystem(), []);
   const hushProcessorNodeRef = useRef<ScriptProcessorNode | null>(null);
-  const skipAudioSetupWarmupRef = useRef<boolean>(import.meta.env.DEV);
+  // In Soft Prime Boot we rely on the MixxOS profile instead of raw env flags.
+  const skipAudioSetupWarmupRef = useRef<boolean>(primeBoot.skipAudioWarmup);
+
+  // --- Soft Prime Boot: gate heavy diagnostics behind config ---
+  const diagnoseAudioSystem: typeof _diagnoseAudioSystem =
+    primeBoot.enableAudioDiagnostics
+      ? _diagnoseAudioSystem
+      : () => {
+          // no-op in this boot profile
+        };
+
+  const logAudioDiagnostics: typeof _logAudioDiagnostics =
+    primeBoot.enableAudioDiagnostics
+      ? _logAudioDiagnostics
+      : () => {};
+
+  const auditMixerConsole: typeof _auditMixerConsole =
+    primeBoot.enableMixerAudit ? _auditMixerConsole : () => {};
+  const logMixerAudit: typeof _logMixerAudit =
+    primeBoot.enableMixerAudit ? _logMixerAudit : () => {};
 
   useEffect(() => {
     if (typeof window === "undefined") return;
