@@ -4,6 +4,7 @@ import { PluginContainer } from '../shared/PluginContainer';
 import { Knob } from '../shared/Knob';
 import { MixxSpiritSettings, PluginComponentProps } from '../../types';
 import { PrimeBrainStub } from '../../lib/PrimeBrainStub';
+import { useFlowComponent } from '../../../../core/flow/useFlowComponent';
 
 const SpiritVisualizer: React.FC<{ sensitivity: number, energyLink: number, threshold: number }> = 
 ({ sensitivity, energyLink, threshold }) => {
@@ -49,9 +50,19 @@ export const MixxSpirit: React.FC<PluginComponentProps<MixxSpiritSettings>> = ({
 }) => {
     const { sensitivity, energyLink, threshold, mix, output } = pluginState;
 
+    // Register plugin with Flow
+    const { broadcast } = useFlowComponent({
+        id: `plugin-mixx-spirit-${name}`,
+        type: 'plugin',
+        name: `Mixx Spirit: ${name}`,
+        broadcasts: ['parameter_change', 'state_change'],
+        listens: [{ signal: 'prime_brain_guidance', callback: () => {} }],
+    });
+
     const handleValueChange = (param: keyof MixxSpiritSettings, value: number) => {
         setPluginState({ [param]: value });
         PrimeBrainStub.sendEvent('parameter_change', { plugin: 'mixx-spirit', parameter: param, value });
+        broadcast('parameter_change', { plugin: 'mixx-spirit', parameter: param, value });
     };
 
     return (

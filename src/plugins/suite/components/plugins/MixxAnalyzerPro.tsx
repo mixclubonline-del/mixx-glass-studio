@@ -2,6 +2,7 @@
 import React, { useState, useEffect, useRef, useCallback } from 'react';
 import { PluginContainer } from '../shared/PluginContainer';
 import { MixxAnalyzerProSettings, PluginComponentProps } from '../../types';
+import { useFlowComponent } from '../../../../core/flow/useFlowComponent';
 
 const Analyzer: React.FC = () => {
     const canvasRef = useRef<HTMLCanvasElement>(null);
@@ -104,6 +105,15 @@ const Analyzer: React.FC = () => {
 export const MixxAnalyzerPro: React.FC<PluginComponentProps<MixxAnalyzerProSettings>> = ({ 
     isDragging, isResizing, name, description
 }) => {
+    // Register plugin with Flow
+    useFlowComponent({
+        id: `plugin-mixx-analyzer-pro-${name}`,
+        type: 'plugin',
+        name: `Mixx Analyzer Pro: ${name}`,
+        broadcasts: ['state_change'],
+        listens: [{ signal: 'prime_brain_guidance', callback: () => {} }],
+    });
+
     return (
         <PluginContainer title={name} subtitle={description} isDragging={isDragging} isResizing={isResizing}>
             <div className="w-full h-full p-4">

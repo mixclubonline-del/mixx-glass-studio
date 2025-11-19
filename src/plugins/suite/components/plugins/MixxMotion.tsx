@@ -4,6 +4,7 @@ import { PluginContainer } from '../shared/PluginContainer';
 import { Knob } from '../shared/Knob';
 import { MixxMotionSettings, PluginComponentProps } from '../../types';
 import { PrimeBrainStub } from '../../lib/PrimeBrainStub';
+import { useFlowComponent } from '../../../../core/flow/useFlowComponent';
 
 const ToggleButton: React.FC<{ label: string, value: boolean, onChange: (val: boolean) => void }> = ({ label, value, onChange }) => (
     <button
@@ -56,9 +57,19 @@ export const MixxMotion: React.FC<PluginComponentProps<MixxMotionSettings>> = ({
 }) => {
     const { rate, depth, sync, mix, output } = pluginState;
 
+    // Register plugin with Flow
+    const { broadcast } = useFlowComponent({
+        id: `plugin-mixx-motion-${name}`,
+        type: 'plugin',
+        name: `Mixx Motion: ${name}`,
+        broadcasts: ['parameter_change', 'state_change'],
+        listens: [{ signal: 'prime_brain_guidance', callback: () => {} }],
+    });
+
     const handleValueChange = (param: keyof MixxMotionSettings, value: number | boolean) => {
         setPluginState({ [param]: value });
         PrimeBrainStub.sendEvent('parameter_change', { plugin: 'mixx-motion', parameter: param, value });
+        broadcast('parameter_change', { plugin: 'mixx-motion', parameter: param, value });
     };
 
     return (

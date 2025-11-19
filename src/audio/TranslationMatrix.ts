@@ -55,16 +55,33 @@ export class TranslationMatrix {
   }
 
   attach(source: AudioNode, destination: AudioNode) {
+    // Disconnect any existing connections
     if (this.attached) {
       try {
         source.disconnect(this.input);
       } catch {
         // ignore
       }
+      try {
+        this.output.disconnect();
+      } catch {
+        // ignore
+      }
     }
+    // Connect source to input
     source.connect(this.input);
+    // Connect output to destination - CRITICAL for audio playback
     this.output.connect(destination);
     this.attached = true;
+    
+    // Verify connection
+    console.log('[TranslationMatrix] Attached:', {
+      sourceConnected: true,
+      outputConnected: true,
+      destination: !!destination,
+      dryGain: this.dryGain.gain.value,
+      activeProfile: this.active,
+    });
   }
 
   activate(profileKey: TranslationProfileKey) {

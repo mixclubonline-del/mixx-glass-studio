@@ -1,7 +1,13 @@
 /**
  * Flow Meter Stack - Meter Utilities (STEP 4)
  * Core meter calculations: Peak, RMS, Crest Factor, Heat
+ * 
+ * QUANTUM OPTIMIZATION: Uses fast math functions and lookup tables
+ * 
+ * @author Prime (Mixx Club)
  */
+
+import { fastLinearToDb, fastRMS, fastPeak } from '../performance/mathCache';
 
 /**
  * Compute peak level from time domain data.
@@ -12,21 +18,22 @@ export function computePeak(buffer: Uint8Array | Float32Array): number {
   if (buffer.length === 0) return -Infinity;
 
   let max = 0;
-  for (let i = 0; i < buffer.length; i++) {
-    const abs = Math.abs(buffer[i]);
-    if (abs > max) max = abs;
+  
+  // Use optimized peak calculation for Float32Array
+  if (buffer instanceof Float32Array) {
+    max = fastPeak(buffer);
+  } else {
+    // Uint8Array path
+    for (let i = 0; i < buffer.length; i++) {
+      const abs = Math.abs(buffer[i] - 128) / 128;
+      if (abs > max) max = abs;
+    }
   }
 
   if (max === 0) return -Infinity;
   
-  // Convert to dB
-  // Uint8Array is 0-255, Float32Array is -1 to 1
-  if (buffer instanceof Uint8Array) {
-    const normalized = (max - 128) / 128;
-    return 20 * Math.log10(Math.max(0.0001, Math.abs(normalized)));
-  } else {
-    return 20 * Math.log10(Math.max(0.0001, max));
-  }
+  // Use fast dB conversion
+  return fastLinearToDb(Math.max(0.0001, max));
 }
 
 /**
@@ -37,22 +44,25 @@ export function computePeak(buffer: Uint8Array | Float32Array): number {
 export function computeRMS(buffer: Uint8Array | Float32Array): number {
   if (buffer.length === 0) return -Infinity;
 
-  let sum = 0;
-  for (let i = 0; i < buffer.length; i++) {
-    let sample = buffer[i];
-    
-    // Normalize Uint8Array to -1..1 range
-    if (buffer instanceof Uint8Array) {
-      sample = (sample - 128) / 128;
+  let rms: number;
+  
+  if (buffer instanceof Float32Array) {
+    // Use optimized RMS calculation
+    rms = fastRMS(buffer);
+  } else {
+    // Uint8Array path
+    let sum = 0;
+    for (let i = 0; i < buffer.length; i++) {
+      const sample = (buffer[i] - 128) / 128;
+      sum += sample * sample;
     }
-    
-    sum += sample * sample;
+    rms = Math.sqrt(sum / buffer.length);
   }
 
-  const rms = Math.sqrt(sum / buffer.length);
   if (rms === 0) return -Infinity;
 
-  return 20 * Math.log10(Math.max(0.0001, rms));
+  // Use fast dB conversion
+  return fastLinearToDb(Math.max(0.0001, rms));
 }
 
 /**

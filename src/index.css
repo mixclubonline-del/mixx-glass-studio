@@ -1,199 +1,233 @@
-@import url("https://fonts.googleapis.com/css2?family=Orbitron:wght@400;700&display=swap");
+/* CSS Cascade Layers - Phase 1: Modern Architecture
+ * Layer order: reset < base < components < utilities < overrides
+ * This prevents specificity wars and makes styles predictable
+ */
+@layer reset, base, components, utilities, overrides;
 
 @tailwind base;
 @tailwind components;
 @tailwind utilities;
 
-:root {
-  color-scheme: dark;
-  font-family: "Inter", "SF Pro Display", "Segoe UI", system-ui, -apple-system, BlinkMacSystemFont, sans-serif;
-  --bg-gradient-start: #040d1f;
-  --bg-gradient-end: #0d1f3c;
-  --bg-glow-color: rgba(72, 132, 255, 0.32);
-  --bg-mist-color: rgba(16, 28, 54, 0.52);
-  --als-glow-color: rgba(96, 200, 255, 0.65);
-  --glass-surface: rgba(9, 18, 36, 0.82);
-  --glass-surface-soft: rgba(12, 24, 46, 0.68);
-  --glass-border: rgba(102, 140, 198, 0.45);
-  --glass-border-soft: rgba(102, 140, 198, 0.26);
-  --glass-shadow: 0 35px 80px rgba(4, 12, 26, 0.58);
-  --ink-foreground: #e6f0ff;
-  --ink-muted: rgba(196, 210, 240, 0.72);
+@layer base {
+  :root {
+    color-scheme: dark;
+    font-family: "Inter", "SF Pro Display", "Segoe UI", system-ui, -apple-system, BlinkMacSystemFont, sans-serif;
+    --bg-gradient-start: #040d1f;
+    --bg-gradient-end: #0d1f3c;
+    --bg-glow-color: rgba(72, 132, 255, 0.32);
+    --bg-mist-color: rgba(16, 28, 54, 0.52);
+    --als-glow-color: rgba(96, 200, 255, 0.65);
+    --glass-surface: rgba(9, 18, 36, 0.82);
+    --glass-surface-soft: rgba(12, 24, 46, 0.68);
+    --glass-border: rgba(102, 140, 198, 0.45);
+    --glass-border-soft: rgba(102, 140, 198, 0.26);
+    --glass-shadow: 0 35px 80px rgba(4, 12, 26, 0.58);
+    --ink-foreground: #e6f0ff;
+    --ink-muted: rgba(196, 210, 240, 0.72);
+  }
 }
 
-body {
-  margin: 0;
-  min-height: 100vh;
-  background: radial-gradient(circle at 25% -5%, rgba(64, 101, 180, 0.4), transparent 55%),
-    radial-gradient(circle at 75% 10%, rgba(32, 72, 150, 0.35), transparent 50%),
-    linear-gradient(130deg, var(--bg-gradient-start), var(--bg-gradient-end));
-  transition: background 1s ease-out;
-  color: var(--ink-foreground);
-  overflow: hidden;
+@layer base {
+  body {
+    margin: 0;
+    min-height: 100vh;
+    background: radial-gradient(circle at 25% -5%, rgba(64, 101, 180, 0.4), transparent 55%),
+      radial-gradient(circle at 75% 10%, rgba(32, 72, 150, 0.35), transparent 50%),
+      linear-gradient(130deg, var(--bg-gradient-start), var(--bg-gradient-end));
+    transition: background 1s ease-out;
+    color: var(--ink-foreground);
+    overflow: hidden;
+  }
 }
 
-body::before {
-  content: "";
-  position: fixed;
-  inset: 0;
-  background: radial-gradient(circle at 45% 15%, var(--bg-glow-color), transparent 60%),
-    radial-gradient(circle at 80% 70%, rgba(46, 94, 180, 0.35), transparent 55%);
-  opacity: 0.7;
-  pointer-events: none;
-  mix-blend-mode: screen;
-  filter: blur(60px);
-}
+@layer base {
+  body::before {
+    content: "";
+    position: fixed;
+    inset: 0;
+    background: radial-gradient(circle at 45% 15%, var(--bg-glow-color), transparent 60%),
+      radial-gradient(circle at 80% 70%, rgba(46, 94, 180, 0.35), transparent 55%);
+    opacity: 0.7;
+    pointer-events: none;
+    mix-blend-mode: screen;
+    filter: blur(60px);
+  }
 
-#root {
-  height: 100%;
-}
+  #root {
+    height: 100%;
+  }
 
-a {
-  color: inherit;
-  text-decoration: none;
-}
+  a {
+    color: inherit;
+    text-decoration: none;
+  }
 
-button {
-  font-family: inherit;
+  button {
+    font-family: inherit;
+  }
 }
 
 /* --- Fader Micro-interaction --- */
-@keyframes fader-pulse {
-  0% {
-    box-shadow: 0 0 5px #fff, 0 0 2px #fff inset;
-    transform: scale(1);
+@layer components {
+  @keyframes fader-pulse {
+    0% {
+      box-shadow: 0 0 5px #fff, 0 0 2px #fff inset;
+      transform: scale(1) translateZ(0);
+    }
+    100% {
+      box-shadow: 0 0 15px #fff, 0 0 10px #fff inset;
+      transform: scale(1.05) translateZ(0);
+    }
   }
-  100% {
-    box-shadow: 0 0 15px #fff, 0 0 10px #fff inset;
-    transform: scale(1.05);
+  .fader-cap-pulse {
+    animation: fader-pulse 0.1s ease-out forwards;
+    will-change: transform, box-shadow;
   }
-}
-.fader-cap-pulse {
-  animation: fader-pulse 0.1s ease-out forwards;
 }
 
 /* --- Transient Flash --- */
-@keyframes transient-flash-anim {
-  from {
-    opacity: 0.7;
+@layer components {
+  @keyframes transient-flash-anim {
+    from {
+      opacity: 0.7;
+    }
+    to {
+      opacity: 0;
+    }
   }
-  to {
-    opacity: 0;
+  .animate-transient-flash {
+    animation: transient-flash-anim 0.3s ease-out;
+    will-change: opacity;
   }
-}
-.animate-transient-flash {
-  animation: transient-flash-anim 0.3s ease-out;
 }
 
 /* --- Kinetic Clip Plasma --- */
-@keyframes plasma {
-  0% {
-    background-position: 0% 50%;
+@layer components {
+  @keyframes plasma {
+    0% {
+      background-position: 0% 50%;
+    }
+    50% {
+      background-position: 100% 50%;
+    }
+    100% {
+      background-position: 0% 50%;
+    }
   }
-  50% {
-    background-position: 100% 50%;
-  }
-  100% {
-    background-position: 0% 50%;
-  }
-}
 
-/* --- Prime Brain Interface Styles --- */
-@keyframes brain-pulse {
-  0%,
-  100% {
-    transform: scale(1);
-    filter: drop-shadow(0 0 20px #f59e0b);
+  /* --- Prime Brain Interface Styles --- */
+  @keyframes brain-pulse {
+    0%,
+    100% {
+      transform: scale(1) translateZ(0);
+      opacity: 0.8;
+      box-shadow: 0 0 20px #f59e0b;
+    }
+    50% {
+      transform: scale(1.03) translateZ(0);
+      opacity: 1;
+      box-shadow: 0 0 35px #f59e0b;
+    }
   }
-  50% {
-    transform: scale(1.03);
-    filter: drop-shadow(0 0 35px #f59e0b);
+  @keyframes lattice-glow {
+    0%,
+    100% {
+      opacity: 0.6;
+    }
+    50% {
+      opacity: 0.9;
+    }
   }
-}
-@keyframes lattice-glow {
-  0%,
-  100% {
-    opacity: 0.6;
-  }
-  50% {
-    opacity: 0.9;
-  }
-}
-@keyframes time-warp-vortex {
-  from {
-    transform: rotate(0deg);
-  }
-  to {
-    transform: rotate(360deg);
+  @keyframes time-warp-vortex {
+    from {
+      transform: rotate(0deg) translateZ(0);
+    }
+    to {
+      transform: rotate(360deg) translateZ(0);
+    }
   }
 }
 
 /* --- ALS Intel Hub Breathing --- */
-@keyframes als-breathing {
-  0%,
-  100% {
-    transform: scale(1);
-    filter: drop-shadow(0 0 10px var(--als-glow-color));
+@layer components {
+  @keyframes als-breathing {
+    0%,
+    100% {
+      transform: scale(1) translateZ(0);
+      opacity: 0.6;
+      box-shadow: 0 0 10px var(--als-glow-color);
+    }
+    50% {
+      transform: scale(1.02) translateZ(0);
+      opacity: 0.9;
+      box-shadow: 0 0 20px var(--als-glow-color);
+    }
   }
-  50% {
-    transform: scale(1.02);
-    filter: drop-shadow(0 0 20px var(--als-glow-color));
+  .animate-als-breathing {
+    animation: als-breathing 4s infinite ease-in-out;
+    will-change: transform, opacity;
+    transform: translateZ(0);
   }
-}
-.animate-als-breathing {
-  animation: als-breathing 4s infinite ease-in-out;
 }
 
 /* --- Record Arm Pulsate --- */
-@keyframes record-arm-pulse {
-  0% {
-    box-shadow: 0 0 0 rgba(220, 38, 38, 0.7);
+@layer components {
+  @keyframes record-arm-pulse {
+    0% {
+      box-shadow: 0 0 0 rgba(220, 38, 38, 0.7);
+    }
+    50% {
+      box-shadow: 0 0 15px 5px rgba(220, 38, 38, 0.7);
+    }
+    100% {
+      box-shadow: 0 0 0 rgba(220, 38, 38, 0.7);
+    }
   }
-  50% {
-    box-shadow: 0 0 15px 5px rgba(220, 38, 38, 0.7);
+  .animate-record-arm-pulse {
+    animation: record-arm-pulse 1.5s infinite ease-in-out;
+    will-change: box-shadow;
+    transform: translateZ(0);
   }
-  100% {
-    box-shadow: 0 0 0 rgba(220, 38, 38, 0.7);
-  }
-}
-.animate-record-arm-pulse {
-  animation: record-arm-pulse 1.5s infinite ease-in-out;
-}
 
-/* --- Routing Node Pulsing --- */
-@keyframes routing-pulse {
-  0% {
-    transform: scale(1.2);
-    box-shadow: 0 0 10px 2px #fff;
+  /* --- Routing Node Pulsing --- */
+  @keyframes routing-pulse {
+    0% {
+      transform: scale(1.2) translateZ(0);
+      box-shadow: 0 0 10px 2px #fff;
+    }
+    50% {
+      transform: scale(1.3) translateZ(0);
+      box-shadow: 0 0 20px 8px #fff;
+    }
+    100% {
+      transform: scale(1.2) translateZ(0);
+      box-shadow: 0 0 10px 2px #fff;
+    }
   }
-  50% {
-    transform: scale(1.3);
-    box-shadow: 0 0 20px 8px #fff;
+  .animate-routing-pulse {
+    animation: routing-pulse 1.5s infinite ease-in-out;
+    will-change: transform, box-shadow;
+    transform: translateZ(0);
   }
-  100% {
-    transform: scale(1.2);
-    box-shadow: 0 0 10px 2px #fff;
+  @keyframes target-pulse {
+    0% {
+      transform: scale(1.1) translateZ(0);
+      opacity: 0.8;
+    }
+    50% {
+      transform: scale(1.2) translateZ(0);
+      opacity: 1;
+    }
+    100% {
+      transform: scale(1.1) translateZ(0);
+      opacity: 0.8;
+    }
   }
-}
-.animate-routing-pulse {
-  animation: routing-pulse 1.5s infinite ease-in-out;
-}
-@keyframes target-pulse {
-  0% {
-    transform: scale(1.1);
-    opacity: 0.8;
+  .animate-target-pulse {
+    animation: target-pulse 1.5s infinite ease-in-out;
+    will-change: transform, opacity;
+    transform: translateZ(0);
   }
-  50% {
-    transform: scale(1.2);
-    opacity: 1;
-  }
-  100% {
-    transform: scale(1.1);
-    opacity: 0.8;
-  }
-}
-.animate-target-pulse {
-  animation: target-pulse 1.5s infinite ease-in-out;
 }
 
 /* --- MixxClub Plugin Suite Overlay Tokens --- */
@@ -270,46 +304,56 @@ button {
 }
 
 /* --- Living Playhead --- */
-@keyframes playhead-breathing {
-  0%,
-  100% {
-    box-shadow: 0 0 8px var(--playhead-color, #06b6d4);
+@layer components {
+  @keyframes playhead-breathing {
+    0%,
+    100% {
+      box-shadow: 0 0 8px var(--playhead-color, #06b6d4);
+    }
+    50% {
+      box-shadow: 0 0 24px var(--playhead-color, #06b6d4), 0 0 10px var(--playhead-color-light, #67e8f9);
+    }
   }
-  50% {
-    box-shadow: 0 0 24px var(--playhead-color, #06b6d4), 0 0 10px var(--playhead-color-light, #67e8f9);
-  }
-}
-.animate-playhead-breathing {
-  animation: playhead-breathing 3s infinite ease-in-out;
-}
-@keyframes spark-burst {
-  0% {
-    transform: scale(0);
-    opacity: 1;
-  }
-  100% {
-    transform: scale(1.5);
-    opacity: 0;
+  .animate-playhead-breathing {
+    animation: playhead-breathing 3s infinite ease-in-out;
+    will-change: box-shadow;
+    transform: translateZ(0);
   }
 }
-.animate-spark-burst {
-  animation: spark-burst 0.5s ease-out forwards;
-}
+@layer components {
+  @keyframes spark-burst {
+    0% {
+      transform: scale(0) translateZ(0);
+      opacity: 1;
+    }
+    100% {
+      transform: scale(1.5) translateZ(0);
+      opacity: 0;
+    }
+  }
+  .animate-spark-burst {
+    animation: spark-burst 0.5s ease-out forwards;
+    will-change: transform, opacity;
+    transform: translateZ(0);
+  }
 
-/* --- Intelligent Ingestion Processing Pulse --- */
-@keyframes processing-pulse {
-  0%,
-  100% {
-    box-shadow: 0 0 0px #06b6d4;
-    opacity: 0.7;
+  /* --- Intelligent Ingestion Processing Pulse --- */
+  @keyframes processing-pulse {
+    0%,
+    100% {
+      box-shadow: 0 0 0px #06b6d4;
+      opacity: 0.7;
+    }
+    50% {
+      box-shadow: 0 0 10px 2px #06b6d4;
+      opacity: 1;
+    }
   }
-  50% {
-    box-shadow: 0 0 10px 2px #06b6d4;
-    opacity: 1;
+  .animate-processing-pulse {
+    animation: processing-pulse 2s infinite ease-in-out;
+    will-change: box-shadow, opacity;
+    transform: translateZ(0);
   }
-}
-.animate-processing-pulse {
-  animation: processing-pulse 2s infinite ease-in-out;
 }
 
 @keyframes flow-welcome-drift {
@@ -472,5 +516,41 @@ button {
 
 ::-webkit-scrollbar-thumb:hover {
   background: linear-gradient(180deg, #56C8FF, #FF67C7);
+}
+
+/* Phase 1: Accessibility - Reduced Motion Support
+ * Respects user's motion preferences for accessibility
+ */
+@layer overrides {
+  @media (prefers-reduced-motion: reduce) {
+    *,
+    *::before,
+    *::after {
+      animation-duration: 0.01ms !important;
+      animation-iteration-count: 1 !important;
+      transition-duration: 0.01ms !important;
+      scroll-behavior: auto !important;
+    }
+    
+    /* Keep essential feedback, remove decorative motion */
+    .als-pulse,
+    .animate-als-breathing {
+      animation: none;
+      opacity: 0.7; /* Static indicator */
+      will-change: auto;
+    }
+    
+    /* Reduce blur intensity for better performance */
+    .glass-container,
+    [class*="backdrop-blur"] {
+      backdrop-filter: blur(8px) saturate(110%) !important;
+    }
+    
+    /* Simplify transforms */
+    .flow-welcome-halo,
+    .flow-welcome-noise {
+      animation: none !important;
+    }
+  }
 }
 

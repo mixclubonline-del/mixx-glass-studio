@@ -31,6 +31,13 @@ export interface AudioDiagnostics {
     connectedCount: number;
     hasAudioBuffers: number;
   };
+  quality: {
+    gainStaging: 'optimal' | 'warning' | 'critical';
+    compressionStacking: 'optimal' | 'warning' | 'critical';
+    phaseCoherence: 'optimal' | 'warning' | 'critical';
+    issues: string[];
+    recommendations: string[];
+  };
 }
 
 /**
@@ -72,6 +79,72 @@ export function diagnoseAudioSystem(
   if (translationMatrix && typeof translationMatrix.attach === 'function') {
     diagnostics.masterChain.connectedToDestination = true;
   }
+
+  // Audio quality analysis
+  const qualityIssues: string[] = [];
+  const qualityRecommendations: string[] = [];
+  let gainStaging: 'optimal' | 'warning' | 'critical' = 'optimal';
+  let compressionStacking: 'optimal' | 'warning' | 'critical' = 'optimal';
+  let phaseCoherence: 'optimal' | 'warning' | 'critical' = 'optimal';
+
+  // Gain staging analysis
+  const masterInputGain = diagnostics.signalPath.masterInputGain;
+  const masterGain = diagnostics.signalPath.masterGainValue;
+  const totalGain = masterInputGain * masterGain;
+
+  if (totalGain > 1.2) {
+    gainStaging = 'critical';
+    qualityIssues.push(`Total gain too high (${(totalGain * 100).toFixed(0)}%) - risk of clipping`);
+    qualityRecommendations.push('Reduce master input gain or master gain to prevent clipping');
+  } else if (totalGain > 1.0) {
+    gainStaging = 'warning';
+    qualityIssues.push(`Total gain above unity (${(totalGain * 100).toFixed(0)}%) - monitor for clipping`);
+    qualityRecommendations.push('Consider reducing gain slightly for headroom');
+  } else if (totalGain < 0.5) {
+    gainStaging = 'warning';
+    qualityIssues.push(`Total gain very low (${(totalGain * 100).toFixed(0)}%) - signal may be too quiet`);
+    qualityRecommendations.push('Increase gain to improve signal-to-noise ratio');
+  }
+
+  // Compression stacking analysis (check if multiple compressors are active)
+  // This is a heuristic - we can't directly measure compression, but we can warn about potential issues
+  if (masterChain) {
+    const hasGlue = !!masterChain.glue;
+    const hasSoftLimiter = !!masterChain.softLimiter;
+    const hasTruePeakLimiter = !!masterChain.truePeakLimiter;
+    const hasMultiBand = !!masterChain.multiBandStage;
+    const hasMidSide = !!masterChain.midSideStage;
+
+    const compressorCount = [hasGlue, hasSoftLimiter, hasTruePeakLimiter, hasMultiBand, hasMidSide].filter(Boolean).length;
+    
+    if (compressorCount >= 4) {
+      compressionStacking = 'warning';
+      qualityIssues.push(`Multiple compressors active (${compressorCount}) - risk of over-compression`);
+      qualityRecommendations.push('Consider reducing compression ratios or bypassing some stages');
+    } else if (compressorCount >= 5) {
+      compressionStacking = 'critical';
+      qualityIssues.push(`Too many compressors active (${compressorCount}) - high risk of artifacts`);
+      qualityRecommendations.push('Reduce number of active compressors or use gentler settings');
+    }
+  }
+
+  // Phase coherence (Phase Weave should be properly implemented)
+  // We can't directly measure phase, but we can verify Phase Weave exists
+  if (masterChain && !masterChain.phaseWeave) {
+    phaseCoherence = 'critical';
+    qualityIssues.push('Phase Weave stage missing - stereo imaging may be compromised');
+    qualityRecommendations.push('Verify Phase Weave is properly initialized in master chain');
+  } else if (masterChain && masterChain.phaseWeave) {
+    phaseCoherence = 'optimal';
+  }
+
+  diagnostics.quality = {
+    gainStaging,
+    compressionStacking,
+    phaseCoherence,
+    issues: qualityIssues,
+    recommendations: qualityRecommendations,
+  };
 
   return diagnostics;
 }
@@ -156,6 +229,41 @@ export function logAudioDiagnostics(diagnostics: AudioDiagnostics): void {
     warnings.push('ℹ️ No audio files imported yet - import audio files to create clips');
   }
 
+  // Audio quality analysis
+  console.group('🎵 Audio Quality Analysis');
+  const quality = diagnostics.quality;
+  
+  const getStatusEmoji = (status: string) => {
+    switch (status) {
+      case 'optimal': return '✅';
+      case 'warning': return '⚠️';
+      case 'critical': return '❌';
+      default: return '❓';
+    }
+  };
+  
+  console.log(`Gain Staging: ${getStatusEmoji(quality.gainStaging)} ${quality.gainStaging.toUpperCase()}`);
+  console.log(`Compression Stacking: ${getStatusEmoji(quality.compressionStacking)} ${quality.compressionStacking.toUpperCase()}`);
+  console.log(`Phase Coherence: ${getStatusEmoji(quality.phaseCoherence)} ${quality.phaseCoherence.toUpperCase()}`);
+  
+  if (quality.issues.length > 0) {
+    console.group('Quality Issues');
+    quality.issues.forEach((issue) => console.warn(issue));
+    console.groupEnd();
+  }
+  
+  if (quality.recommendations.length > 0) {
+    console.group('Recommendations');
+    quality.recommendations.forEach((rec) => console.info(rec));
+    console.groupEnd();
+  }
+  
+  if (quality.issues.length === 0) {
+    console.log('✅ Audio quality checks passed - signal path optimized');
+  }
+  
+  console.groupEnd();
+
   if (issues.length > 0) {
     console.group('🚨 Critical Issues');
     issues.forEach((issue) => console.error(issue));
@@ -168,9 +276,9 @@ export function logAudioDiagnostics(diagnostics: AudioDiagnostics): void {
     console.groupEnd();
   }
   
-  if (issues.length === 0 && warnings.length === 0) {
+  if (issues.length === 0 && warnings.length === 0 && quality.issues.length === 0) {
     console.log('✅ No issues detected - audio system ready');
-  } else if (issues.length === 0) {
+  } else if (issues.length === 0 && quality.issues.length === 0) {
     console.log('✅ No critical issues - audio system should work');
   }
 

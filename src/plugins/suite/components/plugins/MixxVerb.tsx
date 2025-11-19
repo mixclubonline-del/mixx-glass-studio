@@ -4,6 +4,7 @@ import { PluginContainer } from '../shared/PluginContainer';
 import { Knob } from '../shared/Knob';
 import { MixxVerbSettings, PluginComponentProps } from '../../types';
 import { PrimeBrainStub } from '../../lib/PrimeBrainStub';
+import { useFlowComponent } from '../../../../core/flow/useFlowComponent';
 
 interface Particle {
     id: number;
@@ -103,9 +104,27 @@ export const MixxVerb: React.FC<PluginComponentProps<MixxVerbSettings>> = ({
 }) => {
     const { size, predelay, mix, output } = pluginState; 
 
+    // Register plugin with Flow
+    const { broadcast } = useFlowComponent({
+        id: `plugin-mixx-verb-${name}`,
+        type: 'plugin',
+        name: `Mixx Verb: ${name}`,
+        broadcasts: ['parameter_change', 'state_change'],
+        listens: [
+            {
+                signal: 'prime_brain_guidance',
+                callback: (payload) => {
+                    // Prime Brain can guide plugin behavior
+                },
+            },
+        ],
+    });
+
     const handleValueChange = (param: keyof MixxVerbSettings, value: number) => {
         setPluginState({ [param]: value });
         PrimeBrainStub.sendEvent('parameter_change', { plugin: 'mixx-verb', parameter: param, value });
+        // Also broadcast to Flow
+        broadcast('parameter_change', { plugin: 'mixx-verb', parameter: param, value });
     };
 
     return (

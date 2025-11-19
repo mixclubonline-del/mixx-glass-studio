@@ -1,11 +1,15 @@
 /**
  * Flow Meter Stack - Meter Reading Hook (STEP 4)
- * React hook for real-time meter updates using requestAnimationFrame.
+ * React hook for real-time meter updates using batched requestAnimationFrame.
+ * 
+ * QUANTUM OPTIMIZATION: Uses centralized meterBatcher to reduce RAF overhead.
+ * 
+ * @author Prime (Mixx Club)
  */
 
-import { useEffect, useRef, useState } from 'react';
-import { computeMeterReading, type MeterReading } from '../core/meters/meterUtils';
-import { detectTruePeakFromAnalyser } from '../core/meters/truePeak';
+import { useEffect, useRef, useState, useCallback } from 'react';
+import { meterBatcher } from '../core/performance/meterBatcher';
+import type { MeterReading } from '../core/meters/meterUtils';
 
 /**
  * Options for meter reading hook.
@@ -41,73 +45,58 @@ export function useMeterReading(options: UseMeterReadingOptions) {
   
   const [reading, setReading] = useState<MeterReading | null>(null);
   const [isActive, setIsActive] = useState(false);
-  const frameRef = useRef<number | null>(null);
-  const analyserRef = useRef<AnalyserNode | null>(null);
+  const subscriptionIdRef = useRef<string | null>(null);
+  const unsubscribeRef = useRef<(() => void) | null>(null);
 
-  // Update analyser ref when it changes
-  useEffect(() => {
-    analyserRef.current = analyser;
-  }, [analyser]);
+  // Memoized callback to avoid recreating on every render
+  const handleUpdate = useCallback((meterReading: MeterReading) => {
+    setReading(meterReading);
+    if (onUpdate) {
+      onUpdate(meterReading);
+    }
+  }, [onUpdate]);
 
   useEffect(() => {
     if (!analyser) {
       setIsActive(false);
       setReading(null);
+      if (unsubscribeRef.current) {
+        unsubscribeRef.current();
+        unsubscribeRef.current = null;
+        subscriptionIdRef.current = null;
+      }
       return;
     }
 
     setIsActive(true);
-    let lastTruePeak: number | undefined;
 
-    const update = () => {
-      const currentAnalyser = analyserRef.current;
-      if (!currentAnalyser) {
-        setIsActive(false);
-        return;
+    // Generate unique subscription ID
+    const subscriptionId = `meter-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`;
+    subscriptionIdRef.current = subscriptionId;
+
+    // Subscribe to batched meter updates
+    const unsubscribe = meterBatcher.subscribe(
+      subscriptionId,
+      analyser,
+      handleUpdate,
+      {
+        enableTruePeak,
+        oversampleFactor,
       }
+    );
 
-      try {
-        // Compute standard meter reading
-        const meterReading = computeMeterReading(currentAnalyser, lastTruePeak);
-
-        // Optionally compute true peak
-        if (enableTruePeak) {
-          try {
-            lastTruePeak = detectTruePeakFromAnalyser(currentAnalyser, oversampleFactor);
-            meterReading.truePeak = lastTruePeak;
-          } catch (err) {
-            // True peak computation failed, continue without it
-            console.warn('[FLOW METER] True peak detection failed:', err);
-          }
-        }
-
-        setReading(meterReading);
-        
-        // Call update callback if provided
-        if (onUpdate) {
-          onUpdate(meterReading);
-        }
-
-        // Schedule next update
-        frameRef.current = requestAnimationFrame(update);
-      } catch (err) {
-        console.error('[FLOW METER] Meter reading failed:', err);
-        setIsActive(false);
-      }
-    };
-
-    // Start update loop
-    frameRef.current = requestAnimationFrame(update);
+    unsubscribeRef.current = unsubscribe;
 
     // Cleanup
     return () => {
-      if (frameRef.current !== null) {
-        cancelAnimationFrame(frameRef.current);
-        frameRef.current = null;
+      if (unsubscribeRef.current) {
+        unsubscribeRef.current();
+        unsubscribeRef.current = null;
+        subscriptionIdRef.current = null;
       }
       setIsActive(false);
     };
-  }, [analyser, enableTruePeak, oversampleFactor, onUpdate]);
+  }, [analyser, enableTruePeak, oversampleFactor, handleUpdate]);
 
   return { reading, isActive };
 }

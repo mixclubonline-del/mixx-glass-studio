@@ -4,6 +4,7 @@ import { PluginContainer } from '../shared/PluginContainer';
 import { Knob } from '../shared/Knob';
 import { MixxAuraSettings, PluginComponentProps } from '../../types';
 import { PrimeBrainStub } from '../../lib/PrimeBrainStub';
+import { useFlowComponent } from '../../../../core/flow/useFlowComponent';
 
 const ToggleButton: React.FC<{ label: string, value: boolean, onChange: (val: boolean) => void }> = ({ label, value, onChange }) => (
     <button
@@ -74,9 +75,19 @@ export const MixxAura: React.FC<PluginComponentProps<MixxAuraSettings>> = ({
 }) => {
     const { tone, width, shine, moodLock, mix, output } = pluginState;
 
+    // Register plugin with Flow
+    const { broadcast } = useFlowComponent({
+        id: `plugin-mixx-aura-${name}`,
+        type: 'plugin',
+        name: `Mixx Aura: ${name}`,
+        broadcasts: ['parameter_change', 'state_change'],
+        listens: [{ signal: 'prime_brain_guidance', callback: () => {} }],
+    });
+
     const handleValueChange = (param: keyof MixxAuraSettings, value: number | boolean) => {
         setPluginState({ [param]: value });
         PrimeBrainStub.sendEvent('parameter_change', { plugin: 'mixx-aura', parameter: param, value });
+        broadcast('parameter_change', { plugin: 'mixx-aura', parameter: param, value });
     };
 
     return (

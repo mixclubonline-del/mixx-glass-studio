@@ -2,6 +2,7 @@
 import React, { useMemo } from 'react';
 import { PluginContainer } from '../shared/PluginContainer';
 import { PrimeBrainStemSettings, PluginComponentProps } from '../../types';
+import { useFlowComponent } from '../../../../core/flow/useFlowComponent';
 
 const NeuralHub: React.FC = () => {
     const pathwayCount = 20;
@@ -52,6 +53,15 @@ const NeuralHub: React.FC = () => {
 export const PrimeBrainStem: React.FC<PluginComponentProps<PrimeBrainStemSettings>> = ({ 
     isDragging, isResizing, name, description
 }) => {
+    // Register plugin with Flow
+    useFlowComponent({
+        id: `plugin-prime-brainstem-${name}`,
+        type: 'plugin',
+        name: `Prime Brain Stem: ${name}`,
+        broadcasts: ['state_change'],
+        listens: [{ signal: 'prime_brain_guidance', callback: () => {} }],
+    });
+
     return (
         <PluginContainer title={name} subtitle={description} isDragging={isDragging} isResizing={isResizing}>
             <div className="w-full h-full flex flex-col items-center justify-center text-center p-4">

@@ -93,23 +93,23 @@ export async function buildMasterChain(
   const midSideStage = createMidSideStage(ctx);
   const multiBandStage = createMultiBandStage(ctx);
 
-  // Glue with safe defaults (prevent distortion)
+  // Glue with safe defaults (prevent distortion) - optimized for musical glue, not heavy compression
   const glue = ctx.createDynamicsCompressor();
-  glue.threshold.value = -6; // More headroom to prevent distortion
-  glue.ratio.value = 2.0; // Gentler ratio
-  glue.attack.value = 0.01;
-  glue.release.value = 0.15; // Slightly longer release for smoother sound
-  glue.knee.value = 3; // Softer knee
+  glue.threshold.value = -4; // Less aggressive threshold (was -6)
+  glue.ratio.value = 1.8; // Gentler ratio (was 2.0) - subtle glue, not heavy compression
+  glue.attack.value = 0.015; // Slightly slower attack for more natural sound
+  glue.release.value = 0.2; // Longer release for smoother sound (was 0.15)
+  glue.knee.value = 4; // Softer knee (was 3) - more gradual compression
 
   const { drive: colorDrive, shaper: colorShaper } = createVelvetSaturator(ctx);
 
-  // Soft limiter with safe defaults (prevent crackling)
+  // Soft limiter with safe defaults (prevent crackling) - optimized for transparent peak control
   const softLimiter = ctx.createDynamicsCompressor();
-  softLimiter.threshold.value = 0; // More headroom - only limit peaks
-  softLimiter.ratio.value = 3; // Gentler ratio to prevent distortion
-  softLimiter.attack.value = 0.005; // Slightly slower attack to prevent clicks
-  softLimiter.release.value = 0.1; // Longer release for smoother sound
-  softLimiter.knee.value = 6; // Softer knee to prevent harshness
+  softLimiter.threshold.value = -2; // Slightly lower threshold for smoother limiting (was 0)
+  softLimiter.ratio.value = 4; // Moderate ratio for transparent limiting (was 3)
+  softLimiter.attack.value = 0.003; // Fast attack for peak control (was 0.005)
+  softLimiter.release.value = 0.12; // Smooth release (was 0.1)
+  softLimiter.knee.value = 8; // Very soft knee for transparent limiting (was 6)
 
   const truePeakLimiter = await createTruePeakLimiterNode(ctx, -1);
   const dither = await createDitherNode(ctx);
@@ -321,10 +321,10 @@ export async function buildMasterChain(
 
 function createVelvetSaturator(ctx: AudioContext | OfflineAudioContext) {
   const drive = ctx.createGain();
-  drive.gain.value = 0.9; // Reduce drive to prevent distortion
+  drive.gain.value = 0.85; // Reduced drive to prevent distortion (was 0.9)
 
   const shaper = ctx.createWaveShaper();
-  shaper.curve = createSaturationCurve(0.3); // Less aggressive saturation (was 0.45)
+  shaper.curve = createSaturationCurve(0.25); // Gentler saturation for warmth without harshness (was 0.3)
 
   return { drive, shaper };
 }
@@ -422,24 +422,24 @@ function createMultiBandStage(ctx: AudioContext | OfflineAudioContext): MultiBan
   lowFilter.Q.value = 0.707;
 
   const lowComp = ctx.createDynamicsCompressor();
-  lowComp.threshold.value = -30;
-  lowComp.ratio.value = 2.2;
-  lowComp.attack.value = 0.015;
-  lowComp.release.value = 0.18;
-  lowComp.knee.value = 4;
+  lowComp.threshold.value = -28; // Less aggressive (was -30)
+  lowComp.ratio.value = 2.0; // Gentler ratio (was 2.2)
+  lowComp.attack.value = 0.02; // Slightly slower attack (was 0.015)
+  lowComp.release.value = 0.2; // Slightly faster release (was 0.18)
+  lowComp.knee.value = 5; // Softer knee (was 4)
   const lowGain = ctx.createGain();
-  lowGain.gain.value = 1.05;
+  lowGain.gain.value = 1.0; // Unity gain (was 1.05) - prevent low-end buildup
 
   const midFilter = ctx.createBiquadFilter();
   midFilter.type = 'bandpass';
   midFilter.frequency.value = 1600;
   midFilter.Q.value = 0.9;
   const midComp = ctx.createDynamicsCompressor();
-  midComp.threshold.value = -22;
-  midComp.ratio.value = 1.6;
-  midComp.attack.value = 0.008;
-  midComp.release.value = 0.25;
-  midComp.knee.value = 6;
+  midComp.threshold.value = -20; // Less aggressive (was -22)
+  midComp.ratio.value = 1.5; // Gentler ratio (was 1.6)
+  midComp.attack.value = 0.01; // Slightly slower attack (was 0.008)
+  midComp.release.value = 0.22; // Slightly faster release (was 0.25)
+  midComp.knee.value = 7; // Softer knee (was 6)
   const midGain = ctx.createGain();
   midGain.gain.value = 1;
 
@@ -457,7 +457,7 @@ function createMultiBandStage(ctx: AudioContext | OfflineAudioContext): MultiBan
   }
   highEnhancer.curve = curve;
   const highGain = ctx.createGain();
-  highGain.gain.value = 1.1;
+  highGain.gain.value = 1.0; // Unity gain (was 1.1) - prevent high-end harshness
 
   input.connect(lowFilter);
   input.connect(midFilter);
@@ -513,9 +513,9 @@ function recalibrateGlue(
   profile: MasteringProfile
 ) {
   const isClub = profile.targetLUFS >= -10;
-  // Safe defaults - prevent distortion while maintaining glue
-  const threshold = isClub ? -8 : -6; // More headroom to prevent distortion
-  const ratio = isClub ? 2.2 : 2.0; // Gentler ratios
+  // Optimized defaults - musical glue without over-compression
+  const threshold = isClub ? -5 : -4; // Less aggressive (was -8/-6)
+  const ratio = isClub ? 2.0 : 1.8; // Gentler ratios (was 2.2/2.0)
 
   glue.threshold.setTargetAtTime(threshold, glue.context.currentTime, 0.02);
   glue.ratio.setTargetAtTime(ratio, glue.context.currentTime, 0.02);

@@ -3,6 +3,7 @@ import React, { useMemo, useState, useCallback } from "react";
 import type { FxWindowId } from "../App";
 import { PlusCircleIcon, XIcon, StarIcon } from "./icons";
 import { hexToRgba } from "../utils/ALS";
+import styles from "./PluginBrowser.module.css";
 import type {
   PluginInventoryItem,
   PluginTier,
@@ -144,9 +145,35 @@ const PluginBrowser: React.FC<PluginBrowserProps> = ({
     [onPreview, trackId]
   );
 
+  // Generate dynamic CSS for plugin-specific styles
+  const dynamicStyles = useMemo(() => {
+    try {
+      const allPlugins = [...curatedHighlights, ...groupedByTier.flatMap(g => g.plugins)];
+      // Sanitize plugin IDs for CSS class names (remove special characters)
+      const sanitizeId = (id: string) => id.replace(/[^a-zA-Z0-9-_]/g, '-');
+      
+      return allPlugins.map(plugin => {
+        const glowColor = hexToRgba(plugin.glow, 0.26);
+        const gradient = gradientFor(plugin);
+        const safeId = sanitizeId(plugin.id);
+        return `
+          .plugin-${safeId} {
+            --plugin-glow: ${glowColor};
+            --plugin-gradient: ${gradient};
+          }
+        `;
+      }).join('\n');
+    } catch (error) {
+      console.warn('[PluginBrowser] Error generating dynamic styles:', error);
+      return '';
+    }
+  }, [curatedHighlights, groupedByTier]);
+
   return (
-    <div
-      className="fixed inset-0 z-[160] flex items-center justify-center bg-[rgba(2,4,12,0.76)] backdrop-blur-3xl"
+    <>
+      <style>{dynamicStyles}</style>
+      <div
+        className="fixed inset-0 z-[160] flex items-center justify-center bg-[rgba(2,4,12,0.76)] backdrop-blur-3xl"
       onClick={onClose}
     >
       <div
@@ -207,11 +234,7 @@ const PluginBrowser: React.FC<PluginBrowserProps> = ({
                     key={`curated-${plugin.id}`}
                     onClick={() => handleAdd(plugin.id)}
                     onMouseEnter={() => handleHover(plugin.id)}
-                    className="rounded-2xl border border-white/12 bg-[rgba(12,24,48,0.78)] px-4 py-2 text-left transition-all hover:border-white/25 hover:bg-[rgba(16,36,68,0.85)]"
-                    style={{
-                      boxShadow: `0 0 28px ${hexToRgba(plugin.glow, 0.26)}`,
-                      backgroundImage: gradientFor(plugin),
-                    }}
+                    className={`plugin-${plugin.id.replace(/[^a-zA-Z0-9-_]/g, '-')} rounded-2xl border border-white/12 bg-[rgba(12,24,48,0.78)] px-4 py-2 text-left transition-all hover:border-white/25 hover:bg-[rgba(16,36,68,0.85)] ${styles.curatedPluginButton}`}
                   >
                     <div className="flex items-center gap-2">
                       <span className="text-[0.58rem] uppercase tracking-[0.32em] text-white/85">
@@ -256,10 +279,7 @@ const PluginBrowser: React.FC<PluginBrowserProps> = ({
                         <article
                           key={plugin.id}
                           onMouseEnter={() => handleHover(plugin.id)}
-                          className="group relative flex flex-col justify-between rounded-[24px] border border-white/10 bg-[rgba(8,16,36,0.78)] p-5 transition-all duration-200 hover:border-white/25 hover:shadow-[0_22px_48px_rgba(6,16,38,0.55)]"
-                          style={{
-                            backgroundImage: gradientFor(plugin),
-                          }}
+                          className={`plugin-${plugin.id.replace(/[^a-zA-Z0-9-_]/g, '-')} group relative flex flex-col justify-between rounded-[24px] border border-white/10 bg-[rgba(8,16,36,0.78)] p-5 transition-all duration-200 hover:border-white/25 hover:shadow-[0_22px_48px_rgba(6,16,38,0.55)] ${styles.pluginCard}`}
                         >
                           <div className="flex items-start justify-between gap-4">
                             <div>
@@ -333,6 +353,7 @@ const PluginBrowser: React.FC<PluginBrowserProps> = ({
         </footer>
       </div>
     </div>
+    </>
   );
 };
 

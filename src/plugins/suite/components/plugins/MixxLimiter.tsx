@@ -5,6 +5,7 @@ import { PluginContainer } from '../shared/PluginContainer';
 import { Knob } from '../shared/Knob';
 import { MixxLimiterSettings, PluginComponentProps } from '../../types';
 import { PrimeBrainStub } from '../../lib/PrimeBrainStub';
+import { useFlowComponent } from '../../../../core/flow/useFlowComponent';
 
 const ToggleButton: React.FC<{ label: string, value: boolean, onChange: (val: boolean) => void, isSidechainButton?: boolean, isSidechainConnected?: boolean }> = ({ label, value, onChange, isSidechainButton=false, isSidechainConnected=false }) => {
     const activeColor = isSidechainButton ? 'bg-cyan-600/40 text-cyan-200 shadow-[0_0_8px_rgba(56,189,248,0.4)]' : 'bg-yellow-400/40 text-yellow-200 shadow-[0_0_8px_rgba(250,204,21,0.4)]';
@@ -93,9 +94,19 @@ export const MixxLimiter: React.FC<PluginComponentProps<MixxLimiterSettings>> = 
 }) => {
   const { ceiling, drive, lookahead, clubCheck, sidechainActive, mix, output } = pluginState;
 
+  // Register plugin with Flow
+  const { broadcast } = useFlowComponent({
+    id: `plugin-mixx-limiter-${name}`,
+    type: 'plugin',
+    name: `Mixx Limiter: ${name}`,
+    broadcasts: ['parameter_change', 'state_change'],
+    listens: [{ signal: 'prime_brain_guidance', callback: () => {} }],
+  });
+
   const handleValueChange = (param: keyof MixxLimiterSettings, value: number | boolean) => {
     setPluginState({ [param]: value });
     PrimeBrainStub.sendEvent('parameter_change', { plugin: 'mixx-limiter', parameter: param, value });
+    broadcast('parameter_change', { plugin: 'mixx-limiter', parameter: param, value });
   };
 
   return (

@@ -1,0 +1,14 @@
+/* PluginBrowser Dynamic Styles
+ * Uses CSS custom properties for plugin-specific glow and gradient values
+ * These are set via inline styles as they are computed dynamically per plugin
+ */
+
+.curatedPluginButton {
+  box-shadow: 0 0 28px var(--plugin-glow, rgba(255, 255, 255, 0.26));
+  background-image: var(--plugin-gradient, linear-gradient(135deg, hsla(200, 82%, 62%, 0.28), hsla(220, 78%, 58%, 0.32)));
+}
+
+.pluginCard {
+  background-image: var(--plugin-gradient, linear-gradient(135deg, hsla(200, 82%, 62%, 0.28), hsla(220, 78%, 58%, 0.32)));
+}
+

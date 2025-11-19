@@ -30,6 +30,7 @@ import {
 } from '../../utils/ALS';
 import type { TrackALSFeedback, ALSActionPulse } from '../../utils/ALS';
 import { publishAlsSignal } from '../../state/flowSignals';
+import { useFlowComponent } from '../../core/flow/useFlowComponent';
 import type { PluginPreset } from '../../utils/pluginState';
 import type { PluginInventoryItem } from "../../audio/pluginTypes";
 
@@ -213,14 +214,39 @@ const FlowConsole: React.FC<FlowConsoleProps> = ({
     [masterAnalysis.level, masterAnalysis.transient, masterVolume]
   );
 
+  // Register Mixer with Flow system
+  const { broadcast } = useFlowComponent({
+    id: 'mixer-console',
+    type: 'mixer',
+    name: 'Mixer Console',
+    broadcasts: ['als_update', 'track_selection', 'parameter_change'],
+    listens: [
+      {
+        signal: 'prime_brain_guidance',
+        callback: (payload) => {
+          // Mixer can react to Prime Brain guidance if needed
+          // For now, ALS handles display, but we could adjust mixer behavior
+        },
+      },
+    ],
+  });
+
   useEffect(() => {
+    // Publish to Flow signals (existing system)
     publishAlsSignal({
       source: "mixer",
       tracks: trackFeedbackMap,
       master: masterFeedback,
       meta: { trackCount },
     });
-  }, [trackFeedbackMap, masterFeedback, trackCount]);
+    
+    // Also broadcast through Flow component registry
+    broadcast('als_update', {
+      tracks: trackFeedbackMap,
+      master: masterFeedback,
+      trackCount,
+    });
+  }, [trackFeedbackMap, masterFeedback, trackCount, broadcast]);
 
   const resolvedPluginInventory = pluginInventory ?? [];
   const resolvedPluginFavorites = pluginFavorites ?? {};

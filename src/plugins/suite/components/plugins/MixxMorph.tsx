@@ -4,6 +4,7 @@ import { PluginContainer } from '../shared/PluginContainer';
 import { Knob } from '../shared/Knob';
 import { MixxMorphSettings, PluginComponentProps } from '../../types';
 import { PrimeBrainStub } from '../../lib/PrimeBrainStub';
+import { useFlowComponent } from '../../../../core/flow/useFlowComponent';
 
 const SegmentedControl: React.FC<{ label: string, options: string[], value: string, onChange: (val: string) => void }> = ({ label, options, value, onChange }) => (
     <div className="flex flex-col items-center gap-2">
@@ -49,9 +50,19 @@ export const MixxMorph: React.FC<PluginComponentProps<MixxMorphSettings>> = ({
     const [morphProgress, setMorphProgress] = useState(0); // 0 to 1
     const [isMorphing, setIsMorphing] = useState(false);
 
+    // Register plugin with Flow
+    const { broadcast } = useFlowComponent({
+        id: `plugin-mixx-morph-${name}`,
+        type: 'plugin',
+        name: `Mixx Morph: ${name}`,
+        broadcasts: ['parameter_change', 'state_change'],
+        listens: [{ signal: 'prime_brain_guidance', callback: () => {} }],
+    });
+
     const handleValueChange = (param: keyof MixxMorphSettings, value: number | 'bpm' | 'free') => {
         setPluginState({ [param]: value });
         PrimeBrainStub.sendEvent('parameter_change', { plugin: 'mixx-morph', parameter: param, value });
+        broadcast('parameter_change', { plugin: 'mixx-morph', parameter: param, value });
     };
 
     const triggerMorph = () => {

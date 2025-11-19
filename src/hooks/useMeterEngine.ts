@@ -1,5 +1,7 @@
 import { useEffect, useRef, useState } from 'react';
 import { useALSPulse } from '../als/useALSPulse';
+import { meterBatcher } from '../core/performance/meterBatcher';
+import { createParallelAnalyserTap } from '../core/performance/safeAnalyserTap';
 
 interface MeterValues {
   peak: number; // 0–1
@@ -36,90 +38,87 @@ export function useMeterEngine(audioNode?: AudioNode) {
   const pulse = useALSPulse(); // 0–1 intensity from ALS
 
   useEffect(() => {
-    if (!audioNode) return;
+    if (!audioNode) {
+      setValues({ peak: 0, rms: 0, clipped: false, transient: false });
+      return;
+    }
 
     const ctx = audioNode.context as BaseAudioContext;
-    const analyser = ctx.createAnalyser();
-    analyser.fftSize = 2048;
-    analyserRef.current = analyser;
-    data.current = new Float32Array(analyser.fftSize);
+    
+    // Create safe analyser tap to prevent feedback loops
+    let analyserTap: ReturnType<typeof createParallelAnalyserTap> | null = null;
+    let unsubscribe: (() => void) | null = null;
 
-    audioNode.connect(analyser);
+    try {
+      analyserTap = createParallelAnalyserTap(audioNode, ctx);
+      analyserRef.current = analyserTap.analyser;
+      data.current = new Float32Array(analyserTap.analyser.fftSize);
 
-    let lastTransient = 0;
-    let animationFrame: number;
+      let lastTransient = 0;
 
-    const loop = () => {
-      if (!analyserRef.current || !data.current) return;
+      // Use batched meter reading instead of individual RAF loop
+      const subscriptionId = `meter-engine-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`;
+      
+      unsubscribe = meterBatcher.subscribe(
+        subscriptionId,
+        analyserTap.analyser,
+        (reading) => {
+          // Convert dB readings to 0-1 range for meter display
+          const peakLinear = reading.peak !== -Infinity ? Math.pow(10, reading.peak / 20) : 0;
+          const rmsLinear = reading.rms !== -Infinity ? Math.pow(10, reading.rms / 20) : 0;
 
-      analyserRef.current.getFloatTimeDomainData(data.current);
-      const buffer = data.current;
+          const now = performance.now();
 
-      // ---- PEAK ----
-      let peak = 0;
-      for (let i = 0; i < buffer.length; i++) {
-        const sample = buffer[i];
-        const mag = sample < 0 ? -sample : sample;
-        if (mag > peak) peak = mag;
-      }
+          // Peak hold logic
+          if (peakLinear > peakHold.current) {
+            peakHold.current = peakLinear;
+            peakHoldTime.current = now;
+          } else {
+            const diff = now - peakHoldTime.current;
+            if (diff > 900) {
+              peakHold.current = Math.max(peakHold.current - 0.005, peakLinear);
+            }
+          }
 
-      const now = performance.now();
+          // Smooth RMS
+          const smoothRMS = lastRMS.current * 0.7 + rmsLinear * 0.3;
+          lastRMS.current = smoothRMS;
 
-      // Peak hold logic
-      if (peak > peakHold.current) {
-        peakHold.current = peak;
-        peakHoldTime.current = now;
-      } else {
-        const diff = now - peakHoldTime.current;
-        if (diff > 900) {
-          peakHold.current = Math.max(peakHold.current - 0.005, peak);
+          // Clip detection
+          const clipped = peakLinear >= 0.98;
+
+          // Transient shimmer
+          const transient = peakLinear > lastTransient + 0.15;
+          if (transient) lastTransient = peakLinear;
+          lastTransient *= 0.92;
+
+          // Pulse integration
+          const pulseBoost = pulse * 0.15;
+          const finalPeak = Math.min(peakHold.current + pulseBoost, 1);
+          const finalRMS = Math.min(smoothRMS + pulseBoost * 0.4, 1);
+
+          setValues({
+            peak: finalPeak,
+            rms: finalRMS,
+            clipped,
+            transient,
+          });
         }
-      }
-
-      // ---- RMS ---- (smooth)
-      let rmsAccum = 0;
-      for (let i = 0; i < buffer.length; i++) {
-        const s = buffer[i];
-        rmsAccum += s * s;
-      }
-      const rms = Math.sqrt(rmsAccum / buffer.length);
-      const smoothRMS = lastRMS.current * 0.7 + rms * 0.3;
-      lastRMS.current = smoothRMS;
-
-      // ---- CLIP ----
-      const clipped = peak >= 0.98;
-
-      // ---- TRANSIENT SHIMMER ----
-      const transient = peak > lastTransient + 0.15;
-      if (transient) lastTransient = peak;
-      lastTransient *= 0.92;
-
-      // ---- PULSE INTEGRATION ----
-      const pulseBoost = pulse * 0.15;
-      const finalPeak = Math.min(peakHold.current + pulseBoost, 1);
-      const finalRMS = Math.min(smoothRMS + pulseBoost * 0.4, 1);
-
-      setValues({
-        peak: finalPeak,
-        rms: finalRMS,
-        clipped,
-        transient,
-      });
-
-      animationFrame = requestAnimationFrame(loop);
-    };
-
-    animationFrame = requestAnimationFrame(loop);
+      );
+    } catch (err) {
+      console.error('[USE METER ENGINE] Failed to create analyser tap:', err);
+      setValues({ peak: 0, rms: 0, clipped: false, transient: false });
+    }
 
     return () => {
-      if (animationFrame) cancelAnimationFrame(animationFrame);
-      try {
-        if (audioNode && analyser) {
-          audioNode.disconnect(analyser);
-        }
-      } catch {
-        // ignore disconnect races
+      if (unsubscribe) {
+        unsubscribe();
       }
+      if (analyserTap) {
+        analyserTap.disconnect();
+      }
+      analyserRef.current = null;
+      data.current = null;
     };
   }, [audioNode, pulse]);
 

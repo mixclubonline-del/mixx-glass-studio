@@ -22,6 +22,7 @@
 import { FourAnchors, MusicalContext } from '../types/sonic-architecture';
 import { IAudioEngine } from '../types/audio-graph';
 import { breathingPattern, warmthModulation } from '../core/beat-locked-lfo';
+import { parameterDebouncer } from '../core/performance/parameterDebouncer';
 
 export interface VelvetCurveState {
   warmth: number;
@@ -279,26 +280,26 @@ export class VelvetCurveEngine implements IAudioEngine {
     this.inputGainNode = this.audioContext.createGain();
     this.inputGainNode.gain.value = this.processing.inputGain;
 
-    // Warmth curve - Low-mid enhancement for velvet smoothness
+    // Warmth curve - Low-mid enhancement for velvet smoothness (reduced gain)
     this.warmthFilter = this.audioContext.createBiquadFilter();
     this.warmthFilter.type = 'peaking';
     this.warmthFilter.frequency.value = 250; // Warmth frequency
     this.warmthFilter.Q.value = 0.7;
-    this.warmthFilter.gain.value = this.processing.warmthGain * 3; // dB
+    this.warmthFilter.gain.value = this.processing.warmthGain * 1.8; // dB (reduced from 3)
 
-    // Silk edge - High-mid enhancement for clarity
+    // Silk edge - High-mid enhancement for clarity (reduced gain)
     this.silkEdgeFilter = this.audioContext.createBiquadFilter();
     this.silkEdgeFilter.type = 'peaking';
     this.silkEdgeFilter.frequency.value = 3000; // Silk edge frequency
     this.silkEdgeFilter.Q.value = 1.2;
-    this.silkEdgeFilter.gain.value = this.processing.silkEdgeGain * 2; // dB
+    this.silkEdgeFilter.gain.value = this.processing.silkEdgeGain * 1.5; // dB (reduced from 2)
 
-    // Emotion curve - Mid enhancement for musical expression
+    // Emotion curve - Mid enhancement for musical expression (reduced gain)
     this.emotionFilter = this.audioContext.createBiquadFilter();
     this.emotionFilter.type = 'peaking';
     this.emotionFilter.frequency.value = 1000; // Emotion frequency
     this.emotionFilter.Q.value = 0.8;
-    this.emotionFilter.gain.value = this.processing.emotionGain * 2.5; // dB
+    this.emotionFilter.gain.value = this.processing.emotionGain * 1.8; // dB (reduced from 2.5)
 
     // Power curve - Dynamic compression for impact
     this.powerCompressor = this.audioContext.createDynamicsCompressor();
@@ -321,12 +322,12 @@ export class VelvetCurveEngine implements IAudioEngine {
 
   /**
    * Update processing parameters based on current state - ENHANCED FOR 100% COHERENCE
+   * QUANTUM OPTIMIZATION: Uses parameter debouncer to batch updates
    */
   private updateProcessingParameters(): void {
     if (!this.warmthFilter || !this.silkEdgeFilter || !this.emotionFilter || 
         !this.powerCompressor || !this.harmonicEnhancer || !this.audioContext) return;
 
-    const now = this.audioContext.currentTime;
     const rampTime = 0.05; // 50ms ramp to prevent clicks
 
     // ENHANCED COHERENCE: Apply beat-locked modulation for 100% coherence
@@ -334,25 +335,50 @@ export class VelvetCurveEngine implements IAudioEngine {
     const coherenceMultiplier = breathingPattern(beatPhase, 0.5);
     const sentienceMultiplier = warmthModulation(beatPhase, 0.3);
 
-    // Update warmth curve with coherence enhancement
+    // Update warmth curve with coherence enhancement (reduced gain to prevent distortion)
     const enhancedWarmth = this.state.warmth * coherenceMultiplier;
-    this.warmthFilter.gain.setTargetAtTime(enhancedWarmth * 3, now, rampTime);
+    parameterDebouncer.scheduleUpdate(
+      this.warmthFilter.gain,
+      enhancedWarmth * 1.8,
+      this.audioContext,
+      rampTime
+    );
 
-    // Update silk edge curve with sentience enhancement
+    // Update silk edge curve with sentience enhancement (reduced gain)
     const enhancedSilkEdge = this.state.silkEdge * sentienceMultiplier;
-    this.silkEdgeFilter.gain.setTargetAtTime(enhancedSilkEdge * 2, now, rampTime);
+    parameterDebouncer.scheduleUpdate(
+      this.silkEdgeFilter.gain,
+      enhancedSilkEdge * 1.5,
+      this.audioContext,
+      rampTime
+    );
 
-    // Update emotion curve with coherence enhancement
+    // Update emotion curve with coherence enhancement (reduced gain)
     const enhancedEmotion = this.state.emotion * coherenceMultiplier;
-    this.emotionFilter.gain.setTargetAtTime(enhancedEmotion * 2.5, now, rampTime);
+    parameterDebouncer.scheduleUpdate(
+      this.emotionFilter.gain,
+      enhancedEmotion * 1.8,
+      this.audioContext,
+      rampTime
+    );
 
     // Update power curve with sentience enhancement
     const enhancedPower = this.state.power * sentienceMultiplier;
-    this.powerCompressor.ratio.setTargetAtTime(2 + (enhancedPower * 3), now, rampTime);
+    parameterDebouncer.scheduleUpdate(
+      this.powerCompressor.ratio,
+      2 + (enhancedPower * 3),
+      this.audioContext,
+      rampTime
+    );
 
     // Update harmonic enhancement with coherence boost
     const enhancedBalance = this.state.balance * coherenceMultiplier;
-    this.harmonicEnhancer.frequency.setTargetAtTime(60 + (enhancedBalance * 40), now, rampTime);
+    parameterDebouncer.scheduleUpdate(
+      this.harmonicEnhancer.frequency,
+      60 + (enhancedBalance * 40),
+      this.audioContext,
+      rampTime
+    );
   }
 
   /**

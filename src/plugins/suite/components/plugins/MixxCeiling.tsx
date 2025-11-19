@@ -4,6 +4,7 @@ import { PluginContainer } from '../shared/PluginContainer';
 import { Knob } from '../shared/Knob';
 import { MixxCeilingSettings, PluginComponentProps } from '../../types';
 import { PrimeBrainStub } from '../../lib/PrimeBrainStub';
+import { useFlowComponent } from '../../../../core/flow/useFlowComponent';
 
 const CeilingVisualizer: React.FC<{ level: number, softClip: number, tone: number }> = ({ level, softClip, tone }) => {
     const [waveform, setWaveform] = useState<number[]>(Array(100).fill(0));
@@ -74,9 +75,19 @@ export const MixxCeiling: React.FC<PluginComponentProps<MixxCeilingSettings>> = 
 }) => {
     const { level, softClip, tone, mix, output } = pluginState;
 
+    // Register plugin with Flow
+    const { broadcast } = useFlowComponent({
+        id: `plugin-mixx-ceiling-${name}`,
+        type: 'plugin',
+        name: `Mixx Ceiling: ${name}`,
+        broadcasts: ['parameter_change', 'state_change'],
+        listens: [{ signal: 'prime_brain_guidance', callback: () => {} }],
+    });
+
     const handleValueChange = (param: keyof MixxCeilingSettings, value: number) => {
         setPluginState({ [param]: value });
         PrimeBrainStub.sendEvent('parameter_change', { plugin: 'mixx-ceiling', parameter: param, value });
+        broadcast('parameter_change', { plugin: 'mixx-ceiling', parameter: param, value });
     };
 
     return (

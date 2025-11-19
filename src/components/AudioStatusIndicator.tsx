@@ -9,7 +9,6 @@
 import React, { useState, useEffect } from 'react';
 import AudioDeviceSelector from './AudioDeviceSelector';
 import { ensureAudioContextResumed, getAudioContextStateMessage, needsUserInteraction } from '../utils/audioDeviceManager';
-import { createTestTone } from '../utils/audioDiagnostics';
 
 interface AudioStatusIndicatorProps {
   audioContext: AudioContext | null;
@@ -87,19 +86,6 @@ export const AudioStatusIndicator: React.FC<AudioStatusIndicatorProps> = ({
                 className="mt-2 rounded bg-cyan-500/20 px-3 py-1.5 text-xs text-cyan-300 hover:bg-cyan-500/30"
               >
                 Resume Audio
-              </button>
-            )}
-            {masterInput && (
-              <button
-                onClick={async () => {
-                  if (audioContext && masterInput) {
-                    await createTestTone(audioContext, masterInput, 0.5, 440);
-                  }
-                }}
-                className="mt-2 rounded bg-green-500/20 px-3 py-1.5 text-xs text-green-300 hover:bg-green-500/30"
-                disabled={!audioContext}
-              >
-                {contextState === 'suspended' ? 'Test Tone (will resume audio)' : 'Test Tone (440Hz)'}
               </button>
             )}
           </div>

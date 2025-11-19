@@ -104,20 +104,41 @@ export function classifyAudio(audioBuffer: AudioBuffer): AudioClassification {
   }
   const rms = Math.sqrt(sumSquares / (len / 128));
   
-  // Rough mode detection
+  // Improved mode detection with better heuristics
   let type: AudioClassification['type'] = 'unknown';
   let confidence = 0.5;
   
-  if (high > mid && high > low) {
+  // Check for vocal-heavy content (high frequency dominance)
+  if (high > mid && high > low && high > 0.4) {
     type = 'vocal';
     confidence = 0.7;
-  } else if (mid > low) {
+  } 
+  // Check for beat/percussion (high transient density + balanced spectrum)
+  else if (transients.density > 5 && transients.count > 50) {
+    type = 'beat';
+    confidence = 0.75;
+  }
+  // Check for two-track (balanced mix, moderate RMS, low transient density)
+  // Two-track mixes typically have balanced spectrum and lower transient activity
+  else if (mid > 0.3 && low > 0.2 && transients.density < 3 && rms > 0.1) {
     type = 'twotrack';
     confidence = 0.65;
-  } else {
-    type = 'stems'; // Fixed: should be 'stems' not 'full'
+  }
+  // Default to full stems for everything else (most common case)
+  // This ensures we attempt full separation unless we're confident it's something else
+  else {
+    type = 'stems';
     confidence = 0.6;
   }
+  
+  // Log classification details for debugging
+  console.log('[CLASSIFIER] Audio classification:', {
+    type,
+    confidence,
+    spectral: { low: spectral.low.toFixed(3), mid: spectral.mid.toFixed(3), high: spectral.high.toFixed(3) },
+    transients: { count: transients.count, density: transients.density.toFixed(2) },
+    rms: rms.toFixed(3),
+  });
   
   return {
     type,

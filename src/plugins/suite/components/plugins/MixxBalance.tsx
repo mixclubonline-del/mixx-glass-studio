@@ -5,6 +5,7 @@ import { PluginContainer } from '../shared/PluginContainer';
 import { Knob } from '../shared/Knob';
 import { MixxBalanceSettings, PluginComponentProps } from '../../types';
 import { PrimeBrainStub } from '../../lib/PrimeBrainStub';
+import { useFlowComponent } from '../../../../core/flow/useFlowComponent';
 
 const Vectorscope: React.FC<{ widthParam: number, phaseParam: number, tiltParam: number }> = ({ widthParam, phaseParam, tiltParam }) => {
     const canvasRef = useRef<HTMLCanvasElement>(null);
@@ -94,9 +95,19 @@ export const MixxBalance: React.FC<PluginComponentProps<MixxBalanceSettings>> = 
 }) => {
   const { width, phase, tilt, mix, output } = pluginState;
   
+  // Register plugin with Flow
+  const { broadcast } = useFlowComponent({
+    id: `plugin-mixx-balance-${name}`,
+    type: 'plugin',
+    name: `Mixx Balance: ${name}`,
+    broadcasts: ['parameter_change', 'state_change'],
+    listens: [{ signal: 'prime_brain_guidance', callback: () => {} }],
+  });
+  
   const handleValueChange = (param: keyof MixxBalanceSettings, value: number) => {
     setPluginState({ [param]: value });
     PrimeBrainStub.sendEvent('parameter_change', { plugin: 'mixx-balance', parameter: param, value });
+    broadcast('parameter_change', { plugin: 'mixx-balance', parameter: param, value });
   };
 
   return (

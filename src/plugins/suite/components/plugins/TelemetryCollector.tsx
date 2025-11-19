@@ -3,6 +3,7 @@ import { PluginContainer } from '../shared/PluginContainer';
 import { TelemetryCollectorSettings, PluginComponentProps } from '../../types';
 import { motion, AnimatePresence } from 'framer-motion';
 import { PrimeBrainStub } from '../../lib/PrimeBrainStub';
+import { useFlowComponent } from '../../../../core/flow/useFlowComponent';
 
 const Heartbeat: React.FC<{ isSpiking: boolean }> = ({ isSpiking }) => (
     <div className="relative w-full h-full flex items-center justify-center">
@@ -41,6 +42,15 @@ const Heartbeat: React.FC<{ isSpiking: boolean }> = ({ isSpiking }) => (
 export const TelemetryCollector: React.FC<PluginComponentProps<TelemetryCollectorSettings>> = ({ 
     isDragging, isResizing, name, description
 }) => {
+    // Register plugin with Flow
+    useFlowComponent({
+        id: `plugin-telemetry-collector-${name}`,
+        type: 'plugin',
+        name: `Telemetry Collector: ${name}`,
+        broadcasts: ['state_change'],
+        listens: [{ signal: 'prime_brain_guidance', callback: () => {} }],
+    });
+
     const [events, setEvents] = useState<{ id: number; text: string; }[]>([]);
     const [isSpiking, setIsSpiking] = useState(false);
     const spikeTimeoutRef = useRef<number | null>(null);

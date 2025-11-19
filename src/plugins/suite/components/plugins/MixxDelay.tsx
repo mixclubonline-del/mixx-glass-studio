@@ -5,6 +5,7 @@ import { Knob } from '../shared/Knob';
 import { Waveform } from '../shared/Waveform';
 import { MixxDelaySettings, PluginComponentProps } from '../../types';
 import { PrimeBrainStub } from '../../lib/PrimeBrainStub';
+import { useFlowComponent } from '../../../../core/flow/useFlowComponent';
 
 const Echo: React.FC<{ index: number, delay: number, feedback: number, throwIntuition: number, mix: number, onThrow: () => void }> = ({ index, delay, feedback, throwIntuition, mix, onThrow }) => {
     const [isThrown, setIsThrown] = React.useState(false);
@@ -52,6 +53,22 @@ export const MixxDelay: React.FC<PluginComponentProps<MixxDelaySettings>> = ({
     const { time, feedback, throwIntuition, mix, output } = pluginState;
     const [isFlashing, setIsFlashing] = React.useState(false);
 
+    // Register plugin with Flow
+    const { broadcast } = useFlowComponent({
+        id: `plugin-mixx-delay-${name}`,
+        type: 'plugin',
+        name: `Mixx Delay: ${name}`,
+        broadcasts: ['parameter_change', 'state_change'],
+        listens: [
+            {
+                signal: 'prime_brain_guidance',
+                callback: (payload) => {
+                    // Prime Brain can guide plugin behavior
+                },
+            },
+        ],
+    });
+
     const handleThrow = React.useCallback(() => {
         setIsFlashing(true);
         setTimeout(() => setIsFlashing(false), 200);
@@ -60,6 +77,8 @@ export const MixxDelay: React.FC<PluginComponentProps<MixxDelaySettings>> = ({
     const handleValueChange = (param: keyof MixxDelaySettings, value: number) => {
         setPluginState({ [param]: value });
         PrimeBrainStub.sendEvent('parameter_change', { plugin: 'mixx-delay', parameter: param, value });
+        // Also broadcast to Flow
+        broadcast('parameter_change', { plugin: 'mixx-delay', parameter: param, value });
     };
 
     return (

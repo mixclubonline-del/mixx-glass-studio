@@ -4,6 +4,7 @@ import { PluginContainer } from '../shared/PluginContainer';
 import { Knob } from '../shared/Knob';
 import { MixxBrainwaveSettings, PluginComponentProps } from '../../types';
 import { PrimeBrainStub } from '../../lib/PrimeBrainStub';
+import { useFlowComponent } from '../../../../core/flow/useFlowComponent';
 
 const BrainwaveVisualizer: React.FC<{ seed: number, variation: number, intensity: number, isThinking: boolean }> = ({ seed, variation, intensity, isThinking }) => {
     const canvasRef = useRef<HTMLCanvasElement>(null);
@@ -55,9 +56,19 @@ export const MixxBrainwave: React.FC<PluginComponentProps<MixxBrainwaveSettings>
     const { seed, variation, intensity, mix, output } = pluginState;
     const [isThinking, setIsThinking] = useState(false);
 
+    // Register plugin with Flow
+    const { broadcast } = useFlowComponent({
+        id: `plugin-mixx-brainwave-${name}`,
+        type: 'plugin',
+        name: `Mixx Brainwave: ${name}`,
+        broadcasts: ['parameter_change', 'state_change'],
+        listens: [{ signal: 'prime_brain_guidance', callback: () => {} }],
+    });
+
     const handleValueChange = (param: keyof MixxBrainwaveSettings, value: number) => {
         setPluginState({ [param]: value });
         PrimeBrainStub.sendEvent('parameter_change', { plugin: 'mixx-brainwave', parameter: param, value });
+        broadcast('parameter_change', { plugin: 'mixx-brainwave', parameter: param, value });
     };
 
     const generateIdea = () => {
