@@ -4,6 +4,7 @@ import { PluginContainer } from '../shared/PluginContainer';
 import { Knob } from '../shared/Knob';
 import { PrimeMasterEQSettings, PluginComponentProps } from '../../types';
 import { PrimeBrainStub } from '../../lib/PrimeBrainStub';
+import { useFlowComponent } from '../../../../core/flow/useFlowComponent';
 
 const ToggleButton: React.FC<{ label: string, value: boolean, onChange: (val: boolean) => void }> = ({ label, value, onChange }) => (
     <button
@@ -102,9 +103,19 @@ export const PrimeMasterEQ: React.FC<PluginComponentProps<PrimeMasterEQSettings>
 }) => {
     const { lowShelfFreq, lowShelfGain, highShelfFreq, highShelfGain, midSideMode, output } = pluginState;
 
+    // Register plugin with Flow
+    const { broadcast } = useFlowComponent({
+        id: `plugin-prime-master-eq-${name}`,
+        type: 'plugin',
+        name: `Prime Master EQ: ${name}`,
+        broadcasts: ['parameter_change', 'state_change'],
+        listens: [{ signal: 'prime_brain_guidance', callback: () => {} }],
+    });
+
     const handleValueChange = (param: keyof PrimeMasterEQSettings, value: number | boolean) => {
         setPluginState({ [param]: value });
         PrimeBrainStub.sendEvent('parameter_change', { plugin: 'prime-master-eq', parameter: param, value });
+        broadcast('parameter_change', { plugin: 'prime-master-eq', parameter: param, value });
     };
 
     return (

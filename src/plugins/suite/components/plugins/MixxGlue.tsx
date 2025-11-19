@@ -5,6 +5,7 @@ import { PluginContainer } from '../shared/PluginContainer';
 import { Knob } from '../shared/Knob';
 import { MixxGlueSettings, PluginComponentProps } from '../../types';
 import { PrimeBrainStub } from '../../lib/PrimeBrainStub';
+import { useFlowComponent } from '../../../../core/flow/useFlowComponent';
 
 const SidechainButton: React.FC<{ label: string, value: boolean, onChange: (val: boolean) => void, isConnected: boolean }> = ({ label, value, onChange, isConnected }) => (
     <button
@@ -87,9 +88,19 @@ export const MixxGlue: React.FC<PluginComponentProps<MixxGlueSettings>> = ({
 }) => {
     const { threshold, ratio, release, sidechainActive, mix, output } = pluginState; 
 
+    // Register plugin with Flow
+    const { broadcast } = useFlowComponent({
+        id: `plugin-mixx-glue-${name}`,
+        type: 'plugin',
+        name: `Mixx Glue: ${name}`,
+        broadcasts: ['parameter_change', 'state_change'],
+        listens: [{ signal: 'prime_brain_guidance', callback: () => {} }],
+    });
+
     const handleValueChange = (param: keyof MixxGlueSettings, value: number | boolean) => {
         setPluginState({ [param]: value });
         PrimeBrainStub.sendEvent('parameter_change', { plugin: 'mixx-glue', parameter: param, value });
+        broadcast('parameter_change', { plugin: 'mixx-glue', parameter: param, value });
     };
 
     return (

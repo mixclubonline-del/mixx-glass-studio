@@ -4,6 +4,7 @@ import { PluginContainer } from '../shared/PluginContainer';
 import { Knob } from '../shared/Knob';
 import { PrimeEQSettings, PluginComponentProps } from '../../types';
 import { PrimeBrainStub } from '../../lib/PrimeBrainStub';
+import { useFlowComponent } from '../../../../core/flow/useFlowComponent';
 
 const EQVisualizer: React.FC<{ low: number, mid: number, high: number, focus: number }> = ({ low, mid, high, focus }) => {
     const [spectrum, setSpectrum] = useState<number[]>(Array(64).fill(0));
@@ -95,9 +96,27 @@ export const PrimeEQ: React.FC<PluginComponentProps<PrimeEQSettings>> = ({
 }) => {
     const { lowGain, midGain, highGain, smartFocus, mix, output } = pluginState;
 
+    // Register plugin with Flow
+    const { broadcast } = useFlowComponent({
+        id: `plugin-prime-eq-${name}`,
+        type: 'plugin',
+        name: `Prime EQ: ${name}`,
+        broadcasts: ['parameter_change', 'state_change'],
+        listens: [
+            {
+                signal: 'prime_brain_guidance',
+                callback: (payload) => {
+                    // Prime Brain can guide plugin behavior
+                },
+            },
+        ],
+    });
+
     const handleValueChange = (param: keyof PrimeEQSettings, value: number) => {
         setPluginState({ [param]: value });
         PrimeBrainStub.sendEvent('parameter_change', { plugin: 'prime-eq', parameter: param, value });
+        // Also broadcast to Flow
+        broadcast('parameter_change', { plugin: 'prime-eq', parameter: param, value });
     };
 
     return (

@@ -159,6 +159,26 @@ export function useFlowLoop() {
         pulse: als.state.pulse,
         tension: als.state.tension,
       });
+      
+      // Step 8: Flow Neural Bridge ensures all components are registered and communicating
+      // This happens automatically via the bridge in the background
+      // System is resilient - we don't break if components aren't registered
+      // In a closed ecosystem, everything will be registered by the time we're done
+      // Health monitoring only in development mode (not user-facing)
+      if (typeof window !== 'undefined' && (window as any).__flowNeuralBridge && process.env.NODE_ENV === 'development') {
+        // Health check every 5 seconds (roughly every 125 ticks) - dev mode only
+        if (Math.random() < 0.008) { // ~0.8% chance per tick = ~every 5 seconds
+          try {
+            const health = (window as any).__flowNeuralBridge.getHealthStatus();
+            // Only log in dev mode - users never see this
+            if (health.componentRegistry.staleComponents.length > 0) {
+              console.debug('[FlowLoop] Stale components (dev mode):', health.componentRegistry.staleComponents);
+            }
+          } catch (error) {
+            // Health check failed - system continues
+          }
+        }
+      }
     }, LOOP_INTERVAL_MS);
     
     return () => clearInterval(interval);

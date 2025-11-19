@@ -8,6 +8,7 @@ import {
   getBloomGlow,
   getBloomColor,
 } from '../../core/bloom/bloomCharge';
+import { useFlowComponent } from '../../core/flow/useFlowComponent';
 import './BloomHUD.css';
 
 export interface BloomFloatingMenuItem {
@@ -129,6 +130,25 @@ export const BloomFloatingHub: React.FC<BloomFloatingHubProps> = ({
   const animationFrameRef = useRef<number | null>(null);
   const velocityRef = useRef<{ x: number; y: number }>({ x: 0, y: 0 });
   const isDraggingRef = useRef(false);
+
+  // Register Bloom Floating Hub with Flow
+  const { broadcast: broadcastBloomHub } = useFlowComponent({
+    id: 'bloom-floating-hub',
+    type: 'bloom',
+    name: 'Bloom Floating Hub',
+    broadcasts: [
+      'bloom_action',
+      'bloom_menu_change',
+    ],
+    listens: [
+      {
+        signal: 'prime_brain_guidance',
+        callback: (payload) => {
+          // Prime Brain can guide Bloom menu suggestions
+        },
+      },
+    ],
+  });
 
   const currentMenu = menuConfig[activeMenu];
   const items = currentMenu?.items ?? [];

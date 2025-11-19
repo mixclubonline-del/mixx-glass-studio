@@ -4,6 +4,7 @@ import { PluginContainer } from '../shared/PluginContainer';
 import { Knob } from '../shared/Knob';
 import { MixxPortSettings, PluginComponentProps } from '../../types';
 import { PrimeBrainStub } from '../../lib/PrimeBrainStub';
+import { useFlowComponent } from '../../../../core/flow/useFlowComponent';
 
 const SegmentedControl: React.FC<{ label: string, options: string[], value: string, onChange: (val: string) => void }> = ({ label, options, value, onChange }) => (
     <div className="flex flex-col items-center gap-2">
@@ -92,9 +93,19 @@ export const MixxPort: React.FC<PluginComponentProps<MixxPortSettings>> = ({
     const [isRendering, setIsRendering] = useState(false);
     const [progress, setProgress] = useState(0);
 
+    // Register plugin with Flow
+    const { broadcast } = useFlowComponent({
+        id: `plugin-mixx-port-${name}`,
+        type: 'plugin',
+        name: `Mixx Port: ${name}`,
+        broadcasts: ['parameter_change', 'state_change'],
+        listens: [{ signal: 'prime_brain_guidance', callback: () => {} }],
+    });
+
     const handleValueChange = (param: keyof MixxPortSettings, value: number | string) => {
         setPluginState({ [param]: value });
         PrimeBrainStub.sendEvent('parameter_change', { plugin: 'mixx-port', parameter: param, value });
+        broadcast('parameter_change', { plugin: 'mixx-port', parameter: param, value });
     };
 
     const startRender = () => {

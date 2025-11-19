@@ -17,6 +17,7 @@ import { FlowDockDebug } from '../dock/debug/FlowDockDebug';
 import { FlowPulseGraph } from '../dock/debug/FlowPulseGraph';
 import { ALSEventLog } from '../dock/debug/ALSEventLog';
 import { ALSSyncMonitor } from '../dock/debug/ALSSyncMonitor';
+import { useFlowComponent } from '../../core/flow/useFlowComponent';
 import './ArrangeBloomStrip.css';
 
 type ImportProgressLike = {
@@ -203,6 +204,26 @@ export const BloomDock: React.FC<BloomDockProps> = (props) => {
         onToggleRecordingOption,
         onDropTakeMarker,
     } = props;
+    
+    // Register Bloom Dock with Flow
+    const { broadcast: broadcastBloom } = useFlowComponent({
+        id: 'bloom-dock',
+        type: 'bloom',
+        name: 'Bloom Dock',
+        broadcasts: [
+            'bloom_action',
+            'transport_event',
+            'view_mode_change',
+        ],
+        listens: [
+            {
+                signal: 'prime_brain_guidance',
+                callback: (payload) => {
+                    // Prime Brain can guide Bloom actions and suggestions
+                },
+            },
+        ],
+    });
     
     const containerRef = useRef<HTMLDivElement>(null);
     const dragOffsetRef = useRef<{ x: number; y: number }>({ x: 0, y: 0 });
@@ -494,7 +515,10 @@ export const BloomDock: React.FC<BloomDockProps> = (props) => {
     
     const actionButton = (icon: React.ReactNode, action: string, payload?: any, tooltip?: string, disabled?: boolean) => (
         <button
-            onClick={() => onAction(action, payload, { source: "bloom-dock" })}
+            onClick={() => {
+                onAction(action, payload, { source: "bloom-dock" });
+                broadcastBloom('bloom_action', { action, payload, source: 'bloom-dock' });
+            }}
             title={tooltip}
             disabled={disabled}
             className="w-11 h-11 rounded-full bg-glass-surface-soft flex items-center justify-center text-ink/70 hover:bg-glass-surface hover:text-ink disabled:text-ink/40 disabled:bg-glass-surface disabled:cursor-not-allowed transition-colors shadow-[inset_0_0_18px_rgba(4,12,26,0.4)]"
@@ -696,8 +720,9 @@ export const BloomDock: React.FC<BloomDockProps> = (props) => {
             clearSeekTimers();
             cueTransportPulse(isPlaying ? 'pause' : 'play');
             onPlayPause();
+            broadcastBloom('transport_event', { type: isPlaying ? 'pause' : 'play' });
         },
-        [clearSeekTimers, cueTransportPulse, isPlaying, onPlayPause]
+        [clearSeekTimers, cueTransportPulse, isPlaying, onPlayPause, broadcastBloom]
     );
 
     const toggleLoop = useCallback(() => {
@@ -726,6 +751,7 @@ export const BloomDock: React.FC<BloomDockProps> = (props) => {
                 event.preventDefault();
                 cueTransportPulse(isPlaying ? 'pause' : 'play');
                 onPlayPause();
+            broadcastBloom('transport_event', { type: isPlaying ? 'pause' : 'play' });
             } else if (event.code === 'ArrowLeft') {
                 event.preventDefault();
                 onTransportNudge('back');

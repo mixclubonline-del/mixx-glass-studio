@@ -3,6 +3,7 @@ import React, { useState, useEffect, useRef } from 'react';
 import { PluginContainer } from '../shared/PluginContainer';
 import { PrimeBotConsoleSettings, PluginComponentProps, SessionContext } from '../../types';
 import { PrimeBrainStub } from '../../lib/PrimeBrainStub';
+import { useFlowComponent } from '../../../../core/flow/useFlowComponent';
 
 const PrimeBotAvatar: React.FC<{hue: number}> = ({ hue }) => (
     <div className="relative w-8 h-8">
@@ -18,6 +19,15 @@ const PrimeBotAvatar: React.FC<{hue: number}> = ({ hue }) => (
 const PrimeBotConsole: React.FC<PluginComponentProps<PrimeBotConsoleSettings>> = ({ 
     isDragging, isResizing, name, description, sessionContext
 }) => {
+    // Register plugin with Flow
+    useFlowComponent({
+        id: `plugin-prime-bot-console-${name}`,
+        type: 'plugin',
+        name: `Prime Bot Console: ${name}`,
+        broadcasts: ['state_change'],
+        listens: [{ signal: 'prime_brain_guidance', callback: () => {} }],
+    });
+
     const [messages, setMessages] = useState<string[]>(["[PrimeBot 4.0] Console Initialized. Monitoring session."]);
     const consoleEndRef = useRef<HTMLDivElement>(null);
 

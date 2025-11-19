@@ -5,8 +5,9 @@
  * This keeps ALS as the visual heartbeat of the Studio.
  */
 
-import React, { createContext, useContext, useState, useCallback } from 'react';
+import React, { createContext, useContext, useState, useCallback, useEffect } from 'react';
 import type { BehaviorState } from './behaviorEngine';
+import { useFlowComponent } from '../flow/useFlowComponent';
 
 interface ALSState {
   flow: number;
@@ -42,6 +43,26 @@ export function ALSProvider({ children }: ALSProviderProps) {
     tension: 0,
     momentum: 0,
     hushFlags: [],
+  });
+  
+  // Register ALS with Flow (passive - listens to Prime Brain guidance)
+  useFlowComponent({
+    id: 'als-system',
+    type: 'als',
+    name: 'Advanced Leveling System',
+    broadcasts: [
+      'als_update', // Broadcast ALS state updates
+    ],
+    listens: [
+      {
+        signal: 'prime_brain_guidance',
+        callback: (payload) => {
+          // ALS is passive - Prime Brain tells it what to display
+          // The guidance payload contains flow, pulse, tension, momentum, etc.
+          // This is handled by the Flow Loop which calls setState
+        },
+      },
+    ],
   });
   
   // Use ref to track if we're in a batch update to reduce re-renders

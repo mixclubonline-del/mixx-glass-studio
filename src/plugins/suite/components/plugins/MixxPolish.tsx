@@ -5,6 +5,7 @@ import { PluginContainer } from '../shared/PluginContainer';
 import { Knob } from '../shared/Knob';
 import { MixxPolishSettings, PluginComponentProps } from '../../types';
 import { PrimeBrainStub } from '../../lib/PrimeBrainStub';
+import { useFlowComponent } from '../../../../core/flow/useFlowComponent';
 
 const CrystalVisualizer: React.FC<{ clarity: number, air: number, balance: number, mix: number }> = ({ clarity, air, balance, mix }) => {
     const normalizedClarity = clarity / 100;
@@ -67,9 +68,19 @@ export const MixxPolish: React.FC<PluginComponentProps<MixxPolishSettings>> = ({
 }) => {
   const { clarity, air, balance, mix, output } = pluginState;
 
+    // Register plugin with Flow
+    const { broadcast } = useFlowComponent({
+        id: `plugin-mixx-polish-${name}`,
+        type: 'plugin',
+        name: `Mixx Polish: ${name}`,
+        broadcasts: ['parameter_change', 'state_change'],
+        listens: [{ signal: 'prime_brain_guidance', callback: () => {} }],
+    });
+
     const handleValueChange = (param: keyof MixxPolishSettings, value: number) => {
         setPluginState({ [param]: value });
         PrimeBrainStub.sendEvent('parameter_change', { plugin: 'mixx-polish', parameter: param, value });
+        broadcast('parameter_change', { plugin: 'mixx-polish', parameter: param, value });
     };
 
   return (

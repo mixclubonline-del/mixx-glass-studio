@@ -4,6 +4,7 @@ import { PluginContainer } from '../shared/PluginContainer';
 import { Knob } from '../shared/Knob';
 import { MixxSoulSettings, PluginComponentProps } from '../../types';
 import { PrimeBrainStub } from '../../lib/PrimeBrainStub';
+import { useFlowComponent } from '../../../../core/flow/useFlowComponent';
 
 const SoulVisualizer: React.FC<{ empathy: number, depth: number, tone: number, vibe: number }> = 
 ({ empathy, depth, tone, vibe }) => {
@@ -76,9 +77,19 @@ export const MixxSoul: React.FC<PluginComponentProps<MixxSoulSettings>> = ({
 }) => {
     const { empathy, depth, tone, vibe, mix, output } = pluginState;
 
+    // Register plugin with Flow
+    const { broadcast } = useFlowComponent({
+        id: `plugin-mixx-soul-${name}`,
+        type: 'plugin',
+        name: `Mixx Soul: ${name}`,
+        broadcasts: ['parameter_change', 'state_change'],
+        listens: [{ signal: 'prime_brain_guidance', callback: () => {} }],
+    });
+
     const handleValueChange = (param: keyof MixxSoulSettings, value: number) => {
         setPluginState({ [param]: value });
         PrimeBrainStub.sendEvent('parameter_change', { plugin: 'mixx-soul', parameter: param, value });
+        broadcast('parameter_change', { plugin: 'mixx-soul', parameter: param, value });
     };
 
     return (

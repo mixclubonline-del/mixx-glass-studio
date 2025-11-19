@@ -5,13 +5,15 @@
  * This is the integration point between the canonical loop and the existing Studio architecture.
  */
 
-import React from 'react';
+import React, { useEffect } from 'react';
 import { PrimeBrainProvider } from './PrimeBrainContext';
 import { ALSProvider } from './ALSContext';
 import { BloomProvider } from './BloomContext';
 import { SessionCoreProvider } from './SessionCoreContext';
 import { useFlowLoop } from './useFlowLoop';
 import type { PrimeBrainStatus } from '../../types/primeBrainStatus';
+// Initialize Flow Neural Bridge
+import '../../core/flow/FlowNeuralBridge';
 
 interface FlowLoopWrapperProps {
   children: React.ReactNode;

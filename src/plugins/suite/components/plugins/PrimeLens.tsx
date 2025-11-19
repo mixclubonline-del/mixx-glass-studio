@@ -4,6 +4,7 @@ import { PluginContainer } from '../shared/PluginContainer';
 import { Knob } from '../shared/Knob';
 import { PrimeLensSettings, PluginComponentProps } from '../../types';
 import { PrimeBrainStub } from '../../lib/PrimeBrainStub';
+import { useFlowComponent } from '../../../../core/flow/useFlowComponent';
 
 const SegmentedControl: React.FC<{ label: string, options: string[], value: string, onChange: (val: string) => void }> = ({ label, options, value, onChange }) => (
     <div className="flex flex-col items-center gap-2">
@@ -63,9 +64,19 @@ export const PrimeLens: React.FC<PluginComponentProps<PrimeLensSettings>> = ({
 }) => {
     const { gain, resolution, colorMode, mix, output } = pluginState;
 
+    // Register plugin with Flow
+    const { broadcast } = useFlowComponent({
+        id: `plugin-prime-lens-${name}`,
+        type: 'plugin',
+        name: `Prime Lens: ${name}`,
+        broadcasts: ['parameter_change', 'state_change'],
+        listens: [{ signal: 'prime_brain_guidance', callback: () => {} }],
+    });
+
     const handleValueChange = (param: keyof PrimeLensSettings, value: number | string) => {
         setPluginState({ [param]: value });
         PrimeBrainStub.sendEvent('parameter_change', { plugin: 'prime-lens', parameter: param, value });
+        broadcast('parameter_change', { plugin: 'prime-lens', parameter: param, value });
     };
 
     return (

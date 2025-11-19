@@ -20,6 +20,7 @@ import {
 import TimelineNavigator from "./timeline/TimelineNavigator";
 import { useFlowContext } from "../state/flowContextService";
 import { useTimelineInteractions } from "../hooks/useTimelineInteractions";
+import { useFlowComponent } from "../core/flow/useFlowComponent";
 import {
   DEFAULT_TIMELINE_TOOL,
   TimelineTool,
@@ -276,6 +277,35 @@ export const ArrangeWindow: React.FC<Props> = (props) => {
 
   const flowContext = useFlowContext();
 
+  // Register Arrange Window with Flow
+  const { broadcast: broadcastArrange } = useFlowComponent({
+    id: 'arrange-window',
+    type: 'arrange',
+    name: 'Arrange Window',
+    broadcasts: [
+      'clip_selected',
+      'clip_moved',
+      'clip_resized',
+      'clip_split',
+      'clip_merged',
+      'track_selected',
+      'timeline_seek',
+      'tool_changed',
+      'snap_changed',
+      'selection_change',
+      'zoom_event',
+    ],
+    listens: [
+      {
+        signal: 'prime_brain_guidance',
+        callback: (payload) => {
+          // Prime Brain can guide Arrange Window behavior
+          // Could adjust tool suggestions, snap behavior, etc.
+        },
+      },
+    ],
+  });
+
   const timelineViewportRef = useRef<HTMLDivElement>(null);
   const [viewportWidth, setViewportWidth] = useState(0);
   // Debug: Log when tracks/clips props change
@@ -476,20 +506,26 @@ export const ArrangeWindow: React.FC<Props> = (props) => {
     (clipId: ClipId, splitTime: number) => {
       onSplitAt(clipId, splitTime);
       recordEditEvent(0); // Split is a precision edit
+      broadcastArrange('clip_split', { clipId, splitTime });
     },
-    [onSplitAt]
+    [onSplitAt, broadcastArrange]
   );
 
   const handleSetTool = useCallback((tool: TimelineTool) => {
     setActiveTool(tool);
     recordToolSwitch(tool);
-  }, []);
+    broadcastArrange('tool_changed', { tool });
+  }, [broadcastArrange]);
 
   const handleToggleSnap = useCallback(
     (key: "enableGrid" | "enableClips" | "enableMarkers" | "enableZeroCrossings") => {
-      setSnapSettings((prev) => ({ ...prev, [key]: !prev[key] }));
+      setSnapSettings((prev) => {
+        const next = { ...prev, [key]: !prev[key] };
+        broadcastArrange('snap_changed', { settings: next });
+        return next;
+      });
     },
-    []
+    [broadcastArrange]
   );
 
   const handleCycleWaveformMode = useCallback(() => {
@@ -795,6 +831,7 @@ export const ArrangeWindow: React.FC<Props> = (props) => {
     const zoomDelta = newPps / pixelsPerSecond;
     const zoomPos = (startSec + endSec) / 2;
     recordZoomEvent(zoomDelta, zoomPos);
+    broadcastArrange('zoom_event', { delta: zoomDelta, position: zoomPos, pps: newPps });
     recordSessionProbeTimelineEvent({
       kind: "zoom",
       scrollX: newScroll,
@@ -917,10 +954,12 @@ export const ArrangeWindow: React.FC<Props> = (props) => {
         clearSelection();
         setClips((prev) => prev.map((clip) => ({ ...clip, selected: false })));
         onSelectTrack(null);
+        broadcastArrange('track_selected', { trackId: null });
       }
 
       setDraggingSelection({ startSec });
       setSelection(startSec, startSec);
+      broadcastArrange('selection_change', { start: startSec, end: startSec });
       setBoxSelection({
         originClientX: e.clientX,
         originClientY: e.clientY,
@@ -988,6 +1027,7 @@ export const ArrangeWindow: React.FC<Props> = (props) => {
             sec = snapToGrid(sec);
           }
           onSeek(sec);
+          broadcastArrange('timeline_seek', { time: sec });
         }
         return;
       }
@@ -1002,6 +1042,7 @@ export const ArrangeWindow: React.FC<Props> = (props) => {
         const maxSec = Math.max(boxSelection.startSec, currentSec);
 
         setSelection(minSec, maxSec);
+        broadcastArrange('selection_change', { start: minSec, end: maxSec });
         setBoxSelection({
           ...boxSelection,
           endSec: currentSec,
@@ -1171,6 +1212,16 @@ export const ArrangeWindow: React.FC<Props> = (props) => {
 
             return next;
           });
+          
+          // Broadcast clip move
+          if (Math.abs(deltaSec) > 1e-6) {
+            broadcastArrange('clip_moved', { 
+              clipIds: Array.from(selectionSet),
+              deltaSec,
+              newStart: snappedPrimary,
+              targetTrackId
+            });
+          }
         } else if (drag.kind === "resize-left") {
           const reference = primaryOriginal;
           const desiredStart = reference.start + dxSec;
@@ -1210,12 +1261,23 @@ export const ArrangeWindow: React.FC<Props> = (props) => {
                   zeroStart = Boolean(snapped.zeroStart);
                 }
                 finalStart = candidate.start;
-                return {
+                const updatedClip = {
                   ...clip,
                   ...candidate,
                   zeroStart,
                   zeroEnd: clip.zeroEnd ?? false,
                 };
+                
+                // Broadcast clip resize
+                broadcastArrange('clip_resized', {
+                  clipId: drag.primaryId,
+                  kind: 'resize-left',
+                  newStart: finalStart,
+                  newDuration: candidate.duration,
+                  zeroStart
+                });
+                
+                return updatedClip;
               })
             );
             snapValue = finalStart;
@@ -1254,12 +1316,23 @@ export const ArrangeWindow: React.FC<Props> = (props) => {
                 zeroEnd = Boolean(snapped.zeroEnd);
               }
               finalEnd = candidate.start + candidate.duration;
-              return {
+              const updatedClip = {
                 ...clip,
                 duration: candidate.duration,
                 zeroEnd,
                 zeroStart: clip.zeroStart ?? false,
               };
+              
+              // Broadcast clip resize
+              broadcastArrange('clip_resized', {
+                clipId: drag.primaryId,
+                kind: 'resize-right',
+                newDuration: candidate.duration,
+                newEnd: finalEnd,
+                zeroEnd
+              });
+              
+              return updatedClip;
             })
           );
           snapValue = finalEnd;
@@ -1365,8 +1438,9 @@ export const ArrangeWindow: React.FC<Props> = (props) => {
     const xPx = e.clientX - rect.left;
     const sec = Math.max(0, (xPx + scrollX) / pixelsPerSecond);
     onSeek(sec);
+    broadcastArrange('timeline_seek', { time: sec });
     setScrubState({ isScrubbing: true, originX: e.clientX, originTime: sec });
-  }, [onSeek, pixelsPerSecond, scrollX, stopMomentum]);
+  }, [onSeek, pixelsPerSecond, scrollX, stopMomentum, broadcastArrange]);
   
   const masterLevel = masterAnalysis?.level ?? 0;
   const glowIntensity = Math.min(1, masterLevel * 3.0);

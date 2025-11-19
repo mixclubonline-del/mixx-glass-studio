@@ -4,6 +4,7 @@ import { PluginContainer } from '../shared/PluginContainer';
 import { Knob } from '../shared/Knob';
 import { MixxDitherSettings, PluginComponentProps } from '../../types';
 import { PrimeBrainStub } from '../../lib/PrimeBrainStub';
+import { useFlowComponent } from '../../../../core/flow/useFlowComponent';
 
 const SegmentedControl: React.FC<{ label: string, options: (string|number)[], value: string|number, onChange: (val: any) => void }> = ({ label, options, value, onChange }) => (
     <div className="flex flex-col items-center gap-2">
@@ -78,9 +79,19 @@ export const MixxDither: React.FC<PluginComponentProps<MixxDitherSettings>> = ({
 }) => {
     const { bitDepth, noiseShaping, ditherAmount, output } = pluginState;
 
+    // Register plugin with Flow
+    const { broadcast } = useFlowComponent({
+        id: `plugin-mixx-dither-${name}`,
+        type: 'plugin',
+        name: `Mixx Dither: ${name}`,
+        broadcasts: ['parameter_change', 'state_change'],
+        listens: [{ signal: 'prime_brain_guidance', callback: () => {} }],
+    });
+
     const handleValueChange = (param: keyof MixxDitherSettings, value: number | string) => {
         setPluginState({ [param]: value as any }); // Cast as any to handle union types
         PrimeBrainStub.sendEvent('parameter_change', { plugin: 'mixx-dither', parameter: param, value });
+        broadcast('parameter_change', { plugin: 'mixx-dither', parameter: param, value });
     };
 
     return (

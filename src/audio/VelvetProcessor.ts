@@ -58,6 +58,8 @@ export class VelvetProcessor {
     );
     
     // 👑 VELVET CURVE - MixxClub signature
+    // NOTE: For offline processing, we use the simple stage version
+    // The real-time VelvetCurveEngine is used in the master chain
     const velvetCurve = createVelvetCurveStage(offlineContext);
     
     // Master gain for LUFS targeting

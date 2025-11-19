@@ -90,5 +90,22 @@ export const publishFlowSignal = (signal: FlowSignal) => {
   eventBus.publish(signal);
 };
 
+/**
+ * Subscribe to a specific Flow signal type
+ * Used by components to listen for specific signals
+ */
+export const subscribeToFlowSignal = (
+  signalType: string,
+  callback: (signal: FlowSignal) => void
+): (() => void) => {
+  const listener = (signal: FlowSignal) => {
+    // Check if signal matches the type we're looking for
+    if (signal.channel === signalType || (signal.payload as any)?.signal === signalType) {
+      callback(signal);
+    }
+  };
+  return eventBus.subscribe(listener);
+};
+
 
 

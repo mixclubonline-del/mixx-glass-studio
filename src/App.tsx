@@ -32,7 +32,8 @@ import { getMixxFXEngine, initializeMixxFXEngine } from './audio/MixxFXEngine';
 import { buildMasterChain } from './audio/masterChain';
 import type { VelvetMasterChain } from './audio/masterChain';
 import { verifyMasterChainRouting, logVerificationResults, verifyTrackConnections } from './audio/routingVerification';
-import { diagnoseAudioSystem, logAudioDiagnostics, createTestTone } from './utils/audioDiagnostics';
+import { diagnoseAudioSystem, logAudioDiagnostics } from './utils/audioDiagnostics';
+import { auditMixerConsole, logMixerAudit, type MixerAuditContext } from './utils/mixerAudit';
 import { createNativeAudioBridge, createNativeAudioStreamNode } from './utils/nativeAudioBridge';
 import { VelvetLoudnessMeter, DEFAULT_VELVET_LOUDNESS_METRICS } from './audio/VelvetLoudnessMeter';
 import type { VelvetLoudnessMetrics } from './audio/VelvetLoudnessMeter';
@@ -70,6 +71,9 @@ import { monitorHush } from './core/performance/hushMonitor';
 import { recordPunchEvent, recordRecordTap, detectPunchType } from './core/performance/punchMode';
 import { recordTakeMemory } from './core/performance/takeMemory';
 import { analyzeTakeForComp } from './core/performance/compBrain';
+import { useAutoPunch } from './core/performance/autoPunch';
+import { getQuantumNeuralNetwork, type QuantumIntelSnapshot } from './ai/QuantumNeuralNetwork';
+import { initializeQNNFlow, getQNNFlowService } from './ai/QNNFlowService';
 import {
   TRACK_COLOR_SWATCH,
   derivePulsePalette,
@@ -95,7 +99,10 @@ import IngestQueueManager, {
   IngestJobOutcome,
   PersistedIngestSnapshot,
 } from './ingest/IngestQueueManager';
-import StemSeparationIntegration from './audio/StemSeparationIntegration';
+// Flow-native stem separation
+import FlowStemIntegration from './core/import/flowStemIntegration';
+// Legacy (kept for compatibility, will be removed)
+// import StemSeparationIntegration from './audio/StemSeparationIntegration';
 import StemSeparationModal from './components/modals/StemSeparationModal';
 import { FileInput } from './components/import/FileInput';
 import { useTimelineStore } from './state/timelineStore';
@@ -465,7 +472,7 @@ const computeDockDefaultPosition = (): Point => {
 const computeHubDefaultPosition = (dockPosition?: Point): Point => {
   if (typeof window === 'undefined') {
     // Default: top-right (matches CSS default)
-    return { x: window.innerWidth - 220 - 90, y: 240 }; // 220 = HUB_SIZE.width, 90 = right offset
+    return { x: 1920 - 220 - 90, y: 240 }; // 220 = HUB_SIZE.width, 90 = right offset, fallback width
   }
   // Default: top-right (matches CSS: top: 240px, right: 90px)
   const x = window.innerWidth - HUB_SIZE.width - 90; // 90px from right (matches CSS)
@@ -798,9 +805,8 @@ const deriveTrackImportProfile = (
   const waveformType = GROUP_WAVEFORM_DEFAULTS[group];
 
   const sameGroupCount = existingTracks.filter((track) => track.group === group).length;
-  const label = matchedProfile?.label ?? baseName.toUpperCase();
-  const suffix = sameGroupCount > 0 ? ` ${sameGroupCount + 1}` : '';
-  const trackName = `${label}${suffix}`;
+  // Always use the filename (baseName) for track name - preserve the song title
+  const trackName = sameGroupCount > 0 ? `${baseName.toUpperCase()} ${sameGroupCount + 1}` : baseName.toUpperCase();
 
   return { group, color, trackName, waveformType };
 };
@@ -1184,7 +1190,7 @@ interface FlowRuntimeProps {
 const FlowRuntime: React.FC<FlowRuntimeProps> = ({ arrangeFocusToken }) => {
   // --- STATE MANAGEMENT ---
   const [tracks, setTracks] = useState<TrackData[]>(() => buildInitialTracks());
-  const stemIntegrationRef = useRef<StemSeparationIntegration | null>(null);
+  const stemIntegrationRef = useRef<FlowStemIntegration | null>(null);
   const tracksRef = useRef<TrackData[]>(tracks);
   const clipsRef = useRef<ArrangeClip[]>([]);
   const [isStemModalOpen, setIsStemModalOpen] = useState(false);
@@ -1207,6 +1213,13 @@ const FlowRuntime: React.FC<FlowRuntimeProps> = ({ arrangeFocusToken }) => {
   useEffect(() => {
     const cleanup = initThermalSync(100); // Update every 100ms
     return cleanup;
+  }, []);
+
+  // Initialize QNN Flow Service - Connect AI intelligence to Flow
+  useEffect(() => {
+    initializeQNNFlow().catch((error) => {
+      console.warn('[QNN Flow] Failed to initialize:', error);
+    });
   }, []);
   
   useEffect(() => {
@@ -1441,6 +1454,9 @@ const FlowRuntime: React.FC<FlowRuntimeProps> = ({ arrangeFocusToken }) => {
     );
   }, [primeBrainTelemetryEnabled]);
 
+  // Surface Auto Punch through Bloom
+  const { autoPunch } = useAutoPunch();
+
   const [musicalContext, setMusicalContext] = useState<MusicalContext>({ genre: 'Streaming', mood: 'Balanced' });
   const [isHushActive, setIsHushActive] = useState(false);
   const [hushFeedback, setHushFeedback] = useState({ color: '#1a1030', intensity: 0.0, isEngaged: false, noiseCount: 0 });
@@ -1518,9 +1534,8 @@ const FlowRuntime: React.FC<FlowRuntimeProps> = ({ arrangeFocusToken }) => {
     setRecordingOptions((prev) => {
       const nextState = { ...prev, [option]: !prev[option] };
       publishAlsSignal({
-        source: 'recording-option',
-        option,
-        active: nextState[option],
+        source: 'system',
+        meta: { recordingOption: option, active: nextState[option] },
       });
       return nextState;
     });
@@ -1538,8 +1553,8 @@ const FlowRuntime: React.FC<FlowRuntimeProps> = ({ arrangeFocusToken }) => {
       accent: '#f97316',
     });
     publishAlsSignal({
-      source: 'recording',
-      marker: { timestamp, report },
+      source: 'system',
+      meta: { recordingMarker: { timestamp, report } },
     });
   }, [appendHistoryNote, loudnessMetrics, masterAnalysis.waveform, publishAlsSignal]);
 
@@ -1638,21 +1653,32 @@ const FlowRuntime: React.FC<FlowRuntimeProps> = ({ arrangeFocusToken }) => {
     const sessionProbeContext = sessionProbeState?.context ?? null;
 
     // Enhanced ALS channel calculation with Flow Context integration
-    const alsTemperature = clamp01(masterAnalysis.level);
-    let momentum = Math.max(flowContext.momentum, isPlaying ? 0.45 + masterAnalysis.level * 0.4 : 0.18);
-    if (mixerActionPulse) {
+    // CRITICAL: Only show activity when there's actual audio playing (level > 0)
+    const hasAudio = isPlaying && masterAnalysis.level > 0;
+    const alsTemperature = hasAudio ? clamp01(masterAnalysis.level) : 0;
+    
+    // Momentum: Zero when no audio, or when level is too low
+    let momentum = hasAudio 
+        ? Math.max(flowContext.momentum, 0.45 + masterAnalysis.level * 0.4)
+        : 0;
+    if (mixerActionPulse && hasAudio) {
       momentum = Math.min(
         1,
         Math.max(momentum, flowContext.momentum + mixerActionPulse.pulse.intensity * 0.3)
       );
     }
-    const pressureBase =
-      (masterAnalysis.transient ? 0.55 + masterAnalysis.level * 0.4 : masterAnalysis.level * 0.6) +
-      flowContext.momentumTrend * 0.35;
-    const pressure = clamp01(importMessage ? Math.max(pressureBase, 0.65) : pressureBase);
-    const harmony = analysisResult
+    
+    // Pressure: Zero when no audio
+    const pressureBase = hasAudio
+      ? (masterAnalysis.transient ? 0.55 + masterAnalysis.level * 0.4 : masterAnalysis.level * 0.6) +
+        flowContext.momentumTrend * 0.35
+      : 0;
+    const pressure = clamp01(importMessage && hasAudio ? Math.max(pressureBase, 0.65) : pressureBase);
+    
+    // Harmony: Zero when no audio analysis available
+    const harmony = hasAudio && analysisResult
       ? clamp01((analysisResult.soul / 100) * 0.6 + (analysisResult.silk / 100) * 0.4)
-      : 0.38;
+      : 0;
     const harmonyWithFlow = clamp01(
       harmony +
         (flowContext.intensity === 'immersed'
@@ -2077,7 +2103,7 @@ const FlowRuntime: React.FC<FlowRuntimeProps> = ({ arrangeFocusToken }) => {
 
   // Center console when mix view is activated
   useEffect(() => {
-    if (viewMode === 'mix' && typeof window !== 'undefined') {
+    if (viewMode === 'mixer' && typeof window !== 'undefined') {
       // Center console: (viewport width - console width) / 2, (viewport height - console height) / 2
       const consoleWidth = window.innerWidth * 0.88; // 88vw
       const consoleHeight = window.innerHeight * 0.52; // 52vh
@@ -2808,16 +2834,79 @@ const FlowRuntime: React.FC<FlowRuntimeProps> = ({ arrangeFocusToken }) => {
     setImportMessage(`Applying Velvet Sonics: ${displayName}`);
     upsertImportProgress({ id: jobId, label: displayName, percent: 10, type: 'file' });
 
-    const velvetProcessor = new VelvetProcessor(audioContextRef.current);
-    const processedBuffer = await velvetProcessor.processAudioBuffer(buffer, {
-      profile: {
-        name: 'Streaming Standard',
-        targetLUFS: -14,
-        velvetFloor: { depth: 70, translation: 'deep', warmth: 60 },
-        harmonicLattice: { character: 'warm', presence: 75, airiness: 70 },
-        phaseWeave: { width: 80, monoCompatibility: 90 },
-      },
+    // Validate input buffer before processing
+    console.log('[AUDIO IMPORT] Validating input buffer:', {
+      duration: buffer.duration,
+      sampleRate: buffer.sampleRate,
+      numberOfChannels: buffer.numberOfChannels,
+      length: buffer.length,
     });
+    
+    // Check if buffer has actual audio data (not silent)
+    const channelData = buffer.getChannelData(0);
+    let maxSample = 0;
+    for (let i = 0; i < Math.min(channelData.length, 1000); i++) {
+      maxSample = Math.max(maxSample, Math.abs(channelData[i]));
+    }
+    
+    if (maxSample < 0.001) {
+      console.warn('[AUDIO IMPORT] ⚠️ Input buffer appears to be silent or empty!');
+    } else {
+      console.log(`[AUDIO IMPORT] ✅ Input buffer has audio data (max sample: ${maxSample.toFixed(4)})`);
+    }
+
+    // Process through Velvet chain (offline processing)
+    // NOTE: Velvet processing happens in real-time via master chain, so we can skip offline processing
+    // to avoid issues and ensure the original audio plays correctly
+    let processedBuffer: AudioBuffer;
+    
+    // TEMPORARY: Skip offline Velvet processing to fix "hum" issue
+    // The real-time master chain will apply Velvet processing during playback
+    const SKIP_OFFLINE_VELVET_PROCESSING = true;
+    
+    if (SKIP_OFFLINE_VELVET_PROCESSING) {
+      console.log('[AUDIO IMPORT] Using original buffer (offline Velvet processing skipped - real-time processing in master chain)');
+      processedBuffer = buffer;
+    } else {
+      try {
+        const velvetProcessor = new VelvetProcessor(audioContextRef.current);
+        processedBuffer = await velvetProcessor.processAudioBuffer(buffer, {
+          profile: {
+            name: 'Streaming Standard',
+            targetLUFS: -14,
+            truePeakCeiling: -1,
+            velvetFloor: { depth: 70, translation: 'deep', warmth: 60 },
+            harmonicLattice: { character: 'warm', presence: 75, airiness: 70 },
+            phaseWeave: { width: 80, monoCompatibility: 90 },
+          },
+        });
+        
+        // Validate processed buffer
+        console.log('[AUDIO IMPORT] Validating processed buffer:', {
+          duration: processedBuffer.duration,
+          sampleRate: processedBuffer.sampleRate,
+          numberOfChannels: processedBuffer.numberOfChannels,
+          length: processedBuffer.length,
+        });
+        
+        const processedChannelData = processedBuffer.getChannelData(0);
+        let processedMaxSample = 0;
+        for (let i = 0; i < Math.min(processedChannelData.length, 1000); i++) {
+          processedMaxSample = Math.max(processedMaxSample, Math.abs(processedChannelData[i]));
+        }
+        
+        if (processedMaxSample < 0.001) {
+          console.error('[AUDIO IMPORT] ❌ Processed buffer is silent! Using original buffer instead.');
+          processedBuffer = buffer; // Fallback to original buffer
+        } else {
+          console.log(`[AUDIO IMPORT] ✅ Processed buffer has audio data (max sample: ${processedMaxSample.toFixed(4)})`);
+        }
+      } catch (error) {
+        console.error('[AUDIO IMPORT] ❌ Velvet processing failed:', error);
+        console.warn('[AUDIO IMPORT] Using original buffer without processing');
+        processedBuffer = buffer; // Fallback to original buffer if processing fails
+      }
+    }
 
     const timestamp = Date.now();
     const newBufferId = `buffer-import-${timestamp}`;
@@ -3412,21 +3501,18 @@ const FlowRuntime: React.FC<FlowRuntimeProps> = ({ arrangeFocusToken }) => {
         console.log('[AUDIO] AudioContext resumed - audio should now work');
         console.log('[AUDIO] AudioContext state after resume:', ctx.state);
         
-        // Run diagnostics after resume
-        if ((import.meta as any).env?.DEV && masterNodesRef.current) {
-          const diagnostics = diagnoseAudioSystem(
+        // Run comprehensive audio output diagnostics
+        if ((import.meta as any).env?.DEV) {
+          const { diagnoseAudioOutput, logAudioOutputDiagnostics } = await import('./utils/audio/audioOutputDiagnostics');
+          const diagnostics = diagnoseAudioOutput(
             ctx,
             masterNodesRef.current,
+            translationMatrixRef.current,
             trackNodesRef.current,
-            audioBuffers,
-            translationMatrixRef.current
+            clips,
+            audioBuffers
           );
-          logAudioDiagnostics(diagnostics);
-          
-          // Play test tone to verify signal path (will auto-resume if needed)
-          if (masterNodesRef.current.input) {
-            createTestTone(ctx, masterNodesRef.current.input, 0.3, 440).catch(console.error);
-          }
+          logAudioOutputDiagnostics(diagnostics);
         }
       } catch (error) {
         console.error('[AUDIO] Failed to resume AudioContext:', error);
@@ -3732,8 +3818,8 @@ const FlowRuntime: React.FC<FlowRuntimeProps> = ({ arrangeFocusToken }) => {
                 const profile = payload as TranslationProfileKey;
                 setTranslationProfile(profile);
                 publishAlsSignal({
-                    source: 'translation-matrix',
-                    profile,
+                    source: 'system',
+                    meta: { translationMatrix: { profile } },
                 });
               }
               break;
@@ -3777,6 +3863,50 @@ const FlowRuntime: React.FC<FlowRuntimeProps> = ({ arrangeFocusToken }) => {
                   // Example: Map 'soul' and 'silk' anchors to emotional bias for HarmonicLattice
                   const emotionalBias = (analysis.soul / 100 + analysis.silk / 100) / 2;
                   harmonicLatticeEngine.setEmotionalBias(emotionalBias);
+
+                  // Route QNN analysis through Flow
+                  try {
+                      const qnnFlowService = getQNNFlowService();
+                      
+                      // Extract audio features for QNN analysis
+                      const sampleRate = bufferToAnalyze.sampleRate;
+                      const length = bufferToAnalyze.length;
+                      const channelData = bufferToAnalyze.getChannelData(0);
+                      
+                      // Compute FFT-like features (simplified - use RMS energy per frequency band)
+                      const fftSize = 256;
+                      const fftData: number[] = [];
+                      for (let i = 0; i < fftSize; i++) {
+                          const start = Math.floor((i / fftSize) * length);
+                          const end = Math.floor(((i + 1) / fftSize) * length);
+                          let sum = 0;
+                          for (let j = start; j < end && j < length; j++) {
+                              sum += Math.abs(channelData[j]);
+                          }
+                          fftData.push(sum / (end - start));
+                      }
+                      
+                      // Request QNN analysis through Flow (will route to Prime Brain automatically)
+                      await qnnFlowService.requestAudioAnalysis(fftData, {
+                          clipId: clipId,
+                          trackId: trackId,
+                          timestamp: Date.now(),
+                      });
+                      
+                      // Also request pattern recognition
+                      await qnnFlowService.requestPatternRecognition(
+                          Array.from(channelData.slice(0, 64)),
+                          {
+                              clipId: clipId,
+                              trackId: trackId,
+                              timestamp: Date.now(),
+                          }
+                      );
+                      
+                      console.log("[QNN Flow] Analysis requests sent through Flow");
+                  } catch (error) {
+                      console.warn("[QNN Flow] Failed to request analysis:", error);
+                  }
 
                   setImportMessage(null);
               })();
@@ -3843,6 +3973,11 @@ const FlowRuntime: React.FC<FlowRuntimeProps> = ({ arrangeFocusToken }) => {
                 return next;
               });
               break;
+          case 'seekToTime':
+              if (typeof payload === 'number') {
+                  handleSeek(payload);
+              }
+              break;
           case 'splitSelection':
               handleSplitSelectionAt((payload as { time?: number } | undefined)?.time);
               break;
@@ -3897,7 +4032,7 @@ const FlowRuntime: React.FC<FlowRuntimeProps> = ({ arrangeFocusToken }) => {
     });
     setSelectedTrackId(newTrackData.id); // UX improvement: select the new track
     setIsAddTrackModalModalOpen(false);
-    recordPrimeBrainEvent('track-create', { trackId: newTrackData.id, group: newTrackData.group }, 'success');
+    recordPrimeBrainEvent('clip-create', { trackId: newTrackData.id, group: newTrackData.group }, 'success');
   }, []);
 
   const handleMixerChange = useCallback((trackId: string, setting: keyof MixerSettings, value: number | boolean) => {
@@ -4819,37 +4954,37 @@ const FlowRuntime: React.FC<FlowRuntimeProps> = ({ arrangeFocusToken }) => {
         audioContextRef.current = createdCtx;
         ctx = createdCtx;
 
-        const duration = 1;
-        const sampleRate = createdCtx.sampleRate;
-        const frameCount = sampleRate * duration;
-        const buffer = createdCtx.createBuffer(1, frameCount, sampleRate);
-        const data = buffer.getChannelData(0);
-        for (let i = 0; i < frameCount; i++) {
-            data[i] = Math.sin(2 * Math.PI * 440 * i / sampleRate) * 0.2; // A4 tone
-        }
-        if (isCancelled) {
-            await createdCtx.close().catch(() => {});
-            return;
-        }
-        setAudioBuffers({ 'default': buffer });
-        console.log("Default audio buffer created.");
+        // Initialize empty audio buffers (no test tone)
+        setAudioBuffers({});
+        console.log("Audio buffers initialized (empty).");
 
         masterNodesRef.current = await buildMasterChain(createdCtx);
-        if (isCancelled || createdCtx.state === "closed") {
+        if (isCancelled || (createdCtx.state as string) === "closed") {
           return;
         }
         
         // Add VelvetCurveEngine to engine instances for clock sync
         // Note: VelvetCurveEngine is a singleton, so we'll set its clock directly in the clock sync effect
         
-        const translationMatrix = new TranslationMatrix(createdCtx);
-        translationMatrix.attach(masterNodesRef.current.output, createdCtx.destination);
-        translationMatrix.activate(translationProfileRef.current);
-        translationMatrixRef.current = translationMatrix;
-        
-        // Setup native audio bridge if in Tauri
+        // Check if we're in Tauri (native desktop) or web browser
         const isTauri = typeof window !== 'undefined' && typeof (window as unknown as { __TAURI__?: unknown }).__TAURI__ !== 'undefined';
+        
+        // CRITICAL: Disconnect any existing connections from master output to prevent feedback loops
+        try {
+          // Get all current connections
+          const connections = (masterNodesRef.current.output as any)._connections || [];
+          console.log('[AUDIO] Checking for existing master output connections:', connections.length);
+          
+          // Disconnect all existing connections
+          masterNodesRef.current.output.disconnect();
+          console.log('[AUDIO] Disconnected all existing master output connections');
+        } catch (e) {
+          // Ignore - node might not have connections yet
+          console.log('[AUDIO] No existing connections to disconnect');
+        }
+
         if (isTauri) {
+          // NATIVE DESKTOP MODE: Route audio to native engine (bypasses browser audio)
           try {
             const bridge = createNativeAudioBridge();
             if (bridge) {
@@ -4860,18 +4995,64 @@ const FlowRuntime: React.FC<FlowRuntimeProps> = ({ arrangeFocusToken }) => {
               const streamNode = await createNativeAudioStreamNode(createdCtx, bridge);
               if (streamNode) {
                 nativeAudioStreamNodeRef.current = streamNode;
-                // Connect master output to native stream node
+                // Connect master output DIRECTLY to native stream node ONLY (no TranslationMatrix)
+                // This is a sink node (no output) so it won't create feedback
                 masterNodesRef.current.output.connect(streamNode);
-                console.log('[NATIVE AUDIO] Stream node connected to master chain');
-                console.log('[NATIVE AUDIO] Audio will stream from Flow DSP → Native Engine → Hardware');
+                console.log('[NATIVE AUDIO] ✅ Stream node connected to master chain');
+                console.log('[NATIVE AUDIO] Audio routing: Master → Native Stream → Hardware Output');
+                console.log('[NATIVE AUDIO] ⚠️ TranslationMatrix NOT attached (native mode) - prevents feedback loop');
+                
+                // Still create TranslationMatrix for web fallback if native bridge fails
+                // BUT DO NOT ATTACH IT - this prevents dual routing
+                const translationMatrix = new TranslationMatrix(createdCtx);
+                translationMatrixRef.current = translationMatrix;
               } else {
-                console.warn('[NATIVE AUDIO] Failed to create stream node');
+                console.warn('[NATIVE AUDIO] Failed to create stream node - falling back to web audio');
+                // Fallback to web audio if native bridge fails
+                const translationMatrix = new TranslationMatrix(createdCtx);
+                translationMatrix.attach(masterNodesRef.current.output, createdCtx.destination);
+                translationMatrix.activate(translationProfileRef.current);
+                translationMatrixRef.current = translationMatrix;
+                console.log('[AUDIO] ✅ TranslationMatrix attached (fallback mode)');
               }
+            } else {
+              // No bridge available - use web audio
+              const translationMatrix = new TranslationMatrix(createdCtx);
+              translationMatrix.attach(masterNodesRef.current.output, createdCtx.destination);
+              translationMatrix.activate(translationProfileRef.current);
+              translationMatrixRef.current = translationMatrix;
+              console.log('[AUDIO] ✅ TranslationMatrix attached (web fallback)');
             }
           } catch (error) {
             console.error('[NATIVE AUDIO] Failed to setup native audio bridge:', error);
+            // Fallback to web audio on error
+            const translationMatrix = new TranslationMatrix(createdCtx);
+            translationMatrix.attach(masterNodesRef.current.output, createdCtx.destination);
+            translationMatrix.activate(translationProfileRef.current);
+            translationMatrixRef.current = translationMatrix;
+            console.log('[AUDIO] ✅ TranslationMatrix attached (error fallback)');
           }
+        } else {
+          // WEB BROWSER MODE: Route audio through TranslationMatrix to browser destination
+          const translationMatrix = new TranslationMatrix(createdCtx);
+          translationMatrix.attach(masterNodesRef.current.output, createdCtx.destination);
+          translationMatrix.activate(translationProfileRef.current);
+          translationMatrixRef.current = translationMatrix;
+          
+          console.log('[AUDIO] ✅ TranslationMatrix attached (web mode):', {
+            masterOutput: !!masterNodesRef.current.output,
+            destination: !!createdCtx.destination,
+            attached: translationMatrix.attached,
+            profile: translationProfileRef.current,
+          });
         }
+        
+        // Verify final connection state to prevent feedback
+        console.log('[AUDIO] Final master output connection check:', {
+          hasStreamNode: !!nativeAudioStreamNodeRef.current,
+          hasTranslationMatrix: !!translationMatrixRef.current,
+          translationMatrixAttached: translationMatrixRef.current?.attached ?? false,
+        });
         const masterAnalyser = masterNodesRef.current.analyser;
         masterAnalyser.fftSize = TRACK_ANALYSER_FFT;
         masterAnalyser.smoothingTimeConstant = MASTER_ANALYSER_SMOOTHING;
@@ -4894,11 +5075,11 @@ const FlowRuntime: React.FC<FlowRuntimeProps> = ({ arrangeFocusToken }) => {
           if (loudnessListenerRef.current) {
             meter.removeEventListener('metrics', loudnessListenerRef.current as EventListener);
           }
-          if (isCancelled || createdCtx.state === "closed") {
+          if (isCancelled || (createdCtx.state as string) === "closed") {
             return;
           }
           await meter.initialize(createdCtx);
-          if (isCancelled || createdCtx.state === "closed") {
+          if (isCancelled || (createdCtx.state as string) === "closed") {
             return;
           }
           meter.reset();
@@ -4913,7 +5094,7 @@ const FlowRuntime: React.FC<FlowRuntimeProps> = ({ arrangeFocusToken }) => {
           meter.addEventListener('metrics', handler as EventListener);
           loudnessListenerRef.current = handler;
 
-          if (isCancelled || createdCtx.state === "closed" || !masterNodesRef.current) {
+          if (isCancelled || (createdCtx.state as string) === "closed" || !masterNodesRef.current) {
             return;
           }
           const complianceTap = masterNodesRef.current.complianceTap;
@@ -4964,11 +5145,29 @@ const FlowRuntime: React.FC<FlowRuntimeProps> = ({ arrangeFocusToken }) => {
           );
           logAudioDiagnostics(diagnostics);
           
-          // Note: Test tone will be played when user clicks play button (after resume)
+          // Run mixer console audit after routing is complete
+          setTimeout(() => {
+            const auditContext: MixerAuditContext = {
+              trackNodes: trackNodesRef.current,
+              masterChain: masterNodesRef.current,
+              mixerSettings: mixerSettings,
+              masterVolume: masterVolume,
+              masterBalance: masterBalance,
+              soloedTracks: soloedTracks,
+              trackSendLevels: trackSendLevels,
+              inserts: insertsRef.current,
+              fxNodes: fxNodesRef.current,
+              audioContext: createdCtx,
+            };
+            
+            const auditResult = auditMixerConsole(auditContext);
+            logMixerAudit(auditResult);
+          }, 1000); // Wait 1 second for routing to complete
+          
           // Don't auto-play here as AudioContext starts suspended
         }
         
-        if (isCancelled || createdCtx.state === "closed") {
+        if (isCancelled || (createdCtx.state as string) === "closed") {
           return;
         }
         const initialPluginRegistry = getPluginRegistry(createdCtx);
@@ -4982,13 +5181,13 @@ const FlowRuntime: React.FC<FlowRuntimeProps> = ({ arrangeFocusToken }) => {
         engineInstancesRef.current.clear();
         for (const plugin of initialPluginRegistry) {
             if (isCancelled) break;
-            if (createdCtx.state === "closed") {
+            if ((createdCtx.state as string) === "closed") {
               break;
             }
             const engine = plugin.engineInstance(createdCtx);
             engineInstancesRef.current.set(plugin.id, engine);
             if (typeof engine.initialize === 'function' && !engine.getIsInitialized()) {
-                if (isCancelled || createdCtx.state === "closed") {
+                if (isCancelled || (createdCtx.state as string) === "closed") {
                   break;
                 }
                 await engine.initialize(createdCtx);
@@ -5006,7 +5205,8 @@ const FlowRuntime: React.FC<FlowRuntimeProps> = ({ arrangeFocusToken }) => {
           return initialState;
         });
         if (!stemIntegrationRef.current) {
-          const integration = new StemSeparationIntegration(createdCtx);
+          // Use Flow-native stem separation
+          const integration = new FlowStemIntegration(createdCtx);
           integration.onProgress((message, percent) => {
             const suffix = typeof percent === 'number' ? ` (${Math.round(percent)}%)` : '';
             setImportMessage(`${message}${suffix}`);
@@ -5206,27 +5406,60 @@ const FlowRuntime: React.FC<FlowRuntimeProps> = ({ arrangeFocusToken }) => {
     });
   }, [tracks]);
 
-    // Update audio graph based on mixer settings (pan only) - automation overrides gain
+    // Update audio graph based on mixer settings (volume, pan, mute)
+    // Note: During playback, automation overrides volume, but we still apply here for immediate feedback
     useEffect(() => {
+        if (!audioContextRef.current) return;
+        
         tracks.forEach(track => {
             const nodes = trackNodesRef.current[track.id];
             const settings = mixerSettings[track.id];
             if (nodes && settings && audioContextRef.current) {
-                // Volume automation handles nodes.gain.gain.value
-                // Pan is still controlled by mixer settings if not automated
-                nodes.panner.pan.setTargetAtTime(settings.pan, audioContextRef.current.currentTime, 0.01);
+                const ctx = audioContextRef.current;
+                const now = ctx.currentTime;
+                
+                // Apply pan immediately (automation can override during playback)
+                nodes.panner.pan.setTargetAtTime(settings.pan, now, 0.01);
+                
+                // Apply volume and mute immediately (automation will override during playback if active)
+                // This ensures mixer controls work even when not playing
+                const hasSolo = soloedTracks.size > 0;
+                const isSoloed = soloedTracks.has(track.id);
+                const isMuted = settings.isMuted || (hasSolo && !isSoloed);
+                
+                const targetVolume = isMuted ? 0 : settings.volume;
+                nodes.gain.gain.setTargetAtTime(targetVolume, now, 0.01);
+                
+                if ((import.meta as any).env?.DEV && track.id === tracks[0]?.id) {
+                    console.log(`[MIXER] Applied settings to track ${track.id}:`, {
+                        volume: targetVolume,
+                        pan: settings.pan,
+                        muted: isMuted,
+                    });
+                }
             }
         });
-    }, [mixerSettings, tracks]);
+    }, [mixerSettings, tracks, soloedTracks]);
 
     // Connect master volume and pan controls to the audio engine
     useEffect(() => {
         if (masterNodesRef.current && audioContextRef.current) {
             const now = audioContextRef.current.currentTime;
-            masterNodesRef.current.output.gain.setTargetAtTime(masterVolume, now, 0.01);
+            // Set master gain - this controls the final output volume
+            // masterNodesRef.current.output is the masterGain node from master chain
+            if (masterNodesRef.current.masterGain) {
+                masterNodesRef.current.masterGain.gain.setTargetAtTime(masterVolume, now, 0.01);
+                console.log(`[MASTER VOLUME] Set to ${(masterVolume * 100).toFixed(0)}%`);
+            } else {
+                // Fallback to output gain if masterGain not available
+                (masterNodesRef.current.output as GainNode)?.gain?.setTargetAtTime(masterVolume, now, 0.01);
+                console.warn('[MASTER VOLUME] Using output gain fallback');
+            }
             if (masterNodesRef.current.panner) {
                 masterNodesRef.current.panner.pan.setTargetAtTime(masterBalance, now, 0.01);
             }
+        } else if (!masterNodesRef.current) {
+            console.warn('[MASTER VOLUME] Master chain not initialized yet');
         }
     }, [masterVolume, masterBalance]);
 
@@ -5560,6 +5793,21 @@ const FlowRuntime: React.FC<FlowRuntimeProps> = ({ arrangeFocusToken }) => {
                 const threshold = 0.22; // Default threshold
                 const hushDetected = monitorHush(feedback.intensity, threshold);
                 
+                // Connect Hush Monitor to ALS - publish Hush feedback to ALS signals
+                publishAlsSignal({
+                    source: 'system',
+                    meta: {
+                        hush: {
+                            active: hushDetected,
+                            intensity: feedback.intensity,
+                            threshold,
+                            noiseCount: feedback.noiseCount,
+                            isEngaged: feedback.isEngaged,
+                            color: feedback.color,
+                        },
+                    },
+                });
+                
                 // Update recording state with noise floor for Flow Loop
                 updateRecordState({
                     noiseFloor: feedback.intensity,
@@ -5607,7 +5855,14 @@ const FlowRuntime: React.FC<FlowRuntimeProps> = ({ arrangeFocusToken }) => {
 
     const scheduleClips = useCallback((transportTime: number) => {
         const ctx = audioContextRef.current;
-        if (!ctx || Object.keys(audioBuffers).length === 0) return;
+        if (!ctx) {
+          console.warn('[AUDIO] Cannot schedule clips: AudioContext is null');
+          return;
+        }
+        if (Object.keys(audioBuffers).length === 0) {
+          console.warn('[AUDIO] Cannot schedule clips: No audio buffers loaded. Import a file first.');
+          return;
+        }
     
         // Stop all previously scheduled sources
         activeSourcesRef.current.forEach(item => {
@@ -5617,6 +5872,35 @@ const FlowRuntime: React.FC<FlowRuntimeProps> = ({ arrangeFocusToken }) => {
     
         const playbackStartTime = ctx.currentTime;
     
+        // Audio path diagnostic
+        const audioPathDiagnostic = {
+            audioContext: ctx.state,
+            masterChain: !!masterNodesRef.current,
+            masterInput: !!masterNodesRef.current?.input,
+            masterOutput: !!masterNodesRef.current?.output,
+            masterGain: !!masterNodesRef.current?.masterGain,
+            masterGainValue: (masterNodesRef.current?.masterGain as GainNode)?.gain?.value ?? 'N/A',
+            tracksCount: Object.keys(trackNodesRef.current).length,
+            clipsCount: clips.length,
+            audioBuffersCount: Object.keys(audioBuffers).length,
+            translationMatrix: !!translationMatrixRef.current,
+            translationMatrixAttached: translationMatrixRef.current?.attached ?? false,
+        };
+        
+        console.log('[AUDIO PATH DIAGNOSTIC]', audioPathDiagnostic);
+        
+        if (!masterNodesRef.current?.input) {
+            console.error('[AUDIO] ❌ Master input missing - tracks cannot connect!');
+        }
+        
+        if (clips.length === 0) {
+            console.warn('[AUDIO] ⚠️ No clips on timeline - nothing to play');
+        }
+        
+        if (Object.keys(audioBuffers).length === 0) {
+            console.warn('[AUDIO] ⚠️ No audio buffers loaded - import audio files first');
+        }
+
         clips.forEach(clip => {
             const trackNodes = trackNodesRef.current[clip.trackId];
             const audioBuffer = audioBuffers[clip.bufferId];
@@ -5631,14 +5915,14 @@ const FlowRuntime: React.FC<FlowRuntimeProps> = ({ arrangeFocusToken }) => {
             }
             
             // Debug: Log clip scheduling
-            if ((import.meta as any).env?.DEV) {
-                console.log(`[AUDIO] Scheduling clip: ${clip.name} on track ${clip.trackId}`, {
-                    start: clip.start,
-                    duration: clip.duration,
-                    transportTime,
-                    bufferDuration: audioBuffer.duration,
-                });
-            }
+            console.log(`[AUDIO] Scheduling clip: "${clip.name}" on track ${clip.trackId}`, {
+                start: clip.start,
+                duration: clip.duration,
+                transportTime,
+                bufferDuration: audioBuffer.duration,
+                trackInput: !!trackNodes.input,
+                masterInput: !!masterNodesRef.current?.input,
+            });
     
             const clipAbsoluteEnd = clip.start + clip.duration;
             if (clipAbsoluteEnd <= transportTime) return; // Clip is entirely in the past
@@ -5653,10 +5937,12 @@ const FlowRuntime: React.FC<FlowRuntimeProps> = ({ arrangeFocusToken }) => {
             source.connect(clipGainNode);
             clipGainNode.connect(trackNodes.input);
             
-            // Debug: Verify connection
-            if ((import.meta as any).env?.DEV) {
-                console.log(`[AUDIO] Clip connected: ${clip.name} → track ${clip.trackId} → master chain`);
-            }
+            // Verify connection path
+            console.log(`[AUDIO] ✅ Connected clip: "${clip.name}" → track ${clip.trackId}`, {
+              gain: clipGainNode.gain.value,
+              trackInput: !!trackNodes.input,
+              willConnectToMaster: !!masterNodesRef.current?.input,
+            });
     
             // Calculate when this clip should start playing relative to ctx.currentTime
             const timeUntilClipStarts = Math.max(0, clip.start - transportTime);
@@ -5669,8 +5955,17 @@ const FlowRuntime: React.FC<FlowRuntimeProps> = ({ arrangeFocusToken }) => {
             const actualDurationToPlay = clip.duration - Math.max(0, transportTime - clip.start);
     
             if (actualDurationToPlay > 0) {
-                source.start(scheduledStart, offsetIntoSource, actualDurationToPlay);
+                const startTime = scheduledStart;
+                source.start(startTime, offsetIntoSource, actualDurationToPlay);
                 activeSourcesRef.current.push({ source, gain: clipGainNode });
+                
+                console.log(`[AUDIO] 🎵 Source started: "${clip.name}"`, {
+                  startTime: startTime.toFixed(3),
+                  offset: offsetIntoSource.toFixed(3),
+                  duration: actualDurationToPlay.toFixed(3),
+                  ctxCurrentTime: ctx.currentTime.toFixed(3),
+                  timeUntilStart: (startTime - ctx.currentTime).toFixed(3),
+                });
     
                 // Schedule Fade In
                 const fadeInDuration = clip.fadeIn ?? 0;
@@ -5778,30 +6073,10 @@ const FlowRuntime: React.FC<FlowRuntimeProps> = ({ arrangeFocusToken }) => {
             const nextTrackAnalysis: { [key: string]: TrackAnalysisData } = {};
 
             tracksRef.current.forEach((track) => {
+                // RULE 1: Track doesn't exist until we create it - check if track nodes exist
                 const analyser = trackNodesRef.current[track.id]?.analyser;
-                const automationDescriptor = automationDataRef.current[track.id];
-                const automationTargets = automationDescriptor
-                    ? Object.entries(automationDescriptor).flatMap(([scope, params]) =>
-                        Object.keys(params).map((paramName) => `${scope}:${paramName}`)
-                      )
-                    : [];
-
-                if (analyser) {
-                    const buffers = ensureTrackMeterBuffers(trackMeterBuffersRef.current, track.id, analyser);
-                    const metrics = measureAnalyser(analyser, buffers);
-
-                    nextTrackAnalysis[track.id] = {
-                        level: metrics.level,
-                        transient: metrics.transient,
-                        rms: metrics.rms,
-                        peak: metrics.peak,
-                        crestFactor: metrics.crestFactor,
-                        spectralTilt: metrics.spectralTilt,
-                        lowBandEnergy: metrics.lowBandEnergy,
-                        automationActive: automationTargets.length > 0,
-                        automationTargets,
-                    };
-                } else {
+                if (!analyser) {
+                    // Track exists in state but audio nodes don't exist yet - no analysis
                     nextTrackAnalysis[track.id] = {
                         level: 0,
                         transient: false,
@@ -5810,20 +6085,93 @@ const FlowRuntime: React.FC<FlowRuntimeProps> = ({ arrangeFocusToken }) => {
                         crestFactor: 1,
                         spectralTilt: 0,
                         lowBandEnergy: 0,
-                        automationActive: automationTargets.length > 0,
-                        automationTargets,
+                        automationActive: false,
+                        automationTargets: [],
                     };
-                }
-
-                const nodes = trackNodesRef.current[track.id];
-                const settings = mixerSettingsRef.current[track.id];
-                if (!nodes || !settings) {
                     return;
                 }
 
+                // RULE 2: Track must have clips playing at current time
+                const trackClips = clipsRef.current.filter(
+                    clip => clip.trackId === track.id && 
+                    clip.start <= newTime && 
+                    (clip.start + clip.duration) >= newTime
+                );
+                const hasClipsPlaying = trackClips.length > 0 && isPlaying;
+
+                // RULE 3: Track must not be muted
+                const nodes = trackNodesRef.current[track.id];
+                const settings = mixerSettingsRef.current[track.id];
+                if (!nodes || !settings) {
+                    nextTrackAnalysis[track.id] = {
+                        level: 0,
+                        transient: false,
+                        rms: 0,
+                        peak: 0,
+                        crestFactor: 1,
+                        spectralTilt: 0,
+                        lowBandEnergy: 0,
+                        automationActive: false,
+                        automationTargets: [],
+                    };
+                    return;
+                }
+
+                // RULE 4: Only analyze if track has clips playing, is not muted, and transport is playing
                 const hasSolo = soloedTracksRef.current.size > 0;
                 const isSoloed = soloedTracksRef.current.has(track.id);
                 const isMuted = settings.isMuted || (hasSolo && !isSoloed);
+                
+                if (!hasClipsPlaying || isMuted || !isPlaying) {
+                    nextTrackAnalysis[track.id] = {
+                        level: 0,
+                        transient: false,
+                        rms: 0,
+                        peak: 0,
+                        crestFactor: 1,
+                        spectralTilt: 0,
+                        lowBandEnergy: 0,
+                        automationActive: false,
+                        automationTargets: [],
+                    };
+                    // Still apply volume/pan even when muted (for automation)
+                    const targetVolume = isMuted ? 0 : (getAutomationValue(track.id, 'track', 'volume', newTime) ?? settings.volume);
+                    const targetPan = getAutomationValue(track.id, 'track', 'pan', newTime) ?? settings.pan;
+                    nodes.gain.gain.setTargetAtTime(targetVolume, ctx.currentTime, 0.01);
+                    nodes.panner.pan.setTargetAtTime(targetPan, ctx.currentTime, 0.01);
+                    return;
+                }
+
+                // RULE 5: Measure analyser and gate to noise floor (same as master)
+                const buffers = ensureTrackMeterBuffers(trackMeterBuffersRef.current, track.id, analyser);
+                const metrics = measureAnalyser(analyser, buffers);
+                
+                const automationDescriptor = automationDataRef.current[track.id];
+                const automationTargets = automationDescriptor
+                    ? Object.entries(automationDescriptor).flatMap(([scope, params]) =>
+                        Object.keys(params).map((paramName) => `${scope}:${paramName}`)
+                      )
+                    : [];
+
+                // CRITICAL: Gate track analysis to prevent false readings
+                // Only report levels above noise floor when track is actually playing audio
+                const noiseFloor = 0.001; // Same threshold as master
+                const actualLevel = metrics.level > noiseFloor ? metrics.level : 0;
+                const actualTransient = metrics.level > noiseFloor ? metrics.transient : false;
+
+                nextTrackAnalysis[track.id] = {
+                    level: actualLevel,
+                    transient: actualTransient,
+                    rms: metrics.rms > noiseFloor ? metrics.rms : 0,
+                    peak: metrics.peak > noiseFloor ? metrics.peak : 0,
+                    crestFactor: metrics.crestFactor,
+                    spectralTilt: metrics.spectralTilt,
+                    lowBandEnergy: metrics.lowBandEnergy > noiseFloor ? metrics.lowBandEnergy : 0,
+                    automationActive: automationTargets.length > 0,
+                    automationTargets,
+                };
+
+                // Apply volume/pan automation (hasSolo, isSoloed, isMuted already declared above)
 
                 let targetVolume = 0;
                 if (!isMuted) {
@@ -5865,9 +6213,20 @@ const FlowRuntime: React.FC<FlowRuntimeProps> = ({ arrangeFocusToken }) => {
                   masterLevelAvg.current * 0.75 + masterMetrics.level * 0.25
                 );
 
+                // CRITICAL: Gate analysis to prevent false readings from noise/feedback
+                // Only report levels above noise floor when audio is actually playing
+                // Level is 0-1 normalized, noise floor is ~0.001 (roughly -60dB equivalent)
+                const noiseFloor = 0.001; // Normalized threshold for silence (prevents false readings)
+                const actualLevel = masterMetrics.level > noiseFloor && isPlaying 
+                    ? masterLevelAvg.current 
+                    : 0;
+                const actualTransient = masterMetrics.level > noiseFloor && isPlaying 
+                    ? masterMetrics.transient 
+                    : false;
+                
                 setMasterAnalysis({
-                    level: masterLevelAvg.current,
-                    transient: masterMetrics.transient,
+                    level: actualLevel,
+                    transient: actualTransient,
                     waveform: waveformData,
                 });
             }
@@ -6107,25 +6466,32 @@ const FlowRuntime: React.FC<FlowRuntimeProps> = ({ arrangeFocusToken }) => {
   }, [mixerSettings, trackAnalysis, tracks]);
 
   const bloomPulseAgent = useMemo<PulsePalette>(() => {
+    // CRITICAL: System integrity - only show pulse when there's actual audio activity
+    // Maintains relationship: Playhead (isPlaying) → Audio (masterAnalysis.level) → ALS → Bloom
+    const hasActualAudio = isPlaying && masterAnalysis.level > 0;
+    
+    // Import/processing can pulse even without audio (system activity)
     if (importMessage) {
       return derivePulsePalette('magenta', 0.85, clamp01(0.55 + flowContext.momentum * 0.25));
     }
 
+    // Hush recording can pulse even without audio (recording silence)
     if (isHushActive) {
       return derivePulsePalette('green', 0.7, clamp01(0.62 + flowContext.momentumTrend * 0.25));
     }
 
+    // Mixer actions can pulse during UI interactions
     if (mixerPulseAgent) {
-      const baseStrength = Math.max(mixerPulseAgent.pulseStrength, isPlaying ? 0.45 : 0.25);
+      const baseStrength = Math.max(
+        mixerPulseAgent.pulseStrength, 
+        hasActualAudio ? 0.45 : 0.25 // Reduced when no audio
+      );
       const boostedStrength = clamp01(
         baseStrength +
-          (flowContext.intensity === 'immersed'
-            ? 0.18
-            : flowContext.intensity === 'charged'
-            ? 0.1
-            : 0.02) +
-          flowContext.momentum * 0.22 +
-          flowContext.momentumTrend * 0.3
+          (hasActualAudio && flowContext.intensity === 'immersed' ? 0.18 : 0) +
+          (hasActualAudio && flowContext.intensity === 'charged' ? 0.1 : 0.02) +
+          (hasActualAudio ? flowContext.momentum * 0.22 : 0) +
+          (hasActualAudio ? flowContext.momentumTrend * 0.3 : 0)
       );
       return {
         ...mixerPulseAgent,
@@ -6133,19 +6499,18 @@ const FlowRuntime: React.FC<FlowRuntimeProps> = ({ arrangeFocusToken }) => {
       };
     }
 
-    const fallbackColor: TrackColorKey = isPlaying ? 'cyan' : 'purple';
-    const fallbackIntensity = isPlaying ? 0.55 : 0.3;
-    const fallbackPulseBase = isPlaying ? 0.48 : 0.22;
+    // Fallback: Only pulse when there's actual audio
+    const fallbackColor: TrackColorKey = hasActualAudio ? 'cyan' : 'purple';
+    const fallbackIntensity = hasActualAudio ? 0.55 : 0;
+    const fallbackPulseBase = hasActualAudio ? 0.48 : 0;
     const fallbackPulse = clamp01(
       fallbackPulseBase +
-        (flowContext.intensity === 'immersed'
-          ? 0.18
-          : flowContext.intensity === 'charged'
-          ? 0.08
-          : 0) +
-        flowContext.momentum * 0.18 +
-        flowContext.momentumTrend * 0.25
+        (hasActualAudio && flowContext.intensity === 'immersed' ? 0.18 : 0) +
+        (hasActualAudio && flowContext.intensity === 'charged' ? 0.08 : 0) +
+        (hasActualAudio ? flowContext.momentum * 0.18 : 0) +
+        (hasActualAudio ? flowContext.momentumTrend * 0.25 : 0)
     );
+    
     return derivePulsePalette(fallbackColor, fallbackIntensity, fallbackPulse);
   }, [
     flowContext.intensity,
@@ -6154,6 +6519,7 @@ const FlowRuntime: React.FC<FlowRuntimeProps> = ({ arrangeFocusToken }) => {
     importMessage,
     isHushActive,
     isPlaying,
+    masterAnalysis.level, // CRITICAL: Include in dependencies
     mixerPulseAgent,
   ]);
 
@@ -6251,7 +6617,7 @@ const FlowRuntime: React.FC<FlowRuntimeProps> = ({ arrangeFocusToken }) => {
           // Reorder items based on Prime Brain guidance (subtle, only in active mode)
           if (primeMode === 'active' && suggestions.showBloomMenu && item.name.toLowerCase().includes('analyze')) {
             // Boost "Analyze" items when tension is high
-            if (primeBrainSnapshotInputs?.harmonicState.tension > 0.6) {
+            if ((primeBrainSnapshotInputs?.harmonicState?.tension ?? 0) > 0.6) {
               enhanced = {
                 ...enhanced,
                 description: enhanced.description ? `${enhanced.description} • High tension detected` : 'High tension detected',
@@ -6518,6 +6884,9 @@ const FlowRuntime: React.FC<FlowRuntimeProps> = ({ arrangeFocusToken }) => {
         return attachSettingsMenu(buildSimpleMenu(samplerItems));
       }
       case 'record': {
+        // Surface Auto Punch through Bloom
+        const hasAutoPunch = autoPunch !== null && autoPunch.confidence >= 0.4;
+        
         const recordItems: BloomFloatingMenuItem[] = [
           {
             name: isHushActive ? 'HUSH Active' : 'Arm HUSH',
@@ -6528,6 +6897,32 @@ const FlowRuntime: React.FC<FlowRuntimeProps> = ({ arrangeFocusToken }) => {
             disabled: !isAnyTrackArmed,
             progressPercent: isHushActive ? 88 : 20,
             accentColor: '#ff9fbf',
+          },
+          {
+            name: hasAutoPunch && autoPunch ? `Auto Punch (${(autoPunch.confidence * 100).toFixed(0)}%)` : 'Auto Punch',
+            description: hasAutoPunch && autoPunch
+              ? `Predicted punch: ${autoPunch.start.toFixed(2)}s - ${autoPunch.end.toFixed(2)}s`
+              : 'Waiting for punch pattern...',
+            action: () => {
+              if (hasAutoPunch && autoPunch) {
+                // Seek to predicted punch start via Bloom action
+                handleBloomAction('seekToTime', autoPunch.start, meta);
+                publishBloomSignal({
+                  source: 'system',
+                  action: 'autoPunchActivated',
+                  payload: {
+                    autoPunch: {
+                      start: autoPunch.start,
+                      end: autoPunch.end,
+                      confidence: autoPunch.confidence,
+                    },
+                  },
+                });
+              }
+            },
+            disabled: !hasAutoPunch,
+            progressPercent: hasAutoPunch && autoPunch ? Math.round(autoPunch.confidence * 100) : 0,
+            accentColor: hasAutoPunch ? '#ff6b6b' : '#666',
           },
           {
             name: 'New Take Lane',
@@ -6697,6 +7092,8 @@ const FlowRuntime: React.FC<FlowRuntimeProps> = ({ arrangeFocusToken }) => {
     primeBrainTelemetryEnabled,
     flowContext.adaptiveSuggestions,
     primeBrainSnapshotInputs,
+    autoPunch,
+    handleSeek,
   ]);
 
   const handleFloatingBloomPositionChange = useCallback((position: { x: number; y: number }) => {
@@ -6735,7 +7132,6 @@ const FlowRuntime: React.FC<FlowRuntimeProps> = ({ arrangeFocusToken }) => {
       playing: isPlaying,
       looping: isLooping,
       playCount: isLooping ? Math.floor(currentTime / (60 / bpm)) : 0,
-      cursor: currentTime,
       regionLength: isLooping ? (60 / bpm) * 4 : undefined, // Assume 4-bar loop
       cursorLock: isLooping && isPlaying, // Cursor locked when looping
     });
@@ -6761,7 +7157,7 @@ const FlowRuntime: React.FC<FlowRuntimeProps> = ({ arrangeFocusToken }) => {
       if (!window.__mixx_recordState) {
         window.__mixx_recordState = { recording: false, armedTrack: false, noiseFloor: 0 };
       }
-      window.__mixx_recordState.recordStart = performance.now();
+      (window.__mixx_recordState as any).recordStart = performance.now();
     } else if (!isRecording && wasRecording) {
       // Recording stopped - record punch end with duration and take memory
       const punchHistory = window.__mixx_punchHistory || [];
@@ -6855,7 +7251,6 @@ const FlowRuntime: React.FC<FlowRuntimeProps> = ({ arrangeFocusToken }) => {
                     armedTracks={armedTracks}
                     onToggleArm={handleToggleArm}
                     mixerSettings={mixerSettings}
-                    onMixerChange={handleMixerChange}
                     soloedTracks={soloedTracks}
                     onToggleSolo={handleToggleSolo}
                     onToggleMute={handleToggleMute}
@@ -6877,7 +7272,7 @@ const FlowRuntime: React.FC<FlowRuntimeProps> = ({ arrangeFocusToken }) => {
                     }}
                     onOpenPluginSettings={handleOpenPluginSettings}
                     automationParamMenu={automationParamMenu}
-                    onOpenAutomationParamMenu={(x, y, trackId) =>
+                    onOpenAutomationParamMenu={(x: number, y: number, trackId: string) =>
                       setAutomationParamMenu({ x, y, trackId })
                     }
                     onCloseAutomationParamMenu={() => setAutomationParamMenu(null)}
