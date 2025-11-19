@@ -103,6 +103,7 @@ import IngestQueueManager, {
 import FlowStemIntegration from './core/import/flowStemIntegration';
 // Legacy (kept for compatibility, will be removed)
 // import StemSeparationIntegration from './audio/StemSeparationIntegration';
+import { createSignalMatrix } from './audio/SignalMatrix';
 import StemSeparationModal from './components/modals/StemSeparationModal';
 import { FileInput } from './components/import/FileInput';
 import { useTimelineStore } from './state/timelineStore';
@@ -1208,6 +1209,7 @@ const FlowRuntime: React.FC<FlowRuntimeProps> = ({ arrangeFocusToken }) => {
   // MUST be declared before any useEffect that uses it
   const [masterReady, setMasterReady] = useState(false);
   const queuedRoutesRef = useRef<Array<{ trackId: string; outputNode: AudioNode }>>([]);
+  const signalMatrixRef = useRef<ReturnType<typeof createSignalMatrix> | null>(null);
   
   // Initialize Thermal Sync (Part A) - Global thermal color filters
   useEffect(() => {
@@ -1230,12 +1232,12 @@ const FlowRuntime: React.FC<FlowRuntimeProps> = ({ arrangeFocusToken }) => {
   useEffect(() => {
     if (masterReady && queuedRoutesRef.current.length > 0 && masterNodesRef.current) {
       console.log('[MIXER] Flushing queued routes:', queuedRoutesRef.current.length);
-      const masterInput = masterNodesRef.current.input;
-      
-      if (masterInput) {
+      const matrix = signalMatrixRef.current;
+      if (matrix) {
         queuedRoutesRef.current.forEach(({ trackId, outputNode }) => {
           try {
-            outputNode.connect(masterInput);
+            const bus = matrix.routeTrack(trackId, tracksRef.current.find(t => t.id === trackId)?.role as any);
+            outputNode.connect(bus);
             console.log('[MIXER] Route flushed for:', trackId);
             
             // Prime Brain: Queued route successfully connected
@@ -1254,7 +1256,7 @@ const FlowRuntime: React.FC<FlowRuntimeProps> = ({ arrangeFocusToken }) => {
         });
         queuedRoutesRef.current = [];
       } else {
-        console.error('[MIXER] Cannot flush routes - master input not available');
+        console.error('[MIXER] Cannot flush routes - signal matrix not available');
       }
     }
   }, [masterReady]);
@@ -4565,7 +4567,12 @@ const FlowRuntime: React.FC<FlowRuntimeProps> = ({ arrangeFocusToken }) => {
     });
 
     currentOutput.connect(trackNodes.analyser);
-    currentOutput.connect(master.input);
+    const bus = signalMatrixRef.current?.routeTrack(trackId, tracksRef.current.find(t => t.id === trackId)?.role as any);
+    if (bus) {
+      currentOutput.connect(bus);
+    } else {
+      currentOutput.connect(master.input);
+    }
   }, []);
 
   const resolvePluginMeta = useCallback(
@@ -4962,6 +4969,7 @@ const FlowRuntime: React.FC<FlowRuntimeProps> = ({ arrangeFocusToken }) => {
         if (isCancelled || (createdCtx.state as string) === "closed") {
           return;
         }
+<<<<<<< HEAD
         
         // Add VelvetCurveEngine to engine instances for clock sync
         // Note: VelvetCurveEngine is a singleton, so we'll set its clock directly in the clock sync effect
@@ -5045,6 +5053,13 @@ const FlowRuntime: React.FC<FlowRuntimeProps> = ({ arrangeFocusToken }) => {
             attached: translationMatrix.attached,
             profile: translationProfileRef.current,
           });
+        }
+        
+        // Initialize Mixx Club Signal Matrix (buses -> master)
+        try {
+          signalMatrixRef.current = createSignalMatrix(createdCtx, masterNodesRef.current.input);
+        } catch (err) {
+          console.warn('[AUDIO] Failed to initialize Mixx Signal Matrix', err);
         }
         
         // Verify final connection state to prevent feedback
@@ -5243,6 +5258,12 @@ const FlowRuntime: React.FC<FlowRuntimeProps> = ({ arrangeFocusToken }) => {
             }
           });
           stemIntegrationRef.current = integration;
+          // Pre-warm stem model worker immediately
+          try {
+            integration.prewarm();
+          } catch (err) {
+            console.warn('[STEMS] prewarm not available', err);
+          }
         }
     };
     setupAudio();

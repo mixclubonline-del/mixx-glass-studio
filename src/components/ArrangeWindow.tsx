@@ -49,6 +49,7 @@ import { FitSelectionIcon } from "./flowdock/glyphs/FitSelectionIcon";
 import { PlusIcon, MinusIcon } from "./icons";
 import { getStemHeatColor, getStemHeatState, computeStemEnergy } from "../core/als/stemHeat";
 import "../components/lane/StemLaneHeat.css";
+import StemDebugHUD from "./als/StemDebugHUD";
 
 type DragKind = "move" | "resize-left" | "resize-right" | "fade-in" | "fade-out" | "gain";
 
@@ -317,6 +318,7 @@ export const ArrangeWindow: React.FC<Props> = (props) => {
       clipIds: clips.map(c => c.id),
       clipTrackIds: clips.map(c => c.trackId),
     });
+    console.log('[ARRANGE] Hydration Safe Layer Active');
   }, [tracks, clips]);
   
   const projectDuration = useMemo(() => clips.reduce((max, clip) => Math.max(max, clip.start + clip.duration), 60), [clips]);
@@ -1579,6 +1581,10 @@ export const ArrangeWindow: React.FC<Props> = (props) => {
       onMouseUp={onMouseUp}
       onMouseLeave={onMouseUp}
     >
+      {/* ALS Stem Debug HUD */}
+      <div className="absolute left-0 right-0 top-0 z-30" style={{ paddingLeft: trackHeaderWidth + 24, paddingRight: 24 }}>
+        <StemDebugHUD />
+      </div>
       <div
         className="absolute top-3 z-40 flex flex-wrap items-center gap-3 pointer-events-none"
         style={{ left: trackHeaderWidth + 24 }}

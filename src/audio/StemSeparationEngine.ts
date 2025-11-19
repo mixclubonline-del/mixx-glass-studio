@@ -43,6 +43,7 @@ class StemSeparationEngine {
   private modelLoaded = false;
   private currentModel = 'htdemucs';
   private processingWorker: Worker | null = null;
+  private initialized = false;
   private progressCallbacks: ((progress: SeparationProgress) => void)[] = [];
   private workerRequestId = 0;
   private workerResolvers = new Map<number, (value: Float32Array[]) => void>();
@@ -51,6 +52,33 @@ class StemSeparationEngine {
   constructor(audioContext: AudioContext) {
     this.audioContext = audioContext;
     this.initializeWorker();
+  }
+
+  prewarm() {
+    try {
+      if (this.processingWorker) {
+        // eslint-disable-next-line no-console
+        console.log('[STEMS] INIT_MODEL → worker pre-warm');
+        this.processingWorker.postMessage({ type: 'INIT_MODEL' });
+      }
+    } catch (err) {
+      // eslint-disable-next-line no-console
+      console.warn('[STEMS] prewarm failed', err);
+    }
+  }
+
+  private async ensureInit() {
+    if (this.initialized) return;
+    try {
+      await this.loadModel(this.currentModel);
+      this.initialized = true;
+      // eslint-disable-next-line no-console
+      console.log('[STEMS] Model initialized:', this.currentModel);
+    } catch (err) {
+      // eslint-disable-next-line no-console
+      console.error('[STEMS] Model load failed, continuing with fallback DSP', err);
+      this.initialized = false;
+    }
   }
 
   private initializeWorker() {
@@ -111,6 +139,7 @@ class StemSeparationEngine {
     const startTime = performance.now();
     this.notifyProgress({ phase: 'loading', progress: 10, currentStem: 'Loading model…' });
 
+    await this.ensureInit();
     const model = await this.loadModel(options.model).catch((error) => {
       console.warn('[STEMS] model load failed, using fallback filters:', error);
       return null;
@@ -131,6 +160,32 @@ class StemSeparationEngine {
       options.chunk_length || 352 * 4410,
       options.overlap || 0.25
     );
+
+    // Debug: peak per stem (first 5k samples) to verify non-silent outputs
+    try {
+      const peakPerStem = stems.map((arr) => {
+        if (!arr || arr.length === 0) return 0;
+        const limit = Math.min(5000, arr.length);
+        let peak = 0;
+        for (let i = 0; i < limit; i += 1) {
+          const v = Math.abs(arr[i]);
+          if (v > peak) peak = v;
+        }
+        return Number(peak.toFixed(6));
+      });
+      // eslint-disable-next-line no-console
+      console.log('[DEBUG STEMS][engine]', { model: this.currentModel, peaks: peakPerStem });
+      if (typeof window !== 'undefined') {
+        (window as any).__flow_debug_last_stems = {
+          source: 'engine',
+          model: this.currentModel,
+          peaks: peakPerStem,
+          lengths: stems.map((a) => a?.length ?? 0),
+        };
+      }
+    } catch {
+      // ignore debug failures
+    }
 
     this.notifyProgress({ phase: 'encoding', progress: 85, currentStem: 'Encoding stems…' });
     const result = await this.convertToAudioBuffers(stems, audioBuffer.sampleRate);
@@ -317,7 +372,8 @@ class StemSeparationEngine {
       other[i] = this.clamp(sample - bass[i] - drums[i] - vocals[i], -1, 1);
     }
 
-    const output: Float32Array[] = [bass, drums, vocals, other];
+    // Order must match convertToAudioBuffers mapping: [vocals, drums, bass, other, (guitar), (piano)]
+    const output: Float32Array[] = [vocals, drums, bass, other];
 
     if (stemCount > 4) {
       const guitar = new Float32Array(length);
