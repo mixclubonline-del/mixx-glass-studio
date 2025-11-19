@@ -4993,7 +4993,6 @@ const FlowRuntime: React.FC<FlowRuntimeProps> = ({ arrangeFocusToken }) => {
         if (isCancelled || (createdCtx.state as string) === "closed") {
           return;
         }
-<<<<<<< HEAD
         
         // Add VelvetCurveEngine to engine instances for clock sync
         // Note: VelvetCurveEngine is a singleton, so we'll set its clock directly in the clock sync effect

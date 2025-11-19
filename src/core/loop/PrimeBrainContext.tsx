@@ -10,6 +10,7 @@ import type { SessionSignals } from './gatherSessionSignals';
 import { computeBehavior, type BehaviorState, type FlowMode } from './behaviorEngine';
 import type { PrimeBrainStatus } from '../../types/primeBrainStatus';
 import type { QNNIntelligence } from '../../ai/QNNFlowService';
+import { flowComponentRegistry } from '../flow/FlowComponentRegistry';
 
 interface PrimeBrainContextValue {
   state: BehaviorState;
@@ -47,8 +48,6 @@ export function PrimeBrainProvider({ children, primeBrainStatus }: PrimeBrainPro
 
   // Listen to QNN intelligence from Flow Component Registry
   useEffect(() => {
-    const { flowComponentRegistry } = require('../flow/FlowComponentRegistry');
-    
     const unsubscribe = flowComponentRegistry.subscribe('qnn_intelligence', (signal: any) => {
       const intelligence = signal.payload as QNNIntelligence;
       
