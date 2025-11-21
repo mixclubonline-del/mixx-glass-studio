@@ -228,7 +228,13 @@ export async function buildMasterChain(
   };
 
   const setMasterTrim = (gain: number) => {
-    masterGain.gain.setTargetAtTime(gain, ctx.currentTime, 0.01);
+    // Master trim is applied on top of calibrated LUFS gain
+    // gain is 0-1 range from UI slider
+    // Calibrated gain is already set based on targetLUFS
+    // Final gain = calibrated gain * trim
+    const calibratedGain = gainForLUFS(currentProfile.value.targetLUFS);
+    const finalGain = calibratedGain * gain;
+    masterGain.gain.setTargetAtTime(finalGain, ctx.currentTime, 0.01);
   };
 
   const getProfile = () => currentProfile.value;

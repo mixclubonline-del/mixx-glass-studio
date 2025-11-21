@@ -38,8 +38,18 @@ const clamp01 = (value: number) => Math.min(1, Math.max(0, value));
 export function computeBehavior(signals: SessionSignals): BehaviorState {
   const isPerformanceMode = signals.recording || signals.armedTrack;
   
+  // Prime Brain awareness: Master chain calibration state
+  // If master chain is not calibrated or volume is too low/high, adjust behavior
+  const masterChain = signals.masterChain;
+  const calibrationIssue = masterChain && (
+    !masterChain.outputCalibrated ||
+    masterChain.masterVolume < 0.5 ||
+    masterChain.masterVolume > 1.0
+  );
+  
   // Flow: Creative momentum based on signals
   // In Performance Mode: Flow tracks emotional steadiness
+  // Prime Brain: Reduce flow if master chain calibration is off
   let flow = 0;
   if (isPerformanceMode) {
     // Performance Mode: Flow ≈ emotional steadiness
@@ -63,6 +73,15 @@ export function computeBehavior(signals: SessionSignals): BehaviorState {
   }
   if (signals.creativeBurst) flow = Math.max(flow, 0.8);
   if (signals.flowing) flow = Math.max(flow, 0.6);
+  
+  // Prime Brain: Adjust flow based on master chain calibration
+  if (calibrationIssue) {
+    flow *= 0.85; // Slight reduction if calibration is off
+  }
+  if (masterChain && masterChain.outputCalibrated && masterChain.masterVolume > 0.7) {
+    flow *= 1.05; // Slight boost if well-calibrated and at good level
+  }
+  
   flow = clamp01(flow);
   
   // Pulse: Rhythmic energy from playback
@@ -121,6 +140,7 @@ export function computeBehavior(signals: SessionSignals): BehaviorState {
   
   // Hush warnings
   // In Performance Mode: More detailed noise warnings
+  // Prime Brain: Also warn about master chain calibration
   const hushWarnings: string[] = [];
   if (signals.hush) {
     if (isPerformanceMode) {
@@ -134,6 +154,19 @@ export function computeBehavior(signals: SessionSignals): BehaviorState {
   }
   if (isPerformanceMode && signals.hush && !signals.playing) {
     hushWarnings.push('Hold still - mic catching noise');
+  }
+  
+  // Prime Brain: Master chain calibration warnings
+  if (calibrationIssue) {
+    if (!masterChain?.outputCalibrated) {
+      hushWarnings.push('Master chain not calibrated');
+    }
+    if (masterChain && masterChain.masterVolume < 0.5) {
+      hushWarnings.push('Master volume too low');
+    }
+    if (masterChain && masterChain.masterVolume > 1.0) {
+      hushWarnings.push('Master volume exceeds calibrated range');
+    }
   }
   
   // Mode derivation

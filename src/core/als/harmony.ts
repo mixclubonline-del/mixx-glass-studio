@@ -12,6 +12,12 @@
  * @returns Harmony score (0-100)
  */
 export function computeHarmony(harmonicBoost: number): number {
+  // Contextual check: If harmonic boost is 0 or negative, return 0
+  // This ensures harmony is only computed when there's actual harmonic content
+  if (harmonicBoost <= 0 || isNaN(harmonicBoost)) {
+    return 0;
+  }
+  
   return Math.min(100, Math.max(0, Math.round(harmonicBoost)));
 }
 

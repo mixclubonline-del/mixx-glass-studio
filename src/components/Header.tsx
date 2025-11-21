@@ -2,6 +2,7 @@ import React, { useLayoutEffect, useMemo, useRef } from "react";
 import clsx from "clsx";
 import type { PrimeBrainStatus } from "../types/primeBrainStatus";
 import { PrimeBrainIcon } from "./flowdock/glyphs/PrimeBrainIcon";
+import { FlowPulseBar } from "./visualizers/FlowPulseBar";
 
 interface HeaderProps {
   primeBrainStatus: PrimeBrainStatus;
@@ -124,6 +125,11 @@ const Header: React.FC<HeaderProps> = ({
             <span className={clsx("inline-flex h-2 w-2 rounded-full bg-current", isPlaying && "animate-pulse")} />
           </div>
         </div>
+      </div>
+
+      {/* Flow ALS Bar with Adapting Waveform */}
+      <div className="mt-3 -mx-6 px-6">
+        <FlowPulseBar />
       </div>
 
       <div className="mt-3 grid gap-2 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-6">

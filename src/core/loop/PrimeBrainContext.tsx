@@ -8,6 +8,7 @@
 import React, { createContext, useContext, useState, useCallback, useRef, useEffect } from 'react';
 import type { SessionSignals } from './gatherSessionSignals';
 import { computeBehavior, type BehaviorState, type FlowMode } from './behaviorEngine';
+import { scheduleAITask } from '../quantum';
 import type { PrimeBrainStatus } from '../../types/primeBrainStatus';
 
 interface PrimeBrainContextValue {
@@ -46,8 +47,19 @@ export function PrimeBrainProvider({ children, primeBrainStatus }: PrimeBrainPro
   
   const updateFromSession = useCallback((signals: SessionSignals) => {
     lastSignalsRef.current = signals;
-    const behavior = computeBehavior(signals);
-    setState(behavior);
+    
+    // Schedule behavior computation as AI task (can defer if needed)
+    scheduleAITask(
+      `prime-brain-behavior-${Date.now()}`,
+      () => {
+        const behavior = computeBehavior(signals);
+        setState(behavior);
+      },
+      30, // 30ms budget for behavior computation
+      (actualMs, budgetMs) => {
+        console.warn(`[Prime Brain] Behavior computation overrun: ${actualMs.toFixed(2)}ms (budget: ${budgetMs}ms)`);
+      }
+    );
   }, []);
   
   const updateFromALS = useCallback((alsState: { flow: number; pulse: number; tension: number }) => {

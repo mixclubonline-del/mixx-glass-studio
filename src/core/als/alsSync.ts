@@ -43,6 +43,23 @@ export function syncALSToPulse(
   energy: number[],
   harmonicBoost?: number
 ): ALSSyncResult {
+  // Contextual check: Only compute values if there's actual audio
+  // If pulse is 0 and no energy, return zero values
+  const hasEnergy = energy.length > 0 && energy.some(e => e > 0.001);
+  const hasPulse = pulseValue > 0.1;
+  
+  if (!hasEnergy && !hasPulse) {
+    // No audio - return zero values
+    return {
+      pulse: 0,
+      flow: 0,
+      temperature: 'cold',
+      momentum: 0,
+      pressure: 0,
+      harmony: 0,
+    };
+  }
+  
   // Compute momentum from BPM and transients
   const momentum = computeMomentum(
     metadata.bpm,
@@ -112,13 +129,21 @@ export function syncALSToPulseResult(
 /**
  * Update global ALS object with sync result.
  * 
+ * IMPORTANT: Only updates if there's actual audio playing.
+ * This ensures ALS values are contextual - they only show when there's real sound.
+ * 
  * @param syncResult - ALS sync result
+ * @param hasAudio - Whether there's actual audio playing (from audioLevelDetector)
  */
-export function updateGlobalALS(syncResult: ALSSyncResult): void {
+export function updateGlobalALS(
+  syncResult: ALSSyncResult,
+  hasAudio: boolean = true
+): void {
   if (typeof window === 'undefined') {
     return;
   }
   
+  // Initialize window.__als with ALL properties at zero
   window.__als = window.__als || {
     flow: 0,
     temperature: 'cold',
@@ -126,14 +151,31 @@ export function updateGlobalALS(syncResult: ALSSyncResult): void {
     pulse: 0,
   };
   
-  // Update all ALS properties
-  window.__als.pulse = syncResult.pulse;
-  window.__als.flow = syncResult.flow;
-  window.__als.temperature = syncResult.temperature;
+  // Initialize momentum, pressure, harmony to 0 if they don't exist
+  if (!(window.__als as any).momentum) (window.__als as any).momentum = 0;
+  if (!(window.__als as any).pressure) (window.__als as any).pressure = 0;
+  if (!(window.__als as any).harmony) (window.__als as any).harmony = 0;
   
-  // Add new ALS properties
-  (window.__als as any).momentum = syncResult.momentum;
-  (window.__als as any).pressure = syncResult.pressure;
-  (window.__als as any).harmony = syncResult.harmony;
+  // Only update if there's actual audio OR if values are being reset to zero
+  // This ensures ALS is contextual - it only shows values when there's real sound
+  if (hasAudio || (syncResult.pulse === 0 && syncResult.flow === 0 && syncResult.momentum === 0 && syncResult.harmony === 0)) {
+    // Update all ALS properties
+    window.__als.pulse = syncResult.pulse;
+    window.__als.flow = syncResult.flow;
+    window.__als.temperature = syncResult.temperature;
+    
+    // Add new ALS properties
+    (window.__als as any).momentum = syncResult.momentum;
+    (window.__als as any).pressure = syncResult.pressure;
+    (window.__als as any).harmony = syncResult.harmony;
+  } else {
+    // No audio - reset to zero
+    window.__als.pulse = 0;
+    window.__als.flow = 0;
+    window.__als.temperature = 'cold';
+    (window.__als as any).momentum = 0;
+    (window.__als as any).pressure = 0;
+    (window.__als as any).harmony = 0;
+  }
 }
 
