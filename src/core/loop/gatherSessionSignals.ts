@@ -28,6 +28,12 @@ declare global {
       hush?: boolean;
     };
     __mixx_viewSwitches?: Array<{ view: string; timestamp: number }>;
+    __mixx_masterChain?: {
+      targetLUFS: number;
+      profile: string;
+      calibrated: boolean;
+      masterVolume: number;
+    };
   }
 }
 
@@ -53,6 +59,14 @@ export interface SessionSignals {
   
   // Navigation
   viewSwitchBurst: boolean;
+  
+  // Master chain calibration (Prime Brain awareness)
+  masterChain: {
+    targetLUFS: number;
+    currentProfile: string;
+    outputCalibrated: boolean;
+    masterVolume: number; // 0-1 trim on calibrated gain
+  } | null;
   
   // Internal markers
   flowing: boolean;
@@ -94,6 +108,9 @@ export function gatherSessionSignals(): SessionSignals {
     
     // Navigation
     viewSwitchBurst: false,
+    
+    // Master chain calibration (Prime Brain awareness)
+    masterChain: null,
     
     // Internal markers
     flowing: false,
@@ -149,6 +166,20 @@ export function gatherSessionSignals(): SessionSignals {
   // ==========================
   const navEvents = window.__mixx_viewSwitches || [];
   if (navEvents.length >= 2) signals.viewSwitchBurst = true;
+
+  // ==========================
+  // MASTER CHAIN CALIBRATION (Prime Brain awareness)
+  // ==========================
+  // Read master chain state from window global (set by App.tsx)
+  const masterChainState = (window as any).__mixx_masterChain;
+  if (masterChainState) {
+    signals.masterChain = {
+      targetLUFS: masterChainState.targetLUFS || -14,
+      currentProfile: masterChainState.profile || 'streaming',
+      outputCalibrated: masterChainState.calibrated || false,
+      masterVolume: masterChainState.masterVolume || 0.8,
+    };
+  }
 
   // ==========================
   // FLOW STATE (high-level)
