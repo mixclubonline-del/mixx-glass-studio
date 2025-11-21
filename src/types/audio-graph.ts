@@ -10,6 +10,12 @@ export interface IAudioEngine {
   audioContext: BaseAudioContext | null; // Allow engines to hold context reference
 
   /**
+   * Optional sidechain input node for external keying/triggering.
+   * Used for sidechain compression, ducking, and other keyed effects.
+   */
+  sidechainInput?: AudioNode;
+
+  /**
    * Initializes the engine and creates its internal Web Audio nodes.
    * @param ctx The global AudioContext.
    */
@@ -69,6 +75,18 @@ export interface IAudioEngine {
    * @returns The maximum value.
    */
   getParameterMax(name: string): number;
+
+  /**
+   * Sets the sidechain source for this engine.
+   * @param source The audio node to use as sidechain source, or null to disconnect.
+   */
+  setSidechainSource?(source: AudioNode | null): void;
+
+  /**
+   * Gets the current sidechain source node, if any.
+   * @returns The sidechain source node, or null if not connected.
+   */
+  getSidechainSource?(): AudioNode | null;
 
   // Optional methods for context-aware engines
   adaptToAnchors?(anchors: FourAnchors): void;

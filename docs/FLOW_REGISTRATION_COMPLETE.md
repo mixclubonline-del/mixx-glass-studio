@@ -144,3 +144,7 @@ All major components are now registered and broadcasting. Prime Brain can see ev
 
 *Context improved by Giga AI — Used Flow Component Registry, useFlowComponent hook, and component analysis to complete Flow registration for all major Studio components.*
 
+
+
+
+

@@ -74,6 +74,45 @@ export interface PulsePalette {
   pulseStrength: number;
 }
 
+export interface RoutingALSFeedback {
+  intensity: number;
+  pulse: number;
+  color: string;
+  glowColor: string;
+  temperature: ALSTemperature;
+}
+
+/**
+ * Generate ALS feedback for routing activity.
+ * Higher intensity for active sidechain connections and track sends.
+ */
+export function deriveRoutingALSFeedback(
+  isSidechainSource: boolean,
+  receivingSends: number,
+  activeConnections: number
+): RoutingALSFeedback {
+  // Calculate intensity based on routing activity
+  const sidechainIntensity = isSidechainSource ? 0.6 : 0;
+  const sendIntensity = Math.min(0.4, receivingSends * 0.15);
+  const connectionIntensity = Math.min(0.3, activeConnections * 0.1);
+  
+  const intensity = clamp01(sidechainIntensity + sendIntensity + connectionIntensity);
+  const pulse = intensity > 0.3 ? 0.7 + intensity * 0.3 : intensity * 0.5;
+  const temperature = temperatureFromLevel(intensity);
+  
+  // Color based on routing type
+  const color = isSidechainSource ? '#67e8f9' : '#a78bfa'; // Cyan for sidechain, purple for sends
+  const glowColor = isSidechainSource ? '#22d3ee' : '#c4b5fd';
+  
+  return {
+    intensity,
+    pulse,
+    color,
+    glowColor,
+    temperature,
+  };
+}
+
 const temperatureFromLevel = (intensity: number): ALSTemperature => {
   if (intensity >= 0.75) return "hot";
   if (intensity >= 0.5) return "warm";

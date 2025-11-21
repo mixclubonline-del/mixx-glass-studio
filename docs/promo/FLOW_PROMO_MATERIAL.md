@@ -37,7 +37,7 @@ No friction.
 
 Just Flow.
 
-#MixxClub #FlowDAW #HipHopProduction #AIAssistedMusic
+#FLOW #FlowDAW #HipHopProduction #AIAssistedMusic
 ```
 
 ### Feature Highlight: Prime Brain
@@ -475,14 +475,14 @@ system give me the control I need without the clutter I don't."
 ## 📱 **SOCIAL MEDIA HANDLES**
 
 ### Recommended
-- Twitter/X: `@FlowDAW` or `@MixxClubFlow`
+- Twitter/X: `@FlowDAW` or `@FLOW`
 - Instagram: `@flowdaw` or `@mixxclubflow`
 - TikTok: `@flowdaw`
 - YouTube: `Flow DAW` or `Mixx Club Flow`
 
 ### Hashtags
 - #FlowDAW
-- #MixxClub
+- #FLOW
 - #HipHopProduction
 - #AIAssistedMusic
 - #MusicProduction

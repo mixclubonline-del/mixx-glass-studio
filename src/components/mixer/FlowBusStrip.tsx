@@ -1,5 +1,6 @@
 /**
- * FLOW BUS STRIP - MixClub Routing Channel
+ * FLOW BUS STRIP - F.L.O.W. Routing Channel
+ * Created by Ravenis Prime (F.L.O.W)
  *
  * Compact bus strip showing ALS-driven energy,
  * member count, and quick solo controls.

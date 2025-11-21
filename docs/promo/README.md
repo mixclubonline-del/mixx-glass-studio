@@ -192,7 +192,7 @@ See `design-specs.md` for:
 ### Social Media
 - Export graphics from templates
 - Schedule posts
-- Use hashtags: #FlowDAW #MixxClub #HipHopProduction
+- Use hashtags: #FlowDAW #FLOW #HipHopProduction
 - Engage with community
 
 ### Website

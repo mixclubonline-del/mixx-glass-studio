@@ -4,7 +4,7 @@
  * Verifies the master chain signal path integrity after hard-reset.
  * Ensures all nodes are connected in the correct linear sequence.
  * 
- * @author Prime (Mixx Club)
+ * Created by Ravenis Prime (F.L.O.W)
  * @version 1.0.0
  */
 

@@ -1,7 +1,7 @@
 {
-  "name": "mixclub-online",
+  "name": "flow",
   "version": "1.0.0",
-  "description": "MixClub Online - Artist & Engineer Community Platform",
+  "description": "F.L.O.W. - Feel Listen Operate Work",
   "type": "module",
   "scripts": {
     "dev": "vite",
@@ -11,8 +11,7 @@
     "type-check": "tsc --noEmit",
     "test": "vitest run",
     "tauri:dev": "tauri dev",
-    "tauri:build": "tauri build",
-    "generate-test-audio": "node scripts/generateTestAudio.js"
+    "tauri:build": "tauri build"
   },
   "dependencies": {
     "@google/genai": "^1.28.0",

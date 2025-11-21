@@ -4,7 +4,7 @@
  * 
  * QUANTUM OPTIMIZATION: Uses centralized meterBatcher to reduce RAF overhead.
  * 
- * @author Prime (Mixx Club)
+ * Created by Ravenis Prime (F.L.O.W)
  */
 
 import { useEffect, useRef, useState, useCallback } from 'react';

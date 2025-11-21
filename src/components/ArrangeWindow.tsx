@@ -141,6 +141,9 @@ type Props = {
   onToggleMute?: (trackId: string) => void;
   onToggleSolo?: (trackId: string) => void;
   onToggleArm?: (trackId: string) => void;
+  sidechainConnections?: Map<string, { fromTrackId: string; toPluginId: string }>;
+  trackSends?: Map<string, Map<string, { level: number; preFader: boolean }>>;
+  inserts?: Record<string, FxWindowId[]>;
 };
 
 const BASE_CLIP_LANE_H = DEFAULT_TRACK_LANE_HEIGHT;
@@ -149,7 +152,7 @@ const RULER_H = 24;
 const TIMELINE_NAVIGATOR_H = 48;
 const ZERO_CROSS_WINDOW_SEC = 0.006;
 const AUTO_CROSSFADE_SEC = 0.03;
-const TRACK_HEADER_WIDTH_STORAGE_KEY = 'mixxclub:arrange:headerWidth';
+const TRACK_HEADER_WIDTH_STORAGE_KEY = 'flow:arrange:headerWidth';
 const TRACK_HEADER_WIDTH_DEFAULT = 240;
 const TRACK_HEADER_WIDTH_MIN = 180;
 const TRACK_HEADER_WIDTH_MAX = 420;
@@ -227,8 +230,14 @@ const deriveAdaptiveDivision = (
 
 export const ArrangeWindow: React.FC<Props> = (props) => {
   const {
-    height = 540,
     tracks,
+    sidechainConnections = new Map(),
+    trackSends = new Map(),
+    inserts = {},
+    ...restProps
+  } = props;
+  const {
+    height = 540,
     clips,
     setClips,
     isPlaying,
@@ -1730,6 +1739,21 @@ export const ArrangeWindow: React.FC<Props> = (props) => {
           {laneLayouts.map(({ track, laneHeight, clipHeight, isAutomationVisible, uiState }) => {
             const trackFeedback = alsFeedbackByTrack.get(track.id);
             const alsIntensity = trackFeedback?.intensity ?? 0;
+            
+            // Calculate routing indicators
+            const isSidechainSource = Array.from(sidechainConnections.values()).some(
+              conn => conn.fromTrackId === track.id
+            );
+            const receivingSends = Array.from(trackSends.values()).reduce((count, sends) => {
+              return count + (sends.has(track.id) ? 1 : 0);
+            }, 0);
+            
+            // Calculate contextual data
+            const trackClips = clips.filter(c => c.trackId === track.id);
+            const clipCount = trackClips.length;
+            const pluginCount = (inserts[track.id]?.length ?? 0);
+            const hasAutomation = isAutomationVisible || (visibleAutomationLanes[track.id]?.length ?? 0) > 0;
+            
             return (
             <div key={track.id} style={{ height: laneHeight }} className="transition-[height] duration-300 ease-out relative">
               <ArrangeTrackHeader
@@ -1741,6 +1765,13 @@ export const ArrangeWindow: React.FC<Props> = (props) => {
                 isArmed={armedTracks.has(track.id)}
                 isSoloed={soloedTracks.has(track.id)}
                 alsIntensity={alsIntensity}
+                alsFeedback={trackFeedback}
+                isPlaying={isPlaying}
+                isSidechainSource={isSidechainSource}
+                receivingSends={receivingSends}
+                pluginCount={pluginCount}
+                clipCount={clipCount}
+                hasAutomation={hasAutomation}
                 onInvokeBloom={onInvokeTrackBloom}
                 onToggleMute={onToggleMute}
                 onToggleSolo={onToggleSolo}

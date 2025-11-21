@@ -5,7 +5,7 @@
  * - JavaScript/TypeScript (Web Audio API, Flow DSP chain)
  * - Native Rust engine (cpal, low-latency I/O)
  * 
- * @author Prime (Mixx Club)
+ * Created by Ravenis Prime (F.L.O.W)
  */
 
 use crossbeam_queue::ArrayQueue;

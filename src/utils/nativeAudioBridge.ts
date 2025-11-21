@@ -3,7 +3,7 @@
  * 
  * Bridges audio from Flow's Web Audio API master chain to the native Rust engine.
  * 
- * @author Prime (Mixx Club)
+ * Created by Ravenis Prime (F.L.O.W)
  */
 
 export interface NativeAudioBridge {

@@ -33,7 +33,7 @@ import { buildMasterChain } from './audio/masterChain';
 import type { VelvetMasterChain } from './audio/masterChain';
 import { verifyMasterChainRouting, logVerificationResults, verifyTrackConnections } from './audio/routingVerification';
 import { diagnoseAudioSystem as _diagnoseAudioSystem, logAudioDiagnostics as _logAudioDiagnostics } from './utils/audioDiagnostics';
-import { auditMixerConsole as _auditMixerConsole, logMixerAudit as _logMixerAudit, type MixerAuditContext } from './utils/mixerAudit';
+import { auditMixerConsole as _auditMixerConsole, logMixerAudit as _logMixerAudit, type MixerAuditContext, type MixerAuditResult } from './utils/mixerAudit';
 import { createNativeAudioBridge, createNativeAudioStreamNode } from './utils/nativeAudioBridge';
 import { VelvetLoudnessMeter, DEFAULT_VELVET_LOUDNESS_METRICS } from './audio/VelvetLoudnessMeter';
 import type { VelvetLoudnessMetrics } from './audio/VelvetLoudnessMeter';
@@ -44,6 +44,7 @@ import { VelvetProcessor } from './audio/VelvetProcessor';
 import { PluginId, PluginConfig, getPluginRegistry, PlaceholderAudioEngine } from './audio/plugins';
 import TimeWarpVisualizer from './components/TimeWarpVisualizer';
 import PluginBrowser from './components/PluginBrowser';
+import SuitePluginSurface from './plugins/suite/SuitePluginSurface';
 import { IAudioEngine } from './types/audio-graph';
 import { getHushSystem } from './audio/HushSystem';
 import AIHub from './components/AIHub/AIHub'; // Import AIHub
@@ -112,6 +113,7 @@ import PianoRollPanel from './components/piano/PianoRollPanel';
 import { ingestHistoryStore, IngestHistoryEntry } from './state/ingestHistory';
 import { publishAlsSignal, publishBloomSignal, publishIngestSignal } from './state/flowSignals';
 import { useFlowContext } from './state/flowContextService';
+import { broadcastFlowSignal, useFlowComponent, subscribeToFlowComponent } from './core/flow';
 import { createSoftPrimeBootConfig, type PrimeBootConfig } from './flow-kernel/mixxos';
 import {
   TrackUIState,
@@ -1410,6 +1412,57 @@ const FlowRuntime: React.FC<FlowRuntimeProps> = ({ arrangeFocusToken }) => {
     });
     return unsubscribe;
   }, [bumpPrimeBrainTick]);
+
+  // Subscribe to Flow component signals to trigger Prime Brain updates
+  useEffect(() => {
+    // Subscribe to audio system signals
+    const unsubscribeAudio = subscribeToFlowComponent('audio_upload_start', (signal) => {
+      recordPrimeBrainEvent('ingest-start', signal.payload as Record<string, unknown>, 'success');
+      bumpPrimeBrainTick();
+    });
+    
+    const unsubscribeAudioComplete = subscribeToFlowComponent('audio_upload_complete', (signal) => {
+      recordPrimeBrainEvent('ingest-complete', signal.payload as Record<string, unknown>, 'success');
+      bumpPrimeBrainTick();
+    });
+    
+    const unsubscribeStemsCreated = subscribeToFlowComponent('stems_created', (signal) => {
+      recordPrimeBrainEvent('ingest-complete', { ...signal.payload as Record<string, unknown>, stemsCreated: true }, 'success');
+      bumpPrimeBrainTick();
+    });
+    
+    const unsubscribeRecordingStart = subscribeToFlowComponent('audio_recording_start', (signal) => {
+      recordPrimeBrainEvent('track-arm', signal.payload as Record<string, unknown>, 'success');
+      bumpPrimeBrainTick();
+    });
+    
+    const unsubscribeRecordingStop = subscribeToFlowComponent('audio_recording_stop', (signal) => {
+      recordPrimeBrainEvent('track-disarm', signal.payload as Record<string, unknown>, 'success');
+      bumpPrimeBrainTick();
+    });
+    
+    // Subscribe to transport signals
+    const unsubscribeTransport = subscribeToFlowComponent('transport_event', (signal) => {
+      const payload = signal.payload as { type: string; [key: string]: unknown };
+      if (payload.type === 'play') {
+        recordPrimeBrainEvent('transport-play', payload, 'success');
+      } else if (payload.type === 'pause') {
+        recordPrimeBrainEvent('transport-pause', payload, 'success');
+      } else if (payload.type === 'stop') {
+        recordPrimeBrainEvent('transport-stop', payload, 'success');
+      }
+      bumpPrimeBrainTick();
+    });
+    
+    return () => {
+      unsubscribeAudio();
+      unsubscribeAudioComplete();
+      unsubscribeStemsCreated();
+      unsubscribeRecordingStart();
+      unsubscribeRecordingStop();
+      unsubscribeTransport();
+    };
+  }, [bumpPrimeBrainTick]);
   const primeBrainAudioMetricsRef = useRef<{
     latencyMs?: number;
     cpuLoad: number;
@@ -1418,6 +1471,8 @@ const FlowRuntime: React.FC<FlowRuntimeProps> = ({ arrangeFocusToken }) => {
     sampleRate?: number;
     startedAt: number;
     dropoutCount: number;
+    lastUpdateTime?: number;
+    lastTickUpdate?: number;
   }>({
     latencyMs: undefined,
     cpuLoad: 0,
@@ -1426,6 +1481,8 @@ const FlowRuntime: React.FC<FlowRuntimeProps> = ({ arrangeFocusToken }) => {
     sampleRate: undefined,
     startedAt: Date.now(),
     dropoutCount: 0,
+    lastUpdateTime: undefined,
+    lastTickUpdate: undefined,
   });
   const [primeBrainTelemetryEnabled, setPrimeBrainTelemetryEnabled] = useState<boolean>(() => {
     if (typeof window === 'undefined') {
@@ -1461,6 +1518,46 @@ const FlowRuntime: React.FC<FlowRuntimeProps> = ({ arrangeFocusToken }) => {
     );
   }, [primeBrainTelemetryEnabled]);
 
+  // Register Audio System component with Flow
+  const { broadcast: broadcastAudioSystem } = useFlowComponent({
+    id: 'audio-system',
+    type: 'system',
+    name: 'Audio System',
+    broadcasts: [
+      'audio_upload_start',
+      'audio_upload_complete',
+      'audio_recording_start',
+      'audio_recording_stop',
+      'stem_separation_start',
+      'stems_created',
+      'audio_event',
+    ],
+    listens: [
+      {
+        signal: 'prime_brain_guidance',
+        callback: (payload) => {
+          // React to Prime Brain guidance if needed
+        },
+      },
+    ],
+  });
+
+  // Register Transport component with Flow
+  const { broadcast: broadcastTransport } = useFlowComponent({
+    id: 'transport',
+    type: 'transport',
+    name: 'Transport',
+    broadcasts: ['transport_event'],
+    listens: [
+      {
+        signal: 'prime_brain_guidance',
+        callback: (payload) => {
+          // React to Prime Brain guidance if needed
+        },
+      },
+    ],
+  });
+
   // Surface Auto Punch through Bloom
   const { autoPunch } = useAutoPunch();
 
@@ -1482,17 +1579,118 @@ const FlowRuntime: React.FC<FlowRuntimeProps> = ({ arrangeFocusToken }) => {
   const diagnoseAudioSystem: typeof _diagnoseAudioSystem =
     primeBoot.enableAudioDiagnostics
       ? _diagnoseAudioSystem
-      : () => {
-          // no-op in this boot profile
-        };
+      : () => ({
+          audioContext: {
+            exists: false,
+            state: 'suspended',
+            sampleRate: 44100,
+            currentTime: 0,
+          },
+          masterChain: {
+            exists: false,
+            inputExists: false,
+            outputExists: false,
+            connectedToDestination: false,
+          },
+          signalPath: {
+            masterInputGain: 0,
+            masterGainValue: 0,
+            translationMatrixAttached: false,
+          },
+          tracks: {
+            count: 0,
+            connectedCount: 0,
+            hasAudioBuffers: 0,
+          },
+          quality: {
+            gainStaging: 'optimal' as const,
+            compressionStacking: 'optimal' as const,
+            phaseCoherence: 'optimal' as const,
+            issues: [],
+            recommendations: [],
+          },
+        });
 
   const logAudioDiagnostics: typeof _logAudioDiagnostics =
     primeBoot.enableAudioDiagnostics
       ? _logAudioDiagnostics
       : () => {};
 
-  const auditMixerConsole: typeof _auditMixerConsole =
-    primeBoot.enableMixerAudit ? _auditMixerConsole : () => {};
+  const auditMixerConsole = (context: MixerAuditContext): MixerAuditResult => {
+    if (primeBoot.enableMixerAudit) {
+      return _auditMixerConsole(context);
+    } else {
+      return {
+        timestamp: Date.now(),
+        overall: 'pass' as const,
+        summary: 'Audit disabled in current boot profile',
+        sections: {
+          routing: {
+            status: 'pass' as const,
+            trackRouting: {},
+            masterRouting: {
+              hasMasterInput: false,
+              hasMasterOutput: false,
+              hasMasterGain: false,
+              connectedToDestination: false,
+              issues: [],
+            },
+            issues: [],
+          },
+          controls: {
+            status: 'pass' as const,
+            volumeControls: {
+              trackVolumes: {},
+              masterVolume: 0,
+              issues: [],
+            },
+            panControls: {
+              trackPans: {},
+              masterBalance: 0,
+              issues: [],
+            },
+            muteSolo: {
+              mutedTracks: [],
+              soloedTracks: [],
+              issues: [],
+            },
+            issues: [],
+          },
+          sends: {
+            status: 'pass' as const,
+            sendLevels: {},
+            busDefinitions: [],
+            issues: [],
+          },
+          inserts: {
+            status: 'pass' as const,
+            insertChains: {},
+            fxNodes: {},
+            issues: [],
+          },
+          metering: {
+            status: 'pass' as const,
+            trackMeters: {},
+            masterMeter: { exists: false, active: false },
+            alsFeedback: { active: false },
+            issues: [],
+          },
+          gainStaging: {
+            status: 'pass' as const,
+            trackGains: {},
+            masterGain: 0,
+            totalGain: 0,
+            headroom: 0,
+            issues: [],
+            recommendations: [],
+          },
+        },
+        recommendations: [],
+        criticalIssues: [],
+      };
+    }
+  };
+
   const logMixerAudit: typeof _logMixerAudit =
     primeBoot.enableMixerAudit ? _logMixerAudit : () => {};
 
@@ -1678,54 +1876,131 @@ const FlowRuntime: React.FC<FlowRuntimeProps> = ({ arrangeFocusToken }) => {
     const sessionProbeState = getSessionProbeSnapshot();
     const sessionProbeContext = sessionProbeState?.context ?? null;
 
-    // Enhanced ALS channel calculation with Flow Context integration
-    // CRITICAL: Only show activity when there's actual audio playing (level > 0)
-    const hasAudio = isPlaying && masterAnalysis.level > 0;
-    const alsTemperature = hasAudio ? clamp01(masterAnalysis.level) : 0;
-    
-    // Momentum: Zero when no audio, or when level is too low
-    let momentum = hasAudio 
-        ? Math.max(flowContext.momentum, 0.45 + masterAnalysis.level * 0.4)
-        : 0;
-    if (mixerActionPulse && hasAudio) {
-      momentum = Math.min(
-        1,
-        Math.max(momentum, flowContext.momentum + mixerActionPulse.pulse.intensity * 0.3)
+    // Enhanced ALS channel calculation with multi-track aggregation
+    // Aggregate track analysis data for multi-track contextual DAW
+    const activeTrackAnalyses = Object.entries(trackAnalysis).filter(([trackId, analysis]) => {
+      const track = tracksRef.current.find(t => t.id === trackId);
+      const settings = mixerSettings[trackId];
+      if (!track || !settings) return false;
+      
+      // Check if track has clips playing at current time
+      const trackClips = clipsRef.current.filter(
+        clip => clip.trackId === trackId && 
+        clip.start <= currentTime && 
+        (clip.start + clip.duration) >= currentTime
       );
+      const hasClipsPlaying = trackClips.length > 0 && isPlaying;
+      
+      // Check if track is muted
+      const hasSolo = soloedTracks.size > 0;
+      const isSoloed = soloedTracks.has(trackId);
+      const isMuted = settings.isMuted || (hasSolo && !isSoloed);
+      
+      return hasClipsPlaying && !isMuted && analysis.level > 0.001;
+    });
+    
+    const activeTrackCount = activeTrackAnalyses.length;
+    const hasAudio = isPlaying && (masterAnalysis.level > 0.001 || activeTrackCount > 0);
+    
+    // Temperature: Aggregate from all active tracks, weighted by track level
+    let alsTemperature = 0;
+    if (hasAudio) {
+      if (activeTrackCount > 0) {
+        // Multi-track: aggregate from active tracks
+        const totalLevel = activeTrackAnalyses.reduce((sum, [, analysis]) => sum + analysis.level, 0);
+        alsTemperature = clamp01(totalLevel / activeTrackCount);
+      } else {
+        // Fallback to master analysis
+        alsTemperature = clamp01(masterAnalysis.level);
+      }
     }
     
-    // Pressure: Zero when no audio
-    const pressureBase = hasAudio
-      ? (masterAnalysis.transient ? 0.55 + masterAnalysis.level * 0.4 : masterAnalysis.level * 0.6) +
-        flowContext.momentumTrend * 0.35
-      : 0;
-    const pressure = clamp01(importMessage && hasAudio ? Math.max(pressureBase, 0.65) : pressureBase);
+    // Momentum: Aggregate from tracks + master, weighted by activity
+    let momentum = 0;
+    if (hasAudio) {
+      if (activeTrackCount > 0) {
+        // Multi-track momentum: average of active tracks
+        const trackMomentums = activeTrackAnalyses.map(([, analysis]) => {
+          // Momentum from track level and transient activity
+          return clamp01(0.45 + analysis.level * 0.4 + (analysis.transient ? 0.15 : 0));
+        });
+        momentum = trackMomentums.reduce((sum, m) => sum + m, 0) / trackMomentums.length;
+      } else {
+        // Fallback to master + flow context
+        momentum = Math.max(flowContext.momentum, 0.45 + masterAnalysis.level * 0.4);
+      }
+      
+      // Apply mixer action pulse
+      if (mixerActionPulse) {
+        momentum = Math.min(1, Math.max(momentum, flowContext.momentum + mixerActionPulse.pulse.strength * 0.3));
+      }
+      
+      // Incorporate Flow Context activity level
+      if (flowContext.sessionContext?.activityLevel === 'intense') {
+        momentum = Math.min(1, momentum + 0.15);
+      } else if (flowContext.sessionContext?.activityLevel === 'active') {
+        momentum = Math.min(1, momentum + 0.08);
+      }
+    }
     
-    // Harmony: Zero when no audio analysis available
-    const harmony = hasAudio && analysisResult
-      ? clamp01((analysisResult.soul / 100) * 0.6 + (analysisResult.silk / 100) * 0.4)
-      : 0;
-    const harmonyWithFlow = clamp01(
-      harmony +
-        (flowContext.intensity === 'immersed'
-          ? 0.08
-          : flowContext.intensity === 'charged'
-          ? 0.04
-          : 0)
-    );
-
-    // Incorporate Flow Context activity level into momentum calculation
-    if (flowContext.sessionContext?.activityLevel === 'intense') {
-      momentum = Math.min(1, momentum + 0.15);
-    } else if (flowContext.sessionContext?.activityLevel === 'active') {
-      momentum = Math.min(1, momentum + 0.08);
+    // Pressure: Aggregate transients across all tracks
+    let pressure = 0;
+    if (hasAudio) {
+      if (activeTrackCount > 0) {
+        // Multi-track pressure: any transient OR high track density
+        const hasTransient = activeTrackAnalyses.some(([, analysis]) => analysis.transient);
+        const trackDensity = activeTrackCount / Math.max(1, tracksRef.current.length);
+        const avgLevel = activeTrackAnalyses.reduce((sum, [, analysis]) => sum + analysis.level, 0) / activeTrackCount;
+        pressure = clamp01(
+          (hasTransient ? 0.55 : 0.3) + 
+          avgLevel * 0.4 + 
+          trackDensity * 0.25 +
+          flowContext.momentumTrend * 0.35
+        );
+      } else {
+        // Fallback to master
+        pressure = (masterAnalysis.transient ? 0.55 + masterAnalysis.level * 0.4 : masterAnalysis.level * 0.6) +
+          flowContext.momentumTrend * 0.35;
+        pressure = clamp01(pressure);
+      }
+      
+      // Boost pressure during import
+      if (importMessage) {
+        pressure = clamp01(Math.max(pressure, 0.65));
+      }
+    }
+    
+    // Harmony: Use analysis result if available, otherwise aggregate from tracks
+    let harmony = 0;
+    if (hasAudio) {
+      if (analysisResult) {
+        // Use musical analysis result
+        harmony = clamp01((analysisResult.soul / 100) * 0.6 + (analysisResult.silk / 100) * 0.4);
+      } else if (activeTrackCount > 0) {
+        // Fallback: estimate harmony from track spectral content
+        const avgSpectralTilt = activeTrackAnalyses.reduce((sum, [, analysis]) => 
+          sum + (analysis.spectralTilt || 0), 0) / activeTrackCount;
+        // Spectral tilt indicates harmonic content (positive = more high freq = more harmonic)
+        harmony = clamp01(0.4 + avgSpectralTilt * 0.3);
+      }
+      
+      // Add Flow intensity boost
+      const harmonyWithFlow = clamp01(
+        harmony +
+          (flowContext.intensity === 'immersed'
+            ? 0.08
+            : flowContext.intensity === 'charged'
+            ? 0.04
+            : 0)
+      );
+      harmony = harmonyWithFlow;
     }
 
     const alsChannels: PrimeBrainSnapshotInputs['alsChannels'] = [
       { channel: 'temperature', value: alsTemperature },
       { channel: 'momentum', value: momentum },
       { channel: 'pressure', value: pressure },
-      { channel: 'harmony', value: harmonyWithFlow },
+      { channel: 'harmony', value: harmony },
     ];
 
     const aiAnalysisFlags: PrimeBrainAIFlag[] = captureReport.notes.map((note) => {
@@ -1734,7 +2009,7 @@ const FlowRuntime: React.FC<FlowRuntimeProps> = ({ arrangeFocusToken }) => {
           ? 'critical'
           : 'warn'
         : 'info';
-      const message = note.replace(/^[⚠️✅]\s*/, '');
+      const message = note.replace(/^(⚠️|✅)\s*/, '');
       return {
         category: 'capture',
         severity,
@@ -1767,12 +2042,13 @@ const FlowRuntime: React.FC<FlowRuntimeProps> = ({ arrangeFocusToken }) => {
       });
     }
 
+    // Use real audio metrics (no defaults/placeholders)
     const audioMetrics: PrimeBrainSnapshotInputs['audioMetrics'] = {
-      latencyMs: audioMetricsState.latencyMs,
+      latencyMs: audioMetricsState.latencyMs ?? undefined,
       cpuLoad: audioMetricsState.cpuLoad,
       dropoutsPerMinute: audioMetricsState.dropoutsPerMinute,
-      bufferSize: audioMetricsState.bufferSize,
-      sampleRate: audioMetricsState.sampleRate,
+      bufferSize: audioMetricsState.bufferSize ?? undefined,
+      sampleRate: audioMetricsState.sampleRate ?? undefined,
     };
 
     const harmonicState: PrimeBrainSnapshotInputs['harmonicState'] = {
@@ -1802,8 +2078,8 @@ const FlowRuntime: React.FC<FlowRuntimeProps> = ({ arrangeFocusToken }) => {
       isPlaying,
       armedTrackCount: armedTracks.size,
       activeBloomActions,
-      cpuLoad: audioMetrics.cpuLoad,
-      dropoutsPerMinute: audioMetrics.dropoutsPerMinute,
+      cpuLoad: audioMetrics.cpuLoad ?? 0,
+      dropoutsPerMinute: audioMetrics.dropoutsPerMinute ?? 0,
     };
 
     // Mode derivation considers Flow Context activity
@@ -1869,6 +2145,15 @@ const FlowRuntime: React.FC<FlowRuntimeProps> = ({ arrangeFocusToken }) => {
       console.debug('[PrimeBrain] Snapshot preview:', {
         mode: snapshot.mode,
         alsChannels: snapshot.alsChannels.map((c) => `${c.channel}:${c.value.toFixed(2)}`),
+        audioMetrics: {
+          sampleRate: audioMetrics.sampleRate,
+          bufferSize: audioMetrics.bufferSize,
+          latencyMs: audioMetrics.latencyMs,
+          cpuLoad: audioMetrics.cpuLoad.toFixed(2),
+          dropoutsPerMinute: audioMetrics.dropoutsPerMinute.toFixed(2),
+        },
+        activeTrackCount,
+        hasAudio,
         activityLevel: flowContext.sessionContext?.activityLevel,
         adaptiveSuggestions: flowContext.adaptiveSuggestions,
         sessionContext: sessionProbeContext ? {
@@ -1907,6 +2192,11 @@ const FlowRuntime: React.FC<FlowRuntimeProps> = ({ arrangeFocusToken }) => {
     flowContext.momentumTrend,
     flowContext.sessionContext,
     flowContext.adaptiveSuggestions,
+    trackAnalysis,
+    tracks,
+    clipsRef.current,
+    mixerSettings,
+    soloedTracks,
   ]);
 
   const primeBrainStatus = useMemo<PrimeBrainStatus>(() => {
@@ -2117,7 +2407,7 @@ const FlowRuntime: React.FC<FlowRuntimeProps> = ({ arrangeFocusToken }) => {
   );
 
 
-  const [viewMode, setViewMode] = useState<'arrange' | 'sampler' | 'mixer' | 'piano'>('arrange');
+  const [viewMode, setViewMode] = useState<'arrange' | 'sampler' | 'mixer' | 'piano' | 'hybrid'>('arrange');
   // Wide Glass Console positioning
   const [consolePosition, setConsolePosition] = useState({ x: 0, y: 0 });
   
@@ -2140,10 +2430,16 @@ const FlowRuntime: React.FC<FlowRuntimeProps> = ({ arrangeFocusToken }) => {
   }, [viewMode]);
   
   // Wrap setViewMode to record Prime Brain events
-  const handleViewModeChange = useCallback((mode: 'arrange' | 'sampler' | 'mixer' | 'piano') => {
-    setViewMode(mode);
-    recordViewSwitch(mode);
-    recordPrimeBrainEvent('view-switch', { viewMode: mode }, 'success');
+  // Note: BloomDock may pass 'edit' mode, but we only handle main view modes here
+  const handleViewModeChange = useCallback((mode: 'arrange' | 'sampler' | 'mixer' | 'piano' | 'hybrid' | 'edit') => {
+    // Map 'edit' to 'arrange' since edit is a sub-mode of arrange
+    const mainViewMode = mode === 'edit' ? 'arrange' : mode;
+    // Only update if it's a valid main view mode (not 'edit')
+    if (mode !== 'edit') {
+      setViewMode(mainViewMode);
+      recordViewSwitch(mainViewMode);
+      recordPrimeBrainEvent('view-switch', { viewMode: mainViewMode }, 'success');
+    }
   }, []);
   const [activePrimeBrainClipId, setActivePrimeBrainClipId] = useState<ClipId | null>(null);
   const [selectedTrackId, setSelectedTrackId] = useState<string | null>(null);
@@ -2367,6 +2663,11 @@ const FlowRuntime: React.FC<FlowRuntimeProps> = ({ arrangeFocusToken }) => {
   const [isPluginBrowserOpen, setIsPluginBrowserOpen] = useState(false);
   const [trackIdForPluginBrowser, setTrackIdForPluginBrowser] = useState<string | null>(null);
   
+  const handleClosePluginBrowser = useCallback(() => {
+    setIsPluginBrowserOpen(false);
+    setTrackIdForPluginBrowser(null);
+  }, []);
+  
   const [fxBypassState, setFxBypassState] = useState<Record<FxWindowId, boolean>>({});
   const [pluginFavorites, setPluginFavorites] = useState<Record<FxWindowId, boolean>>(
     () => loadPluginFavorites() as Record<FxWindowId, boolean>
@@ -2567,6 +2868,16 @@ const FlowRuntime: React.FC<FlowRuntimeProps> = ({ arrangeFocusToken }) => {
       return {
         id,
         name,
+        description: '', // UI doesn't need descriptions
+        tier: 'core' as const, // Default tier
+        tierLabel: 'Standard',
+        parameters: [], // UI doesn't need parameter details
+        moodResponse: '', // UI doesn't need mood responses
+        lightingProfile: {
+          hueStart: 240,
+          hueEnd: 260,
+          motion: 'float' as const
+        }, // Default lighting profile
         colorKey: palette.colorKey,
         base: palette.base,
         glow: palette.glow,
@@ -2655,6 +2966,18 @@ const FlowRuntime: React.FC<FlowRuntimeProps> = ({ arrangeFocusToken }) => {
        try {
          const originalIndex = tracksRef.current.findIndex((track) => track.id === request.originalTrackId);
          setImportMessage('Prime Brain is analyzing stems...');
+         
+         // Publish Flow signal: stem separation started
+         broadcastAudioSystem('stem_separation_start', {
+           jobId,
+           fileName: request.fileName,
+           originalTrackId: request.originalTrackId,
+           bufferDuration: request.buffer.duration,
+           sampleRate: request.buffer.sampleRate,
+           allowedStems: canonicalAllowed,
+           timestamp: Date.now(),
+         });
+         
          const separationResult = await integration.importAudioWithStemSeparation(
            request.buffer,
            request.fileName,
@@ -2721,8 +3044,30 @@ const FlowRuntime: React.FC<FlowRuntimeProps> = ({ arrangeFocusToken }) => {
          });
  
          setClips((prev) => [...prev, ...separationResult.newClips]);
- 
+
          console.log(`[STEMS] Created ${separationResult.newTracks.length} stem tracks from ${request.fileName}.`);
+         
+         // Publish Flow signal: stems created
+         broadcastAudioSystem('stems_created', {
+           jobId,
+           fileName: request.fileName,
+           originalTrackId: request.originalTrackId,
+           stemTracks: separationResult.newTracks.map(t => ({
+             trackId: t.id,
+             trackName: t.trackName,
+             group: t.group,
+             color: t.trackColor,
+           })),
+           stemClips: separationResult.newClips.map(c => ({
+             clipId: c.id,
+             trackId: c.trackId,
+             name: c.name,
+             duration: c.duration,
+           })),
+           stemsCreated: separationResult.newTracks.length,
+           timestamp: Date.now(),
+         });
+         
          setTimeout(() => setImportMessage(null), 1200);
          if (jobId) {
            canonicalAllowed.forEach((stemKey) => {
@@ -2857,6 +3202,18 @@ const FlowRuntime: React.FC<FlowRuntimeProps> = ({ arrangeFocusToken }) => {
     const { resetSession = false, reingestClipId } = options;
 
     const displayName = stripFileExtension(fileName);
+    
+    // Publish Flow signal: audio upload started
+    broadcastAudioSystem('audio_upload_start', {
+      jobId,
+      fileName: displayName,
+      duration: buffer.duration,
+      sampleRate: buffer.sampleRate,
+      channels: buffer.numberOfChannels,
+      resetSession,
+      timestamp: Date.now(),
+    });
+    
     setImportMessage(`Applying Velvet Sonics: ${displayName}`);
     upsertImportProgress({ id: jobId, label: displayName, percent: 10, type: 'file' });
 
@@ -3109,6 +3466,19 @@ const FlowRuntime: React.FC<FlowRuntimeProps> = ({ arrangeFocusToken }) => {
 
     setSelectedTrackId(assignedTrackId);
     upsertImportProgress({ id: jobId, label: `${displayName} • Track seeded`, percent: 45, type: 'file' });
+
+    // Publish Flow signal: audio upload complete (before stem separation)
+    broadcastAudioSystem('audio_upload_complete', {
+      jobId,
+      fileName: displayName,
+      trackId: assignedTrackId,
+      clipId: newClip.id,
+      bufferId: newBufferId,
+      duration: processedBuffer.duration,
+      sampleRate: processedBuffer.sampleRate,
+      channels: processedBuffer.numberOfChannels,
+      timestamp: Date.now(),
+    });
 
     setImportMessage('Prime Brain is analyzing stems...');
     await new Promise<void>((resolve, reject) => {
@@ -3557,6 +3927,25 @@ const FlowRuntime: React.FC<FlowRuntimeProps> = ({ arrangeFocusToken }) => {
     
     setIsPlaying(newIsPlaying);
     
+    // Publish Flow signal: transport event
+    const activeTracks = tracksRef.current.filter(track => {
+      const trackClips = clipsRef.current.filter(
+        clip => clip.trackId === track.id && 
+        clip.start <= currentTime && 
+        (clip.start + clip.duration) >= currentTime
+      );
+      return trackClips.length > 0;
+    }).map(t => t.id);
+    
+    broadcastTransport('transport_event', {
+      type: newIsPlaying ? 'play' : 'pause',
+      currentTime,
+      activeTracks,
+      armedTracks: Array.from(armedTracks),
+      isLooping,
+      timestamp: Date.now(),
+    });
+    
     const isTauri = typeof window !== 'undefined' && typeof (window as unknown as { __TAURI__?: unknown }).__TAURI__ !== 'undefined';
     
     // Initialize and control Tauri Flow Engine
@@ -3914,17 +4303,17 @@ const FlowRuntime: React.FC<FlowRuntimeProps> = ({ arrangeFocusToken }) => {
                       
                       // Request QNN analysis through Flow (will route to Prime Brain automatically)
                       await qnnFlowService.requestAudioAnalysis(fftData, {
-                          clipId: clipId,
-                          trackId: trackId,
+                          clipId: firstClip.id,
+                          trackId: firstClip.trackId,
                           timestamp: Date.now(),
                       });
-                      
+
                       // Also request pattern recognition
                       await qnnFlowService.requestPatternRecognition(
                           Array.from(channelData.slice(0, 64)),
                           {
-                              clipId: clipId,
-                              trackId: trackId,
+                              clipId: firstClip.id,
+                              trackId: firstClip.trackId,
                               timestamp: Date.now(),
                           }
                       );
@@ -5085,13 +5474,25 @@ const FlowRuntime: React.FC<FlowRuntimeProps> = ({ arrangeFocusToken }) => {
           console.warn('[AUDIO] Failed to initialize Mixx Signal Matrix', err);
         }
         
+        // Initialize Prime Brain audio metrics from AudioContext
+        primeBrainAudioMetricsRef.current.sampleRate = createdCtx.sampleRate;
+        if (createdCtx.baseLatency !== undefined) {
+          const outputLatency = (createdCtx as any).outputLatency || 0;
+          primeBrainAudioMetricsRef.current.latencyMs = (createdCtx.baseLatency + outputLatency) * 1000;
+        }
+        const masterAnalyser = masterNodesRef.current.analyser;
+        if (masterAnalyser) {
+          primeBrainAudioMetricsRef.current.bufferSize = masterAnalyser.fftSize / 2;
+        }
+        primeBrainAudioMetricsRef.current.startedAt = Date.now();
+        primeBrainAudioMetricsRef.current.dropoutCount = 0;
+        
         // Verify final connection state to prevent feedback
         console.log('[AUDIO] Final master output connection check:', {
           hasStreamNode: !!nativeAudioStreamNodeRef.current,
           hasTranslationMatrix: !!translationMatrixRef.current,
           translationMatrixAttached: translationMatrixRef.current?.attached ?? false,
         });
-        const masterAnalyser = masterNodesRef.current.analyser;
         masterAnalyser.fftSize = TRACK_ANALYSER_FFT;
         masterAnalyser.smoothingTimeConstant = MASTER_ANALYSER_SMOOTHING;
         masterAnalyser.minDecibels = MIN_DECIBELS;
@@ -5179,7 +5580,7 @@ const FlowRuntime: React.FC<FlowRuntimeProps> = ({ arrangeFocusToken }) => {
             masterNodesRef.current,
             trackNodesRef.current,
             audioBuffers,
-            translationMatrix
+            translationMatrixRef.current
           );
           logAudioDiagnostics(diagnostics);
           
@@ -5244,7 +5645,9 @@ const FlowRuntime: React.FC<FlowRuntimeProps> = ({ arrangeFocusToken }) => {
         });
         if (!stemIntegrationRef.current) {
           // Use Flow-native stem separation
-          const integration = new FlowStemIntegration(createdCtx);
+          // Enable spectral analysis - now using working implementation
+          const useSpectralAnalysis = true; // Using functional spectral analysis
+          const integration = new FlowStemIntegration(createdCtx, useSpectralAnalysis);
           integration.onProgress((message, percent) => {
             const suffix = typeof percent === 'number' ? ` (${Math.round(percent)}%)` : '';
             setImportMessage(`${message}${suffix}`);
@@ -5283,7 +5686,7 @@ const FlowRuntime: React.FC<FlowRuntimeProps> = ({ arrangeFocusToken }) => {
           stemIntegrationRef.current = integration;
           // Pre-warm stem model worker immediately
           try {
-            integration.prewarm();
+            (integration as any).prewarm?.();
           } catch (err) {
             console.warn('[STEMS] prewarm not available', err);
           }
@@ -6244,6 +6647,9 @@ const FlowRuntime: React.FC<FlowRuntimeProps> = ({ arrangeFocusToken }) => {
             });
 
             const masterAnalyser = masterNodesRef.current?.analyser ?? null;
+            let actualLevel = 0;
+            let actualTransient = false;
+            
             if (masterAnalyser) {
                 const masterBuffers = ensureMasterMeterBuffers(masterMeterBufferRef.current, masterAnalyser);
                 masterMeterBufferRef.current = masterBuffers;
@@ -6261,10 +6667,10 @@ const FlowRuntime: React.FC<FlowRuntimeProps> = ({ arrangeFocusToken }) => {
                 // Only report levels above noise floor when audio is actually playing
                 // Level is 0-1 normalized, noise floor is ~0.001 (roughly -60dB equivalent)
                 const noiseFloor = 0.001; // Normalized threshold for silence (prevents false readings)
-                const actualLevel = masterMetrics.level > noiseFloor && isPlaying 
+                actualLevel = masterMetrics.level > noiseFloor && isPlaying 
                     ? masterLevelAvg.current 
                     : 0;
-                const actualTransient = masterMetrics.level > noiseFloor && isPlaying 
+                actualTransient = masterMetrics.level > noiseFloor && isPlaying 
                     ? masterMetrics.transient 
                     : false;
                 
@@ -6273,6 +6679,75 @@ const FlowRuntime: React.FC<FlowRuntimeProps> = ({ arrangeFocusToken }) => {
                     transient: actualTransient,
                     waveform: waveformData,
                 });
+            }
+
+            // Update Prime Brain audio metrics in real-time (during playback)
+            if (ctx && isPlayingRef.current && masterAnalyser) {
+                const now = performance.now();
+                const metrics = primeBrainAudioMetricsRef.current;
+                
+                // Update sample rate and buffer size from AudioContext
+                if (!metrics.sampleRate || metrics.sampleRate !== ctx.sampleRate) {
+                    metrics.sampleRate = ctx.sampleRate;
+                }
+                
+                // Get buffer size from analyser
+                const fftSize = masterAnalyser.fftSize;
+                // FFT size is typically 2048, 4096, etc. Buffer size is fftSize / 2
+                metrics.bufferSize = fftSize / 2;
+                
+                // Calculate latency (baseLatency + outputLatency if available)
+                if (ctx.baseLatency !== undefined) {
+                    const outputLatency = (ctx as any).outputLatency || 0;
+                    metrics.latencyMs = (ctx.baseLatency + outputLatency) * 1000;
+                }
+                
+                // Estimate CPU load from processing time
+                // This is a simple heuristic - measure time between analysis frames
+                const lastUpdate = metrics.lastUpdateTime || now;
+                const frameTime = now - lastUpdate;
+                // Target frame time is ~16.67ms for 60fps, actual processing should be less
+                // CPU load = how much of the frame time was spent processing
+                const targetFrameTime = 16.67; // 60fps
+                const processingTime = frameTime;
+                const newCpuLoad = Math.min(1, Math.max(0, processingTime / targetFrameTime));
+                
+                // Only update if CPU load changed significantly (to avoid constant ticks)
+                if (Math.abs(metrics.cpuLoad - newCpuLoad) > 0.05) {
+                    metrics.cpuLoad = newCpuLoad;
+                }
+                metrics.lastUpdateTime = now;
+                
+                // Detect dropouts by checking for gaps in audio
+                // Use actualLevel which was computed above in master analysis
+                const noiseFloor = 0.001;
+                const hasAudio = actualLevel > noiseFloor;
+                const expectedAudio = tracksRef.current.some(track => {
+                    const trackClips = clipsRef.current.filter(
+                        clip => clip.trackId === track.id && 
+                        clip.start <= newTime && 
+                        (clip.start + clip.duration) >= newTime
+                    );
+                    return trackClips.length > 0;
+                });
+                
+                if (expectedAudio && !hasAudio) {
+                    // Potential dropout detected
+                    metrics.dropoutCount += 1;
+                }
+                
+                // Calculate dropouts per minute
+                const elapsedMinutes = (now - metrics.startedAt) / 60000;
+                if (elapsedMinutes > 0) {
+                    metrics.dropoutsPerMinute = metrics.dropoutCount / elapsedMinutes;
+                }
+                
+                // Periodically trigger Prime Brain tick to update snapshots with new metrics
+                // Update every ~500ms during playback to keep snapshots fresh
+                if (!metrics.lastTickUpdate || (now - metrics.lastTickUpdate) > 500) {
+                    metrics.lastTickUpdate = now;
+                    bumpPrimeBrainTick();
+                }
             }
 
             setTrackAnalysis(nextTrackAnalysis);
@@ -6578,6 +7053,7 @@ const FlowRuntime: React.FC<FlowRuntimeProps> = ({ arrangeFocusToken }) => {
     if (isAIHubOpen) return 'ai';
     if (isAnyTrackArmed || isHushActive) return 'record';
     if (viewMode === 'mixer') return 'mix';
+    if (viewMode === 'hybrid') return 'mix';
     if (viewMode === 'sampler') return 'sampler';
     if (analysisResult) return 'master';
     if (viewMode === 'arrange') return 'arrange';
@@ -7176,8 +7652,6 @@ const FlowRuntime: React.FC<FlowRuntimeProps> = ({ arrangeFocusToken }) => {
       playing: isPlaying,
       looping: isLooping,
       playCount: isLooping ? Math.floor(currentTime / (60 / bpm)) : 0,
-      regionLength: isLooping ? (60 / bpm) * 4 : undefined, // Assume 4-bar loop
-      cursorLock: isLooping && isPlaying, // Cursor locked when looping
     });
     
     // Update recording state
@@ -7202,20 +7676,36 @@ const FlowRuntime: React.FC<FlowRuntimeProps> = ({ arrangeFocusToken }) => {
         window.__mixx_recordState = { recording: false, armedTrack: false, noiseFloor: 0 };
       }
       (window.__mixx_recordState as any).recordStart = performance.now();
+      
+      // Publish Flow signal: recording started
+      broadcastAudioSystem('audio_recording_start', {
+        armedTracks: Array.from(armedTracks),
+        timestamp: Date.now(),
+        currentTime,
+      });
     } else if (!isRecording && wasRecording) {
       // Recording stopped - record punch end with duration and take memory
       const punchHistory = window.__mixx_punchHistory || [];
+      let recordingDuration = 0;
       if (punchHistory.length > 0) {
         const lastPunch = punchHistory[punchHistory.length - 1];
-        const duration = (performance.now() - lastPunch.ts) / 1000; // Convert to seconds
+        recordingDuration = (performance.now() - lastPunch.ts) / 1000; // Convert to seconds
         // Update last punch with duration
-        lastPunch.duration = duration;
+        lastPunch.duration = recordingDuration;
         // Detect punch type
         const punchType = detectPunchType(punchHistory);
         if (punchType) {
           lastPunch.type = punchType;
         }
       }
+      
+      // Publish Flow signal: recording stopped
+      broadcastAudioSystem('audio_recording_stop', {
+        armedTracks: Array.from(armedTracks),
+        duration: recordingDuration,
+        timestamp: Date.now(),
+        currentTime,
+      });
       
       // Record take memory (crown jewel of Punch Mode)
       const takeMemory = recordTakeMemory();
@@ -7272,6 +7762,7 @@ const FlowRuntime: React.FC<FlowRuntimeProps> = ({ arrangeFocusToken }) => {
                     height={contentHeight}
                     tracks={tracks}
                     clips={clips}
+                    inserts={inserts}
                     setClips={setClips}
                     isPlaying={isPlaying}
                     currentTime={currentTime}
@@ -7305,31 +7796,13 @@ const FlowRuntime: React.FC<FlowRuntimeProps> = ({ arrangeFocusToken }) => {
                     onUpdateAutomationPoint={handleUpdateAutomationPoint}
                     onDeleteAutomationPoint={handleDeleteAutomationPoint}
                     onUpdateClipProperties={updateClipProperties}
-                    inserts={inserts}
-                    fxWindows={fxWindows}
-                    onAddPlugin={handleAddPlugin}
-                    onRemovePlugin={handleRemovePlugin}
-                    onMovePlugin={handleMovePlugin}
-                    onOpenPluginBrowser={(trackId: string) => {
-                      setTrackIdForPluginBrowser(trackId);
-                      setIsPluginBrowserOpen(true);
-                    }}
-                    onOpenPluginSettings={handleOpenPluginSettings}
-                    automationParamMenu={automationParamMenu}
-                    onOpenAutomationParamMenu={(x: number, y: number, trackId: string) =>
-                      setAutomationParamMenu({ x, y, trackId })
-                    }
-                    onCloseAutomationParamMenu={() => setAutomationParamMenu(null)}
-                    onToggleAutomationLaneWithParam={handleToggleAutomationLane}
                     style={arrangeBorderGlowStyle}
                     trackAnalysis={trackAnalysis}
                     highlightClipIds={recallHighlightClipIds}
                     followPlayhead={followPlayhead}
                     onManualScroll={handleManualTimelineScroll}
                     trackUiState={trackUiState}
-                    onToggleTrackCollapse={handleToggleTrackCollapse}
                     onResizeTrack={handleResizeTrack}
-                    onRequestTrackCapsule={handleOpenTrackCapsule}
                     onSetTrackContext={handleTrackContextChange}
                     onOpenPianoRoll={handleOpenPianoRoll}
                     audioBuffers={audioBuffers}
@@ -7407,6 +7880,125 @@ const FlowRuntime: React.FC<FlowRuntimeProps> = ({ arrangeFocusToken }) => {
                   />
                 ),
               },
+              {
+                id: "hybrid",
+                label: "Hybrid View",
+                content: (
+                  <div className="flex h-full w-full flex-row gap-4 overflow-hidden">
+                    {/* Arrange Panel - Left Side */}
+                    <div className="flex-1 min-w-0 overflow-hidden">
+                      <ArrangeWindow
+                        height={contentHeight}
+                        tracks={tracks}
+                        clips={clips}
+                        inserts={inserts}
+                        setClips={setClips}
+                        isPlaying={isPlaying}
+                        currentTime={currentTime}
+                        onSeek={handleSeek}
+                        bpm={bpm}
+                        beatsPerBar={4}
+                        pixelsPerSecond={ppsAPI.value}
+                        ppsAPI={ppsAPI}
+                        scrollX={scrollX}
+                        setScrollX={setScrollX}
+                        selection={selection}
+                        setSelection={setSelection}
+                        clearSelection={clearSelection}
+                        onSplitAt={onSplitAt}
+                        undo={undo}
+                        redo={redo}
+                        canUndo={canUndo}
+                        canRedo={canRedo}
+                        selectedTrackId={selectedTrackId}
+                        onSelectTrack={setSelectedTrackId}
+                        armedTracks={armedTracks}
+                        onToggleArm={handleToggleArm}
+                        mixerSettings={mixerSettings}
+                        soloedTracks={soloedTracks}
+                        onToggleSolo={handleToggleSolo}
+                        onToggleMute={handleToggleMute}
+                        masterAnalysis={masterAnalysis}
+                        automationData={automationData}
+                        visibleAutomationLanes={visibleAutomationLanes}
+                        onAddAutomationPoint={handleAddAutomationPoint}
+                        onUpdateAutomationPoint={handleUpdateAutomationPoint}
+                        onDeleteAutomationPoint={handleDeleteAutomationPoint}
+                        onUpdateClipProperties={updateClipProperties}
+                        style={arrangeBorderGlowStyle}
+                        trackAnalysis={trackAnalysis}
+                        highlightClipIds={recallHighlightClipIds}
+                        followPlayhead={followPlayhead}
+                        onManualScroll={handleManualTimelineScroll}
+                        trackUiState={trackUiState}
+                        onResizeTrack={handleResizeTrack}
+                        onSetTrackContext={handleTrackContextChange}
+                        onOpenPianoRoll={handleOpenPianoRoll}
+                        audioBuffers={audioBuffers}
+                      />
+                    </div>
+                    {/* Mixer Panel - Right Side */}
+                    <div className="w-[480px] flex-shrink-0 overflow-hidden">
+                      <FlowConsole
+                        tracks={tracks}
+                        mixerSettings={mixerSettings}
+                        trackAnalysis={trackAnalysis}
+                        onMixerChange={handleMixerChangeForMixer}
+                        soloedTracks={soloedTracks}
+                        onToggleSolo={handleToggleSolo}
+                        masterVolume={masterVolume}
+                        onMasterVolumeChange={setMasterVolume}
+                        masterBalance={masterBalance}
+                        onBalanceChange={setMasterBalance}
+                        masterAnalysis={masterAnalysis}
+                        selectedTrackId={selectedTrackId}
+                        onSelectTrack={setSelectedTrackId}
+                        armedTracks={armedTracks}
+                        onToggleArm={handleToggleArm}
+                        onRenameTrack={handleRenameTrack}
+                        inserts={inserts}
+                        fxWindows={fxWindows}
+                        onAddPlugin={handleAddPlugin}
+                        onRemovePlugin={handleRemovePlugin}
+                        onMovePlugin={handleMovePlugin}
+                        onOpenPluginBrowser={(trackId: string) => {
+                          setTrackIdForPluginBrowser(trackId);
+                          setIsPluginBrowserOpen(true);
+                        }}
+                        onOpenPluginSettings={handleOpenPluginSettings}
+                        fxBypassState={fxBypassState}
+                        onToggleBypass={handleToggleBypass}
+                        availableSends={availableSendPalette}
+                        trackSendLevels={trackSendLevels}
+                        onSendLevelChange={handleSendLevelChange}
+                        buses={busStrips}
+                        selectedBusId={selectedBusId}
+                        onSelectBus={(busId) =>
+                          setSelectedBusId((prev) => {
+                            const typed = busId as MixerBusId;
+                            return prev === typed ? null : typed;
+                          })
+                        }
+                        dynamicsSettings={channelDynamicsSettings}
+                        eqSettings={channelEQSettings}
+                        onDynamicsChange={handleDynamicsSettingsChange}
+                        onEQChange={handleEQSettingsChange}
+                        pluginInventory={pluginInventory}
+                        pluginFavorites={pluginFavorites}
+                        onTogglePluginFavorite={handleTogglePluginFavorite}
+                        pluginPresets={pluginPresets}
+                        isPlaying={isPlaying}
+                        currentTime={currentTime}
+                        followPlayhead={followPlayhead}
+                        onSavePluginPreset={handleSavePluginPreset}
+                        onLoadPluginPreset={handleLoadPluginPreset}
+                        onDeletePluginPreset={handleDeletePluginPreset}
+                        mixerActionPulse={mixerActionPulse}
+                      />
+                    </div>
+                  </div>
+                ),
+              },
             ]}
           />
                 {/* Wide Glass Console for Mix View */}
@@ -7426,6 +8018,7 @@ const FlowRuntime: React.FC<FlowRuntimeProps> = ({ arrangeFocusToken }) => {
                                 height={contentHeight}
                                 tracks={tracks}
                                 clips={clips}
+                                inserts={inserts}
                                 setClips={setClips}
                                 isPlaying={isPlaying}
                                 currentTime={currentTime}
@@ -7449,7 +8042,6 @@ const FlowRuntime: React.FC<FlowRuntimeProps> = ({ arrangeFocusToken }) => {
                                 armedTracks={armedTracks}
                                 onToggleArm={handleToggleArm}
                                 mixerSettings={mixerSettings}
-                                onMixerChange={handleMixerChange}
                                 soloedTracks={soloedTracks}
                                 onToggleSolo={handleToggleSolo}
                                 onToggleMute={handleToggleMute}
@@ -7460,31 +8052,13 @@ const FlowRuntime: React.FC<FlowRuntimeProps> = ({ arrangeFocusToken }) => {
                                 onUpdateAutomationPoint={handleUpdateAutomationPoint}
                                 onDeleteAutomationPoint={handleDeleteAutomationPoint}
                                 onUpdateClipProperties={updateClipProperties}
-                                inserts={inserts}
-                                fxWindows={fxWindows}
-                                onAddPlugin={handleAddPlugin}
-                                onRemovePlugin={handleRemovePlugin}
-                                onMovePlugin={handleMovePlugin}
-                                onOpenPluginBrowser={(trackId: string) => {
-                                  setTrackIdForPluginBrowser(trackId);
-                                  setIsPluginBrowserOpen(true);
-                                }}
-                                onOpenPluginSettings={handleOpenPluginSettings}
-                                automationParamMenu={automationParamMenu}
-                                onOpenAutomationParamMenu={(x, y, trackId) =>
-                                  setAutomationParamMenu({ x, y, trackId })
-                                }
-                                onCloseAutomationParamMenu={() => setAutomationParamMenu(null)}
-                                onToggleAutomationLaneWithParam={handleToggleAutomationLane}
                                 style={arrangeBorderGlowStyle}
                                 trackAnalysis={trackAnalysis}
                                 highlightClipIds={recallHighlightClipIds}
                                 followPlayhead={followPlayhead}
                                 onManualScroll={handleManualTimelineScroll}
                                 trackUiState={trackUiState}
-                                onToggleTrackCollapse={handleToggleTrackCollapse}
                                 onResizeTrack={handleResizeTrack}
-                                onRequestTrackCapsule={handleOpenTrackCapsule}
                                 onSetTrackContext={handleTrackContextChange}
                                 onOpenPianoRoll={handleOpenPianoRoll}
                                 audioBuffers={audioBuffers}

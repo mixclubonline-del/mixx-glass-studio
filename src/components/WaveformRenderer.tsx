@@ -1,6 +1,7 @@
 /**
  * WaveformRenderer
- * Canvas-based waveform rendering tuned for the Mixx Club glass aesthetic.
+ * Canvas-based waveform rendering tuned for the F.L.O.W. glass aesthetic.
+ * Created by Ravenis Prime (F.L.O.W)
  * - Handles direct AudioBuffer data or precomputed peaks.
  * - Respects viewport trimming via startTime / duration.
  * - Adapts detail to zoom level and supports RMS or peak display.

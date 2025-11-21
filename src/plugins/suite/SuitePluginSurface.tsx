@@ -154,7 +154,7 @@ const SuitePluginSurface: React.FC<SuitePluginSurfaceProps> = ({
   }, []);
 
   const handleMidiMessage = useCallback((message: MIDIMessageEvent) => {
-    if (!isControlChange(message) || !message.target) return;
+    if (!isControlChange(message) || !message.target || !message.data) return;
 
     const [, cc, value] = message.data;
     const deviceId = (message.target as any).id;
@@ -316,7 +316,7 @@ const SuitePluginSurface: React.FC<SuitePluginSurfaceProps> = ({
             <MixxClubLogo className="h-8 w-8 transition-all duration-200 hover:scale-105" />
             <div className="flex flex-col">
               <h1 className="font-orbitron text-xl font-bold tracking-wider text-shadow-[0_0_10px_rgba(0,255,255,0.5)]">
-                MixxClub
+                F.L.O.W.
               </h1>
               {trackName && (
                 <span className="text-[0.6rem] uppercase tracking-[0.4em] text-white/55">

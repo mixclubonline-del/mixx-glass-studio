@@ -167,6 +167,21 @@ class FlowNeuralBridge {
   }
 
   /**
+   * Broadcast ALS display decision
+   * Prime Brain decides when Header should show text vs waveform
+   */
+  broadcastALSDisplayDecision(decision: {
+    showText: boolean;
+    priority: string;
+    reason: string;
+    duration?: number;
+    information?: any;
+  }): void {
+    // Broadcast to ALS Header component
+    flowComponentRegistry.broadcast('prime-brain', 'als_display_decision', decision);
+  }
+
+  /**
    * Get bridge health status
    */
   getHealthStatus(): {

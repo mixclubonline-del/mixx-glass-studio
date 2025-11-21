@@ -1,7 +1,7 @@
 import { useState, useEffect, useCallback } from 'react';
 import { Preset, PluginStates } from '../types';
 
-const PRESETS_STORAGE_KEY = 'mixxclub_presets_v1';
+const PRESETS_STORAGE_KEY = 'flow:presets:v1';
 
 export const usePresets = () => {
   const [presets, setPresets] = useState<Preset[]>([]);

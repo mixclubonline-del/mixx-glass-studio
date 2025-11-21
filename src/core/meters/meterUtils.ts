@@ -4,7 +4,7 @@
  * 
  * QUANTUM OPTIMIZATION: Uses fast math functions and lookup tables
  * 
- * @author Prime (Mixx Club)
+ * Created by Ravenis Prime (F.L.O.W)
  */
 
 import { fastLinearToDb, fastRMS, fastPeak } from '../performance/mathCache';

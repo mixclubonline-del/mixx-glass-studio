@@ -183,28 +183,43 @@ export const BloomFloatingHub: React.FC<BloomFloatingHubProps> = ({
     }
     const flow = window.__als.flow || 0;
     const temp = (window.__als.temperature || 'cold') as any;
-    return bloomChargeFromFlow(flow, temp);
+    const charge = bloomChargeFromFlow(flow, temp);
+    return Math.max(0, Math.min(1, charge || 0.5)); // Ensure valid range
   }, [flowContext, isOpen]);
   
-  const bloomScale = useMemo(() => getBloomScale(bloomCharge), [bloomCharge]);
-  const bloomGlowRadius = useMemo(() => getBloomGlow(bloomCharge), [bloomCharge]);
+  const bloomScale = useMemo(() => {
+    const charge = bloomCharge ?? 0.5;
+    return getBloomScale(charge);
+  }, [bloomCharge]);
+  
+  const bloomGlowRadius = useMemo(() => {
+    const charge = bloomCharge ?? 0.5;
+    return getBloomGlow(charge);
+  }, [bloomCharge]);
+  
   const bloomChargeColor = useMemo(() => {
     if (typeof window === 'undefined' || !window.__als) {
       return flowGlowColor;
     }
+    const charge = bloomCharge ?? 0.5;
     const temp = (window.__als.temperature || 'cold') as any;
-    return getBloomColor(bloomCharge, temp);
+    return getBloomColor(charge, temp);
   }, [bloomCharge, flowGlowColor]);
   
   const containerGlow = useMemo(
-    () => ({
-      boxShadow: `0 0 ${bloomGlowRadius}px ${bloomChargeColor}, inset 0 0 ${
-        24 + pulseStrength * 26
-      }px ${hexToRgba(FLOW_ACCENT, 0.28)}, 0 0 ${110 + pulseStrength * 70}px ${flowHaloColor}`,
-      transform: `scale(${bloomScale})`,
-      transition: 'transform 0.3s ease-out, box-shadow 0.3s ease-out',
-    }),
-    [bloomChargeColor, flowHaloColor, pulseStrength, bloomGlowRadius, bloomScale]
+    () => {
+      const scale = bloomScale ?? 1;
+      const glowRadius = bloomGlowRadius ?? 30;
+      const chargeColor = bloomChargeColor ?? flowGlowColor;
+      return {
+        boxShadow: `0 0 ${glowRadius}px ${chargeColor}, inset 0 0 ${
+          24 + pulseStrength * 26
+        }px ${hexToRgba(FLOW_ACCENT, 0.28)}, 0 0 ${110 + pulseStrength * 70}px ${flowHaloColor}`,
+        transform: `scale(${scale})`,
+        transition: 'transform 0.3s ease-out, box-shadow 0.3s ease-out',
+      };
+    },
+    [bloomChargeColor, flowHaloColor, pulseStrength, bloomGlowRadius, bloomScale, flowGlowColor]
   );
 
   const scheduleAnimation = useCallback(() => {

@@ -7,7 +7,7 @@
  * Flow Doctrine: Efficient resource management
  * Reductionist Engineering: Pool pattern for workers
  * 
- * @author Prime (Mixx Club)
+ * Created by Ravenis Prime (F.L.O.W)
  */
 
 import type { AudioWorkerMessage, AudioWorkerResponse } from './audioWorker';
@@ -139,4 +139,8 @@ class AudioWorkerPool {
 
 // Singleton instance
 export const audioWorkerPool = new AudioWorkerPool();
+
+
+
+
 

@@ -7,7 +7,7 @@
  * Flow Doctrine: Cache expensive computations
  * Reductionist Engineering: Compute once, reuse many times
  * 
- * @author Prime (Mixx Club)
+ * Created by Ravenis Prime (F.L.O.W)
  */
 
 interface CachedCurve {
@@ -107,4 +107,8 @@ class SaturationCache {
 
 // Singleton instance
 export const saturationCache = new SaturationCache();
+
+
+
+
 

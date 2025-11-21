@@ -1,0 +1,38 @@
+{
+  "name": "mixx-glass-studio",
+  "version": "1.0.0",
+  "description": "F.L.O.W. - Professional AI-powered DAW for hip-hop production",
+  "type": "web",
+  "workspace": "/Users/mixxclub/GLASS/mixx-glass-studio",
+  "build": {
+    "command": "npm run build",
+    "output": "dist",
+    "base": "/",
+    "watch": false
+  },
+  "serve": {
+    "command": "npm run preview",
+    "port": 4173,
+    "host": "localhost"
+  },
+  "dev": {
+    "command": "npm run dev",
+    "port": 3001,
+    "host": "localhost",
+    "watch": true,
+    "hotReload": true
+  },
+  "environment": {
+    "NODE_ENV": "development"
+  },
+  "dependencies": {
+    "node": "18.x"
+  },
+  "scripts": {
+    "dev": "npm run dev",
+    "build": "npm run build",
+    "preview": "npm run preview",
+    "type-check": "npm run type-check"
+  }
+}
+

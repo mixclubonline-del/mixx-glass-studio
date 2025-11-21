@@ -7,7 +7,7 @@ import { MixxGlueSettings, PluginComponentProps } from '../../types';
 import { PrimeBrainStub } from '../../lib/PrimeBrainStub';
 import { useFlowComponent } from '../../../../core/flow/useFlowComponent';
 
-const SidechainButton: React.FC<{ label: string, value: boolean, onChange: (val: boolean) => void, isConnected: boolean }> = ({ label, value, onChange, isConnected }) => (
+const SidechainButton: React.FC<{ label: string, value: boolean, onChange: (val: boolean) => void, isConnected: boolean; sourceTrackName?: string }> = ({ label, value, onChange, isConnected, sourceTrackName }) => (
     <button
         onClick={() => onChange(!value)}
         disabled={!isConnected}
@@ -113,8 +113,19 @@ export const MixxGlue: React.FC<PluginComponentProps<MixxGlueSettings>> = ({
                     <Knob label="Release" value={release} setValue={(v) => handleValueChange('release', v)} min={10} max={2000} step={10} paramName="release" isLearning={isLearning('release')} onMidiLearn={onMidiLearn} />
                     <Knob label="Mix" value={mix} setValue={(v) => handleValueChange('mix', v)} paramName="mix" isLearning={isLearning('mix')} onMidiLearn={onMidiLearn} />
                     <Knob label="Output" value={output} setValue={(v) => handleValueChange('output', v)} paramName="output" isLearning={isLearning('output')} onMidiLearn={onMidiLearn} />
-                    <div className="w-28 flex justify-center items-end">
-                      <SidechainButton label="SIDECHAIN" value={sidechainActive} onChange={(v) => handleValueChange('sidechainActive', v)} isConnected={isSidechainTarget ?? false} />
+                    <div className="w-28 flex flex-col justify-center items-center gap-1">
+                      <SidechainButton 
+                        label="SIDECHAIN" 
+                        value={sidechainActive} 
+                        onChange={(v) => handleValueChange('sidechainActive', v)} 
+                        isConnected={isSidechainTarget ?? false}
+                        sourceTrackName={isSidechainTarget ? "Connected" : undefined}
+                      />
+                      {isSidechainTarget && (
+                        <span className="text-[10px] text-cyan-300/70 uppercase tracking-wider">
+                          {"Connected"}
+                        </span>
+                      )}
                     </div>
                 </div>
             </div>

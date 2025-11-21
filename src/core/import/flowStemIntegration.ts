@@ -10,6 +10,7 @@ import { classifyAudio, AudioClassification } from './classifier';
 import { ArrangeClip } from '../../hooks/useArrange';
 import { TrackData, MixerSettings } from '../../App';
 import type { StemResult } from './stemEngine';
+import { broadcastFlowSignal } from '../../core/flow';
 
 export interface FlowStemImportResult {
   success: boolean;
@@ -54,8 +55,8 @@ export class FlowStemIntegration {
   private flowSeparator: FlowStemSeparation;
   private progressCallbacks: ((message: string, percent: number) => void)[] = [];
 
-  constructor(audioContext: AudioContext) {
-    this.flowSeparator = new FlowStemSeparation(audioContext);
+  constructor(audioContext: AudioContext, useSpectralAnalysis: boolean = false) {
+    this.flowSeparator = new FlowStemSeparation(audioContext, useSpectralAnalysis);
   }
 
   /**
@@ -84,6 +85,16 @@ export class FlowStemIntegration {
       if (enableStemSeparation) {
         this.notifyProgress('Separating stems using Five Pillars...', 20);
         
+        // Publish Flow signal: stem separation started
+        broadcastFlowSignal('audio-system', 'stem_separation_start', {
+          fileName,
+          duration: audioBuffer.duration,
+          sampleRate: audioBuffer.sampleRate,
+          channels: audioBuffer.numberOfChannels,
+          allowedStems: allowedStemKeys,
+          timestamp: Date.now(),
+        });
+        
         try {
           // Log filename for debugging classification issues
           console.log('[FLOW STEMS] Processing file:', fileName);
@@ -106,6 +117,19 @@ export class FlowStemIntegration {
           result.newClips = stemCreationResult.clips;
           result.newBuffers = stemCreationResult.buffers;
           result.mixerSettings = stemCreationResult.mixerSettings;
+          
+          // Publish Flow signal: stem separation complete
+          broadcastFlowSignal('audio-system', 'stem_separation_complete', {
+            fileName,
+            stemsCreated: result.newTracks.length,
+            stemTracks: result.newTracks.map(t => ({
+              trackId: t.id,
+              trackName: t.trackName,
+              group: t.group,
+              color: t.trackColor,
+            })),
+            timestamp: Date.now(),
+          });
         } catch (stemError) {
           console.warn('[FLOW STEMS] Separation failed, falling back to single track:', stemError);
           const fallbackResult = this.createSingleTrackImport(
@@ -183,15 +207,43 @@ export class FlowStemIntegration {
     const timestamp = Date.now();
     let index = 0;
 
+    console.log('[FLOW STEMS] Creating tracks from stems:', {
+      stemsAvailable: stemEntries.map(([key, buf]) => [key, !!buf, buf?.duration, buf?.length]),
+      allowedStems: allowedStemKeys,
+      allowedSet: allowedSet ? Array.from(allowedSet) : 'all',
+    });
+
     stemEntries.forEach(([stemKey, stemBuffer]) => {
-      if (!stemBuffer) return;
-      
       const lowerKey = stemKey.toLowerCase();
       
-      // Check if this stem is allowed
+      // Check if this stem is allowed first
       if (allowedSet && !allowedSet.has(lowerKey)) {
+        console.log(`[FLOW STEMS] Skipping ${stemKey} - not in allowed set (${Array.from(allowedSet).join(', ')})`);
         return;
       }
+
+      // Check if stem buffer exists
+      if (!stemBuffer) {
+        console.log(`[FLOW STEMS] Skipping ${stemKey} - buffer is null`);
+        return;
+      }
+
+      // Validate buffer has valid data
+      if (stemBuffer.length === 0 || stemBuffer.duration === 0 || !isFinite(stemBuffer.duration)) {
+        console.log(`[FLOW STEMS] Skipping ${stemKey} - buffer is empty or invalid:`, {
+          length: stemBuffer.length,
+          duration: stemBuffer.duration,
+          sampleRate: stemBuffer.sampleRate,
+        });
+        return;
+      }
+      
+      console.log(`[FLOW STEMS] Creating track for ${stemKey}:`, {
+        duration: stemBuffer.duration,
+        length: stemBuffer.length,
+        channels: stemBuffer.numberOfChannels,
+        sampleRate: stemBuffer.sampleRate,
+      });
 
       const color = STEM_COLOR_MAP[lowerKey] ?? 'cyan';
       const group = STEM_GROUP_MAP[lowerKey] ?? 'Instruments';
@@ -229,8 +281,19 @@ export class FlowStemIntegration {
       clips.push(clip);
       buffers[bufferId] = stemBuffer;
       mixerSettings[trackId] = { volume: 0.75, pan: 0, isMuted: false };
+      
+      console.log(`[FLOW STEMS] Created track for ${stemKey}:`, {
+        trackId,
+        bufferId,
+        duration: stemBuffer.duration,
+        channels: stemBuffer.numberOfChannels,
+        sampleRate: stemBuffer.sampleRate,
+      });
+      
       index += 1;
     });
+
+    console.log(`[FLOW STEMS] Created ${tracks.length} tracks, ${clips.length} clips from stems`);
 
     return { tracks, clips, buffers, mixerSettings };
   }

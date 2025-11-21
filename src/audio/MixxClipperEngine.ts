@@ -8,7 +8,8 @@ type MixxClipParams = {
 
 /**
  * MixxClipperEngine
- * what: Soft clipper inspired by MixxClub suite.
+ * what: Soft clipper inspired by F.L.O.W. suite.
+ * Created by Ravenis Prime (F.L.O.W)
  * why: Restore headroom and energy management in the new mixer flow.
  * how: Wrap a waveshaper with bias tilt and wet/dry control. (Reduction / Flow)
  */

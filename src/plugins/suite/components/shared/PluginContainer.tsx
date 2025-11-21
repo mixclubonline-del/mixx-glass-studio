@@ -56,7 +56,7 @@ export const PluginContainer: React.FC<PluginContainerProps> = ({ children, titl
         
         <footer className="relative z-10 flex-shrink-0 p-4 flex justify-center items-center gap-2 text-white/40">
             <MixxClubLogo className="h-6 w-6" />
-            <span className="font-orbitron text-lg">MixxClub</span>
+            <span className="font-orbitron text-lg">F.L.O.W.</span>
         </footer>
     </div>
   );

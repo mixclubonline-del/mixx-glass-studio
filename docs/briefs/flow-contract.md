@@ -1,4 +1,4 @@
-# Flow Contract – MixClub Studio Ecosystem  
+# Flow Contract – F.L.O.W. Ecosystem  
 
 > “No lone soldiers.” Every surface breathes with the others.  
 

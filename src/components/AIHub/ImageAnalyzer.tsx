@@ -1,5 +1,5 @@
 // components/AIHub/ImageAnalyzer.tsx
-import React, { useState, useRef, useCallback } from 'react';
+import React, { useState, useRef, useCallback, useEffect } from 'react';
 import { GoogleGenAI, Modality } from "@google/genai";
 import { getGeminiAI, fileToBase64 } from '../../utils/gemini';
 import LoadingSpinner from '../common/LoadingSpinner';
@@ -20,9 +20,20 @@ const ImageAnalyzer: React.FC<ImageAnalyzerProps> = ({ clips, tracks, selectedTr
   const [analysisResult, setAnalysisResult] = useState<string | null>(null);
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [apiError, setApiError] = useState<string | null>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
 
-  const ai = useRef(getGeminiAI());
+  const ai = useRef<GoogleGenAI | null>(null);
+  useEffect(() => {
+    try {
+      ai.current = getGeminiAI();
+      setApiError(null);
+    } catch (err) {
+      const errorMessage = err instanceof Error ? err.message : 'Failed to initialize Gemini AI';
+      setApiError(errorMessage);
+      console.error('Gemini AI initialization error:', err);
+    }
+  }, []);
 
   const handleImageUpload = useCallback((e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
@@ -42,6 +53,10 @@ const ImageAnalyzer: React.FC<ImageAnalyzerProps> = ({ clips, tracks, selectedTr
     }
     if (!prompt.trim()) {
       setError("Please enter a question or prompt for the image analysis.");
+      return;
+    }
+    if (!ai.current) {
+      setError("AI service is not available. Please configure VITE_GEMINI_API_KEY.");
       return;
     }
 
@@ -129,20 +144,28 @@ const ImageAnalyzer: React.FC<ImageAnalyzerProps> = ({ clips, tracks, selectedTr
             <button
               type="submit"
               className="w-full px-6 py-3 bg-indigo-600 text-white rounded-lg font-semibold hover:bg-indigo-500 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
-              disabled={isLoading || !imageFile || !prompt.trim()}
+              disabled={isLoading || !imageFile || !prompt.trim() || !!apiError || !ai.current}
             >
               Analyze Image
             </button>
           </form>
 
           <div className="flex-grow bg-gray-800/50 rounded-lg p-3 shadow-inner overflow-y-auto custom-scrollbar relative">
-            {isLoading && <LoadingSpinner message="Analyzing image..." color="indigo" />}
-            {error && (
+            {apiError && (
+              <div className="flex flex-col items-center justify-center h-full text-red-400 p-4">
+                <SparklesIcon className="w-16 h-16 text-red-400 mb-4" />
+                <p className="text-lg font-semibold mb-2">AI Hub Configuration Error</p>
+                <p className="text-sm text-center max-w-md">{apiError}</p>
+                <p className="text-xs text-gray-500 mt-4">Please set VITE_GEMINI_API_KEY in your .env file</p>
+              </div>
+            )}
+            {!apiError && isLoading && <LoadingSpinner message="Analyzing image..." color="indigo" />}
+            {!apiError && error && (
               <div className="text-red-400 text-center p-4">{error}</div>
             )}
-            {analysisResult && !isLoading ? (
+            {!apiError && analysisResult && !isLoading ? (
               <p className="text-gray-200 whitespace-pre-wrap">{analysisResult}</p>
-            ) : !isLoading && !error && (
+            ) : !apiError && !isLoading && !error && (
               <div className="flex flex-col items-center justify-center h-full text-gray-500">
                 <SparklesIcon className="w-16 h-16 text-indigo-400 mb-4 animate-pulse" />
                 <p className="text-lg text-center">Analysis results will appear here.</p>

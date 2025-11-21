@@ -7,7 +7,7 @@
  * Flow Doctrine: Single source of truth for meter updates
  * Reductionist Engineering: One RAF loop instead of N loops
  * 
- * @author Prime (Mixx Club)
+ * Created by Ravenis Prime (F.L.O.W)
  */
 
 import { fastLinearToDb, fastRMS, fastPeak } from './mathCache';

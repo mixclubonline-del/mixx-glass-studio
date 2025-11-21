@@ -1,8 +1,8 @@
-# MixClub Online - Artist & Engineer Community Platform
+# F.L.O.W. - Feel Listen Operate Work
 
 🎵 **Where Culture, Sound, and Engineering Intersect** 🎵
 
-MixClub Online is the premier digital community for artists, engineers, and producers in the hip-hop ecosystem. Built on the principles of **Flow**, **Reduction**, and **Mixx Recall**, this platform connects creators across the globe.
+F.L.O.W. is a professional AI-powered DAW built for hip-hop production. Built on the principles of **Flow**, **Reduction**, and **Mixx Recall**, this platform empowers creators to create, mix, and master with next-gen tools.
 
 ## 🌟 **Core Philosophy**
 
@@ -43,7 +43,7 @@ MixClub Online is the premier digital community for artists, engineers, and prod
 - **Styling**: Tailwind CSS + Framer Motion
 - **Backend**: Supabase (Auth, Database, Storage)
 - **State Management**: Zustand
-- **UI Components**: Radix UI + Custom MixClub Design System
+- **UI Components**: Radix UI + Custom F.L.O.W. Design System
 - **Deployment**: Vercel
 
 ## 🎯 **Getting Started**
@@ -106,7 +106,7 @@ src/
 ### **Typography**
 - **Headings**: Inter (clean, modern)
 - **Body**: System fonts (optimal performance)
-- **Accent**: Custom MixClub font for branding
+- **Accent**: Custom F.L.O.W. font for branding
 
 ### **Components**
 - **Glass Morphism**: Translucent cards with backdrop blur
@@ -204,6 +204,6 @@ This project is licensed under the MIT License - see the [LICENSE](LICENSE) file
 
 ---
 
-**Built with ❤️ by the MixClub Team**
+**Created by Ravenis Prime (F.L.O.W)**
 
 *Where Culture, Sound, and Engineering Intersect*

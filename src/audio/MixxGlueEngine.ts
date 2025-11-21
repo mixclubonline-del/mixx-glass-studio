@@ -18,10 +18,14 @@ export class MixxGlueEngine implements IAudioEngine {
   output: GainNode;
   makeup: GainNode;
   audioContext: BaseAudioContext | null;
+  sidechainInput?: GainNode;
 
   private compressor: DynamicsCompressorNode | null = null;
   private dryGain: GainNode | null = null;
   private wetGain: GainNode | null = null;
+  private sidechainSource: AudioNode | null = null;
+  private sidechainAnalyser: AnalyserNode | null = null;
+  private sidechainGain: GainNode | null = null;
 
   private params: MixxGlueParams = {
     threshold: -20,
@@ -46,6 +50,8 @@ export class MixxGlueEngine implements IAudioEngine {
     this.input = ctx.createGain();
     this.output = ctx.createGain();
     this.makeup = ctx.createGain();
+    this.sidechainInput = ctx.createGain();
+    this.sidechainInput.gain.value = 1.0;
 
     this.compressor = ctx.createDynamicsCompressor();
     this.compressor.attack.value = 0.01;
@@ -56,6 +62,10 @@ export class MixxGlueEngine implements IAudioEngine {
 
     this.dryGain = ctx.createGain();
     this.wetGain = ctx.createGain();
+    this.sidechainGain = ctx.createGain();
+    this.sidechainAnalyser = ctx.createAnalyser();
+    this.sidechainAnalyser.fftSize = 256;
+    this.sidechainAnalyser.smoothingTimeConstant = 0.8;
 
     this.input.connect(this.compressor);
     this.compressor.connect(this.wetGain);
@@ -65,6 +75,12 @@ export class MixxGlueEngine implements IAudioEngine {
     this.dryGain.connect(this.makeup);
     this.wetGain.connect(this.makeup);
     this.makeup.connect(this.output);
+
+    // Sidechain routing
+    if (this.sidechainInput) {
+      this.sidechainInput.connect(this.sidechainGain!);
+      this.sidechainGain!.connect(this.sidechainAnalyser!);
+    }
 
     this.updateParameters();
     this.isInitialized = true;
@@ -90,7 +106,38 @@ export class MixxGlueEngine implements IAudioEngine {
     this.makeup?.disconnect();
     this.output?.disconnect();
     this.input?.disconnect();
+    this.sidechainInput?.disconnect();
+    this.sidechainGain?.disconnect();
+    this.sidechainAnalyser?.disconnect();
+    this.sidechainSource = null;
     this.isInitialized = false;
+  }
+
+  setSidechainSource(source: AudioNode | null): void {
+    if (!this.audioContext || !this.sidechainInput) return;
+
+    // Disconnect existing source
+    if (this.sidechainSource) {
+      try {
+        this.sidechainSource.disconnect();
+      } catch (e) {
+        // Already disconnected
+      }
+    }
+
+    this.sidechainSource = source;
+
+    // Connect new source
+    if (source && this.sidechainInput) {
+      source.connect(this.sidechainInput);
+      console.log('[MixxGlue] Sidechain source connected');
+    } else {
+      console.log('[MixxGlue] Sidechain source disconnected');
+    }
+  }
+
+  getSidechainSource(): AudioNode | null {
+    return this.sidechainSource;
   }
 
   setParameter(name: string, value: number): void {

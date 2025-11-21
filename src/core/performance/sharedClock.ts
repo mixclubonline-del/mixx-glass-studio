@@ -7,7 +7,7 @@
  * Flow Doctrine: Single source of truth
  * Reductionist Engineering: One clock, many consumers
  * 
- * @author Prime (Mixx Club)
+ * Created by Ravenis Prime (F.L.O.W)
  */
 
 class SharedClock {
@@ -112,4 +112,8 @@ if (typeof window !== 'undefined') {
   // Start clock on page load (lazy)
   sharedClock.start();
 }
+
+
+
+
 

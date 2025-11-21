@@ -12,10 +12,23 @@ const AudioProcessor: React.FC<{ audioContext: AudioContext | null }> = ({ audio
   const [outputTranscription, setOutputTranscription] = useState('');
   const [transcriptionHistory, setTranscriptionHistory] = useState<string[]>([]);
   const [isLiveLoading, setIsLiveLoading] = useState(false);
+  const [apiError, setApiError] = useState<string | null>(null);
   const mediaStreamRef = useRef<MediaStream | null>(null);
   const scriptProcessorRef = useRef<ScriptProcessorNode | null>(null);
   const sessionPromiseRef = useRef<Promise<any> | null>(null); // To hold the promise of the live session
-  const aiRef = useRef(getGeminiAI());
+  const aiRef = useRef<GoogleGenAI | null>(null);
+
+  // Initialize AI with error handling
+  useEffect(() => {
+    try {
+      aiRef.current = getGeminiAI();
+      setApiError(null);
+    } catch (err) {
+      const errorMessage = err instanceof Error ? err.message : 'Failed to initialize Gemini AI';
+      setApiError(errorMessage);
+      console.error('Gemini AI initialization error:', err);
+    }
+  }, []);
 
   // TTS state
   const [ttsInput, setTtsInput] = useState('');
@@ -67,6 +80,10 @@ const AudioProcessor: React.FC<{ audioContext: AudioContext | null }> = ({ audio
   const startRecording = useCallback(async () => {
     if (!audioContext) {
       alert("AudioContext is not available.");
+      return;
+    }
+    if (!aiRef.current) {
+      setTtsError("AI service is not available. Please configure VITE_GEMINI_API_KEY.");
       return;
     }
     setIsLiveLoading(true);
@@ -207,6 +224,10 @@ const AudioProcessor: React.FC<{ audioContext: AudioContext | null }> = ({ audio
       setTtsError("Please enter text to convert to speech.");
       return;
     }
+    if (!aiRef.current) {
+      setTtsError("AI service is not available. Please configure VITE_GEMINI_API_KEY.");
+      return;
+    }
 
     setIsTtsLoading(true);
     setTtsError(null);
@@ -265,6 +286,15 @@ const AudioProcessor: React.FC<{ audioContext: AudioContext | null }> = ({ audio
     <div className="flex flex-col h-full bg-gray-900/60 rounded-lg p-4 shadow-inner">
       <h3 className="text-xl font-bold text-gray-200 mb-4 border-b border-gray-700 pb-2">Real-time Audio Transcription & TTS</h3>
 
+      {apiError && (
+        <div className="flex flex-col items-center justify-center flex-grow text-red-400 p-4 mb-4">
+          <SparklesIcon className="w-16 h-16 text-red-400 mb-4" />
+          <p className="text-lg font-semibold mb-2">AI Hub Configuration Error</p>
+          <p className="text-sm text-center max-w-md">{apiError}</p>
+          <p className="text-xs text-gray-500 mt-4">Please set VITE_GEMINI_API_KEY in your .env file</p>
+        </div>
+      )}
+
       {/* Audio Transcription Section */}
       <div className="mb-6">
         <h4 className="text-lg font-semibold text-gray-300 mb-2 flex items-center space-x-2">
@@ -276,7 +306,7 @@ const AudioProcessor: React.FC<{ audioContext: AudioContext | null }> = ({ audio
             className={`px-5 py-2 rounded-lg font-semibold transition-colors flex items-center space-x-2
               ${isRecording ? 'bg-red-600 text-white hover:bg-red-500' : 'bg-indigo-600 text-white hover:bg-indigo-500'}
               disabled:opacity-50 disabled:cursor-not-allowed`}
-            disabled={isLiveLoading}
+            disabled={isLiveLoading || !!apiError || !aiRef.current}
           >
             {isLiveLoading ? (
                 <LoadingSpinner size="sm" color="white" message="" />
@@ -333,7 +363,7 @@ const AudioProcessor: React.FC<{ audioContext: AudioContext | null }> = ({ audio
           <button
             type="submit"
             className="px-5 py-2 bg-fuchsia-600 text-white rounded-lg font-semibold hover:bg-fuchsia-500 transition-colors disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center space-x-2"
-            disabled={isTtsLoading || !ttsInput.trim() || !audioContext || !outputNodeRef.current}
+            disabled={isTtsLoading || !ttsInput.trim() || !audioContext || !outputNodeRef.current || !!apiError || !aiRef.current}
           >
             {isTtsLoading ? (
               <LoadingSpinner size="sm" color="white" message="" />

@@ -8,7 +8,7 @@
  * INPUT → Velvet Floor (sub-harmonic foundation)
  *       → Harmonic Lattice (upper warmth)
  *       → Phase Weave (stereo space)
- *       → Velvet Curve (MixClub signature)
+ *       → Velvet Curve (F.L.O.W. signature)
  *       → OUTPUT
  * 
  * All processing < 5ms latency.

@@ -3,7 +3,7 @@
  * 
  * Comprehensive audio system diagnostics to trace signal path issues.
  * 
- * @author Prime (Mixx Club)
+ * Created by Ravenis Prime (F.L.O.W)
  */
 
 import type { VelvetMasterChain } from '../audio/masterChain';

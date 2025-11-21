@@ -1,6 +1,7 @@
 /**
  * AI Preset Suggestion - Generate professional plugin presets
- * Uses Lovable AI (Gemini 2.5 Flash) to suggest optimal plugin settings
+ * Uses AI service to suggest optimal plugin settings
+ * Created by Ravenis Prime (F.L.O.W)
  */
 
 import { createClient } from 'https://esm.sh/@supabase/supabase-js@2';
@@ -65,26 +66,26 @@ Example format:
   "explanation": "Fast attack to catch transients, medium ratio for control, auto-release for musicality"
 }`;
 
-    // Call Lovable AI
-    const aiResponse = await fetch('https://ai.gateway.lovable.dev/v1/chat/completions', {
+    // Call AI service (configure with GEMINI_API_KEY or alternative)
+    const AI_API_KEY = Deno.env.get('GEMINI_API_KEY') || Deno.env.get('AI_API_KEY');
+    if (!AI_API_KEY) {
+      throw new Error('AI_API_KEY or GEMINI_API_KEY not configured');
+    }
+
+    const aiResponse = await fetch(`https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash-exp:generateContent?key=${AI_API_KEY}`, {
       method: 'POST',
       headers: {
-        'Authorization': `Bearer ${Deno.env.get('LOVABLE_API_KEY')}`,
         'Content-Type': 'application/json',
       },
       body: JSON.stringify({
-        model: 'google/gemini-2.5-flash',
-        messages: [
-          {
-            role: 'system',
-            content: 'You are a professional audio engineer. Always respond with valid JSON containing preset_name, parameters, and explanation fields.',
-          },
-          {
-            role: 'user',
-            content: prompt,
-          },
-        ],
-        temperature: 0.7,
+        contents: [{
+          parts: [{
+            text: `You are a professional audio engineer. Always respond with valid JSON containing preset_name, parameters, and explanation fields.\n\n${prompt}`
+          }]
+        }],
+        generationConfig: {
+          temperature: 0.7,
+        },
       }),
     });
 
@@ -93,7 +94,7 @@ Example format:
     }
 
     const aiData = await aiResponse.json();
-    const aiContent = aiData.choices[0].message.content;
+    const aiContent = aiData.candidates?.[0]?.content?.parts?.[0]?.text || '';
 
     // Parse AI response (handle markdown code blocks)
     let presetData;
@@ -116,7 +117,7 @@ Example format:
       JSON.stringify({
         success: true,
         preset: presetData,
-        model: 'google/gemini-2.5-flash',
+        model: 'gemini-2.0-flash-exp',
       }),
       {
         headers: { ...corsHeaders, 'Content-Type': 'application/json' },

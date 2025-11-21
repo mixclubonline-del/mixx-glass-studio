@@ -4,7 +4,7 @@
  * Handles audio input/output device enumeration and selection.
  * Provides device selection UI and manages device switching.
  * 
- * @author Prime (Mixx Club)
+ * Created by Ravenis Prime (F.L.O.W)
  */
 
 export interface AudioDevice {
@@ -23,13 +23,28 @@ export interface AudioDeviceManager {
   getCurrentOutputDevice: () => AudioDevice | null;
 }
 
+// Cache for permission state to avoid repeated getUserMedia calls
+let permissionRequested = false;
+let permissionStream: MediaStream | null = null;
+
 /**
  * Get all available audio input devices
+ * Only requests permission once to avoid device switching issues
  */
 export async function getInputDevices(): Promise<AudioDevice[]> {
   try {
-    // Request permission first (required for device labels)
-    await navigator.mediaDevices.getUserMedia({ audio: true });
+    // Request permission only once (required for device labels)
+    // Reusing the same stream prevents device switching
+    if (!permissionRequested) {
+      try {
+        permissionStream = await navigator.mediaDevices.getUserMedia({ audio: true });
+        permissionRequested = true;
+        console.log('[AUDIO DEVICES] Permission granted, device labels available');
+      } catch (permError) {
+        console.warn('[AUDIO DEVICES] Permission denied, device labels may be generic:', permError);
+        // Continue anyway - we can still enumerate devices, just without labels
+      }
+    }
     
     const devices = await navigator.mediaDevices.enumerateDevices();
     return devices
@@ -43,6 +58,18 @@ export async function getInputDevices(): Promise<AudioDevice[]> {
   } catch (error) {
     console.warn('[AUDIO DEVICES] Failed to enumerate input devices:', error);
     return [];
+  }
+}
+
+/**
+ * Clean up permission stream (call when component unmounts or app closes)
+ */
+export function cleanupAudioPermissions(): void {
+  if (permissionStream) {
+    permissionStream.getTracks().forEach(track => track.stop());
+    permissionStream = null;
+    permissionRequested = false;
+    console.log('[AUDIO DEVICES] Permission stream cleaned up');
   }
 }
 

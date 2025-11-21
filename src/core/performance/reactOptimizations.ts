@@ -9,7 +9,7 @@
  * Flow Doctrine: Minimize unnecessary re-renders
  * Reductionist Engineering: Only render when needed
  * 
- * @author Prime (Mixx Club)
+ * Created by Ravenis Prime (F.L.O.W)
  */
 
 import React, { useMemo, useCallback, useRef, useState, useEffect } from 'react';

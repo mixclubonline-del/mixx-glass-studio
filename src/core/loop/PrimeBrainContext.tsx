@@ -11,6 +11,7 @@ import { computeBehavior, type BehaviorState, type FlowMode } from './behaviorEn
 import type { PrimeBrainStatus } from '../../types/primeBrainStatus';
 import type { QNNIntelligence } from '../../ai/QNNFlowService';
 import { flowComponentRegistry } from '../flow/FlowComponentRegistry';
+import { computeALSDisplayDecision, type DisplayContext, type ALSDisplayDecision } from './alsDisplayDecisionEngine';
 
 interface PrimeBrainContextValue {
   state: BehaviorState;
@@ -82,10 +83,35 @@ export function PrimeBrainProvider({ children, primeBrainStatus }: PrimeBrainPro
     return unsubscribe;
   }, []);
   
+  const lastActionTimeRef = useRef<number>(Date.now());
+  const lastUserActionRef = useRef<boolean>(false);
+
   const updateFromSession = useCallback((signals: SessionSignals) => {
     lastSignalsRef.current = signals;
     const behavior = computeBehavior(signals);
     setState(behavior);
+    
+    // Track user actions for display decisions
+    const hasUserAction = signals.editing || signals.playing || signals.recording || signals.zoomBurst;
+    if (hasUserAction) {
+      lastUserActionRef.current = true;
+      lastActionTimeRef.current = Date.now();
+    }
+    
+    // Compute ALS display decision
+    const displayContext: DisplayContext = {
+      behaviorState: behavior,
+      primeBrainStatus,
+      isPlaying: signals.playing,
+      isRecording: signals.recording || signals.armedTrack,
+      hushActive: signals.hush || false,
+      hasSelection: signals.selection || false,
+      hasClips: signals.clips || false,
+      recentUserAction: lastUserActionRef.current,
+      timeSinceLastAction: Date.now() - lastActionTimeRef.current,
+    };
+    
+    const displayDecision = computeALSDisplayDecision(displayContext);
     
     // Broadcast Prime Brain guidance through Neural Bridge
     if (typeof window !== 'undefined' && (window as any).__flowNeuralBridge) {
@@ -96,8 +122,16 @@ export function PrimeBrainProvider({ children, primeBrainStatus }: PrimeBrainPro
         tension: behavior.tension,
         warnings: behavior.hushWarnings,
       });
+      
+      // Broadcast ALS display decision
+      flowComponentRegistry.broadcast('prime-brain', 'als_display_decision', displayDecision);
     }
-  }, []);
+    
+    // Reset user action flag after processing
+    setTimeout(() => {
+      lastUserActionRef.current = false;
+    }, 100);
+  }, [primeBrainStatus]);
   
   const updateFromALS = useCallback((alsState: { flow: number; pulse: number; tension: number }) => {
     // Feedback loop: ALS state influences Prime Brain

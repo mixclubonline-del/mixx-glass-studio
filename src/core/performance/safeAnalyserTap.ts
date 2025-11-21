@@ -7,7 +7,7 @@
  * Flow Doctrine: Safe audio routing
  * Reductionist Engineering: Proper tap points
  * 
- * @author Prime (Mixx Club)
+ * Created by Ravenis Prime (F.L.O.W)
  */
 
 import { audioGraphGuard } from './audioGraphGuard';

@@ -1,4 +1,4 @@
-// Unified ordering for MixxClub stems
+// Unified ordering for F.L.O.W. stems
 export const STEM_PRIORITY_ORDER = [
   'vocals',
   'drums',

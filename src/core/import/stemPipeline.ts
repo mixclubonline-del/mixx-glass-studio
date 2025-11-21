@@ -98,7 +98,7 @@ export async function runFlowStemPipeline(
     stems.harmonic = sanitizeStem('harmonic', stemResult.music);
   }
 
-  // Normalize, filter and order stems using MixxClub priority
+  // Normalize, filter and order stems using F.L.O.W. priority
   const normalizeStemSet = (input: Record<string, AudioBuffer | null>) => {
     const ordered: Record<string, AudioBuffer> = {} as any;
     (STEM_PRIORITY_ORDER as unknown as string[]).forEach((stem) => {

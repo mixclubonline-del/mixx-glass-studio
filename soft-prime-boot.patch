@@ -1,0 +1,115 @@
+diff --git a/src/flow-kernel/mixxos.ts b/src/flow-kernel/mixxos.ts
+new file mode 100644
+--- /dev/null
++++ b/src/flow-kernel/mixxos.ts
+@@ -0,0 +1,95 @@
++/**
++ * MixxOS Kernel – Soft Prime Boot
++ *
++ * This is the "Prime-only" dev boot profile:
++ * - Full diagnostics & metrics are available for Prime
++ * - Soft boot avoids hard fails; audio can still come up even if some services lag
++ * - All knobs live here so we can flip other modes later (Hard, Quantum, etc.)
++ */
++
++export type PrimeBootMode = 'soft-prime';
++
++export interface PrimeBootConfig {
++  mode: PrimeBootMode;
++  /**
++   * If true, skips the Web Audio warmup sequence.
++   * In Soft Prime Boot we want the *real* audio path,
++   * so this stays false by default.
++   */
++  skipAudioWarmup: boolean;
++
++  /**
++   * Controls whether deep audio diagnostics are actually invoked.
++   * When false, calls are no-op but the wiring stays intact.
++   */
++  enableAudioDiagnostics: boolean;
++
++  /**
++   * Controls mixer audits (routing, gain structure, etc.).
++   */
++  enableMixerAudit: boolean;
++
++  /**
++   * Optional metadata for overlays / future MixxOS UI.
++   */
++  label: string;
++  description: string;
++}
++
++/**
++ * Factory for the Soft Prime Boot profile.
++ * Later we can swap this out for other modes without rewiring FlowRuntime.
++ */
++export function createSoftPrimeBootConfig(): PrimeBootConfig {
++  return {
++    mode: 'soft-prime',
++    // In Prime dev we want the full signal path exercised.
++    skipAudioWarmup: false,
++    // Keep diagnostics & audits ON in Soft Prime Boot:
++    // they're for you, not for end users.
++    enableAudioDiagnostics: true,
++    enableMixerAudit: true,
++    label: 'Soft Prime Boot',
++    description:
++      'Prime-only development boot: full diagnostics and metrics available, with a forgiving startup profile.',
++  };
++}
+diff --git a/src/App.tsx b/src/App.tsx
+--- a/src/App.tsx
++++ b/src/App.tsx
+@@ -13,10 +13,11 @@
+-import { diagnoseAudioSystem, logAudioDiagnostics } from './utils/audioDiagnostics';
+-import { auditMixerConsole, logMixerAudit, type MixerAuditContext } from './utils/mixerAudit';
++import { diagnoseAudioSystem as _diagnoseAudioSystem, logAudioDiagnostics as _logAudioDiagnostics } from './utils/audioDiagnostics';
++import { auditMixerConsole as _auditMixerConsole, logMixerAudit as _logMixerAudit, type MixerAuditContext } from './utils/mixerAudit';
+@@ -56,6 +57,8 @@
+ import { ingestHistoryStore, IngestHistoryEntry } from './state/ingestHistory';
+ import { publishAlsSignal, publishBloomSignal, publishIngestSignal } from './state/flowSignals';
+ import { useFlowContext } from './state/flowContextService';
++import { createSoftPrimeBootConfig, type PrimeBootConfig } from './flow-kernel/mixxos';
++
+@@ -493,7 +496,11 @@ interface FlowRuntimeProps {
+   arrangeFocusToken: number;
+ }
+ 
+ const FlowRuntime: React.FC<FlowRuntimeProps> = ({ arrangeFocusToken }) => {
+-  // --- STATE MANAGEMENT ---
++  // --- MIXXOS / PRIME BOOT ---
++  // Soft Prime Boot: Prime-only dev profile for FlowRuntime.
++  const primeBoot = React.useMemo<PrimeBootConfig>(() => createSoftPrimeBootConfig(), []);
++
++  // --- STATE MANAGEMENT ---
+   const [tracks, setTracks] = useState<TrackData[]>(() => buildInitialTracks());
+@@ -716,9 +723,26 @@
+   const [viewportHeight, setViewportHeight] = useState(() =>
+     typeof window !== "undefined" ? window.innerHeight : 900
+   );
+-  const hushSystem = useMemo(() => getHushSystem(), []);
++  const hushSystem = useMemo(() => getHushSystem(), []);
+   const hushProcessorNodeRef = useRef<ScriptProcessorNode | null>(null);
+-  const skipAudioSetupWarmupRef = useRef<boolean>(import.meta.env.DEV);
++  // In Soft Prime Boot we rely on the MixxOS profile instead of raw env flags.
++  const skipAudioSetupWarmupRef = useRef<boolean>(primeBoot.skipAudioWarmup);
++
++  // --- Soft Prime Boot: gate heavy diagnostics behind config ---
++  const diagnoseAudioSystem: typeof _diagnoseAudioSystem =
++    primeBoot.enableAudioDiagnostics
++      ? _diagnoseAudioSystem
++      : () => {
++          // no-op in this boot profile
++        };
++
++  const logAudioDiagnostics: typeof _logAudioDiagnostics =
++    primeBoot.enableAudioDiagnostics
++      ? _logAudioDiagnostics
++      : () => {};
++
++  const auditMixerConsole: typeof _auditMixerConsole =
++    primeBoot.enableMixerAudit ? _auditMixerConsole : () => {};
++  const logMixerAudit: typeof _logMixerAudit =
++    primeBoot.enableMixerAudit ? _logMixerAudit : () => {};

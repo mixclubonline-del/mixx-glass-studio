@@ -17,8 +17,20 @@ const AIChatbot: React.FC = () => {
   const [isLoading, setIsLoading] = useState(false);
   const [isThinkingMode, setIsThinkingMode] = useState(false); // New state for thinking mode
   const chatContainerRef = useRef<HTMLDivElement>(null);
+  const [apiError, setApiError] = useState<string | null>(null);
 
-  const ai = useRef(getGeminiAI()); // Use ref for Gemini AI instance
+  // Initialize AI with error handling
+  const ai = useRef<GoogleGenAI | null>(null);
+  useEffect(() => {
+    try {
+      ai.current = getGeminiAI();
+      setApiError(null);
+    } catch (error) {
+      const errorMessage = error instanceof Error ? error.message : 'Failed to initialize Gemini AI';
+      setApiError(errorMessage);
+      console.error('Gemini AI initialization error:', error);
+    }
+  }, []);
 
   // Scroll to bottom on new message
   useEffect(() => {
@@ -29,7 +41,7 @@ const AIChatbot: React.FC = () => {
 
   const sendMessage = useCallback(async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!input.trim() || isLoading) return;
+    if (!input.trim() || isLoading || !ai.current) return;
 
     const userMessage: ChatMessage = { role: 'user', text: input };
     setMessages((prev) => [...prev, userMessage]);
@@ -85,7 +97,15 @@ const AIChatbot: React.FC = () => {
   return (
     <div className="flex flex-col h-full bg-gray-900/60 rounded-lg p-4 shadow-inner">
       <div ref={chatContainerRef} className="flex-grow overflow-y-auto custom-scrollbar p-2 mb-4 space-y-4">
-        {messages.length === 0 && (
+        {apiError && (
+          <div className="flex flex-col items-center justify-center h-full text-red-400 p-4">
+            <SparklesIcon className="w-16 h-16 text-red-400 mb-4" />
+            <p className="text-lg font-semibold mb-2">AI Hub Configuration Error</p>
+            <p className="text-sm text-center max-w-md">{apiError}</p>
+            <p className="text-xs text-gray-500 mt-4">Please set VITE_GEMINI_API_KEY in your .env file</p>
+          </div>
+        )}
+        {!apiError && messages.length === 0 && (
           <div className="flex flex-col items-center justify-center h-full text-gray-500">
             <SparklesIcon className="w-16 h-16 text-indigo-400 mb-4 animate-pulse" />
             <p className="text-lg font-semibold">Start a conversation with Gemini!</p>
@@ -134,12 +154,12 @@ const AIChatbot: React.FC = () => {
           onChange={(e) => setInput(e.target.value)}
           placeholder={isThinkingMode ? "Ask a complex question for deep thought..." : "Type your message..."}
           className="flex-grow p-3 rounded-lg bg-gray-800 text-gray-100 border border-gray-700 focus:outline-none focus:ring-2 focus:ring-indigo-500"
-          disabled={isLoading}
+          disabled={isLoading || !!apiError || !ai.current}
         />
         <button
           type="submit"
           className="px-6 py-3 bg-indigo-600 text-white rounded-lg font-semibold hover:bg-indigo-500 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
-          disabled={isLoading || !input.trim()}
+          disabled={isLoading || !input.trim() || !!apiError || !ai.current}
         >
           Send
         </button>

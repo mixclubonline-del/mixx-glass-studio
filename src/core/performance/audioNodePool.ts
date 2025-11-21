@@ -7,7 +7,7 @@
  * Flow Doctrine: Efficient resource management
  * Reductionist Engineering: Reuse instead of recreate
  * 
- * @author Prime (Mixx Club)
+ * Created by Ravenis Prime (F.L.O.W)
  */
 
 interface PooledNode<T extends AudioNode> {
@@ -144,4 +144,8 @@ export const gainNodePool = new AudioNodePool<GainNode>(
     maxIdleTime: 60000,
   }
 );
+
+
+
+
 

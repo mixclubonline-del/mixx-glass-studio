@@ -7,7 +7,7 @@
  * Flow Doctrine: Smooth parameter transitions
  * Reductionist Engineering: Batch parameter updates
  * 
- * @author Prime (Mixx Club)
+ * Created by Ravenis Prime (F.L.O.W)
  */
 
 interface PendingUpdate {

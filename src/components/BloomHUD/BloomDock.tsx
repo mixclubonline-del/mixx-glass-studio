@@ -56,9 +56,9 @@ const MasterWaveform: React.FC<{ waveform: Uint8Array, color: string }> = ({ wav
     );
 };
 
-type DockViewMode = 'arrange' | 'sampler' | 'mixer' | 'piano' | 'edit';
+type DockViewMode = 'arrange' | 'sampler' | 'mixer' | 'piano' | 'edit' | 'hybrid';
 
-const VIEW_ORDER: DockViewMode[] = ['arrange', 'mixer', 'sampler', 'piano', 'edit'];
+const VIEW_ORDER: DockViewMode[] = ['arrange', 'hybrid', 'mixer', 'sampler', 'piano', 'edit'];
 
 const VIEW_META: Record<DockViewMode, { label: string; icon: React.ComponentType<{ className?: string }> }> = {
     arrange: { label: 'Arrange View', icon: ArrangeViewIcon },
@@ -66,6 +66,7 @@ const VIEW_META: Record<DockViewMode, { label: string; icon: React.ComponentType
     mixer: { label: 'Mix View', icon: MixerIcon },
     piano: { label: 'Piano Roll', icon: PianoIcon },
     edit: { label: 'Clip Edit', icon: EditSurfaceIcon },
+    hybrid: { label: 'Hybrid View', icon: MixerIcon },
 };
 
 const ViewToggle: React.FC<{
@@ -672,7 +673,7 @@ export const BloomDock: React.FC<BloomDockProps> = (props) => {
 
     // Flow Dock adaptive cluster selection based on intent mode
     const leftSegments: React.ReactNode[] = [];
-    const isArrangeSurface = viewMode === 'arrange' || viewMode === 'piano' || viewMode === 'edit';
+    const isArrangeSurface = viewMode === 'arrange' || viewMode === 'piano' || viewMode === 'edit' || viewMode === 'hybrid';
     
     // Flow Dock mode-based cluster priority
     if (flowMode === 'record' && isAnyTrackArmed) {
@@ -683,10 +684,13 @@ export const BloomDock: React.FC<BloomDockProps> = (props) => {
         // Edit mode: prioritize editing tools
         if (editingCluster) leftSegments.push(editingCluster);
         if (isArrangeSurface) leftSegments.push(arrangeWorkflowCluster);
-    } else if (flowMode === 'mix' && viewMode === 'mixer') {
-        // Mix mode: prioritize mixer controls
+    } else if ((flowMode === 'mix' && viewMode === 'mixer') || viewMode === 'hybrid') {
+        // Mix mode or hybrid: prioritize mixer controls
         leftSegments.push(mixCluster);
         if (recordCluster) leftSegments.push(recordCluster);
+        if (viewMode === 'hybrid' && isArrangeSurface) {
+            leftSegments.push(arrangeWorkflowCluster);
+        }
     } else if (flowMode === 'perform' && viewMode === 'sampler') {
         // Performance mode: prioritize sampler controls
         leftSegments.push(samplerCluster);

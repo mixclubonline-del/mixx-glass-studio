@@ -9,7 +9,7 @@
  * Flow Doctrine: Protect the mix
  * Reductionist Engineering: Prevent catastrophic failures
  * 
- * @author Prime (Mixx Club)
+ * Created by Ravenis Prime (F.L.O.W)
  */
 
 class AudioGraphGuard {
@@ -92,4 +92,8 @@ class AudioGraphGuard {
 
 // Singleton instance
 export const audioGraphGuard = new AudioGraphGuard();
+
+
+
+
 

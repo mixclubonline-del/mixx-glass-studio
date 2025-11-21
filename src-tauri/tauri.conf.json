@@ -1,7 +1,7 @@
 {
-  "productName": "Mixx Club Studio",
+  "productName": "F.L.O.W.",
   "version": "0.1.0",
-  "identifier": "com.mixxclub.studio",
+  "identifier": "com.flow.studio",
   "build": {
     "beforeDevCommand": "npm run dev",
     "beforeBuildCommand": "npm run build",
@@ -22,7 +22,7 @@
     "windows": [
       {
         "label": "main",
-        "title": "Mixx Club Studio",
+        "title": "F.L.O.W.",
         "width": 1400,
         "height": 900,
         "minWidth": 800,

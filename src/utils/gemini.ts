@@ -1,11 +1,14 @@
 // utils/gemini.ts
 import { GoogleGenAI, Modality } from "@google/genai";
 
-// Initialize the GoogleGenAI client (this assumes process.env.API_KEY is available)
+// Initialize the GoogleGenAI client (uses Vite environment variables)
 export const getGeminiAI = () => {
-    // Creating a new instance each time to ensure the latest API key is used,
-    // though for this app, it's globally available via process.env.API_KEY.
-    return new GoogleGenAI({ apiKey: process.env.API_KEY });
+    const apiKey = import.meta.env.VITE_GEMINI_API_KEY;
+    if (!apiKey) {
+        throw new Error('VITE_GEMINI_API_KEY is not configured. Please set it in your .env file.');
+    }
+    // Creating a new instance each time to ensure the latest API key is used
+    return new GoogleGenAI({ apiKey });
 };
 
 // Helper functions for audio encoding/decoding (as per Gemini Live API Guidelines)

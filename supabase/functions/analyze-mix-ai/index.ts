@@ -1,6 +1,7 @@
 /**
  * AI Mix Analysis - Analyze mix and provide intelligent feedback
- * Uses Lovable AI (Gemini 2.5 Flash) for professional mixing suggestions
+ * Uses AI service for professional mixing suggestions
+ * Created by Ravenis Prime (F.L.O.W)
  */
 
 import { createClient } from 'https://esm.sh/@supabase/supabase-js@2';
@@ -71,25 +72,25 @@ Return JSON format:
   "dynamicRange": ${mixFeatures.dynamicRange}
 }`;
 
-    const aiResponse = await fetch('https://ai.gateway.lovable.dev/v1/chat/completions', {
+    const AI_API_KEY = Deno.env.get('GEMINI_API_KEY') || Deno.env.get('AI_API_KEY');
+    if (!AI_API_KEY) {
+      throw new Error('AI_API_KEY or GEMINI_API_KEY not configured');
+    }
+
+    const aiResponse = await fetch(`https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash-exp:generateContent?key=${AI_API_KEY}`, {
       method: 'POST',
       headers: {
-        'Authorization': `Bearer ${Deno.env.get('LOVABLE_API_KEY')}`,
         'Content-Type': 'application/json',
       },
       body: JSON.stringify({
-        model: 'google/gemini-2.5-flash',
-        messages: [
-          {
-            role: 'system',
-            content: 'You are a professional mixing engineer with expertise in modern music production. Always respond with valid JSON.',
-          },
-          {
-            role: 'user',
-            content: prompt,
-          },
-        ],
-        temperature: 0.7,
+        contents: [{
+          parts: [{
+            text: `You are a professional mixing engineer with expertise in modern music production. Always respond with valid JSON.\n\n${prompt}`
+          }]
+        }],
+        generationConfig: {
+          temperature: 0.7,
+        },
       }),
     });
 
@@ -98,7 +99,7 @@ Return JSON format:
     }
 
     const aiData = await aiResponse.json();
-    const aiContent = aiData.choices[0].message.content;
+    const aiContent = aiData.candidates?.[0]?.content?.parts?.[0]?.text || '';
 
     // Parse AI response
     let analysis;
@@ -116,7 +117,7 @@ Return JSON format:
       JSON.stringify({
         success: true,
         analysis,
-        model: 'google/gemini-2.5-flash',
+        model: 'gemini-2.0-flash-exp',
       }),
       {
         headers: { ...corsHeaders, 'Content-Type': 'application/json' },

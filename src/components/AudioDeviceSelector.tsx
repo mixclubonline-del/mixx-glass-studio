@@ -3,7 +3,7 @@
  * 
  * Allows users to select audio input and output devices.
  * 
- * @author Prime (Mixx Club)
+ * Created by Ravenis Prime (F.L.O.W)
  */
 
 import React, { useState, useEffect } from 'react';
@@ -56,10 +56,26 @@ export const AudioDeviceSelector: React.FC<AudioDeviceSelectorProps> = ({
       }
     };
 
+    // Load devices on mount
     loadDevices();
     
-    // Refresh devices when permission might have changed
-    const interval = setInterval(loadDevices, 5000);
+    // Listen for device changes instead of polling
+    // This prevents aggressive device enumeration that causes switching
+    const handleDeviceChange = () => {
+      console.log('[AUDIO DEVICES] Device change detected, refreshing list...');
+      loadDevices();
+    };
+    
+    if (navigator.mediaDevices && navigator.mediaDevices.addEventListener) {
+      navigator.mediaDevices.addEventListener('devicechange', handleDeviceChange);
+      return () => {
+        navigator.mediaDevices.removeEventListener('devicechange', handleDeviceChange);
+      };
+    }
+    
+    // Fallback: Only poll if devicechange event is not supported (very rare)
+    // Use a much longer interval (30 seconds) to avoid device switching
+    const interval = setInterval(loadDevices, 30000);
     return () => clearInterval(interval);
   }, []);
 

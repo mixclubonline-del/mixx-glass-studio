@@ -10,7 +10,7 @@
  * Flow Doctrine: Visibility into system health
  * Reductionist Engineering: Minimal overhead monitoring
  * 
- * @author Prime (Mixx Club)
+ * Created by Ravenis Prime (F.L.O.W)
  */
 
 interface PerformanceMetrics {

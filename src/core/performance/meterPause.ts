@@ -6,7 +6,7 @@
  * Flow Doctrine: Only process when needed
  * Reductionist Engineering: Pause when idle
  * 
- * @author Prime (Mixx Club)
+ * Created by Ravenis Prime (F.L.O.W)
  */
 
 class MeterPauseManager {
@@ -62,4 +62,8 @@ class MeterPauseManager {
 
 // Singleton instance
 export const meterPauseManager = new MeterPauseManager();
+
+
+
+
 

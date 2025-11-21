@@ -9,7 +9,8 @@ type MixxLimiterParams = {
 /**
  * MixxLimiterEngine
  * what: Hybrid dynamics stage with controllable threshold, release, and makeup gain.
- * why: Bring back the MixxClub suite's master safety net.
+ * why: Bring back the F.L.O.W. suite's master safety net.
+ * Created by Ravenis Prime (F.L.O.W)
  * how: Wrap a DynamicsCompressorNode with make-up gain and normalized param mapping. (Flow / Recall)
  */
 export class MixxLimiterEngine implements IAudioEngine {
@@ -17,8 +18,12 @@ export class MixxLimiterEngine implements IAudioEngine {
   output: GainNode;
   makeup: GainNode;
   audioContext: BaseAudioContext | null;
+  sidechainInput?: GainNode;
   private dyn: DynamicsCompressorNode | null = null;
   private isInitialized = false;
+  private sidechainSource: AudioNode | null = null;
+  private sidechainAnalyser: AnalyserNode | null = null;
+  private sidechainGain: GainNode | null = null;
 
   private params: MixxLimiterParams = {
     threshold: -6,
@@ -40,6 +45,8 @@ export class MixxLimiterEngine implements IAudioEngine {
     this.input = ctx.createGain();
     this.output = ctx.createGain();
     this.makeup = ctx.createGain();
+    this.sidechainInput = ctx.createGain();
+    this.sidechainInput.gain.value = 1.0;
     this.dyn = ctx.createDynamicsCompressor();
 
     this.dyn.threshold.value = this.params.threshold;
@@ -49,9 +56,20 @@ export class MixxLimiterEngine implements IAudioEngine {
     this.dyn.release.value = this.params.release;
     this.makeup.gain.value = this.params.makeupGain;
 
+    this.sidechainGain = ctx.createGain();
+    this.sidechainAnalyser = ctx.createAnalyser();
+    this.sidechainAnalyser.fftSize = 256;
+    this.sidechainAnalyser.smoothingTimeConstant = 0.8;
+
     this.input.connect(this.dyn);
     this.dyn.connect(this.makeup);
     this.makeup.connect(this.output);
+
+    // Sidechain routing
+    if (this.sidechainInput) {
+      this.sidechainInput.connect(this.sidechainGain);
+      this.sidechainGain.connect(this.sidechainAnalyser);
+    }
 
     this.isInitialized = true;
   }
@@ -69,7 +87,38 @@ export class MixxLimiterEngine implements IAudioEngine {
     this.dyn?.disconnect();
     this.makeup.disconnect();
     this.output.disconnect();
+    this.sidechainInput?.disconnect();
+    this.sidechainGain?.disconnect();
+    this.sidechainAnalyser?.disconnect();
+    this.sidechainSource = null;
     this.isInitialized = false;
+  }
+
+  setSidechainSource(source: AudioNode | null): void {
+    if (!this.audioContext || !this.sidechainInput) return;
+
+    // Disconnect existing source
+    if (this.sidechainSource) {
+      try {
+        this.sidechainSource.disconnect();
+      } catch (e) {
+        // Already disconnected
+      }
+    }
+
+    this.sidechainSource = source;
+
+    // Connect new source
+    if (source && this.sidechainInput) {
+      source.connect(this.sidechainInput);
+      console.log('[MixxLimiter] Sidechain source connected');
+    } else {
+      console.log('[MixxLimiter] Sidechain source disconnected');
+    }
+  }
+
+  getSidechainSource(): AudioNode | null {
+    return this.sidechainSource;
   }
 
   setClock(): void {

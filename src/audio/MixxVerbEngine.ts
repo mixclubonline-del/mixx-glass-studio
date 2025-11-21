@@ -9,7 +9,8 @@ type MixxVerbParams = {
 /**
  * MixxVerbEngine
  * what: Convolution reverb with animated impulse generation and pre-delay trim.
- * why: Restore the MixxClub plug-in suite's ambience stage inside Studio Flow.
+ * why: Restore the F.L.O.W. plug-in suite's ambience stage inside Studio Flow.
+ * Created by Ravenis Prime (F.L.O.W)
  * how: Split wet/dry paths, regenerate IR on time changes, expose normalized params. (Flow / Recall)
  */
 export class MixxVerbEngine implements IAudioEngine {

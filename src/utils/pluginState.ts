@@ -1,8 +1,9 @@
 /**
- * Mixx Plugin State Persistence
+ * F.L.O.W. Plugin State Persistence
  * what: Local persistence for plugin favorites and presets.
  * why: Preserve Flow by keeping a user's go-to modules close, and reinforce Mixx Recall.
  * how: Wrap window.localStorage with safe read/write helpers. (Reduction / Flow / Recall)
+ * Created by Ravenis Prime (F.L.O.W)
  */
 export interface PluginPreset {
   id: string;
@@ -15,8 +16,8 @@ export interface PluginPreset {
 type PluginFavoritesStore = Record<string, boolean>;
 type PluginPresetStore = Record<string, PluginPreset[]>;
 
-const FAVORITES_KEY = "mixxclub:plugin-favorites";
-const PRESETS_KEY = "mixxclub:plugin-presets";
+const FAVORITES_KEY = "flow:plugin-favorites";
+const PRESETS_KEY = "flow:plugin-presets";
 
 const safeParse = <T,>(value: string | null, fallback: T): T => {
   if (!value) return fallback;

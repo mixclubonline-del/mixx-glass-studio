@@ -1,8 +1,8 @@
 [package]
-name = "mixx-glass-studio"
+name = "flow"
 version = "0.1.0"
-description = "Mixx Club Studio - Quantum Audio Engine"
-authors = ["Mixx Club"]
+description = "F.L.O.W. - Feel Listen Operate Work"
+authors = ["Ravenis Prime (F.L.O.W)"]
 license = "MIT"
 repository = "https://github.com/mixxclub/mixx-glass-studio"
 edition = "2021"

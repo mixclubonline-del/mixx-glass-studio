@@ -21,6 +21,9 @@ export interface AudioOutputDiagnostics {
     exists: boolean;
     attached: boolean;
     connectedToDestination: boolean;
+    inputGain: number;
+    outputGain: number;
+    activeProfileGain: number;
   };
   tracks: {
     count: number;
@@ -91,12 +94,19 @@ export function diagnoseAudioOutput(
     exists: !!translationMatrix,
     attached: translationMatrix?.attached ?? false,
     connectedToDestination: false, // Can't directly check, but if attached should be connected
+    inputGain: translationMatrix?.inputGain ?? 0,
+    outputGain: translationMatrix?.outputGain ?? 0,
+    activeProfileGain: translationMatrix?.activeProfileGain ?? 0,
   };
   
   if (!translationMatrix) {
     issues.push('❌ TranslationMatrix not initialized');
   } else if (!matrixInfo.attached) {
     issues.push('❌ TranslationMatrix not attached to master output');
+  } else if (matrixInfo.outputGain === 0) {
+    issues.push('⚠️ TranslationMatrix output gain is 0 - no audio will pass through');
+  } else if (matrixInfo.activeProfileGain === 0 && matrixInfo.inputGain === 0) {
+    issues.push('⚠️ TranslationMatrix active profile gain is 0 - check profile activation');
   }
   
   // Check Tracks
@@ -167,7 +177,10 @@ export function logAudioOutputDiagnostics(diagnostics: AudioOutputDiagnostics) {
   console.group('🔍 Audio Output Diagnostics');
   console.log('AudioContext:', diagnostics.audioContext);
   console.log('Master Chain:', diagnostics.masterChain);
-  console.log('Translation Matrix:', diagnostics.translationMatrix);
+  console.log('Translation Matrix:', {
+    ...diagnostics.translationMatrix,
+    gainInfo: `Input: ${diagnostics.translationMatrix.inputGain.toFixed(2)}, Output: ${diagnostics.translationMatrix.outputGain.toFixed(2)}, Profile: ${diagnostics.translationMatrix.activeProfileGain.toFixed(2)}`,
+  });
   console.log('Tracks:', diagnostics.tracks);
   console.log('Clips:', diagnostics.clips);
   console.log('Audio Buffers:', diagnostics.audioBuffers);
@@ -181,4 +194,7 @@ export function logAudioOutputDiagnostics(diagnostics: AudioOutputDiagnostics) {
   }
   console.groupEnd();
 }
+
+
+
 

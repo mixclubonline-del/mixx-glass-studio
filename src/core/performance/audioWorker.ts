@@ -10,7 +10,7 @@
  * Flow Doctrine: Keep main thread free for real-time audio
  * Reductionist Engineering: Parallel processing for heavy tasks
  * 
- * @author Prime (Mixx Club)
+ * Created by Ravenis Prime (F.L.O.W)
  */
 
 export interface AudioWorkerMessage {
@@ -193,4 +193,8 @@ function computeSpectral(samples: Float32Array, sampleRate: number): {
 
   return { centroid, spread, rolloff };
 }
+
+
+
+
 

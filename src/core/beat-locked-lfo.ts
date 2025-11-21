@@ -6,7 +6,7 @@
  * Flow Doctrine: Beat-locked coherence
  * Reductionist Engineering: Shared clock, optimized calculations
  * 
- * @author Prime (Mixx Club)
+ * Created by Ravenis Prime (F.L.O.W)
  */
 
 import { sharedClock } from '../performance/sharedClock';

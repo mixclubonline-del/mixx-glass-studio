@@ -15,7 +15,7 @@
  * - P(t): Power curve - dynamic impact
  * - B(t): Beat-locked breathing for Movement Doctrine
  * 
- * @author Prime (Mixx Club)
+ * Created by Ravenis Prime (F.L.O.W)
  * @version 2.0.0 - Five Pillars Doctrine
  */
 
@@ -59,6 +59,7 @@ export class VelvetCurveEngine implements IAudioEngine {
   public input: AudioNode; // Publicly exposed input node
   public output: AudioNode; // Publicly exposed output node
   public makeup: GainNode; // Makeup gain before final output
+  public sidechainInput?: GainNode; // Optional sidechain input
   
   // Beat-locked timing for Movement Doctrine
   private getBeatPhase: (() => number) | null = null;
@@ -76,6 +77,8 @@ export class VelvetCurveEngine implements IAudioEngine {
   private powerCompressor: DynamicsCompressorNode | null = null;
   private harmonicEnhancer: BiquadFilterNode | null = null;
   private outputGainNode: GainNode | null = null; // Internal output gain before makeup
+  private sidechainSource: AudioNode | null = null;
+  private sidechainAnalyser: AnalyserNode | null = null;
 
 
   constructor(audioContext: BaseAudioContext | null = null, config?: VelvetCurveConfig) {
@@ -240,6 +243,16 @@ export class VelvetCurveEngine implements IAudioEngine {
     this.input = this.audioContext.createGain();
     this.makeup = this.audioContext.createGain();
     this.output = this.audioContext.createGain(); // Final public output
+    this.sidechainInput = this.audioContext.createGain();
+    this.sidechainInput.gain.value = 1.0;
+
+    // Create sidechain analyser for potential modulation
+    this.sidechainAnalyser = this.audioContext.createAnalyser();
+    this.sidechainAnalyser.fftSize = 256;
+    this.sidechainAnalyser.smoothingTimeConstant = 0.8;
+    if (this.sidechainInput) {
+      this.sidechainInput.connect(this.sidechainAnalyser);
+    }
 
     // Create internal audio processing chain
     this.createProcessingChain();
@@ -469,6 +482,39 @@ export class VelvetCurveEngine implements IAudioEngine {
   }
 
   /**
+   * Set the sidechain source for this engine.
+   */
+  setSidechainSource(source: AudioNode | null): void {
+    if (!this.audioContext || !this.sidechainInput) return;
+
+    // Disconnect existing source
+    if (this.sidechainSource) {
+      try {
+        this.sidechainSource.disconnect();
+      } catch (e) {
+        // Already disconnected
+      }
+    }
+
+    this.sidechainSource = source;
+
+    // Connect new source
+    if (source && this.sidechainInput) {
+      source.connect(this.sidechainInput);
+      console.log('[VelvetCurve] Sidechain source connected');
+    } else {
+      console.log('[VelvetCurve] Sidechain source disconnected');
+    }
+  }
+
+  /**
+   * Get the current sidechain source node, if any.
+   */
+  getSidechainSource(): AudioNode | null {
+    return this.sidechainSource;
+  }
+
+  /**
    * Dispose of the engine
    */
   dispose(): void {
@@ -482,6 +528,9 @@ export class VelvetCurveEngine implements IAudioEngine {
     if (this.makeup) this.makeup.disconnect();
     if (this.input) this.input.disconnect(); // Disconnect public input
     if (this.output) this.output.disconnect(); // Disconnect public output
+    if (this.sidechainInput) this.sidechainInput.disconnect();
+    if (this.sidechainAnalyser) this.sidechainAnalyser.disconnect();
+    this.sidechainSource = null;
 
     this.isInitialized = false;
   }

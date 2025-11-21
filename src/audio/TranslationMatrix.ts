@@ -34,7 +34,7 @@ export class TranslationMatrix {
   private dryGain: GainNode;
   private profiles: Record<NonFlatProfileKey, ProfileNode>;
   private active: TranslationProfileKey = 'flat';
-  private attached = false;
+  private _attached = false;
 
   constructor(context: AudioContext) {
     this.context = context;
@@ -55,7 +55,7 @@ export class TranslationMatrix {
   }
 
   attach(source: AudioNode, destination: AudioNode) {
-    if (this.attached) {
+    if (this._attached) {
       try {
         source.disconnect(this.input);
       } catch {
@@ -64,11 +64,19 @@ export class TranslationMatrix {
     }
     source.connect(this.input);
     this.output.connect(destination);
-    this.attached = true;
+    this._attached = true;
+    console.log('[TRANSLATION MATRIX] Attached to destination:', {
+      sourceConnected: true,
+      outputConnected: true,
+      activeProfile: this.active,
+      inputGain: this.input.gain.value,
+      outputGain: this.output.gain.value,
+    });
   }
 
   activate(profileKey: TranslationProfileKey) {
-    if (!this.attached) {
+    if (!this._attached) {
+      console.warn('[TRANSLATION MATRIX] Cannot activate profile - not attached to destination');
       return;
     }
     if (this.active === profileKey) {
@@ -108,6 +116,26 @@ export class TranslationMatrix {
     return CALIBRATION_PRESETS;
   }
 
+  get attached(): boolean {
+    return this._attached;
+  }
+
+  get inputGain(): number {
+    return this.input.gain.value;
+  }
+
+  get outputGain(): number {
+    return this.output.gain.value;
+  }
+
+  get activeProfileGain(): number {
+    if (this.active === 'flat') {
+      return this.dryGain.gain.value;
+    }
+    const profile = this.profiles[this.active as NonFlatProfileKey];
+    return profile ? profile.gain.gain.value : 0;
+  }
+
   dispose() {
     try {
       this.input.disconnect();
@@ -117,7 +145,7 @@ export class TranslationMatrix {
     } catch {
       // ignore
     }
-    this.attached = false;
+    this._attached = false;
   }
 
   private buildProfiles(): Record<NonFlatProfileKey, ProfileNode> {

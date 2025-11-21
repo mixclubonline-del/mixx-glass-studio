@@ -9,7 +9,7 @@
  * Flow Doctrine: Speed through precomputation
  * Reductionist Engineering: Lookup tables instead of calculations
  * 
- * @author Prime (Mixx Club)
+ * Created by Ravenis Prime (F.L.O.W)
  */
 
 // dB lookup table: linear value (0-1) -> dB value
@@ -140,4 +140,8 @@ export function fastPeak(samples: Float32Array): number {
   
   return max;
 }
+
+
+
+
 

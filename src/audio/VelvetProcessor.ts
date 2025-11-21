@@ -57,7 +57,7 @@ export class VelvetProcessor {
       profile.phaseWeave
     );
     
-    // 👑 VELVET CURVE - MixxClub signature
+    // 👑 VELVET CURVE - F.L.O.W. signature
     // NOTE: For offline processing, we use the simple stage version
     // The real-time VelvetCurveEngine is used in the master chain
     const velvetCurve = createVelvetCurveStage(offlineContext);

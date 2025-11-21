@@ -3,7 +3,7 @@
  * 
  * Shows AudioContext state and provides device selection.
  * 
- * @author Prime (Mixx Club)
+ * Created by Ravenis Prime (F.L.O.W)
  */
 
 import React, { useState, useEffect } from 'react';
@@ -61,17 +61,43 @@ export const AudioStatusIndicator: React.FC<AudioStatusIndicatorProps> = ({
   const stateIcon =
     contextState === 'running' ? '🔊' : contextState === 'suspended' ? '⏸️' : '❌';
 
+  const [isResuming, setIsResuming] = useState(false);
+
+  const handleMainButtonClick = async (e: React.MouseEvent) => {
+    // If suspended, resume audio immediately (primary action)
+    if (contextState === 'suspended') {
+      e.stopPropagation();
+      setIsResuming(true);
+      try {
+        await handleResume();
+        // Small delay to show feedback
+        setTimeout(() => setIsResuming(false), 500);
+      } catch (error) {
+        setIsResuming(false);
+        console.error('[AUDIO STATUS] Failed to resume:', error);
+      }
+      // Don't toggle dropdown when resuming
+      return;
+    }
+    // Otherwise, toggle device selector (secondary action)
+    setShowDevices(!showDevices);
+  };
+
   return (
     <div className="relative">
       <button
-        onClick={() => setShowDevices(!showDevices)}
-        className="flex items-center gap-2 rounded-lg border border-white/10 bg-white/5 px-3 py-2 text-sm transition-all hover:bg-white/10"
+        onClick={handleMainButtonClick}
+        className={`flex items-center gap-2 rounded-lg border px-3 py-2 text-sm transition-all ${
+          contextState === 'suspended'
+            ? 'border-yellow-400/40 bg-yellow-400/10 hover:bg-yellow-400/20 cursor-pointer'
+            : 'border-white/10 bg-white/5 hover:bg-white/10'
+        } ${isResuming ? 'animate-pulse' : ''}`}
         title={getAudioContextStateMessage(audioContext)}
       >
         <span className={stateColor}>{stateIcon}</span>
         <span className="text-ink/80 capitalize">{contextState}</span>
         {needsUserInteraction(audioContext) && (
-          <span className="text-[10px] text-yellow-400">Click to enable</span>
+          <span className="text-[10px] text-yellow-400 font-medium">Click to enable</span>
         )}
       </button>
 
