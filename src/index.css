@@ -6,17 +6,17 @@
 
 @layer base {
   :root {
-    /* ========== PRIME PURPLE SCALE ========== */
-    --prime-50: 275 100% 97%;   /* Lightest hint */
-    --prime-100: 275 100% 95%;  /* Very light */
-    --prime-200: 275 100% 85%;  /* Light */
-    --prime-300: 275 100% 75%;  /* Medium light */
-    --prime-400: 275 100% 70%;  /* Medium */
-    --prime-500: 275 100% 65%;  /* Base - Deep purple glow #7d46ff */
-    --prime-600: 275 100% 55%;  /* Medium dark */
-    --prime-700: 275 90% 45%;   /* Dark */
-    --prime-800: 275 80% 35%;   /* Very dark */
-    --prime-900: 275 70% 25%;   /* Darkest */
+    /* ========== PRIME SKY BLUE SCALE ========== */
+    --prime-50: 200 100% 98%;   /* Lightest hint */
+    --prime-100: 200 95% 94%;  /* Very light */
+    --prime-200: 200 90% 88%;  /* Light */
+    --prime-300: 200 85% 78%;  /* Medium light */
+    --prime-400: 200 80% 68%;  /* Medium */
+    --prime-500: 200 85% 60%;  /* Base - Sky blue glow */
+    --prime-600: 200 90% 50%;  /* Medium dark */
+    --prime-700: 200 95% 42%;   /* Dark */
+    --prime-800: 200 98% 32%;   /* Very dark */
+    --prime-900: 200 100% 22%;   /* Darkest */
     
     /* ========== NEON BLUE SCALE ========== */
     --neon-blue-50: 191 100% 97%;
@@ -143,18 +143,18 @@
     --radius: 0.5rem;
     
     /* ========== GLASS EFFECTS ========== */
-    --glass-bg: 240 10% 8% / 0.6;
-    --glass-border: 0 0% 100% / 0.1;
+    --glass-bg: 200 60% 15% / 0.35;
+    --glass-border: 200 70% 60% / 0.25;
     --glass-glow: var(--prime-500) / 0.2;
     
-    --glass-ultra: 240 10% 5% / 0.05;
-    --glass-light: 240 10% 10% / 0.10;
-    --glass-medium: 240 10% 12% / 0.15;
-    --glass-heavy: 240 10% 8% / 0.25;
+    --glass-ultra: 200 40% 20% / 0.08;
+    --glass-light: 200 45% 25% / 0.12;
+    --glass-medium: 200 50% 20% / 0.18;
+    --glass-heavy: 200 55% 18% / 0.28;
     
     /* Glass tints with color */
-    --glass-prime: 275 100% 65% / 0.08;
-    --glass-blue: 191 100% 50% / 0.08;
+    --glass-prime: 200 85% 60% / 0.12;
+    --glass-blue: 191 100% 50% / 0.12;
     --glass-pink: 314 100% 65% / 0.08;
     --glass-green: 140 85% 50% / 0.08;
     --glass-orange: 25 100% 60% / 0.08;
@@ -233,17 +233,17 @@
     /* ========== GRADIENT MESH BACKGROUNDS ========== */
     --gradient-mesh: radial-gradient(
       ellipse at 20% 30%, 
-      hsl(var(--prime-500) / 0.15) 0%, 
+      hsl(200 80% 40% / 0.2) 0%, 
       transparent 50%
     ),
     radial-gradient(
       ellipse at 80% 70%, 
-      hsl(var(--neon-blue-500) / 0.12) 0%, 
+      hsl(190 75% 45% / 0.15) 0%, 
       transparent 50%
     ),
     radial-gradient(
       ellipse at 50% 50%, 
-      hsl(var(--neon-pink-500) / 0.08) 0%, 
+      hsl(210 70% 35% / 0.12) 0%, 
       transparent 70%
     );
     
