@@ -73,7 +73,11 @@ export const UnifiedWorkspaceView: React.FC = () => {
   });
 
   return (
-    <div className="h-screen w-full flex flex-col bg-background overflow-hidden">
+    <div className="h-screen w-full flex flex-col bg-gradient-to-br from-background via-background to-primary/5 overflow-hidden relative">
+      {/* Animated background effect */}
+      <div className="absolute inset-0 bg-gradient-to-br from-primary/5 via-transparent to-accent/5 opacity-30 pointer-events-none" />
+      <div className="absolute inset-0 bg-[radial-gradient(ellipse_at_top_right,_var(--tw-gradient-stops))] from-primary/10 via-transparent to-transparent opacity-20 pointer-events-none" />
+      
       {/* Transport Bar */}
       <MinimalTransportBar onMenuClick={() => setIsBloomMenuOpen(!isBloomMenuOpen)} />
 

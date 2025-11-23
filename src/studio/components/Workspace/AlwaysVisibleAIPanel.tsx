@@ -29,10 +29,13 @@ export const AlwaysVisibleAIPanel: React.FC = () => {
   return (
     <div className="w-[320px] border-l border-border/50 bg-background/60 backdrop-blur-sm flex flex-col">
       {/* Header */}
-      <div className="h-[80px] border-b border-border/30 flex items-center justify-center gap-2 px-4">
-        <Brain className="h-5 w-5 text-primary" />
-        <h3 className="text-lg font-semibold bg-gradient-to-r from-primary to-accent bg-clip-text text-transparent">
-          PrimeBrain AI
+      <div className="h-[80px] border-b border-border/30 flex items-center justify-center gap-3 px-4 bg-gradient-to-b from-primary/10 to-transparent">
+        <div className="relative">
+          <Brain className="h-6 w-6 text-primary animate-pulse" />
+          <div className="absolute inset-0 blur-xl bg-primary/30 animate-pulse" />
+        </div>
+        <h3 className="text-xl font-bold bg-gradient-to-r from-primary via-accent to-primary bg-clip-text text-transparent tracking-tight">
+          PrimeBrain
         </h3>
       </div>
 
@@ -40,12 +43,12 @@ export const AlwaysVisibleAIPanel: React.FC = () => {
       <ScrollArea className="flex-1 p-4">
         <div className="space-y-4">
           {/* AI Status */}
-          <div className="p-3 rounded-lg bg-primary/10 border border-primary/20">
-            <div className="flex items-center gap-2 mb-2">
-              <Sparkles className="h-4 w-4 text-primary" />
-              <span className="text-sm font-medium">Listening...</span>
+          <div className="p-4 rounded-xl bg-gradient-to-br from-primary/15 to-accent/10 border border-primary/30 shadow-lg shadow-primary/10">
+            <div className="flex items-center gap-3 mb-2">
+              <Sparkles className="h-5 w-5 text-primary animate-pulse" />
+              <span className="text-sm font-semibold tracking-wide">Listening...</span>
             </div>
-            <p className="text-xs text-muted-foreground">
+            <p className="text-xs text-muted-foreground leading-relaxed">
               Analyzing your mix in real-time. I'll suggest improvements as you work.
             </p>
           </div>
@@ -58,15 +61,15 @@ export const AlwaysVisibleAIPanel: React.FC = () => {
             {suggestions.map((suggestion, index) => (
               <button
                 key={index}
-                className="w-full p-3 rounded-lg bg-muted/30 hover:bg-muted/50 border border-border/30 transition-colors text-left group"
+                className="w-full p-4 rounded-xl bg-gradient-to-br from-muted/20 to-muted/5 hover:from-muted/30 hover:to-muted/10 border border-border/20 hover:border-primary/30 transition-all duration-300 text-left group shadow-sm hover:shadow-lg hover:shadow-primary/10"
               >
                 <div className="flex items-start gap-3">
-                  <div className="mt-0.5 text-primary group-hover:scale-110 transition-transform">
+                  <div className="mt-1 text-primary group-hover:scale-125 transition-transform duration-300">
                     {suggestion.icon}
                   </div>
                   <div className="flex-1 min-w-0">
-                    <div className="text-sm font-medium mb-1">{suggestion.title}</div>
-                    <div className="text-xs text-muted-foreground">
+                    <div className="text-sm font-semibold mb-1.5 tracking-wide">{suggestion.title}</div>
+                    <div className="text-xs text-muted-foreground leading-relaxed">
                       {suggestion.description}
                     </div>
                   </div>
