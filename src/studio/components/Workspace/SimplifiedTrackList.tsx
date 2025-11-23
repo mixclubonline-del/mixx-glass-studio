@@ -17,8 +17,8 @@ export const SimplifiedTrackList: React.FC = () => {
   return (
     <div className="w-[280px] border-r border-border/50 bg-background/60 backdrop-blur-sm flex flex-col">
       {/* Header */}
-      <div className="h-[80px] border-b border-border/30 flex items-center px-4">
-        <h3 className="text-sm font-medium text-muted-foreground uppercase tracking-wider">
+      <div className="h-[80px] border-b border-border/30 flex items-center px-6 bg-gradient-to-b from-background/80 to-background/40">
+        <h3 className="text-xs font-semibold text-muted-foreground/80 uppercase tracking-[0.2em]">
           Tracks
         </h3>
       </div>
@@ -30,20 +30,23 @@ export const SimplifiedTrackList: React.FC = () => {
             key={track.id}
             onClick={() => selectTrack(track.id)}
             className={cn(
-              "h-[48px] border-b border-border/20 flex items-center gap-3 px-4 cursor-pointer transition-colors",
+              "h-[56px] border-b border-border/10 flex items-center gap-4 px-6 cursor-pointer transition-all duration-200",
               selectedTrackId === track.id
-                ? "bg-primary/10 border-l-2 border-l-primary"
-                : "hover:bg-muted/30"
+                ? "bg-gradient-to-r from-primary/15 to-primary/5 border-l-4 border-l-primary shadow-lg shadow-primary/20"
+                : "hover:bg-gradient-to-r hover:from-muted/20 hover:to-transparent"
             )}
           >
             {/* Color Indicator */}
             <div
-              className="w-3 h-3 rounded-full shrink-0"
-              style={{ backgroundColor: track.color }}
+              className="w-4 h-4 rounded-full shrink-0 shadow-lg ring-2 ring-background/50"
+              style={{ 
+                backgroundColor: track.color,
+                boxShadow: `0 0 12px ${track.color}40`
+              }}
             />
 
             {/* Track Name */}
-            <div className="flex-1 text-sm font-medium truncate">
+            <div className="flex-1 text-base font-medium truncate tracking-wide">
               {track.name}
             </div>
 

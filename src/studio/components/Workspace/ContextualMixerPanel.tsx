@@ -17,10 +17,10 @@ export const ContextualMixerPanel: React.FC = () => {
   if (!isPanelOpen) return null;
 
   return (
-    <div className="fixed bottom-[64px] left-0 right-0 h-[400px] bg-background/95 backdrop-blur-xl border-t border-border/50 shadow-2xl animate-slide-in-bottom z-50">
+    <div className="fixed bottom-[64px] left-0 right-0 h-[400px] bg-gradient-to-b from-background/98 to-background/95 backdrop-blur-2xl border-t border-border/50 shadow-2xl animate-slide-in-bottom z-50">
       {/* Header */}
-      <div className="h-12 border-b border-border/30 flex items-center justify-between px-4">
-        <h3 className="text-sm font-medium">Mixer Console</h3>
+      <div className="h-14 border-b border-border/30 flex items-center justify-between px-6 bg-gradient-to-r from-background/80 to-background/60">
+        <h3 className="text-base font-semibold tracking-wide">Mixer Console</h3>
         <Button
           variant="ghost"
           size="icon"

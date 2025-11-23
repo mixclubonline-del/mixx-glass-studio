@@ -16,9 +16,9 @@ export const MinimalTransportBar: React.FC<MinimalTransportBarProps> = ({ onMenu
   const isPlaying = transport.isPlaying;
 
   return (
-    <div className="h-[60px] border-b border-border/50 flex items-center justify-between px-6 bg-background/95 backdrop-blur-xl">
+    <div className="h-[60px] border-b border-border/50 flex items-center justify-between px-8 bg-gradient-to-r from-background/95 via-background/98 to-background/95 backdrop-blur-xl shadow-lg">
       {/* Left: Menu + Transport */}
-      <div className="flex items-center gap-4">
+      <div className="flex items-center gap-6">
         <Button
           variant="ghost"
           size="icon"
@@ -58,16 +58,17 @@ export const MinimalTransportBar: React.FC<MinimalTransportBarProps> = ({ onMenu
       </div>
 
       {/* Center: Project Name */}
-      <div className="text-lg font-medium text-foreground">
+      <div className="text-xl font-bold tracking-tight bg-gradient-to-r from-foreground via-primary/80 to-foreground bg-clip-text text-transparent">
         Untitled Project
       </div>
 
       {/* Right: BPM + Time Signature */}
-      <div className="flex items-center gap-4">
-        <div className="text-sm text-muted-foreground">
-          <span className="text-primary font-mono text-base">120.0</span> bpm
+      <div className="flex items-center gap-6">
+        <div className="text-sm text-muted-foreground tracking-wide">
+          <span className="text-primary font-mono text-lg font-bold">120.0</span>
+          <span className="ml-1 text-xs">bpm</span>
         </div>
-        <div className="text-sm text-muted-foreground font-mono">
+        <div className="text-base text-muted-foreground font-mono font-semibold tracking-wider">
           4/4
         </div>
       </div>

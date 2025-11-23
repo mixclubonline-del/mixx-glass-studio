@@ -81,25 +81,16 @@ export const EnhancedWaveformRenderer: React.FC<EnhancedWaveformRendererProps> =
       if (sample > maxAmplitude) maxAmplitude = sample;
     }
     
-    // Create amplitude-based gradient
-    const gradient = ctx.createLinearGradient(0, 0, 0, height);
-    if (maxAmplitude > 0.8) {
-      // Hot zone - fire colors
-      gradient.addColorStop(0, 'hsl(0 100% 70% / 0.5)');
-      gradient.addColorStop(0.5, 'hsl(30 100% 60% / 0.5)');
-      gradient.addColorStop(1, 'hsl(45 100% 50% / 0.5)');
-    } else if (maxAmplitude > 0.5) {
-      // Warm zone
-      gradient.addColorStop(0, 'hsl(275 100% 70% / 0.4)');
-      gradient.addColorStop(1, 'hsl(314 100% 65% / 0.4)');
-    } else {
-      // Cool zone - ice colors
-      gradient.addColorStop(0, 'hsl(191 100% 60% / 0.3)');
-      gradient.addColorStop(1, 'hsl(220 100% 70% / 0.3)');
-    }
+    // Create futuristic gradient - blue to purple to pink
+    const waveformGradient = ctx.createLinearGradient(0, 0, width, 0);
+    waveformGradient.addColorStop(0, 'hsl(200, 85%, 65%)');     // Sky blue
+    waveformGradient.addColorStop(0.25, 'hsl(220, 80%, 60%)');  // Electric blue
+    waveformGradient.addColorStop(0.5, 'hsl(265, 75%, 60%)');   // Purple
+    waveformGradient.addColorStop(0.75, 'hsl(290, 80%, 65%)');  // Violet
+    waveformGradient.addColorStop(1, 'hsl(320, 85%, 65%)');     // Pink
     
     ctx.beginPath();
-    ctx.strokeStyle = gradient;
+    ctx.strokeStyle = waveformGradient;
     ctx.lineWidth = 1;
     
     // Draw waveform
@@ -129,11 +120,14 @@ export const EnhancedWaveformRenderer: React.FC<EnhancedWaveformRendererProps> =
     
     ctx.stroke();
     
-    // Add fill for better visibility
-    ctx.fillStyle = gradient;
-    ctx.globalAlpha = 0.2;
+    // Add fill for better visibility with glow effect
+    ctx.shadowBlur = 10;
+    ctx.shadowColor = 'hsl(275, 80%, 60%)';
+    ctx.fillStyle = waveformGradient;
+    ctx.globalAlpha = 0.3;
     ctx.fill();
     ctx.globalAlpha = 1;
+    ctx.shadowBlur = 0;
     
   }, [audioBuffer, width, height, color, bufferOffset, regionDuration, zoom, displayMode]);
   
