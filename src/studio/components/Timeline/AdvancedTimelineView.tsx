@@ -544,10 +544,10 @@ export const AdvancedTimelineView: React.FC<AdvancedTimelineViewProps> = ({
             
             {/* Scrollable timeline content */}
             <div ref={containerRef} onScroll={handleScroll} style={{
-          background: 'linear-gradient(180deg, hsl(240 15% 4% / 0.8) 0%, hsl(240 10% 2% / 0.6) 100%)',
+          background: 'linear-gradient(180deg, hsl(200 40% 12% / 0.4) 0%, hsl(200 35% 8% / 0.5) 100%)',
           backdropFilter: 'blur(20px)',
           minHeight: 0
-        }} className="flex-1 overflow-auto relative bg-gray-400 text-slate-800 rounded-md shadow-md">
+        }} className="flex-1 overflow-auto relative rounded-md shadow-md">
               <div ref={contentRef} className="relative" style={{
             width: `${totalWidth}px`
           }} onClick={handleTimelineClick} onDrop={handleTimelineDrop} onDragOver={handleDragOver}>
