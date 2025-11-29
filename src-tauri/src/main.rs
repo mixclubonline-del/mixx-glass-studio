@@ -3,6 +3,7 @@
 
 mod flow_engine;
 mod quantum;
+mod git;
 
 use flow_engine::FlowEngine;
 use quantum::superposition::{SuperpositionEngine, MeasurementBasis, CollapsePolicy};
@@ -261,7 +262,11 @@ fn main() {
             quantum_create_superposition,
             quantum_measure_superposition,
             quantum_dissolve_superposition,
-            quantum_get_superposition_status
+            quantum_get_superposition_status,
+            // Git Operations
+            git::git_status,
+            git::git_pull,
+            git::git_fetch
         ])
         .run(tauri::generate_context!())
         .expect("error while running tauri application");
