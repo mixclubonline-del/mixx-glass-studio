@@ -28,7 +28,6 @@ import ViewDeck from './components/layout/ViewDeck';
 import OverlayPortal from './components/layout/OverlayPortal';
 import VelvetComplianceHUD from './components/ALS/VelvetComplianceHUD';
 import PrimeBrainInterface from './components/PrimeBrainInterface';
-import { ExternalPluginTestButton } from './components/dev/ExternalPluginTestButton';
 import { useAutoSave } from './hooks/useAutoSave';
 import { AutoSaveStatus } from './components/AutoSaveStatus';
 import { AutoSaveRecovery } from './components/AutoSaveRecovery';
@@ -43,6 +42,8 @@ import { evaluateCapture } from './audio/CaptureSanityCheck';
 import { serializeAudioBuffers, deserializeAudioBuffers } from './audio/serialization';
 import { VelvetProcessor } from './audio/VelvetProcessor';
 import { PluginId, PluginConfig, getPluginRegistry, PlaceholderAudioEngine } from './audio/plugins';
+import { PLUGIN_CATALOG } from './audio/pluginCatalog';
+import type { PluginTier } from './audio/pluginTypes';
 import TimeWarpVisualizer from './components/TimeWarpVisualizer';
 import PluginBrowser from './components/PluginBrowser';
 import { IAudioEngine } from './types/audio-graph';
@@ -1226,14 +1227,13 @@ const FlowRuntime: React.FC<FlowRuntimeProps> = ({ arrangeFocusToken }) => {
   // Flush queued routes the moment master becomes ready
   useEffect(() => {
     if (masterReady && queuedRoutesRef.current.length > 0 && masterNodesRef.current) {
-      console.log('[MIXER] Flushing queued routes:', queuedRoutesRef.current.length);
       const matrix = signalMatrixRef.current;
       if (matrix) {
         queuedRoutesRef.current.forEach(({ trackId, outputNode }) => {
           try {
             const bus = matrix.routeTrack(trackId, tracksRef.current.find(t => t.id === trackId)?.role as any);
             outputNode.connect(bus);
-            console.log('[MIXER] Route flushed for:', trackId);
+            // Route flushed successfully - ALS provides visual feedback
           } catch (err) {
             console.error('[MIXER] Failed to flush route:', trackId, err);
           }
@@ -2429,10 +2429,13 @@ const FlowRuntime: React.FC<FlowRuntimeProps> = ({ arrangeFocusToken }) => {
   }, [setVelvetCurveState]);
   
   const handleTimeWarpChange = useCallback((param: string, value: any) => {
-    // Placeholder for TimeWarp FX parameter changes
-    // In a real scenario, this would interact with a TimeWarpEngine instance
-    // console.log(`TimeWarp: ${param} changed to ${value}`);
-    // For now, update the fxWindows state directly for visualization if it's a fixed instance
+    // Update TimeWarpEngine parameters
+    const engine = engineInstancesRef.current.get('time-warp');
+    if (engine && engine.setParameter) {
+      // Map parameter names if needed
+      const paramName = param === 'warp' ? 'stretch' : param; // Legacy 'warp' -> 'stretch'
+      engine.setParameter(paramName, value);
+    }
   }, []);
 
   const getHarmonicLatticeState = useCallback(() => getHarmonicLattice().getHarmonicLatticeState(), []);
@@ -2515,7 +2518,12 @@ const FlowRuntime: React.FC<FlowRuntimeProps> = ({ arrangeFocusToken }) => {
           onChange = handleMixxFXChange;
           break;
         case 'time-warp':
-          params = { warp: engineInstance.getParameter('warp'), intensity: engineInstance.getParameter('intensity') }; // Assuming TimeWarp has these params
+          params = { 
+            stretch: engineInstance.getParameter('stretch'), 
+            bend: engineInstance.getParameter('bend'),
+            quantize: engineInstance.getParameter('quantize'),
+            slew: engineInstance.getParameter('slew')
+          };
           onChange = handleTimeWarpChange;
           break;
         default:
@@ -2553,24 +2561,42 @@ const FlowRuntime: React.FC<FlowRuntimeProps> = ({ arrangeFocusToken }) => {
       pluginRegistry.length > 0
         ? pluginRegistry
             .filter(plugin => !CORE_PROCESSOR_IDS.includes(plugin.id))
-            .map((plugin) => ({ id: plugin.id, name: plugin.name }))
         : Object.entries(FALLBACK_PLUGIN_NAMES)
             .filter(([id]) => !CORE_PROCESSOR_IDS.includes(id as FxWindowId))
             .map(([id, name]) => ({
                 id: id as FxWindowId,
                 name,
+                description: '',
+                tier: 'core' as const,
+                tierLabel: 'Core Tier',
+                parameters: [],
+                moodResponse: '',
+                lightingProfile: { hueStart: 270, hueEnd: 270, motion: 'glow' as const },
               }));
 
-    return source.map(({ id, name }) => {
-      const palette = paletteFor(id);
+    return source.map((plugin) => {
+      const catalogEntry = PLUGIN_CATALOG[plugin.id as PluginId];
+      const palette = paletteFor(plugin.id);
+      
+      // Use catalog entry if available, otherwise use plugin registry data
+      const baseEntry = catalogEntry || {
+        id: plugin.id,
+        name: plugin.name,
+        description: 'description' in plugin ? plugin.description : '',
+        tier: ('tier' in plugin ? plugin.tier : 'core') as PluginTier,
+        tierLabel: ('tierLabel' in plugin ? plugin.tierLabel : 'Core Tier'),
+        parameters: ('parameters' in plugin ? plugin.parameters : []),
+        moodResponse: ('moodResponse' in plugin ? plugin.moodResponse : ''),
+        lightingProfile: ('lightingProfile' in plugin ? plugin.lightingProfile : { hueStart: 270, hueEnd: 270, motion: 'glow' as const }),
+      };
+
       return {
-        id,
-        name,
+        ...baseEntry,
         colorKey: palette.colorKey,
         base: palette.base,
         glow: palette.glow,
-        isFavorite: !!pluginFavorites[id],
-        isCurated: CURATED_INSERT_IDS.includes(id),
+        isFavorite: !!pluginFavorites[plugin.id],
+        isCurated: CURATED_INSERT_IDS.includes(plugin.id) || baseEntry.curated || false,
       };
     });
   }, [pluginFavorites, pluginPaletteMap, pluginRegistry]);
@@ -3160,6 +3186,7 @@ const FlowRuntime: React.FC<FlowRuntimeProps> = ({ arrangeFocusToken }) => {
     masterBalance,
     isLooping,
     bpm,
+    ppsAPI, // ppsAPI.value changes when pixelsPerSecond changes
     scrollX,
     automationData,
     visibleAutomationLanes,
@@ -3167,136 +3194,16 @@ const FlowRuntime: React.FC<FlowRuntimeProps> = ({ arrangeFocusToken }) => {
     fxBypassState,
     bloomPosition,
     floatingBloomPosition,
+    ingestSnapshot, // Used as fallback when ingestQueueRef is null
     followPlayhead,
+    pianoRollStore, // Piano roll sketches state
+    pianoRollState, // Piano roll zoom/scroll state
     autoSave.isEnabled,
-    autoSave.saveNow,
+    // Note: autoSave.saveNow is stable (useCallback with empty deps) and called directly, not needed in deps
   ]);
 
-  // Keyboard shortcuts for save and recovery
-  useEffect(() => {
-    const isEditableTarget = (event: KeyboardEvent) => {
-      const target = event.target as HTMLElement | null;
-      if (!target) return false;
-      return (
-        target.isContentEditable ||
-        ['INPUT', 'TEXTAREA', 'SELECT'].includes(target.tagName) ||
-        target.getAttribute('role') === 'textbox'
-      );
-    };
-
-    // Cmd/Ctrl+S: Manual save (Mac uses meta, Windows/Linux use ctrl)
-    registerShortcut('save-project-meta', { meta: true, key: 's' }, (event) => {
-      if (isEditableTarget(event)) return;
-      handleSaveProject();
-    });
-    registerShortcut('save-project-ctrl', { ctrl: true, key: 's' }, (event) => {
-      if (isEditableTarget(event)) return;
-      handleSaveProject();
-    });
-
-    // Cmd/Ctrl+Shift+S: Open recovery (Mac uses meta, Windows/Linux use ctrl)
-    registerShortcut('recover-autosave-meta', { meta: true, shift: true, key: 's' }, (event) => {
-      if (isEditableTarget(event)) return;
-      setIsRecoveryOpen(true);
-    });
-    registerShortcut('recover-autosave-ctrl', { ctrl: true, shift: true, key: 's' }, (event) => {
-      if (isEditableTarget(event)) return;
-      setIsRecoveryOpen(true);
-    });
-
-    return () => {
-      unregisterShortcut('save-project-meta');
-      unregisterShortcut('save-project-ctrl');
-      unregisterShortcut('recover-autosave-meta');
-      unregisterShortcut('recover-autosave-ctrl');
-    };
-  }, [handleSaveProject]);
-
-  // Handler to restore from auto-save
-  const handleRestoreFromAutoSave = useCallback((state: PersistedProjectState) => {
-    // Restore tracks
-    if (state.tracks) {
-      setTracks(state.tracks);
-    }
-
-    // Restore clips
-    if (state.clips) {
-      setClips(state.clips);
-    }
-
-    // Restore mixer settings
-    if (state.mixerSettings) {
-      setMixerSettings(state.mixerSettings);
-    }
-
-    // Restore inserts
-    if (state.inserts) {
-      setInserts(state.inserts);
-    }
-
-    // Restore master settings
-    if (state.masterVolume !== undefined) {
-      setMasterVolume(typeof state.masterVolume === 'string' ? parseFloat(state.masterVolume) : state.masterVolume);
-    }
-    if (state.masterBalance !== undefined) {
-      setMasterBalance(typeof state.masterBalance === 'string' ? parseFloat(state.masterBalance) : state.masterBalance);
-    }
-
-    // Restore transport
-    if (state.isLooping !== undefined) {
-      setIsLooping(state.isLooping);
-    }
-    if (state.bpm !== undefined) {
-      setBpm(typeof state.bpm === 'string' ? parseFloat(state.bpm) : state.bpm);
-    }
-
-    // Restore other state
-    if (state.scrollX !== undefined) {
-      setScrollX(typeof state.scrollX === 'string' ? parseFloat(state.scrollX) : state.scrollX);
-    }
-    if (state.automationData) {
-      setAutomationData(state.automationData);
-    }
-    if (state.visibleAutomationLanes) {
-      setVisibleAutomationLanes(state.visibleAutomationLanes);
-    }
-    if (state.musicalContext) {
-      setMusicalContext(state.musicalContext);
-    }
-    if (state.fxBypassState) {
-      setFxBypassState(state.fxBypassState);
-    }
-    if (state.bloomPosition) {
-      setBloomPosition(state.bloomPosition);
-    }
-    if (state.floatingBloomPosition) {
-      setFloatingBloomPosition(state.floatingBloomPosition);
-    }
-    if (state.followPlayhead !== undefined) {
-      setFollowPlayhead(state.followPlayhead);
-    }
-
-    console.log('[AutoSave] Project state restored from auto-save');
-  }, [
-    setTracks,
-    setClips,
-    setMixerSettings,
-    setInserts,
-    setMasterVolume,
-    setMasterBalance,
-    setIsLooping,
-    setBpm,
-    setScrollX,
-    setAutomationData,
-    setVisibleAutomationLanes,
-    setMusicalContext,
-    setFxBypassState,
-    setBloomPosition,
-    setFloatingBloomPosition,
-    setFollowPlayhead,
-  ]);
-
-  const handleSaveProject = async () => {
+  // Define handleSaveProject before keyboard shortcuts to avoid forward reference
+  const handleSaveProject = useCallback(async () => {
       const serializedBuffers = await serializeAudioBuffers(audioBuffers);
       const queueSnapshot = ingestQueueRef.current
         ? ingestQueueRef.current.getSnapshot()
@@ -3340,7 +3247,217 @@ const FlowRuntime: React.FC<FlowRuntimeProps> = ({ arrangeFocusToken }) => {
       a.click();
       URL.revokeObjectURL(url);
       console.log("Project saved.");
-  };
+  }, [
+    audioBuffers,
+    tracks,
+    clips,
+    mixerSettings,
+    inserts,
+    masterVolume,
+    masterBalance,
+    isLooping,
+    bpm,
+    ppsAPI,
+    scrollX,
+    automationData,
+    visibleAutomationLanes,
+    musicalContext,
+    fxBypassState,
+    bloomPosition,
+    floatingBloomPosition,
+    ingestSnapshot,
+    followPlayhead,
+    pianoRollStore,
+    pianoRollState,
+  ]);
+
+  // Use ref to store latest handleSaveProject to avoid re-registering shortcuts
+  const handleSaveProjectRef = useRef(handleSaveProject);
+  useEffect(() => {
+    handleSaveProjectRef.current = handleSaveProject;
+  }, [handleSaveProject]);
+
+  // Keyboard shortcuts for save and recovery
+  useEffect(() => {
+    const isEditableTarget = (event: KeyboardEvent) => {
+      const target = event.target as HTMLElement | null;
+      if (!target) return false;
+      return (
+        target.isContentEditable ||
+        ['INPUT', 'TEXTAREA', 'SELECT'].includes(target.tagName) ||
+        target.getAttribute('role') === 'textbox'
+      );
+    };
+
+    // Unregister any existing handlers first to prevent duplicates
+    unregisterShortcut('save-project-meta');
+    unregisterShortcut('save-project-ctrl');
+    unregisterShortcut('recover-autosave-meta');
+    unregisterShortcut('recover-autosave-ctrl');
+
+    // Cmd/Ctrl+S: Manual save (Mac uses meta, Windows/Linux use ctrl)
+    registerShortcut('save-project-meta', { meta: true, key: 's' }, (event) => {
+      if (isEditableTarget(event)) return;
+      handleSaveProjectRef.current().catch((error) => {
+        console.error('[App] Failed to save project:', error);
+      });
+    });
+    registerShortcut('save-project-ctrl', { ctrl: true, key: 's' }, (event) => {
+      if (isEditableTarget(event)) return;
+      handleSaveProjectRef.current().catch((error) => {
+        console.error('[App] Failed to save project:', error);
+      });
+    });
+
+    // Cmd/Ctrl+Shift+S: Open recovery (Mac uses meta, Windows/Linux use ctrl)
+    registerShortcut('recover-autosave-meta', { meta: true, shift: true, key: 's' }, (event) => {
+      if (isEditableTarget(event)) return;
+      setIsRecoveryOpen(true);
+    });
+    registerShortcut('recover-autosave-ctrl', { ctrl: true, shift: true, key: 's' }, (event) => {
+      if (isEditableTarget(event)) return;
+      setIsRecoveryOpen(true);
+    });
+
+    return () => {
+      unregisterShortcut('save-project-meta');
+      unregisterShortcut('save-project-ctrl');
+      unregisterShortcut('recover-autosave-meta');
+      unregisterShortcut('recover-autosave-ctrl');
+    };
+  }, [setIsRecoveryOpen]); // Only depend on setIsRecoveryOpen (stable setState function)
+
+  // Handler to restore from auto-save
+  const handleRestoreFromAutoSave = useCallback((state: PersistedProjectState) => {
+    // Restore tracks
+    if (state.tracks) {
+      setTracks(state.tracks);
+    }
+
+    // Restore clips
+    if (state.clips) {
+      setClips(state.clips);
+    }
+
+    // Restore mixer settings
+    if (state.mixerSettings) {
+      setMixerSettings(state.mixerSettings);
+    }
+
+    // Restore inserts
+    if (state.inserts) {
+      setInserts(state.inserts);
+    }
+
+    // Restore master settings
+    if (state.masterVolume !== undefined) {
+      setMasterVolume(typeof state.masterVolume === 'string' ? parseFloat(state.masterVolume) : state.masterVolume);
+    }
+    if (state.masterBalance !== undefined) {
+      setMasterBalance(typeof state.masterBalance === 'string' ? parseFloat(state.masterBalance) : state.masterBalance);
+    }
+
+    // Restore transport
+    if (state.isLooping !== undefined) {
+      setIsLooping(state.isLooping);
+    }
+    if (state.bpm !== undefined) {
+      setBpm(typeof state.bpm === 'string' ? parseFloat(state.bpm) : state.bpm);
+    }
+
+    // Restore pixels-per-second zoom level
+    if (state.ppsValue !== undefined) {
+      const ppsValue = typeof state.ppsValue === 'string' ? parseFloat(state.ppsValue) : state.ppsValue;
+      if (!isNaN(ppsValue) && ppsAPI) {
+        ppsAPI.set(ppsValue);
+      }
+    }
+
+    // Restore scroll position
+    if (state.scrollX !== undefined) {
+      setScrollX(typeof state.scrollX === 'string' ? parseFloat(state.scrollX) : state.scrollX);
+    }
+
+    // Restore automation data
+    if (state.automationData) {
+      setAutomationData(state.automationData);
+    }
+    if (state.visibleAutomationLanes) {
+      setVisibleAutomationLanes(state.visibleAutomationLanes);
+    }
+
+    // Restore musical context
+    if (state.musicalContext) {
+      setMusicalContext(state.musicalContext);
+    }
+
+    // Restore FX bypass state
+    if (state.fxBypassState) {
+      setFxBypassState(state.fxBypassState);
+    }
+
+    // Restore bloom positions
+    if (state.bloomPosition) {
+      setBloomPosition(state.bloomPosition);
+    }
+    if (state.floatingBloomPosition) {
+      setFloatingBloomPosition(state.floatingBloomPosition);
+    }
+
+    // Restore follow playhead
+    if (state.followPlayhead !== undefined) {
+      setFollowPlayhead(state.followPlayhead);
+    }
+
+    // Restore ingest queue snapshot
+    if (state.ingestSnapshot) {
+      setIngestSnapshot(state.ingestSnapshot);
+      // Note: IngestQueueManager reads from ingestSnapshot state, so setting state is sufficient
+    }
+
+    // Restore ingest history
+    if (state.ingestHistoryEntries && Array.isArray(state.ingestHistoryEntries)) {
+      ingestHistoryStore.hydrate(state.ingestHistoryEntries);
+    }
+
+    // Restore piano roll sketches
+    if (state.pianoRollSketches) {
+      setPianoRollStore(state.pianoRollSketches);
+    }
+
+    // Restore piano roll zoom/scroll state
+    if (state.pianoRollZoom) {
+      setPianoRollState((prev) => ({
+        ...prev,
+        scrollX: state.pianoRollZoom!.scrollX,
+        zoomX: state.pianoRollZoom!.zoomX,
+        zoomY: state.pianoRollZoom!.zoomY,
+      }));
+    }
+
+    console.log('[AutoSave] Project state restored from auto-save');
+  }, [
+    setTracks,
+    setClips,
+    setMixerSettings,
+    setInserts,
+    setMasterVolume,
+    setMasterBalance,
+    setIsLooping,
+    setBpm,
+    ppsAPI,
+    setScrollX,
+    setAutomationData,
+    setVisibleAutomationLanes,
+    setMusicalContext,
+    setFxBypassState,
+    setBloomPosition,
+    setFloatingBloomPosition,
+    setFollowPlayhead,
+    setIngestSnapshot,
+    setPianoRollStore,
+    setPianoRollState,
+  ]);
 
   const processImportJob = async (
     job: IngestRuntimeJob,
@@ -5383,9 +5500,8 @@ const FlowRuntime: React.FC<FlowRuntimeProps> = ({ arrangeFocusToken }) => {
             await createdCtx.close().catch(() => {});
             return;
         }
-        setPluginRegistry(initialPluginRegistry);
-        console.log("Plugin Registry loaded.");
-
+        // Initialize engines FIRST, then set plugin registry
+        // This ensures engines are ready when routing graph rebuilds
         engineInstancesRef.current.clear();
         for (const plugin of initialPluginRegistry) {
             if (isCancelled) break;
@@ -5406,6 +5522,11 @@ const FlowRuntime: React.FC<FlowRuntimeProps> = ({ arrangeFocusToken }) => {
             return;
         }
         console.log("All plugin engines initialized and stored.");
+        
+        // Set plugin registry AFTER engines are initialized
+        // This ensures routing graph rebuild has engines available
+        setPluginRegistry(initialPluginRegistry);
+        console.log("Plugin Registry loaded.");
 
         setFxBypassState(() => {
           const initialState: Record<FxWindowId, boolean> = {};
@@ -5530,6 +5651,14 @@ const FlowRuntime: React.FC<FlowRuntimeProps> = ({ arrangeFocusToken }) => {
       return (currentTime % beatDuration) / beatDuration;
     };
 
+    // Expose beat phase to window for beat-locked LFO functions
+    if (typeof window !== 'undefined') {
+      (window as any).__mixx_getBeatPhase = getBeatPhase;
+      (window as any).__mixx_bpm = bpm;
+      (window as any).__mixx_currentTime = currentTime;
+      (window as any).__mixx_isPlaying = isPlaying;
+    }
+
     engineInstancesRef.current.forEach(engine => {
         if (engine && typeof engine.setClock === 'function') {
             engine.setClock(getBeatPhase);
@@ -5644,16 +5773,24 @@ const FlowRuntime: React.FC<FlowRuntimeProps> = ({ arrangeFocusToken }) => {
       // Guard: Only run if context state is running or suspended (not closed)
       if (ctx.state === 'closed') return;
       
+      // Guard: Wait for engines to be initialized before building routing graph
+      // Check if we have engines for at least some plugins
+      const hasEngines = engineInstancesRef.current.size > 0;
+      if (!hasEngines) {
+        console.log('[FX] Waiting for engines to initialize before building routing graph...');
+        return;
+      }
+      
       pluginRegistry.forEach(plugin => {
         const id = plugin.id;
+        // Get engine from the instances ref (where they're stored during initialization)
+        const engine = engineInstancesRef.current.get(id);
         if (!fxNodesRef.current[id]) {
           try {
             const input = ctx.createGain(); // Main input for this FX node wrapper
             const bypass = ctx.createGain(); // WET path gain (signal goes through engine)
             const direct = ctx.createGain(); // DRY path gain (signal bypasses engine)
             const output = ctx.createGain(); // Output from this FX node wrapper
-            
-            const engine = engineInstancesRef.current.get(id);
 
             // Connect dry path
             input.connect(direct);
@@ -7477,6 +7614,11 @@ const FlowRuntime: React.FC<FlowRuntimeProps> = ({ arrangeFocusToken }) => {
             selectedTrackId={selectedTrackId}
             viewMode={viewMode}
             onViewModeChange={handleViewModeChange}
+            pluginInventory={pluginInventory}
+            pluginFavorites={pluginFavorites}
+            onAddPlugin={handleAddPlugin}
+            onTogglePluginFavorite={handleTogglePluginFavorite}
+            tracks={tracks}
             onOpenAIHub={() => setIsAIHubOpen(true)}
             currentTime={currentTime}
             canRecallLastImport={ingestHistoryEntries.length > 0}
@@ -8034,9 +8176,6 @@ const FlowRuntime: React.FC<FlowRuntimeProps> = ({ arrangeFocusToken }) => {
           onWarpAnchors={handleApplyWarpAnchors}
           onExportMidi={handleExportPianoRollMidi}
         />
-        
-        {/* External Plugin Test Button (Dev Only) */}
-        <ExternalPluginTestButton audioContext={audioContextRef.current} />
         
         {/* Auto-Save Status Indicator */}
         <AutoSaveStatus getProjectState={getProjectState} />
