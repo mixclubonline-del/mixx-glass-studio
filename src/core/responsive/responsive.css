@@ -11,6 +11,17 @@
   --flow-breakpoint: xl;
   --flow-dpr: 1;
   
+  /* Adaptive layout dimensions (updated by useAdaptiveLayout) */
+  --adaptive-header-height: 60px;
+  --adaptive-dock-height: 84px;
+  --adaptive-bloom-width: 380px;
+  --adaptive-bloom-height: 300px;
+  --adaptive-track-header-width: 200px;
+  --adaptive-timeline-padding: 16px;
+  --adaptive-mode: standard;
+  --adaptive-platform: desktop;
+  --adaptive-orientation: landscape;
+  
   /* Spacing scale (scaled based on viewport) */
   --flow-spacing-xs: 0.125rem;
   --flow-spacing-sm: 0.25rem;

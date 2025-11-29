@@ -195,7 +195,13 @@ export const FileInput = forwardRef<FileInputHandle, FileInputProps>(({
       const audioContext = new AudioContext();
       
       // FLOW GOLDEN PATH: Run the complete pipeline
-      const result = await runFlowStemPipeline(file, audioContext);
+      // Set up snapshot export callback if exporter is available
+      let snapshotCallback: ((snapshot: any) => void) | undefined;
+      if (typeof window !== 'undefined' && (window as any).__mixx_stem_separation_exporter?.enabled) {
+        snapshotCallback = (window as any).__mixx_stem_separation_exporter.exportSnapshot;
+      }
+      
+      const result = await runFlowStemPipeline(file, audioContext, snapshotCallback);
       
       if ((import.meta as any).env?.DEV) {
         console.log('[FLOW IMPORT] Pipeline complete:', {

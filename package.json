@@ -1,7 +1,7 @@
 {
-  "name": "mixclub-online",
-  "version": "1.0.0",
-  "description": "MixClub Online - Artist & Engineer Community Platform",
+  "name": "mixx-glass-studio",
+  "version": "0.1.0",
+  "private": true,
   "type": "module",
   "scripts": {
     "dev": "vite",
@@ -11,7 +11,10 @@
     "type-check": "tsc --noEmit",
     "test": "vitest run",
     "tauri:dev": "tauri dev",
-    "tauri:build": "tauri build"
+    "tauri:build": "tauri build",
+    "test:stem-system": "npx ts-node scripts/test-revolutionary-stem-system.ts",
+    "setup:data-collection": "npx ts-node scripts/setup-data-collection.ts",
+    "test:endpoint": "node scripts/test-endpoint-simulator.js"
   },
   "dependencies": {
     "@google/genai": "^1.28.0",

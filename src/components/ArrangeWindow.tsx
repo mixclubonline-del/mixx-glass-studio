@@ -6,6 +6,7 @@ import { ArrangeClip } from "./ArrangeClip";
 import { quantizeSeconds, secondsPerBar, secondsPerBeat } from "../utils/time";
 import { TrackData, MixerSettings, AutomationPoint, TrackAnalysisData, FxWindowId } from "../App";
 import ArrangeTrackHeader from "./ArrangeTrackHeader";
+import ProfessionalTrackHeader from "./ProfessionalTrackHeader";
 import AutomationLane from "./AutomationLane";
 import { deriveTrackALSFeedback, TrackALSFeedback, hexToRgba } from "../utils/ALS";
 import { findNearestZeroCrossing } from "../utils/zeroCrossing";
@@ -48,6 +49,7 @@ import { FitSelectionIcon } from "./flowdock/glyphs/FitSelectionIcon";
 import { PlusIcon, MinusIcon } from "./icons";
 import { getStemHeatColor, getStemHeatState, computeStemEnergy } from "../core/als/stemHeat";
 import "../components/lane/StemLaneHeat.css";
+import StemDebugHUD from "./ALS/StemDebugHUD";
 
 type DragKind = "move" | "resize-left" | "resize-right" | "fade-in" | "fade-out" | "gain";
 
@@ -139,6 +141,10 @@ type Props = {
   onToggleMute?: (trackId: string) => void;
   onToggleSolo?: (trackId: string) => void;
   onToggleArm?: (trackId: string) => void;
+  onAddPlugin?: (trackId: string, pluginId: FxWindowId) => void;
+  onToggleTrackCollapse?: (trackId: string) => void;
+  inserts?: Record<string, FxWindowId[]>;
+  trackSendLevels?: Record<string, Record<string, number>>;
 };
 
 const BASE_CLIP_LANE_H = DEFAULT_TRACK_LANE_HEIGHT;
@@ -272,6 +278,10 @@ export const ArrangeWindow: React.FC<Props> = (props) => {
     onToggleMute,
     onToggleSolo,
     onToggleArm,
+    onToggleTrackCollapse,
+    inserts = {},
+    trackSendLevels = {},
+    onAddPlugin = undefined,
   } = props;
 
   const flowContext = useFlowContext();
@@ -287,6 +297,7 @@ export const ArrangeWindow: React.FC<Props> = (props) => {
       clipIds: clips.map(c => c.id),
       clipTrackIds: clips.map(c => c.trackId),
     });
+    console.log('[ARRANGE] Hydration Safe Layer Active');
   }, [tracks, clips]);
   
   const projectDuration = useMemo(() => clips.reduce((max, clip) => Math.max(max, clip.start + clip.duration), 60), [clips]);
@@ -1505,6 +1516,10 @@ export const ArrangeWindow: React.FC<Props> = (props) => {
       onMouseUp={onMouseUp}
       onMouseLeave={onMouseUp}
     >
+      {/* ALS Stem Debug HUD */}
+      <div className="absolute left-0 right-0 top-0 z-30" style={{ paddingLeft: trackHeaderWidth + 24, paddingRight: 24 }}>
+        <StemDebugHUD />
+      </div>
       <div
         className="absolute top-3 z-40 flex flex-wrap items-center gap-3 pointer-events-none"
         style={{ left: trackHeaderWidth + 24 }}
@@ -1646,13 +1661,40 @@ export const ArrangeWindow: React.FC<Props> = (props) => {
           style={{ background: 'linear-gradient(to left, rgba(56,189,248,0.4), rgba(15,23,42,0.05))' }}
         />
         <div className="h-[24px] border-b border-glass-border"></div>
-        <div className="h-[calc(100%_-_24px)] overflow-y-auto">
-          {laneLayouts.map(({ track, laneHeight, clipHeight, isAutomationVisible, uiState }) => {
+        <div 
+          className="relative overflow-hidden"
+          style={{ 
+            height: height - RULER_H - TIMELINE_NAVIGATOR_H - 14,
+            marginTop: 14
+          }}
+        >
+          {laneLayouts.map(({ track, top, laneHeight, clipHeight, isAutomationVisible, uiState }) => {
             const trackFeedback = alsFeedbackByTrack.get(track.id);
             const alsIntensity = trackFeedback?.intensity ?? 0;
             return (
-            <div key={track.id} style={{ height: laneHeight }} className="transition-[height] duration-300 ease-out relative">
-              <ArrangeTrackHeader
+            <div 
+              key={track.id} 
+              className="absolute left-0 right-0 transition-[height,top] duration-300 ease-out"
+              style={{ 
+                top,
+                height: laneHeight,
+              }}
+              onDragOver={(e) => {
+                e.preventDefault();
+                e.stopPropagation();
+                e.dataTransfer.dropEffect = "copy";
+              }}
+              onDrop={(e) => {
+                e.preventDefault();
+                e.stopPropagation();
+                const pluginId = e.dataTransfer.getData("application/plugin-id") || 
+                                 e.dataTransfer.getData("text/plain");
+                if (pluginId && onAddPlugin) {
+                  onAddPlugin(track.id, pluginId as FxWindowId);
+                }
+              }}
+            >
+              <ProfessionalTrackHeader
                 track={track}
                 uiState={uiState}
                 selectedTrackId={selectedTrackId}
@@ -1661,10 +1703,15 @@ export const ArrangeWindow: React.FC<Props> = (props) => {
                 isArmed={armedTracks.has(track.id)}
                 isSoloed={soloedTracks.has(track.id)}
                 alsIntensity={alsIntensity}
+                trackType={track.role === 'twoTrack' ? 'two-track' : track.role === 'hushRecord' ? 'hush-record' : 'audio'}
                 onInvokeBloom={onInvokeTrackBloom}
                 onToggleMute={onToggleMute}
                 onToggleSolo={onToggleSolo}
                 onToggleArm={onToggleArm}
+                onToggleCollapse={onToggleTrackCollapse}
+                insertCount={inserts[track.id]?.length ?? 0}
+                sendCount={trackSendLevels[track.id] ? Object.values(trackSendLevels[track.id]).filter(level => level > 0.01).length : 0}
+                onAddPlugin={onAddPlugin}
               />
               {!uiState.collapsed && (
                 <div

@@ -6,5 +6,7 @@
 
 export * from './scaleSystem';
 export { initResponsiveScale } from './scaleSystem';
-export type { } from './scaleSystem';
+export * from './platformDetection';
+export * from './useAdaptiveLayout';
+export * from './adaptiveUtils';
 

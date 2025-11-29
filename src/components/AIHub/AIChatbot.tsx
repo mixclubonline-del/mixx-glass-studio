@@ -38,9 +38,36 @@ const AIChatbot: React.FC = () => {
 
     try {
       const model = isThinkingMode ? 'gemini-2.5-pro' : 'gemini-2.5-flash';
+      
+      // System instruction explaining MixClub Studio's workflow
+      // Prepend to first message or include in conversation history
+      const systemInstruction = `You are an AI assistant for MixClub Studio, a professional digital audio workstation (DAW) with advanced stem separation capabilities.
+
+CRITICAL WORKFLOW UNDERSTANDING:
+- When audio files (MP3, WAV, M4A, or other formats) are imported into MixClub Studio, they are AUTOMATICALLY stem-separated into individual stems using AI-powered separation algorithms.
+- This is NOT post-processing or manual splitting—stem separation happens immediately upon import as part of the Flow Stem Pipeline.
+- The separated stems include: vocals, drums, bass, harmonic (instrumental), perc (percussion), and sub (sub-bass/808s).
+- Each separated stem is automatically placed on its own dedicated track on the timeline, aligned at the start position (time 0).
+- The stem tracks are organized in a deterministic order: vocals, drums, bass, harmonic, perc, sub.
+- Each stem track has its own color coding and belongs to appropriate groups (Vocals, Drums, Instruments).
+
+When users ask about importing audio, splitting tracks, or working with stems, you should explain that:
+1. Import automatically triggers stem separation—no separate step needed
+2. All stems are placed on individual tracks automatically
+3. Users can then edit, mix, and process each stem independently
+4. The original file format doesn't matter—MP3, WAV, etc. all go through the same stem separation process
+
+Be helpful, concise, and accurate about the studio's automatic stem separation workflow.`;
+
+      // Prepend system instruction to first message only for context
+      const isFirstMessage = messages.length === 0;
+      const userContent = isFirstMessage 
+        ? `${systemInstruction}\n\nUser question: ${input}`
+        : input;
+
       const config: any = {
         model: model,
-        contents: input,
+        contents: userContent,
       };
 
       if (isThinkingMode) {

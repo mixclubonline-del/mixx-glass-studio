@@ -13,6 +13,10 @@ import type {
 import FlowChannelStrip from './FlowChannelStrip';
 import FlowMasterStrip from './FlowMasterStrip';
 import FlowBusStrip from './FlowBusStrip';
+import FlowConsoleHeader, { type ConsoleViewMode } from './FlowConsoleHeader';
+import FlowConsoleMatrixView from './FlowConsoleMatrixView';
+import FlowConsoleAnalyzerView, { type AnalyzerType } from './FlowConsoleAnalyzerView';
+import FlowConsoleCompactView from './FlowConsoleCompactView';
 import {
   MIXER_CONSOLE_MAX_WIDTH,
   MIXER_CONSOLE_MIN_WIDTH,
@@ -171,6 +175,8 @@ const FlowConsole: React.FC<FlowConsoleProps> = ({
 }) => {
   const [stageHeights, setStageHeights] = useState(computeStageHeights);
   const scrollContainerRef = useRef<HTMLDivElement>(null);
+  const [consoleViewMode, setConsoleViewMode] = useState<ConsoleViewMode>('strips');
+  const [selectedAnalyzer, setSelectedAnalyzer] = useState<AnalyzerType | null>(null);
 
   useEffect(() => {
     const handleResize = () => setStageHeights(computeStageHeights());
@@ -232,25 +238,64 @@ const FlowConsole: React.FC<FlowConsoleProps> = ({
   const viewportWidth = typeof window !== 'undefined' ? window.innerWidth : consoleWidth;
   const stageWidth = Math.max(consoleWidth, viewportWidth - 96);
 
-  return (
-    <div className="flex h-full w-full flex-col gap-6 px-4 py-6 lg:flex-row">
-      <div className="relative flex-1 overflow-hidden rounded-[32px] border border-white/8 bg-[rgba(8,12,24,0.82)] shadow-[0_32px_90px_rgba(4,12,26,0.6)]">
-        <div className="pointer-events-none absolute inset-0">
-          <div className="absolute inset-x-0 top-0 h-32 bg-gradient-to-b from-[rgba(21,45,88,0.9)] via-transparent to-transparent" />
-          <div className="absolute inset-y-0 left-0 w-20 bg-gradient-to-r from-[rgba(12,28,58,0.75)] via-[rgba(12,28,58,0.2)] to-transparent" />
-          <div className="absolute inset-y-0 right-0 w-20 bg-gradient-to-l from-[rgba(12,28,58,0.75)] via-[rgba(12,28,58,0.2)] to-transparent" />
-          <div className="absolute left-1/2 top-8 h-1 w-2/3 -translate-x-1/2 rounded-full bg-gradient-to-r from-[rgba(64,120,210,0.45)] via-[rgba(126,162,235,0.35)] to-[rgba(64,120,210,0.45)] blur-sm" />
-        </div>
-        <div 
-          ref={scrollContainerRef}
-          className="relative h-full w-full overflow-x-auto"
-          onWheel={handleWheel}
-        >
-          <div
-            className="relative mx-auto flex h-full flex-col"
-            style={{ width: stageWidth, height: stageHeights.stageHeight }}
+  const renderView = () => {
+    switch (consoleViewMode) {
+      case 'matrix':
+        return (
+          <FlowConsoleMatrixView
+            tracks={tracks}
+            buses={buses.map((bus) => ({
+              id: bus.id,
+              name: bus.name,
+              color: bus.alsColor,
+              glow: bus.alsGlow,
+            }))}
+            trackSendLevels={trackSendLevels ?? {}}
+            trackFeedbackMap={trackFeedbackMap}
+            onSendLevelChange={onSendLevelChange}
+            selectedBusId={selectedBusId}
+            onSelectBus={onSelectBus}
+          />
+        );
+
+      case 'analyzer':
+        return (
+          <FlowConsoleAnalyzerView
+            analyzerType={selectedAnalyzer ?? 'spectrum'}
+            tracks={tracks}
+            trackFeedbackMap={trackFeedbackMap}
+            masterAnalysis={masterAnalysis}
+          />
+        );
+
+      case 'compact':
+        return (
+          <FlowConsoleCompactView
+            tracks={tracks}
+            mixerSettings={mixerSettings}
+            trackAnalysis={trackAnalysis}
+            trackFeedbackMap={trackFeedbackMap}
+            selectedTrackId={selectedTrackId}
+            onSelectTrack={onSelectTrack}
+            onMixerChange={onMixerChange}
+            soloedTracks={soloedTracks}
+            onToggleSolo={onToggleSolo}
+          />
+        );
+
+      case 'strips':
+      default:
+        return (
+          <div 
+            ref={scrollContainerRef}
+            className="relative h-full w-full overflow-x-auto"
+            onWheel={handleWheel}
           >
-            <div className="flex items-end justify_center gap-x-3">
+            <div
+              className="relative mx-auto flex h-full flex-col"
+              style={{ width: stageWidth, height: stageHeights.stageHeight }}
+            >
+              <div className="flex items-end justify_center gap-x-3">
               {tracks.map((track) => {
                 const analysis = trackAnalysis[track.id] ?? { level: 0, transient: false };
                 const settings =
@@ -324,6 +369,9 @@ const FlowConsole: React.FC<FlowConsoleProps> = ({
                     actionMessage={stripActionMessage}
                     selectedBusId={selectedBusId}
                     onToggleAutomationLaneWithParam={onToggleAutomationLaneWithParam}
+                    isPlaying={isPlaying}
+                    currentTime={currentTime}
+                    followPlayhead={followPlayhead}
                   />
                 );
               })}
@@ -344,18 +392,56 @@ const FlowConsole: React.FC<FlowConsoleProps> = ({
                 />
               ))}
               <div className="w-8 flex-shrink-0" />
-              <FlowMasterStrip
-                volume={masterVolume}
-                onVolumeChange={onMasterVolumeChange}
-                balance={masterBalance}
-                onBalanceChange={onBalanceChange}
-                analysis={masterAnalysis}
-                stageHeight={stageHeights.stageHeight}
-                meterHeight={stageHeights.masterMeterHeight || stageHeights.meterHeight}
-                faderHeight={stageHeights.faderHeight}
-              />
+                <FlowMasterStrip
+                  volume={masterVolume}
+                  onVolumeChange={onMasterVolumeChange}
+                  balance={masterBalance}
+                  onBalanceChange={onBalanceChange}
+                  analysis={masterAnalysis}
+                  stageHeight={stageHeights.stageHeight}
+                  meterHeight={stageHeights.masterMeterHeight || stageHeights.meterHeight}
+                  faderHeight={stageHeights.faderHeight}
+                />
+              </div>
             </div>
           </div>
+        );
+    }
+  };
+
+  return (
+    <div className="flex h-full w-full flex-col gap-6 px-4 py-6 lg:flex-row">
+      <div className="relative flex-1 overflow-hidden rounded-[32px] border border-white/8 bg-[rgba(8,12,24,0.82)] shadow-[0_32px_90px_rgba(4,12,26,0.6)]">
+        <div className="pointer-events-none absolute inset-0">
+          <div className="absolute inset-x-0 top-0 h-32 bg-gradient-to-b from-[rgba(21,45,88,0.9)] via-transparent to-transparent" />
+          <div className="absolute inset-y-0 left-0 w-20 bg-gradient-to-r from-[rgba(12,28,58,0.75)] via-[rgba(12,28,58,0.2)] to-transparent" />
+          <div className="absolute inset-y-0 right-0 w-20 bg-gradient-to-l from-[rgba(12,28,58,0.75)] via-[rgba(12,28,58,0.2)] to-transparent" />
+          <div className="absolute left-1/2 top-8 h-1 w-2/3 -translate-x-1/2 rounded-full bg-gradient-to-r from-[rgba(64,120,210,0.45)] via-[rgba(126,162,235,0.35)] to-[rgba(64,120,210,0.45)] blur-sm" />
+        </div>
+        
+        {/* Console Header */}
+        <FlowConsoleHeader
+          viewMode={consoleViewMode}
+          onViewModeChange={setConsoleViewMode}
+          trackCount={trackCount}
+          busCount={busCount}
+          masterFeedback={{
+            temperature: masterFeedback.temperature,
+            flow: masterFeedback.flow,
+            pulse: masterFeedback.pulse,
+          }}
+          selectedAnalyzer={selectedAnalyzer}
+          onAnalyzerChange={(analyzer) => {
+            setSelectedAnalyzer(analyzer);
+            if (analyzer && consoleViewMode !== 'analyzer') {
+              setConsoleViewMode('analyzer');
+            }
+          }}
+        />
+
+        {/* View Content */}
+        <div className="relative h-[calc(100%-80px)] w-full">
+          {renderView()}
         </div>
       </div>
     </div>

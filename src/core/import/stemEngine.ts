@@ -139,32 +139,63 @@ export async function stemSplitEngine(
     return result;
   }
   
-  // 2TRACK MODE
+  // 2TRACK MODE - Use AI model for proper stem separation of final mixes
   if (mode === '2track') {
-    result.music = await renderPass((ctx, src) => src);
-    return result;
+    console.log('[FLOW IMPORT] Two-track detected - using AI model for stem separation...');
+    try {
+      // Try to use AI model for proper separation
+      const aiResult = await aiFullStemModel(audioBuffer);
+      
+      // Map AI results to our stem format
+      if (aiResult.vocals) result.vocals = aiResult.vocals;
+      if (aiResult.drums) result.drums = aiResult.drums;
+      if (aiResult.bass) result.bass = aiResult.bass;
+      if (aiResult.music) {
+        result.music = aiResult.music;
+        result.harmonic = aiResult.music; // Use music as harmonic for two-track
+      }
+      
+      // If we got some stems, return them
+      const stemCount = Object.values(result).filter(b => b !== null).length;
+      if (stemCount > 0) {
+        console.log('[FLOW IMPORT] AI separation complete for two-track:', {
+          vocals: result.vocals !== null,
+          drums: result.drums !== null,
+          bass: result.bass !== null,
+          music: result.music !== null,
+        });
+        return result;
+      }
+      
+      // Fall through to full mode if AI didn't produce stems
+      console.log('[FLOW IMPORT] AI separation returned no stems, falling back to full mode...');
+    } catch (aiError) {
+      console.warn('[FLOW IMPORT] AI separation failed, falling back to full mode:', aiError);
+      // Fall through to full mode
+    }
+    // Don't return here - let it fall through to FULL MODE for proper separation
   }
   
   // FULL MODE - Use HPSS + vocal extraction for proper stem separation
   try {
     console.log('[FLOW IMPORT] Starting HPSS-based stem separation...');
-    
+
     // Use HPSS for harmonic/percussive separation
     const hpssResult = await hpss(audioBuffer);
     console.log('[FLOW IMPORT] HPSS complete, extracting additional stems...');
-    
+
     // Extract vocals using AI model (or fallback)
     const vocals = await aiVocalModel(audioBuffer);
     console.log('[FLOW IMPORT] Vocals extracted');
-    
+
     // Extract bass from harmonic content (or original if harmonic failed)
     const bass = await extractBass(hpssResult.harmonic || audioBuffer);
     console.log('[FLOW IMPORT] Bass extracted');
-    
+
     // Extract sub-bass (808s)
     const sub = await extractSubBass(audioBuffer);
     console.log('[FLOW IMPORT] Sub-bass extracted');
-    
+
     // Assign stems
     result.vocals = vocals;
     result.drums = hpssResult.percussive;
@@ -172,7 +203,7 @@ export async function stemSplitEngine(
     result.music = hpssResult.harmonic; // Music = harmonic content (will refine below)
     result.bass = bass;
     result.sub = sub;
-    
+
     // If we have vocals, subtract them from harmonic to get instrumental
     if (vocals && hpssResult.harmonic) {
       try {
@@ -183,7 +214,7 @@ export async function stemSplitEngine(
         result.music = hpssResult.harmonic;
       }
     }
-    
+
     // Ensure we have at least some stems
     const stemCount = Object.values(result).filter(b => b !== null).length;
     console.log('[FLOW IMPORT] Stem separation complete:', {
@@ -195,7 +226,7 @@ export async function stemSplitEngine(
       sub: result.sub !== null,
       harmonic: result.harmonic !== null,
     });
-    
+
     // If no stems were created, fall back to frequency filtering
     if (stemCount === 0) {
       throw new Error('HPSS produced no stems, falling back to frequency filtering');
@@ -235,7 +266,11 @@ export async function stemSplitEngine(
       result.music = audioBuffer;
     }
   }
-  
+
+  // Do not synthesize band-filter fallbacks here; return true separation results only
+  // Music fallback still defaults to harmonic/original to preserve timeline context
+  if (!result.music) result.music = result.harmonic ?? audioBuffer;
+
   return result;
 }
 

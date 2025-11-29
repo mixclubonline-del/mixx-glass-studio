@@ -1,5 +1,5 @@
 // components/PluginBrowser.tsx
-import React, { useMemo, useState, useCallback } from "react";
+import React, { useMemo, useState, useCallback, useRef } from "react";
 import type { FxWindowId } from "../App";
 import { PlusCircleIcon, XIcon, StarIcon } from "./icons";
 import { hexToRgba } from "../utils/ALS";
@@ -144,6 +144,33 @@ const PluginBrowser: React.FC<PluginBrowserProps> = ({
     [onPreview, trackId]
   );
 
+  const handleDragStart = useCallback(
+    (e: React.DragEvent, pluginId: FxWindowId) => {
+      e.dataTransfer.effectAllowed = "copy";
+      e.dataTransfer.setData("application/plugin-id", pluginId);
+      e.dataTransfer.setData("text/plain", pluginId); // Fallback for compatibility
+      // Add visual feedback
+      if (e.dataTransfer.setDragImage) {
+        const dragImage = document.createElement("div");
+        dragImage.style.position = "absolute";
+        dragImage.style.top = "-1000px";
+        dragImage.style.padding = "8px 16px";
+        dragImage.style.background = "rgba(6, 14, 32, 0.95)";
+        dragImage.style.border = "1px solid rgba(255, 255, 255, 0.3)";
+        dragImage.style.borderRadius = "8px";
+        dragImage.style.color = "white";
+        dragImage.style.fontSize = "0.75rem";
+        dragImage.style.textTransform = "uppercase";
+        dragImage.style.letterSpacing = "0.1em";
+        dragImage.textContent = inventory.find(p => p.id === pluginId)?.name || pluginId;
+        document.body.appendChild(dragImage);
+        e.dataTransfer.setDragImage(dragImage, 0, 0);
+        setTimeout(() => document.body.removeChild(dragImage), 0);
+      }
+    },
+    [inventory]
+  );
+
   return (
     <div
       className="fixed inset-0 z-[160] flex items-center justify-center bg-[rgba(2,4,12,0.76)] backdrop-blur-3xl"
@@ -205,9 +232,11 @@ const PluginBrowser: React.FC<PluginBrowserProps> = ({
                 {curatedHighlights.map((plugin) => (
                   <button
                     key={`curated-${plugin.id}`}
+                    draggable
+                    onDragStart={(e) => handleDragStart(e, plugin.id)}
                     onClick={() => handleAdd(plugin.id)}
                     onMouseEnter={() => handleHover(plugin.id)}
-                    className="rounded-2xl border border-white/12 bg-[rgba(12,24,48,0.78)] px-4 py-2 text-left transition-all hover:border-white/25 hover:bg-[rgba(16,36,68,0.85)]"
+                    className="rounded-2xl border border-white/12 bg-[rgba(12,24,48,0.78)] px-4 py-2 text-left transition-all hover:border-white/25 hover:bg-[rgba(16,36,68,0.85)] cursor-grab active:cursor-grabbing"
                     style={{
                       boxShadow: `0 0 28px ${hexToRgba(plugin.glow, 0.26)}`,
                       backgroundImage: gradientFor(plugin),
@@ -255,8 +284,10 @@ const PluginBrowser: React.FC<PluginBrowserProps> = ({
                       return (
                         <article
                           key={plugin.id}
+                          draggable
+                          onDragStart={(e) => handleDragStart(e, plugin.id)}
                           onMouseEnter={() => handleHover(plugin.id)}
-                          className="group relative flex flex-col justify-between rounded-[24px] border border-white/10 bg-[rgba(8,16,36,0.78)] p-5 transition-all duration-200 hover:border-white/25 hover:shadow-[0_22px_48px_rgba(6,16,38,0.55)]"
+                          className="group relative flex flex-col justify-between rounded-[24px] border border-white/10 bg-[rgba(8,16,36,0.78)] p-5 transition-all duration-200 hover:border-white/25 hover:shadow-[0_22px_48px_rgba(6,16,38,0.55)] cursor-grab active:cursor-grabbing"
                           style={{
                             backgroundImage: gradientFor(plugin),
                           }}

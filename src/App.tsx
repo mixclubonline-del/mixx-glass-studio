@@ -1,7 +1,7 @@
 import React, { useState, useRef, createRef, useCallback, useEffect, useMemo } from 'react';
 import FXWindow from './components/FXWindow';
 import FXRack from './components/FXRack';
-import Header from './components/Header';
+import AdaptiveWaveformHeader from './components/AdaptiveWaveformHeader';
 import AddTrackModal from './components/AddTrackModal';
 import { getVelvetCurveEngine, initializeVelvetCurveEngine, VelvetCurveState } from './audio/VelvetCurveEngine';
 import VelvetCurveVisualizer from './components/VelvetCurveVisualizer';
@@ -28,6 +28,7 @@ import ViewDeck from './components/layout/ViewDeck';
 import OverlayPortal from './components/layout/OverlayPortal';
 import VelvetComplianceHUD from './components/ALS/VelvetComplianceHUD';
 import PrimeBrainInterface from './components/PrimeBrainInterface';
+import { ExternalPluginTestButton } from './components/dev/ExternalPluginTestButton';
 import { getMixxFXEngine, initializeMixxFXEngine } from './audio/MixxFXEngine';
 import { buildMasterChain } from './audio/masterChain';
 import type { VelvetMasterChain } from './audio/masterChain';
@@ -58,6 +59,7 @@ import {
   derivePrimeBrainMode,
 } from './ai/PrimeBrainSnapshot';
 import { usePrimeBrainExporter } from './ai/usePrimeBrainExporter';
+import { useStemSeparationExporter } from './core/import/useStemSeparationExporter';
 import { recordPrimeBrainEvent, subscribeToPrimeBrainEvents, type PrimeBrainEvent } from './ai/primeBrainEvents';
 import { PrimeBrainDebugOverlay } from './components/dev/PrimeBrainDebugOverlay';
 import { FlowLoopWrapper } from './core/loop/FlowLoopWrapper';
@@ -93,9 +95,11 @@ import IngestQueueManager, {
   PersistedIngestSnapshot,
 } from './ingest/IngestQueueManager';
 import StemSeparationIntegration from './audio/StemSeparationIntegration';
+import { createSignalMatrix } from './audio/SignalMatrix';
 import StemSeparationModal from './components/modals/StemSeparationModal';
 import { FileInput } from './components/import/FileInput';
 import { useTimelineStore } from './state/timelineStore';
+import { runFlowStemPipeline } from './core/import/stemPipeline';
 import TrackCapsule from './components/TrackCapsule';
 import PianoRollPanel from './components/piano/PianoRollPanel';
 import { ingestHistoryStore, IngestHistoryEntry } from './state/ingestHistory';
@@ -121,6 +125,9 @@ import type {
   VelvetAnchorDescriptor,
   VelvetLensState,
 } from './types/primeBrainStatus';
+import type { WaveformHeaderSettings } from './types/waveformHeaderSettings';
+import { DEFAULT_WAVEFORM_HEADER_SETTINGS } from './types/waveformHeaderSettings';
+import { WaveformHeaderSettingsPanel } from './components/WaveformHeaderSettingsPanel';
 
 
 const DEFAULT_STEM_SELECTION = ['Vocals', 'Drums', 'Bass', 'Other Instruments'] as const;
@@ -207,6 +214,7 @@ type Point = { x: number; y: number };
 
 const PRIME_BRAIN_TELEMETRY_STORAGE_KEY = 'mixxclub:primebrain-telemetry-enabled';
 const PRIME_BRAIN_EXPORT_URL_STORAGE_KEY = 'mixxclub:primebrain-export-url';
+const STEM_SEPARATION_EXPORT_URL_STORAGE_KEY = 'mixxclub:stem-separation-export-url';
 
 const clamp01 = (value: number) => Math.min(1, Math.max(0, value));
 
@@ -1199,6 +1207,7 @@ const FlowRuntime: React.FC<FlowRuntimeProps> = ({ arrangeFocusToken }) => {
   // MUST be declared before any useEffect that uses it
   const [masterReady, setMasterReady] = useState(false);
   const queuedRoutesRef = useRef<Array<{ trackId: string; outputNode: AudioNode }>>([]);
+  const signalMatrixRef = useRef<ReturnType<typeof createSignalMatrix> | null>(null);
   
   // Initialize Thermal Sync (Part A) - Global thermal color filters
   useEffect(() => {
@@ -1214,12 +1223,12 @@ const FlowRuntime: React.FC<FlowRuntimeProps> = ({ arrangeFocusToken }) => {
   useEffect(() => {
     if (masterReady && queuedRoutesRef.current.length > 0 && masterNodesRef.current) {
       console.log('[MIXER] Flushing queued routes:', queuedRoutesRef.current.length);
-      const masterInput = masterNodesRef.current.input;
-      
-      if (masterInput) {
+      const matrix = signalMatrixRef.current;
+      if (matrix) {
         queuedRoutesRef.current.forEach(({ trackId, outputNode }) => {
           try {
-            outputNode.connect(masterInput);
+            const bus = matrix.routeTrack(trackId, tracksRef.current.find(t => t.id === trackId)?.role as any);
+            outputNode.connect(bus);
             console.log('[MIXER] Route flushed for:', trackId);
           } catch (err) {
             console.error('[MIXER] Failed to flush route:', trackId, err);
@@ -1227,7 +1236,7 @@ const FlowRuntime: React.FC<FlowRuntimeProps> = ({ arrangeFocusToken }) => {
         });
         queuedRoutesRef.current = [];
       } else {
-        console.error('[MIXER] Cannot flush routes - master input not available');
+        console.error('[MIXER] Cannot flush routes - signal matrix not available');
       }
     }
   }, [masterReady]);
@@ -1309,6 +1318,8 @@ const FlowRuntime: React.FC<FlowRuntimeProps> = ({ arrangeFocusToken }) => {
   const [translationProfile, setTranslationProfile] = useState<TranslationProfileKey>('flat');
   const [recordingOptions, setRecordingOptions] = useState(() => ({ ...INITIAL_RECORDING_OPTIONS }));
   const [trackAnalysis, setTrackAnalysis] = useState<{ [key: string]: TrackAnalysisData }>({});
+  const [waveformHeaderSettings, setWaveformHeaderSettings] = useState<WaveformHeaderSettings>(() => ({ ...DEFAULT_WAVEFORM_HEADER_SETTINGS }));
+  const [isWaveformSettingsOpen, setIsWaveformSettingsOpen] = useState(false);
   const [masterAnalysis, setMasterAnalysis] = useState({ level: 0, transient: false, waveform: new Uint8Array(128) });
   const [loudnessMetrics, setLoudnessMetrics] = useState(DEFAULT_VELVET_LOUDNESS_METRICS);
   const masterLevelAvg = useRef(0.01);
@@ -1955,6 +1966,46 @@ const FlowRuntime: React.FC<FlowRuntimeProps> = ({ arrangeFocusToken }) => {
     intervalMs: 4000,
     debug: import.meta.env.DEV && import.meta.env.VITE_PRIME_BRAIN_EXPORT_DEBUG === '1',
   });
+
+  // Stem Separation Export URL
+  const [stemSeparationExportUrl] = useState<string | null>(() => {
+    if (typeof window !== 'undefined') {
+      return (
+        window.localStorage.getItem(STEM_SEPARATION_EXPORT_URL_STORAGE_KEY) ??
+        // @ts-expect-error optional runtime hook
+        (window.__MIXX_STEM_SEPARATION_EXPORT_URL ?? null) ??
+        (import.meta.env?.VITE_STEM_SEPARATION_EXPORT_URL as string | undefined) ??
+        null
+      );
+    }
+    return null;
+  });
+
+  const [stemSeparationTelemetryEnabled] = useState<boolean>(() => {
+    if (typeof window === 'undefined') {
+      return false;
+    }
+    const stored = window.localStorage.getItem('mixxclub:stem-separation-telemetry-enabled');
+    return stored !== 'disabled' && Boolean(stemSeparationExportUrl);
+  });
+
+  // Stem Separation Exporter - initialized for snapshot export callback
+  const { exportSnapshot: exportStemSeparationSnapshot } = useStemSeparationExporter({
+    enabled: stemSeparationTelemetryEnabled && Boolean(stemSeparationExportUrl),
+    exportUrl: stemSeparationExportUrl,
+    debug: import.meta.env.DEV && import.meta.env.VITE_STEM_SEPARATION_EXPORT_DEBUG === '1',
+  });
+
+  // Expose exporter to window for pipeline callback
+  useEffect(() => {
+    if (typeof window !== 'undefined') {
+      (window as any).__mixx_stem_separation_exporter = {
+        exportSnapshot: exportStemSeparationSnapshot,
+        enabled: stemSeparationTelemetryEnabled && Boolean(stemSeparationExportUrl),
+      };
+    }
+  }, [exportStemSeparationSnapshot, stemSeparationTelemetryEnabled, stemSeparationExportUrl]);
+
   const normalizeCommandPayload = useCallback((value: unknown): Record<string, unknown> => {
     if (value === null || value === undefined) return {};
     if (Array.isArray(value)) {
@@ -2463,19 +2514,20 @@ const FlowRuntime: React.FC<FlowRuntimeProps> = ({ arrangeFocusToken }) => {
           onChange = handleTimeWarpChange;
           break;
         default:
-          // For generic MixxClub plugins, use PlaceholderAudioEngine
+          // For external plugins, get initial params from engine and sync changes
           params = engineInstance.getParameterNames().reduce((acc: any, paramName: string) => {
             acc[paramName] = engineInstance.getParameter(paramName);
             return acc;
           }, {});
           onChange = (param: string, value: any) => {
-              // Placeholder for generic plugin param changes
-              // console.log(`Generic Plugin ${plugin.id}: ${param} changed to ${value}`);
+              // Update engine parameter
               engineInstance.setParameter(param, value);
+              // Sync to external plugin system via adapter if needed
+              // The wrapper component handles the conversion automatically
           };
       }
       const { engineInstance: _factory, ...pluginWithoutFactory } = plugin;
-      return { ...pluginWithoutFactory, params, onChange, engineInstance };
+      return { ...pluginWithoutFactory, params, onChange, engineInstance, trackId: '', fxId: plugin.id };
     });
   }, [velvetCurveState, harmonicLatticeState, handleVelvetCurveChange, handleMixxFXChange, handleTimeWarpChange, pluginRegistry]);
 
@@ -2652,17 +2704,50 @@ const FlowRuntime: React.FC<FlowRuntimeProps> = ({ arrangeFocusToken }) => {
            return next;
          });
  
-         setInserts((prev) => {
-           const updated = { ...prev };
-           separationResult.newTracks.forEach((track) => {
-             if (!updated[track.id]) {
-               updated[track.id] = [];
-             }
-           });
-           return updated;
-         });
- 
-         setClips((prev) => [...prev, ...separationResult.newClips]);
+        setInserts((prev) => {
+          const updated = { ...prev };
+          separationResult.newTracks.forEach((track) => {
+            if (!updated[track.id]) {
+              updated[track.id] = [];
+            }
+          });
+          return updated;
+        });
+
+        // Initialize send levels for all new stem tracks
+        setTrackSendLevels((prev) => {
+          const updated = { ...prev };
+          separationResult.newTracks.forEach((track) => {
+            if (!updated[track.id]) {
+              updated[track.id] = createDefaultSendLevels(track);
+            }
+          });
+          return updated;
+        });
+
+        // Initialize dynamics settings for all new stem tracks
+        setChannelDynamicsSettings((prev) => {
+          const updated = { ...prev };
+          separationResult.newTracks.forEach((track) => {
+            if (!updated[track.id]) {
+              updated[track.id] = createDefaultDynamicsSettings(track);
+            }
+          });
+          return updated;
+        });
+
+        // Initialize EQ settings for all new stem tracks
+        setChannelEQSettings((prev) => {
+          const updated = { ...prev };
+          separationResult.newTracks.forEach((track) => {
+            if (!updated[track.id]) {
+              updated[track.id] = createDefaultEQSettings(track);
+            }
+          });
+          return updated;
+        });
+
+        setClips((prev) => [...prev, ...separationResult.newClips]);
  
          console.log(`[STEMS] Created ${separationResult.newTracks.length} stem tracks from ${request.fileName}.`);
          setTimeout(() => setImportMessage(null), 1200);
@@ -3067,11 +3152,68 @@ const FlowRuntime: React.FC<FlowRuntimeProps> = ({ arrangeFocusToken }) => {
         return;
       }
 
-      controls.reportProgress({ percent: 5, message: `Decoding ${displayName}` });
+      // Check if this is a re-ingest (clip replacement)
+      const reingestClipId = job.metadata?.reingestClipId as ClipId | undefined;
+      if (reingestClipId) {
+        // Re-ingest: use legacy path for now (replaces existing clip buffer)
+        controls.reportProgress({ percent: 5, message: `Decoding ${displayName}` });
+        upsertImportProgress({ id: job.id, label: displayName, percent: 5, type: 'file' });
+        setImportMessage(`Decoding ${displayName}…`);
+
+        const arrayBuffer = await job.file.arrayBuffer();
+        if (controls.isCancelled()) {
+          controls.markCancelled('User cancelled import');
+          removeImportProgressByPrefix(job.id);
+          setImportMessage(null);
+          return { status: 'cancelled' };
+        }
+
+        const decodedBuffer = await ctx.decodeAudioData(arrayBuffer);
+        if (controls.isCancelled()) {
+          controls.markCancelled('User cancelled import');
+          removeImportProgressByPrefix(job.id);
+          setImportMessage(null);
+          return { status: 'cancelled' };
+        }
+
+        controls.reportProgress({ percent: 20, message: `Priming ${displayName}` });
+        await handleFileImport(job.id, decodedBuffer, job.fileName, {
+          resetSession: job.resetSession,
+          reingestClipId,
+        });
+        controls.reportProgress({ percent: 100, message: `${displayName} • Complete` });
+        setImportMessage(null);
+        return;
+      }
+
+      // NEW PATH: Immediate stem separation for all audio imports
+      // Audio files are immediately stem-separated and placed on individual tracks
+      controls.reportProgress({ percent: 5, message: `Stem separating ${displayName}…` });
       upsertImportProgress({ id: job.id, label: displayName, percent: 5, type: 'file' });
-      setImportMessage(`Decoding ${displayName}…`);
+      setImportMessage(`Stem separating ${displayName}…`);
 
-      const arrayBuffer = await job.file.arrayBuffer();
+      // If resetSession is true, clear existing tracks/clips first
+      if (job.resetSession) {
+        setTracks([]);
+        setClips([]);
+        setAudioBuffers({});
+        tracksRef.current = [];
+        clipsRef.current = [];
+        // Clear Zustand store as well
+        const { getTracks, getClips, getAudioBuffers } = useTimelineStore.getState();
+        const existingTracks = getTracks();
+        const existingClips = getClips();
+        existingTracks.forEach(track => {
+          useTimelineStore.getState().removeTrack(track.id);
+        });
+        existingClips.forEach(clip => {
+          useTimelineStore.getState().removeClip(clip.id);
+        });
+      }
+
+      // Run stem pipeline - this immediately stem-separates and places stems on tracks
+      const result = await runFlowStemPipeline(job.file, ctx);
+
       if (controls.isCancelled()) {
         controls.markCancelled('User cancelled import');
         removeImportProgressByPrefix(job.id);
@@ -3079,22 +3221,145 @@ const FlowRuntime: React.FC<FlowRuntimeProps> = ({ arrangeFocusToken }) => {
         return { status: 'cancelled' };
       }
 
-      const decodedBuffer = await ctx.decodeAudioData(arrayBuffer);
-      if (controls.isCancelled()) {
-        controls.markCancelled('User cancelled import');
-        removeImportProgressByPrefix(job.id);
-        setImportMessage(null);
-        return { status: 'cancelled' };
+      // Sync Zustand to React state (same as FileInput does)
+      const zustandState = useTimelineStore.getState();
+      const zustandTracks = zustandState.getTracks();
+      const zustandClips = zustandState.getClips();
+      const zustandBuffers = zustandState.getAudioBuffers();
+
+      // Check if stems were actually created
+      const stemsCreated = Object.keys(result.stems).filter(k => result.stems[k] !== null).length;
+      if (stemsCreated === 0) {
+        controls.reportProgress({ percent: 100, message: `${displayName} • No stems detected` });
+        setImportMessage(`${displayName} • No stems detected`);
+        setTimeout(() => setImportMessage(null), 3000);
+        return {
+          status: 'completed',
+          summary: {
+            tracksCreated: 0,
+            clipsCreated: 0,
+            stemsCreated: 0,
+            fileName: job.fileName,
+            warning: 'No stems were detected in the audio file',
+          },
+        };
       }
 
-      controls.reportProgress({ percent: 20, message: `Priming ${displayName}` });
-      await handleFileImport(job.id, decodedBuffer, job.fileName, {
-        resetSession: job.resetSession,
-        reingestClipId: job.metadata?.reingestClipId as ClipId | undefined,
-      });
+      if (zustandTracks.length > 0 || zustandClips.length > 0) {
+        // MERGE tracks
+        setTracks(prev => {
+          const existingById = new Map(prev.map(t => [t.id, t]));
+          const merged: TrackData[] = [...prev];
+          
+          zustandTracks.forEach(zTrack => {
+            if (!existingById.has(zTrack.id)) {
+              merged.push(zTrack);
+              existingById.set(zTrack.id, zTrack);
+            } else {
+              const index = merged.findIndex(t => t.id === zTrack.id);
+              if (index !== -1) {
+                merged[index] = { ...merged[index], ...zTrack };
+              }
+            }
+          });
+          
+          return merged;
+        });
+
+        // MERGE clips
+        setClips(prev => {
+          const existingById = new Map(prev.map(c => [c.id, c]));
+          const merged: ArrangeClip[] = [...prev];
+          
+          zustandClips.forEach(zClip => {
+            if (!existingById.has(zClip.id)) {
+              merged.push(zClip as ArrangeClip);
+              existingById.set(zClip.id, zClip);
+            } else {
+              const index = merged.findIndex(c => c.id === zClip.id);
+              if (index !== -1) {
+                merged[index] = { ...merged[index], ...zClip } as ArrangeClip;
+              }
+            }
+          });
+          
+          return merged;
+        });
+
+        // MERGE buffers
+        setAudioBuffers(prev => ({ ...prev, ...zustandBuffers }));
+
+        // Initialize all track state for imported tracks
+        setMixerSettings(prev => {
+          const next = { ...prev };
+          zustandTracks.forEach(track => {
+            if (!next[track.id]) {
+              const volume = track.role === 'two-track' ? 0.82 : 
+                           track.role === 'hushRecord' ? 0.78 : 0.75;
+              next[track.id] = { volume, pan: 0, isMuted: false };
+            }
+          });
+          return next;
+        });
+
+        setInserts(prev => {
+          const updated = { ...prev };
+          zustandTracks.forEach(track => {
+            if (!updated[track.id]) {
+              updated[track.id] = [];
+            }
+          });
+          return updated;
+        });
+
+        setTrackSendLevels(prev => {
+          const updated = { ...prev };
+          zustandTracks.forEach(track => {
+            if (!updated[track.id]) {
+              updated[track.id] = createDefaultSendLevels(track);
+            }
+          });
+          return updated;
+        });
+
+        setChannelDynamicsSettings(prev => {
+          const updated = { ...prev };
+          zustandTracks.forEach(track => {
+            if (!updated[track.id]) {
+              updated[track.id] = createDefaultDynamicsSettings(track);
+            }
+          });
+          return updated;
+        });
+
+        setChannelEQSettings(prev => {
+          const updated = { ...prev };
+          zustandTracks.forEach(track => {
+            if (!updated[track.id]) {
+              updated[track.id] = createDefaultEQSettings(track);
+            }
+          });
+          return updated;
+        });
+
+        // Update refs
+        tracksRef.current = zustandTracks;
+        clipsRef.current = zustandClips;
+
+        console.log(`[INGEST] Imported ${zustandTracks.length} stem tracks from ${displayName}`);
+      }
+
       controls.reportProgress({ percent: 100, message: `${displayName} • Complete` });
       setImportMessage(null);
-      return { status: 'completed', summary: { fileName: job.fileName } };
+      return {
+        status: 'completed',
+        summary: {
+          tracksCreated: zustandTracks.length,
+          clipsCreated: zustandClips.length,
+          stemsCreated: Object.keys(result.stems).filter(k => result.stems[k] !== null).length,
+          fileName: job.fileName,
+        },
+      };
     } catch (error) {
       const message =
         error instanceof Error ? error.message : 'Failed to import audio';
@@ -4389,7 +4654,12 @@ const FlowRuntime: React.FC<FlowRuntimeProps> = ({ arrangeFocusToken }) => {
     });
 
     currentOutput.connect(trackNodes.analyser);
-    currentOutput.connect(master.input);
+    const bus = signalMatrixRef.current?.routeTrack(trackId, tracksRef.current.find(t => t.id === trackId)?.role as any);
+    if (bus) {
+      currentOutput.connect(bus);
+    } else {
+      currentOutput.connect(master.input);
+    }
   }, []);
 
   const resolvePluginMeta = useCallback(
@@ -4791,10 +5061,16 @@ const FlowRuntime: React.FC<FlowRuntimeProps> = ({ arrangeFocusToken }) => {
         if (isCancelled || createdCtx.state === "closed") {
           return;
         }
-        
+        // Initialize Mixx Club Signal Matrix (buses -> master)
+        try {
+          signalMatrixRef.current = createSignalMatrix(createdCtx, masterNodesRef.current.input);
+        } catch (err) {
+          console.warn('[AUDIO] Failed to initialize Mixx Signal Matrix', err);
+        }
+
         // Apply initial master volume calibration (trim on top of LUFS gain)
         masterNodesRef.current.setMasterTrim(masterVolume);
-        
+
         // Expose master chain state to Prime Brain (via window global)
         const profile = masterNodesRef.current.getProfile();
         if (typeof window !== 'undefined') {
@@ -4805,7 +5081,6 @@ const FlowRuntime: React.FC<FlowRuntimeProps> = ({ arrangeFocusToken }) => {
             masterVolume: masterVolume,
           };
         }
-        
         const translationMatrix = new TranslationMatrix(createdCtx);
         translationMatrix.attach(masterNodesRef.current.output, createdCtx.destination);
         translationMatrix.activate(translationProfileRef.current);
@@ -4959,6 +5234,12 @@ const FlowRuntime: React.FC<FlowRuntimeProps> = ({ arrangeFocusToken }) => {
             }
           });
           stemIntegrationRef.current = integration;
+          // Pre-warm stem model worker immediately
+          try {
+            integration.prewarm();
+          } catch (err) {
+            console.warn('[STEMS] prewarm not available', err);
+          }
         }
     };
     setupAudio();
@@ -5224,17 +5505,17 @@ const FlowRuntime: React.FC<FlowRuntimeProps> = ({ arrangeFocusToken }) => {
     useEffect(() => {
         const ctx = audioContextRef.current;
         if (!ctx) {
-          console.warn('[MIXER] Audio context not available');
+          // Audio context not yet initialized - expected during startup
           return;
         }
         
         if (!masterNodesRef.current) {
-          console.warn('[MIXER] Master chain not initialized, cannot route tracks');
+          // Master chain not yet initialized - expected during startup
           return;
         }
         
         if (!masterReady) {
-          console.warn('[MIXER] Master not ready – queuing routing for', tracks.length, 'tracks');
+          // Master not ready yet - queue routing for when it becomes ready
           // Queue all tracks for routing when master becomes ready
           tracks.forEach(track => {
             const trackNodes = trackNodesRef.current[track.id];
@@ -5858,6 +6139,7 @@ const FlowRuntime: React.FC<FlowRuntimeProps> = ({ arrangeFocusToken }) => {
             onAddAutomationPoint={handleAddAutomationPoint}
             onUpdateAutomationPoint={handleUpdateAutomationPoint}
             onDeleteAutomationPoint={handleDeleteAutomationPoint}
+            engineInstance={fw.engineInstance}
           />
         </FXWindow>
       ) : null;
@@ -6246,7 +6528,9 @@ const FlowRuntime: React.FC<FlowRuntimeProps> = ({ arrangeFocusToken }) => {
 
     const attachSettingsMenu = (menus: Record<string, BloomFloatingMenu>) => {
       const main = menus.main ?? { items: [] };
-      const filteredItems = main.items.filter((item) => item.subMenu !== 'prime/settings');
+      const filteredItems = main.items.filter((item) => 
+        item.subMenu !== 'prime/settings' && item.subMenu !== 'waveform/settings'
+      );
       const settingsAccent = primeBrainTelemetryEnabled ? '#c084fc' : '#475569';
       const settingsDescriptor = primeBrainTelemetryEnabled
         ? 'Telemetry flowing to Prime Fabric.'
@@ -6257,10 +6541,16 @@ const FlowRuntime: React.FC<FlowRuntimeProps> = ({ arrangeFocusToken }) => {
         subMenu: 'prime/settings',
         accentColor: settingsAccent,
       };
+      const waveformSettingsItem: BloomFloatingMenuItem = {
+        name: 'Waveform Header',
+        description: 'Adjust waveform visual parameters.',
+        subMenu: 'waveform/settings',
+        accentColor: '#22d3ee',
+      };
 
       return {
         ...menus,
-        main: { ...main, items: [...filteredItems, settingsItem] },
+        main: { ...main, items: [...filteredItems, settingsItem, waveformSettingsItem] },
         'prime/settings': {
           parent: 'main',
           items: [
@@ -6277,6 +6567,17 @@ const FlowRuntime: React.FC<FlowRuntimeProps> = ({ arrangeFocusToken }) => {
               description: primeBrainStatus.health.caption,
               disabled: true,
               accentColor: primeBrainStatus.health.color,
+            },
+          ],
+        },
+        'waveform/settings': {
+          parent: 'main',
+          items: [
+            {
+              name: 'Open Settings Panel',
+              description: 'Adjust amplitude, thickness, and visual effects.',
+              action: () => setIsWaveformSettingsOpen(true),
+              accentColor: '#22d3ee',
             },
           ],
         },
@@ -6649,11 +6950,12 @@ const FlowRuntime: React.FC<FlowRuntimeProps> = ({ arrangeFocusToken }) => {
     <FlowLoopWrapper primeBrainStatus={primeBrainStatus}>
     <div className="relative w-screen h-screen text-ink overflow-hidden" style={backgroundGlowStyle}>
         <div className="pointer-events-none absolute inset-0 bg-gradient-to-br from-[rgba(48,92,178,0.45)] via-[rgba(19,37,74,0.4)] to-transparent blur-[110px] opacity-80"></div>
-        <Header
+        <AdaptiveWaveformHeader
           primeBrainStatus={primeBrainStatus}
           hushFeedback={hushFeedback}
           isPlaying={isPlaying}
           onHeightChange={setHeaderHeight}
+          settings={waveformHeaderSettings}
         />
         <main
           className="absolute left-0 right-0 overflow-hidden"
@@ -6709,6 +7011,7 @@ const FlowRuntime: React.FC<FlowRuntimeProps> = ({ arrangeFocusToken }) => {
                     onDeleteAutomationPoint={handleDeleteAutomationPoint}
                     onUpdateClipProperties={updateClipProperties}
                     inserts={inserts}
+                    trackSendLevels={trackSendLevels}
                     fxWindows={fxWindows}
                     onAddPlugin={handleAddPlugin}
                     onRemovePlugin={handleRemovePlugin}
@@ -6970,6 +7273,40 @@ const FlowRuntime: React.FC<FlowRuntimeProps> = ({ arrangeFocusToken }) => {
           />
         </OverlayPortal>
 
+        {/* Waveform Header Settings Modal */}
+        {isWaveformSettingsOpen && (
+          <div 
+            className="fixed inset-0 bg-black/70 flex items-center justify-center z-[100] backdrop-filter backdrop-blur-md"
+            onClick={() => setIsWaveformSettingsOpen(false)}
+          >
+            <div 
+              className="relative w-[600px] max-h-[80vh] rounded-2xl bg-gradient-to-br from-slate-900/95 to-indigo-900/50 border border-cyan-400/30 flex flex-col shadow-2xl shadow-cyan-500/20 overflow-hidden"
+              onClick={(e) => e.stopPropagation()}
+            >
+              <div className="flex items-center justify-between p-6 border-b border-white/10">
+                <h2 className="text-lg font-semibold text-white uppercase tracking-wide">
+                  Waveform Header Settings
+                </h2>
+                <button
+                  onClick={() => setIsWaveformSettingsOpen(false)}
+                  className="p-2 rounded-full hover:bg-white/10 text-white/60 hover:text-white transition-colors"
+                >
+                  <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+                  </svg>
+                </button>
+              </div>
+              <div className="overflow-y-auto flex-1">
+                <WaveformHeaderSettingsPanel
+                  settings={waveformHeaderSettings}
+                  onSettingsChange={setWaveformHeaderSettings}
+                  onReset={() => setWaveformHeaderSettings({ ...DEFAULT_WAVEFORM_HEADER_SETTINGS })}
+                />
+              </div>
+            </div>
+          </div>
+        )}
+
         {isAddTrackModalOpen && (
             <AddTrackModal
                 onClose={() => setIsAddTrackModalModalOpen(false)}
@@ -7058,31 +7395,92 @@ const FlowRuntime: React.FC<FlowRuntimeProps> = ({ arrangeFocusToken }) => {
               const zustandClips = zustandState.getClips();
               const zustandBuffers = zustandState.getAudioBuffers();
               
-              // Sync Zustand tracks/clips to React state
+              // Sync Zustand tracks/clips to React state (MERGE, not replace)
               if (zustandTracks.length > 0 || zustandClips.length > 0) {
                 console.log('[FLOW IMPORT] Syncing Zustand to React state:', {
                   tracks: zustandTracks.length,
                   clips: zustandClips.length,
                   buffers: Object.keys(zustandBuffers).length,
+                  existingTracks: tracks.length,
+                  existingClips: clips.length,
                 });
                 
-                // Update React state from Zustand
-                setTracks(zustandTracks);
-                setClips(zustandClips);
-                setAudioBuffers(zustandBuffers);
+                // MERGE tracks: Keep existing tracks, add/update new ones from Zustand
+                setTracks(prev => {
+                  const existingById = new Map(prev.map(t => [t.id, t]));
+                  const merged: TrackData[] = [...prev];
+                  
+                  zustandTracks.forEach(zTrack => {
+                    if (!existingById.has(zTrack.id)) {
+                      // New track from Zustand - add it
+                      merged.push(zTrack);
+                      existingById.set(zTrack.id, zTrack);
+                    } else {
+                      // Update existing track with Zustand data
+                      const index = merged.findIndex(t => t.id === zTrack.id);
+                      if (index !== -1) {
+                        merged[index] = { ...merged[index], ...zTrack };
+                      }
+                    }
+                  });
+                  
+                  console.log('[FLOW IMPORT] Merged tracks:', {
+                    before: prev.length,
+                    after: merged.length,
+                    added: merged.length - prev.length,
+                  });
+                  
+                  return merged;
+                });
                 
-                // Initialize mixer settings for new tracks from Zustand
+                // MERGE clips: Keep existing clips, add/update new ones from Zustand
+                setClips(prev => {
+                  const existingById = new Map(prev.map(c => [c.id, c]));
+                  const merged: ArrangeClip[] = [...prev];
+                  
+                  zustandClips.forEach(zClip => {
+                    if (!existingById.has(zClip.id)) {
+                      // New clip from Zustand - add it
+                      merged.push(zClip as ArrangeClip);
+                      existingById.set(zClip.id, zClip);
+                    } else {
+                      // Update existing clip with Zustand data
+                      const index = merged.findIndex(c => c.id === zClip.id);
+                      if (index !== -1) {
+                        merged[index] = { ...merged[index], ...zClip } as ArrangeClip;
+                      }
+                    }
+                  });
+                  
+                  console.log('[FLOW IMPORT] Merged clips:', {
+                    before: prev.length,
+                    after: merged.length,
+                    added: merged.length - prev.length,
+                  });
+                  
+                  return merged;
+                });
+                
+                // MERGE buffers: Add new buffers from Zustand
+                setAudioBuffers(prev => {
+                  return { ...prev, ...zustandBuffers };
+                });
+                
+                // Initialize mixer settings for all Zustand tracks (merge with existing)
                 setMixerSettings(prev => {
                   const next = { ...prev };
                   zustandTracks.forEach(track => {
                     if (!next[track.id]) {
-                      next[track.id] = { volume: 0.75, pan: 0, isMuted: false };
+                      // Default volume based on track role
+                      const volume = track.role === 'two-track' ? 0.82 : 
+                                   track.role === 'hushRecord' ? 0.78 : 0.75;
+                      next[track.id] = { volume, pan: 0, isMuted: false };
                     }
                   });
                   return next;
                 });
                 
-                // Initialize inserts for new tracks
+                // Initialize inserts for all Zustand tracks (merge with existing)
                 setInserts(prev => {
                   const updated = { ...prev };
                   zustandTracks.forEach(track => {
@@ -7093,7 +7491,7 @@ const FlowRuntime: React.FC<FlowRuntimeProps> = ({ arrangeFocusToken }) => {
                   return updated;
                 });
                 
-                // Initialize send levels for new tracks
+                // Initialize send levels for all Zustand tracks (merge with existing)
                 setTrackSendLevels(prev => {
                   const updated = { ...prev };
                   zustandTracks.forEach(track => {
@@ -7104,7 +7502,33 @@ const FlowRuntime: React.FC<FlowRuntimeProps> = ({ arrangeFocusToken }) => {
                   return updated;
                 });
                 
-                console.log('[FLOW IMPORT] React state synced from Zustand');
+                // Initialize dynamics settings for all Zustand tracks (merge with existing)
+                setChannelDynamicsSettings(prev => {
+                  const updated = { ...prev };
+                  zustandTracks.forEach(track => {
+                    if (!updated[track.id]) {
+                      updated[track.id] = createDefaultDynamicsSettings(track);
+                    }
+                  });
+                  return updated;
+                });
+                
+                // Initialize EQ settings for all Zustand tracks (merge with existing)
+                setChannelEQSettings(prev => {
+                  const updated = { ...prev };
+                  zustandTracks.forEach(track => {
+                    if (!updated[track.id]) {
+                      updated[track.id] = createDefaultEQSettings(track);
+                    }
+                  });
+                  return updated;
+                });
+                
+                // Update refs to keep everything in sync
+                tracksRef.current = useTimelineStore.getState().getTracks();
+                clipsRef.current = useTimelineStore.getState().getClips();
+                
+                console.log('[FLOW IMPORT] React state synced from Zustand (merged)');
                 return; // Early return - Zustand is source of truth
               }
               
@@ -7394,6 +7818,9 @@ const FlowRuntime: React.FC<FlowRuntimeProps> = ({ arrangeFocusToken }) => {
           onWarpAnchors={handleApplyWarpAnchors}
           onExportMidi={handleExportPianoRollMidi}
         />
+        
+        {/* External Plugin Test Button (Dev Only) */}
+        <ExternalPluginTestButton audioContext={audioContextRef.current} />
     </div>
     </FlowLoopWrapper>
   );

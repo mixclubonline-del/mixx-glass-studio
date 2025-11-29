@@ -138,6 +138,10 @@ const FlowWelcomeHub: React.FC<FlowWelcomeHubProps> = ({ onEnterFlow }) => {
   );
 };
 
+FlowWelcomeHub.displayName = 'FlowWelcomeHub';
+
 export default FlowWelcomeHub;
+
+
 
 

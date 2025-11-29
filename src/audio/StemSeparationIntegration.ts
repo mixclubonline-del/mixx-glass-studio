@@ -96,6 +96,17 @@ export class StemSeparationIntegration {
     });
   }
 
+  prewarm() {
+    try {
+      // eslint-disable-next-line no-console
+      console.log('[STEMS] Integration prewarm → INIT_MODEL');
+      (this.engine as any)?.prewarm?.();
+    } catch (err) {
+      // eslint-disable-next-line no-console
+      console.warn('[STEMS] Integration prewarm failed', err);
+    }
+  }
+
   async importAudioWithStemSeparation(
     audioBuffer: AudioBuffer,
     fileName: string,
