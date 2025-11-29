@@ -24,23 +24,35 @@ export function useAutoSave(getProjectState: () => PersistedProjectState) {
     saveInProgress: false,
   });
   const initializedRef = useRef(false);
+  const getProjectStateRef = useRef(getProjectState);
 
-  // Initialize service
+  // Keep getProjectState ref up to date without re-initializing
+  useEffect(() => {
+    getProjectStateRef.current = getProjectState;
+    // Update the service's state getter if already initialized
+    if (initializedRef.current) {
+      autoSaveService.registerStateGetter(getProjectState);
+    }
+  }, [getProjectState]);
+
+  // Initialize service only once (empty deps like useAutoPull)
   useEffect(() => {
     if (!initializedRef.current) {
       autoSaveService.initialize().then(() => {
-        autoSaveService.registerStateGetter(getProjectState);
+        autoSaveService.registerStateGetter(() => getProjectStateRef.current());
         autoSaveService.onStatusChange(setStatus);
+        autoSaveService.addConsumer();
         initializedRef.current = true;
       });
     }
 
     return () => {
       if (initializedRef.current) {
-        autoSaveService.shutdown();
+        autoSaveService.removeConsumer();
+        initializedRef.current = false;
       }
     };
-  }, [getProjectState]);
+  }, []); // Empty deps - only initialize once
 
   const saveNow = useCallback(() => {
     autoSaveService.saveNow();

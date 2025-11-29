@@ -3128,6 +3128,7 @@ const FlowRuntime: React.FC<FlowRuntimeProps> = ({ arrangeFocusToken }) => {
     masterBalance,
     isLooping,
     bpm,
+    ppsAPI, // ppsAPI.value changes when pixelsPerSecond changes
     scrollX,
     automationData,
     visibleAutomationLanes,
@@ -3135,7 +3136,11 @@ const FlowRuntime: React.FC<FlowRuntimeProps> = ({ arrangeFocusToken }) => {
     fxBypassState,
     bloomPosition,
     floatingBloomPosition,
+    ingestSnapshot, // Used as fallback when ingestQueueRef is null
     followPlayhead,
+    pianoRollStore, // Piano roll sketches state
+    pianoRollState, // Piano roll zoom/scroll state
+    // Note: ingestHistoryStore is a stable store reference, exportAll() gets current state
   ]);
 
   // Initialize auto-save
@@ -3179,21 +3184,31 @@ const FlowRuntime: React.FC<FlowRuntimeProps> = ({ arrangeFocusToken }) => {
       );
     };
 
-    // Cmd/Ctrl+S: Manual save
-    registerShortcut('save-project', { meta: true, key: 's', ctrl: true }, (event) => {
+    // Cmd/Ctrl+S: Manual save (Mac uses meta, Windows/Linux use ctrl)
+    registerShortcut('save-project-meta', { meta: true, key: 's' }, (event) => {
+      if (isEditableTarget(event)) return;
+      handleSaveProject();
+    });
+    registerShortcut('save-project-ctrl', { ctrl: true, key: 's' }, (event) => {
       if (isEditableTarget(event)) return;
       handleSaveProject();
     });
 
-    // Cmd/Ctrl+Shift+S: Open recovery
-    registerShortcut('recover-autosave', { meta: true, shift: true, key: 's', ctrl: true }, (event) => {
+    // Cmd/Ctrl+Shift+S: Open recovery (Mac uses meta, Windows/Linux use ctrl)
+    registerShortcut('recover-autosave-meta', { meta: true, shift: true, key: 's' }, (event) => {
+      if (isEditableTarget(event)) return;
+      setIsRecoveryOpen(true);
+    });
+    registerShortcut('recover-autosave-ctrl', { ctrl: true, shift: true, key: 's' }, (event) => {
       if (isEditableTarget(event)) return;
       setIsRecoveryOpen(true);
     });
 
     return () => {
-      unregisterShortcut('save-project');
-      unregisterShortcut('recover-autosave');
+      unregisterShortcut('save-project-meta');
+      unregisterShortcut('save-project-ctrl');
+      unregisterShortcut('recover-autosave-meta');
+      unregisterShortcut('recover-autosave-ctrl');
     };
   }, [handleSaveProject]);
 

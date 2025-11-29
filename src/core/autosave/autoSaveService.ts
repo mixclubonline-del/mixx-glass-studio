@@ -33,6 +33,7 @@ class AutoSaveService {
   private intervalTimer: number | null = null;
   private getProjectState: (() => PersistedProjectState) | null = null;
   private onSaveStatusChange: ((status: AutoSaveState) => void) | null = null;
+  private consumerCount: number = 0; // Track number of active consumers
 
   /**
    * Initialize the auto-save service
@@ -99,9 +100,35 @@ class AutoSaveService {
 
   /**
    * Register the function to get current project state
+   * Can be called multiple times to update the getter
    */
   registerStateGetter(getter: () => PersistedProjectState): void {
     this.getProjectState = getter;
+  }
+
+  /**
+   * Increment consumer count (called when a component mounts)
+   */
+  addConsumer(): void {
+    this.consumerCount++;
+  }
+
+  /**
+   * Decrement consumer count (called when a component unmounts)
+   * Only shutdowns when the last consumer is removed
+   */
+  removeConsumer(): void {
+    this.consumerCount = Math.max(0, this.consumerCount - 1);
+    if (this.consumerCount === 0) {
+      this.shutdown();
+    }
+  }
+
+  /**
+   * Check if service has any active consumers
+   */
+  hasConsumers(): boolean {
+    return this.consumerCount > 0;
   }
 
   /**
