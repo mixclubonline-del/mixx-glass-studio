@@ -29,6 +29,10 @@ import OverlayPortal from './components/layout/OverlayPortal';
 import VelvetComplianceHUD from './components/ALS/VelvetComplianceHUD';
 import PrimeBrainInterface from './components/PrimeBrainInterface';
 import { ExternalPluginTestButton } from './components/dev/ExternalPluginTestButton';
+import { useAutoSave } from './hooks/useAutoSave';
+import { AutoSaveStatus } from './components/AutoSaveStatus';
+import { AutoSaveRecovery } from './components/AutoSaveRecovery';
+import { registerShortcut, unregisterShortcut } from './utils/keyboardShortcuts';
 import { getMixxFXEngine, initializeMixxFXEngine } from './audio/MixxFXEngine';
 import { buildMasterChain } from './audio/masterChain';
 import type { VelvetMasterChain } from './audio/masterChain';
@@ -1321,6 +1325,7 @@ const FlowRuntime: React.FC<FlowRuntimeProps> = ({ arrangeFocusToken }) => {
   const [waveformHeaderSettings, setWaveformHeaderSettings] = useState<WaveformHeaderSettings>(() => ({ ...DEFAULT_WAVEFORM_HEADER_SETTINGS }));
   const [isWaveformSettingsOpen, setIsWaveformSettingsOpen] = useState(false);
   const [masterAnalysis, setMasterAnalysis] = useState({ level: 0, transient: false, waveform: new Uint8Array(128) });
+  const [isRecoveryOpen, setIsRecoveryOpen] = useState(false);
   const [loudnessMetrics, setLoudnessMetrics] = useState(DEFAULT_VELVET_LOUDNESS_METRICS);
   const masterLevelAvg = useRef(0.01);
   const [analysisResult, setAnalysisResult] = useState<FourAnchors | null>(null);
@@ -3080,6 +3085,202 @@ const FlowRuntime: React.FC<FlowRuntimeProps> = ({ arrangeFocusToken }) => {
     });
   };
   
+  // Get project state for auto-save (lightweight, no audio buffer serialization)
+  const getProjectState = useCallback((): PersistedProjectState => {
+    const queueSnapshot = ingestQueueRef.current
+      ? ingestQueueRef.current.getSnapshot()
+      : ingestSnapshot;
+    const historySnapshot = ingestHistoryStore.exportAll();
+    return {
+      tracks,
+      clips,
+      mixerSettings,
+      inserts,
+      masterVolume,
+      masterBalance,
+      isLooping,
+      bpm,
+      ppsValue: ppsAPI.value,
+      scrollX,
+      // Note: audioBuffers not included in auto-save for performance
+      automationData,
+      visibleAutomationLanes,
+      musicalContext,
+      fxBypassState,
+      bloomPosition,
+      floatingBloomPosition,
+      ingestSnapshot: queueSnapshot,
+      ingestHistoryEntries: historySnapshot,
+      followPlayhead,
+      pianoRollSketches: pianoRollStore,
+      pianoRollZoom: {
+        scrollX: pianoRollState.scrollX,
+        zoomX: pianoRollState.zoomX,
+        zoomY: pianoRollState.zoomY,
+      },
+    };
+  }, [
+    tracks,
+    clips,
+    mixerSettings,
+    inserts,
+    masterVolume,
+    masterBalance,
+    isLooping,
+    bpm,
+    scrollX,
+    automationData,
+    visibleAutomationLanes,
+    musicalContext,
+    fxBypassState,
+    bloomPosition,
+    floatingBloomPosition,
+    followPlayhead,
+  ]);
+
+  // Initialize auto-save
+  const autoSave = useAutoSave(getProjectState);
+
+  // Trigger auto-save on state changes (debounced)
+  useEffect(() => {
+    if (autoSave.isEnabled) {
+      autoSave.saveNow();
+    }
+  }, [
+    tracks,
+    clips,
+    mixerSettings,
+    inserts,
+    masterVolume,
+    masterBalance,
+    isLooping,
+    bpm,
+    scrollX,
+    automationData,
+    visibleAutomationLanes,
+    musicalContext,
+    fxBypassState,
+    bloomPosition,
+    floatingBloomPosition,
+    followPlayhead,
+    autoSave.isEnabled,
+    autoSave.saveNow,
+  ]);
+
+  // Keyboard shortcuts for save and recovery
+  useEffect(() => {
+    const isEditableTarget = (event: KeyboardEvent) => {
+      const target = event.target as HTMLElement | null;
+      if (!target) return false;
+      return (
+        target.isContentEditable ||
+        ['INPUT', 'TEXTAREA', 'SELECT'].includes(target.tagName) ||
+        target.getAttribute('role') === 'textbox'
+      );
+    };
+
+    // Cmd/Ctrl+S: Manual save
+    registerShortcut('save-project', { meta: true, key: 's', ctrl: true }, (event) => {
+      if (isEditableTarget(event)) return;
+      handleSaveProject();
+    });
+
+    // Cmd/Ctrl+Shift+S: Open recovery
+    registerShortcut('recover-autosave', { meta: true, shift: true, key: 's', ctrl: true }, (event) => {
+      if (isEditableTarget(event)) return;
+      setIsRecoveryOpen(true);
+    });
+
+    return () => {
+      unregisterShortcut('save-project');
+      unregisterShortcut('recover-autosave');
+    };
+  }, [handleSaveProject]);
+
+  // Handler to restore from auto-save
+  const handleRestoreFromAutoSave = useCallback((state: PersistedProjectState) => {
+    // Restore tracks
+    if (state.tracks) {
+      setTracks(state.tracks);
+    }
+
+    // Restore clips
+    if (state.clips) {
+      setClips(state.clips);
+    }
+
+    // Restore mixer settings
+    if (state.mixerSettings) {
+      setMixerSettings(state.mixerSettings);
+    }
+
+    // Restore inserts
+    if (state.inserts) {
+      setInserts(state.inserts);
+    }
+
+    // Restore master settings
+    if (state.masterVolume !== undefined) {
+      setMasterVolume(typeof state.masterVolume === 'string' ? parseFloat(state.masterVolume) : state.masterVolume);
+    }
+    if (state.masterBalance !== undefined) {
+      setMasterBalance(typeof state.masterBalance === 'string' ? parseFloat(state.masterBalance) : state.masterBalance);
+    }
+
+    // Restore transport
+    if (state.isLooping !== undefined) {
+      setIsLooping(state.isLooping);
+    }
+    if (state.bpm !== undefined) {
+      setBpm(typeof state.bpm === 'string' ? parseFloat(state.bpm) : state.bpm);
+    }
+
+    // Restore other state
+    if (state.scrollX !== undefined) {
+      setScrollX(typeof state.scrollX === 'string' ? parseFloat(state.scrollX) : state.scrollX);
+    }
+    if (state.automationData) {
+      setAutomationData(state.automationData);
+    }
+    if (state.visibleAutomationLanes) {
+      setVisibleAutomationLanes(state.visibleAutomationLanes);
+    }
+    if (state.musicalContext) {
+      setMusicalContext(state.musicalContext);
+    }
+    if (state.fxBypassState) {
+      setFxBypassState(state.fxBypassState);
+    }
+    if (state.bloomPosition) {
+      setBloomPosition(state.bloomPosition);
+    }
+    if (state.floatingBloomPosition) {
+      setFloatingBloomPosition(state.floatingBloomPosition);
+    }
+    if (state.followPlayhead !== undefined) {
+      setFollowPlayhead(state.followPlayhead);
+    }
+
+    console.log('[AutoSave] Project state restored from auto-save');
+  }, [
+    setTracks,
+    setClips,
+    setMixerSettings,
+    setInserts,
+    setMasterVolume,
+    setMasterBalance,
+    setIsLooping,
+    setBpm,
+    setScrollX,
+    setAutomationData,
+    setVisibleAutomationLanes,
+    setMusicalContext,
+    setFxBypassState,
+    setBloomPosition,
+    setFloatingBloomPosition,
+    setFollowPlayhead,
+  ]);
+
   const handleSaveProject = async () => {
       const serializedBuffers = await serializeAudioBuffers(audioBuffers);
       const queueSnapshot = ingestQueueRef.current
@@ -7821,6 +8022,17 @@ const FlowRuntime: React.FC<FlowRuntimeProps> = ({ arrangeFocusToken }) => {
         
         {/* External Plugin Test Button (Dev Only) */}
         <ExternalPluginTestButton audioContext={audioContextRef.current} />
+        
+        {/* Auto-Save Status Indicator */}
+        <AutoSaveStatus getProjectState={getProjectState} />
+
+        {/* Auto-Save Recovery Modal */}
+        <AutoSaveRecovery
+          isOpen={isRecoveryOpen}
+          onClose={() => setIsRecoveryOpen(false)}
+          onRestore={handleRestoreFromAutoSave}
+          getProjectState={getProjectState}
+        />
     </div>
     </FlowLoopWrapper>
   );
