@@ -1,7 +1,21 @@
+/**
+ * New Plugin Registry - Using External Plugin System
+ * 
+ * This replaces the old plugin registry with the external plugin system.
+ * All plugins now use the external components with proper audio engine integration.
+ * 
+ * Supports Flow by maintaining plugin ID compatibility.
+ * Supports Reduction by using a single unified plugin system.
+ * Supports Recall by preserving all plugin metadata and state.
+ */
 
-// audio/plugins.ts
 import React from "react";
 import { IAudioEngine } from "../types/audio-graph";
+import { getAllExternalPlugins } from "../plugins/external/migration/adapter";
+import { PLUGIN_CATALOG } from "./pluginCatalog";
+import type { PluginId, PluginCatalogEntry } from "./pluginTypes";
+
+// Keep Five Pillars and core processors from old system
 import VelvetCurveVisualizer from "../components/VelvetCurveVisualizer";
 import { getVelvetCurveEngine } from "./VelvetCurveEngine";
 import HarmonicLatticeVisualizer from "../components/HarmonicLatticeVisualizer";
@@ -10,22 +24,6 @@ import MixxFXVisualizer from "../components/MixxFXVisualizer";
 import { getMixxFXEngine } from "./MixxFXEngine";
 import TimeWarpVisualizer from "../components/TimeWarpVisualizer";
 import { getTimeWarpEngine } from "./TimeWarpEngine";
-import MixxTuneVisualizer from "../components/plugins/MixxTuneVisualizer";
-import { getMixxTuneEngine } from "./MixxTuneEngine";
-import MixxVerbVisualizer from "../components/plugins/MixxVerbVisualizer";
-import { getMixxVerbEngine } from "./MixxVerbEngine";
-import MixxDelayVisualizer from "../components/plugins/MixxDelayVisualizer";
-import { getMixxDelayEngine } from "./MixxDelayEngine";
-import MixxLimiterVisualizer from "../components/plugins/MixxLimiterVisualizer";
-import { getMixxLimiterEngine } from "./MixxLimiterEngine";
-import MixxClipperVisualizer from "../components/plugins/MixxClipperVisualizer";
-import { getMixxClipperEngine } from "./MixxClipperEngine";
-import MixxDriveVisualizer from "../components/plugins/MixxDriveVisualizer";
-import { getMixxDriveEngine } from "./MixxDriveEngine";
-import MixxGlueVisualizer from "../components/plugins/MixxGlueVisualizer";
-import { getMixxGlueEngine } from "./MixxGlueEngine";
-import { PLUGIN_CATALOG } from "./pluginCatalog";
-import type { PluginId, PluginCatalogEntry } from "./pluginTypes";
 
 export interface PluginConfig extends PluginCatalogEntry {
   component: React.FC<any>;
@@ -74,65 +72,53 @@ export class PlaceholderAudioEngine implements IAudioEngine {
   getParameterMax(name: string): number { return 1; }
 }
 
-
-const COMPONENT_REGISTRY: Partial<Record<PluginId, React.FC<any>>> = {
+/**
+ * Legacy plugin registry for Five Pillars and core processors
+ * These stay in the old system as they're engine-level processors
+ */
+const LEGACY_COMPONENT_REGISTRY: Partial<Record<PluginId, React.FC<any>>> = {
   "velvet-curve": VelvetCurveVisualizer,
   "harmonic-lattice": HarmonicLatticeVisualizer,
-  "mixx-tune": MixxTuneVisualizer,
-  "mixx-verb": MixxVerbVisualizer,
-  "mixx-delay": MixxDelayVisualizer,
-  "mixx-drive": MixxDriveVisualizer,
-  "mixx-glue": MixxGlueVisualizer,
-  "mixx-limiter": MixxLimiterVisualizer,
-  "mixx-clip": MixxClipperVisualizer,
   "mixx-fx": MixxFXVisualizer,
   "time-warp": TimeWarpVisualizer,
 };
 
-const resolveEngineFactory = (
-  id: PluginId,
-  ctx: BaseAudioContext
-): ((ctx: BaseAudioContext) => IAudioEngine) => {
-  switch (id) {
-    case "velvet-curve":
-      return () => getVelvetCurveEngine(ctx);
-    case "harmonic-lattice":
-      return () => getHarmonicLattice(ctx);
-    case "mixx-tune":
-      return () => getMixxTuneEngine(ctx);
-    case "mixx-verb":
-      return () => getMixxVerbEngine(ctx);
-    case "mixx-delay":
-      return () => getMixxDelayEngine(ctx);
-    case "mixx-drive":
-      return () => getMixxDriveEngine(ctx);
-    case "mixx-glue":
-      return () => getMixxGlueEngine(ctx);
-    case "mixx-limiter":
-      return () => getMixxLimiterEngine(ctx);
-    case "mixx-clip":
-      return () => getMixxClipperEngine(ctx);
-    case "mixx-fx":
-      return () => getMixxFXEngine(ctx);
-    case "time-warp":
-      return () => getTimeWarpEngine(ctx);
-    default:
-      return (innerCtx) => new PlaceholderAudioEngine(innerCtx);
-  }
+const LEGACY_ENGINE_FACTORIES: Partial<Record<PluginId, (ctx: BaseAudioContext) => IAudioEngine>> = {
+  "velvet-curve": (ctx) => getVelvetCurveEngine(ctx),
+  "harmonic-lattice": (ctx) => getHarmonicLattice(ctx),
+  "mixx-fx": (ctx) => getMixxFXEngine(ctx),
+  "time-warp": (ctx) => getTimeWarpEngine(ctx),
 };
 
+/**
+ * Main plugin registry - combines external plugins with legacy processors
+ */
 export function getPluginRegistry(ctx: BaseAudioContext): PluginConfig[] {
-  return Object.values(PLUGIN_CATALOG)
-    .filter((entry) => Boolean(COMPONENT_REGISTRY[entry.id]))
-    .map((entry) => {
-      const component = COMPONENT_REGISTRY[entry.id]!;
-      const engineInstance = resolveEngineFactory(entry.id, ctx);
+  // Get all external plugins
+  const externalPlugins = getAllExternalPlugins(ctx);
+
+  // Get legacy plugins (Five Pillars)
+  const legacyPlugins: PluginConfig[] = Object.entries(LEGACY_COMPONENT_REGISTRY)
+    .map(([id, component]) => {
+      const catalogEntry = PLUGIN_CATALOG[id as PluginId];
+      if (!catalogEntry) return null;
+
+      const engineFactory = LEGACY_ENGINE_FACTORIES[id as PluginId];
+      if (!engineFactory) return null;
+
       return {
-        ...entry,
-        component,
-        engineInstance,
+        ...catalogEntry,
+        component: component!,
+        engineInstance: engineFactory,
       };
-    });
+    })
+    .filter((plugin): plugin is PluginConfig => plugin !== null);
+
+  // Combine external and legacy plugins
+  const allPlugins = [...legacyPlugins, ...externalPlugins];
+
+  // Filter to only include plugins in catalog
+  return allPlugins.filter(plugin => PLUGIN_CATALOG[plugin.id]);
 }
 
 export type {

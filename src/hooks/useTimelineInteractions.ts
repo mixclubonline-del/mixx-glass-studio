@@ -45,6 +45,12 @@ export function useTimelineInteractions({
   const rafRef = useRef<number | null>(null);
   const smoothScrollJobRef = useRef<SmoothScrollJob | null>(null);
   const lastWheelTimeRef = useRef<number>(0);
+  const scrollXRef = useRef(scrollX);
+
+  // Keep ref in sync with state
+  useEffect(() => {
+    scrollXRef.current = scrollX;
+  }, [scrollX]);
 
   const stopMomentum = useCallback(() => {
     if (rafRef.current !== null) {
@@ -59,7 +65,9 @@ export function useTimelineInteractions({
       const viewport = viewportRef.current;
       const viewportWidth = viewport?.clientWidth ?? 0;
       const maxScroll = Math.max(0, contentWidth - viewportWidth);
-      setScrollX(clamp(next, 0, maxScroll));
+      const clamped = clamp(next, 0, maxScroll);
+      scrollXRef.current = clamped;
+      setScrollX(clamped);
     },
     [contentWidth, setScrollX, viewportRef]
   );
@@ -75,11 +83,12 @@ export function useTimelineInteractions({
         momentumVelocityRef.current = 0;
         return;
       }
-      applyScroll(scrollX + velocity);
+      // Use ref value instead of state to avoid dependency loop
+      applyScroll(scrollXRef.current + velocity);
       momentumVelocityRef.current = velocity * 0.92;
       scheduleMomentumStep();
     });
-  }, [applyScroll, scrollX]);
+  }, [applyScroll]);
 
   const handleWheel = useCallback(
     (event: WheelEvent) => {

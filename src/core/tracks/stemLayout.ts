@@ -16,19 +16,21 @@ export function stemTrackIdFor(stem: CanonicalStem): string {
   return `track-stem-${stem}`;
 }
 
-function createTrackIfMissing(tracks: TrackData[], track: TrackData) {
+function createTrackIfMissing(track: TrackData) {
+  const { getTracks, addTrack } = useTimelineStore.getState();
+  const tracks = getTracks(); // Always get fresh tracks from Zustand for idempotency
   const exists = tracks.some((t) => t.id === track.id);
   if (exists) return;
-  const { addTrack } = useTimelineStore.getState();
   addTrack(track);
 }
 
+/**
+ * Ensure deterministic stem track layout exists in Zustand store.
+ * Idempotent: safe to call multiple times, won't duplicate tracks.
+ */
 export function ensureStemTrackLayout(): void {
-  const { getTracks } = useTimelineStore.getState();
-  const tracks = getTracks();
-
   // 1) Reserved lanes
-  createTrackIfMissing(tracks, {
+  createTrackIfMissing({
     id: 'track-two-track',
     trackName: 'TWO TRACK',
     trackColor: 'cyan',
@@ -39,7 +41,7 @@ export function ensureStemTrackLayout(): void {
     locked: false,
   });
 
-  createTrackIfMissing(tracks, {
+  createTrackIfMissing({
     id: 'track-hush-record',
     trackName: 'HUSH RECORD',
     trackColor: 'magenta',
@@ -69,7 +71,7 @@ export function ensureStemTrackLayout(): void {
   };
 
   STEM_ORDER.forEach((stem) => {
-    createTrackIfMissing(tracks, {
+    createTrackIfMissing({
       id: stemTrackIdFor(stem),
       trackName: stem.toUpperCase(),
       trackColor: stemColorByKey[stem],

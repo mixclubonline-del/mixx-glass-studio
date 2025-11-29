@@ -1,129 +1,237 @@
-# MixClub Online - Artist & Engineer Community Platform
+# Mixx Club Studio
 
-🎵 **Where Culture, Sound, and Engineering Intersect** 🎵
+**Professional Digital Audio Workstation — Hip-Hop Native, AI-Assisted, Vision-Forward**
 
-MixClub Online is the premier digital community for artists, engineers, and producers in the hip-hop ecosystem. Built on the principles of **Flow**, **Reduction**, and **Mixx Recall**, this platform connects creators across the globe.
+Mixx Club Studio is a next-generation DAW built for hip-hop producers and engineers. Featuring the proprietary **Five Pillars** audio processing chain, AI-driven mix analysis, and a glass-morphism interface optimized for creative flow.
 
-## 🌟 **Core Philosophy**
+---
 
-### **The Three Pillars**
-- **Flow**: Preserve creator momentum, no friction, no clutter
-- **Reduction**: Strip the noise, keep only what matters  
+## 🌟 Core Philosophy
+
+### The Three Doctrines
+
+- **Flow**: Preserve creator momentum — no friction, no clutter, pure creative energy
+- **Reductionist Engineering**: Strip the noise, keep only what matters
 - **Mixx Recall**: The system remembers, so users don't have to
 
-### **Community Ethos**
-- **Culture First**: Hip-hop as nucleus includes Trap, Drill, R&B, Afrobeat, Reggaetón, Dancehall, Amapiano, UK Grime, Baile Funk
-- **Collaboration Over Competition**: Build together, grow together
-- **Quality Over Quantity**: Every interaction should add value
-- **Respect the Craft**: Honor the engineering behind the art
+### Design Aesthetic
 
-## 🚀 **Key Features**
+- **Glass Morphism**: Translucent layers with backdrop blur
+- **Temperature-Based Feedback**: Color and motion replace raw numbers
+- **Adaptive Layout**: Context-aware interface that adapts to platform and screen size
+- **Vision-Forward**: Optimized for Google Glass / Apple Vision aesthetic
 
-### **Artist Hub**
-- **Profile Showcase**: Display your work, influences, and style
-- **Collaboration Board**: Find engineers, producers, and fellow artists
-- **Project Galleries**: Share beats, tracks, and creative process
-- **Skill Development**: Access tutorials, workshops, and mentorship
+---
 
-### **Engineer Zone** 
-- **Technical Forums**: Deep-dive discussions on mixing, mastering, and production
-- **Gear Reviews**: Honest assessments from working professionals
-- **Client Matching**: Connect with artists who need your expertise
-- **Knowledge Sharing**: Share techniques, tips, and industry insights
+## 🎵 Core Features
 
-### **Community Features**
-- **Live Sessions**: Real-time collaboration and feedback
-- **Challenge Boards**: Monthly creative challenges and competitions
-- **Mentorship Program**: Connect experienced pros with emerging talent
-- **Industry News**: Stay updated on trends, releases, and opportunities
+### Five Pillars Audio Processing Chain
 
-## 🛠️ **Technology Stack**
+The proprietary mastering system that shapes tone through five interconnected stages:
 
-- **Frontend**: React 18 + TypeScript + Vite
-- **Styling**: Tailwind CSS + Framer Motion
-- **Backend**: Supabase (Auth, Database, Storage)
-- **State Management**: Zustand
-- **UI Components**: Radix UI + Custom MixClub Design System
-- **Deployment**: Vercel
+1. **Velvet Curve Engine**: Dynamic tonal shaping with temperature-based feedback
+2. **Harmonic Lattice**: Upper harmonic processing for presence and airiness
+3. **Phase Weave**: Stereo field manipulation and width control
+4. **Velvet Floor**: Sub-harmonic foundation with warmth and depth
+5. **Master Chain**: Professional limiting, dithering, and compliance monitoring
 
-## 🎯 **Getting Started**
+### Professional Timeline
 
-### **Prerequisites**
-- Node.js 18+
-- npm or yarn
-- Supabase account
+- Multi-region editing with collision detection
+- Time-aware region manipulation
+- Crossfade management
+- Group-based alignment
+- Zero-crossing snap assist
+- Glass Rail Grid for beat/bar alignment
+- Professional playhead with pulse visualization
 
-### **Installation**
+### Advanced Mixer Console
+
+- Flow Console with multiple view modes (Compact, Matrix, Analyzer)
+- Professional channel strips with inserts and sends
+- ALS (Advanced Leveling System) metering
+- Real-time LUFS and True Peak monitoring
+- Bus routing and sidechain support
+- Temperature-based visual feedback
+
+### AI Integration
+
+- **Prime Brain**: Context-aware AI assistant for mixing guidance
+- **Quantum Neural Network**: Genre detection, pattern recognition, mix recommendations
+- **Musical Context Engine**: Real-time key/chord detection and harmonic analysis
+- **Stem Separation**: AI-powered source separation (Demucs integration)
+
+### Adaptive Layout System
+
+- Platform detection (Desktop, Mobile, Tablet, VisionOS)
+- Responsive breakpoints with four layout modes (Compact, Standard, Expanded, Immersive)
+- Touch-optimized controls for mobile devices
+- Context-aware component visibility
+
+---
+
+## 🛠️ Technology Stack
+
+### Frontend
+- **React 18** + **TypeScript**
+- **Vite** / **Rsbuild** (parallel build support)
+- **Tailwind CSS** + **PostCSS**
+- **Framer Motion** for animations
+- **Radix UI** for accessible components
+
+### Audio Processing
+- **Web Audio API** for real-time processing
+- **Audio Worklets** for low-latency DSP
+- **WASM** modules for stem separation
+- **Custom DSP algorithms** for Five Pillars
+
+### State Management
+- **Zustand** for global state
+- **Custom hooks** for audio context and timeline
+- **Flow Context Service** for real-time context mesh
+
+### Desktop App
+- **Tauri 2.x** for cross-platform desktop builds
+- **Rust** backend for performance-critical operations
+- Native window controls
+
+### AI & Machine Learning
+- **TensorFlow.js** for Quantum Neural Network
+- **Google Generative AI** for Prime Brain
+- **Custom WASM models** for audio analysis
+
+---
+
+## 🚀 Getting Started
+
+### Prerequisites
+
+- **Node.js** 18+ 
+- **Rust** (for Tauri desktop builds)
+- **npm** or **bun**
+
+### Installation
+
 ```bash
 # Clone the repository
-git clone https://github.com/mixclubonline-del/raven-mix-ai.git
-cd mixclub-online
+git clone <your-repo-url>
+cd mixx-glass-studio
 
 # Install dependencies
 npm install
 
 # Set up environment variables
-cp .env.example .env.local
-# Add your Supabase credentials
+cp env.example .env.local
+# Add your API keys if needed
 
-# Start development server
+# Start development server (Vite)
 npm run dev
+
+# Or use Rsbuild
+npm run dev:rsbuild
+
+# For desktop app development
+npm run tauri:dev
 ```
 
-### **Environment Setup**
-```env
-VITE_SUPABASE_URL=your_supabase_url
-VITE_SUPABASE_ANON_KEY=your_supabase_anon_key
+### Build Commands
+
+```bash
+# Web build
+npm run build
+
+# Desktop app build
+npm run tauri:build
+
+# Type checking
+npm run type-check
+
+# Linting
+npm run lint
 ```
 
-## 📁 **Project Structure**
+---
+
+## 📁 Project Structure
 
 ```
-src/
-├── components/          # Reusable UI components
-│   ├── ui/             # Base UI components (Radix)
-│   ├── community/      # Community-specific components
-│   ├── artist/         # Artist-focused components
-│   └── engineer/       # Engineer-focused components
-├── pages/              # Route components
-├── hooks/              # Custom React hooks
-├── store/              # Zustand state management
-├── services/           # API and external services
-├── types/              # TypeScript type definitions
-├── utils/              # Utility functions
-└── assets/             # Images, icons, etc.
+mixx-glass-studio/
+├── src/
+│   ├── audio/              # Audio processing engines
+│   │   ├── fivePillars.ts  # Five Pillars implementation
+│   │   ├── masterChain.ts  # Master chain processing
+│   │   └── plugins.ts      # Plugin system
+│   ├── components/         # React components
+│   │   ├── ArrangeWindow.tsx
+│   │   ├── mixer/          # Mixer console components
+│   │   ├── timeline/       # Timeline components
+│   │   └── ALS/            # Advanced Leveling System
+│   ├── core/               # Core DAW logic
+│   │   ├── responsive/     # Adaptive layout system
+│   │   └── loop/           # Flow loop learning
+│   ├── ai/                 # AI integration
+│   │   ├── QuantumNeuralNetwork.ts
+│   │   └── PrimeBrainSnapshot.ts
+│   ├── hooks/              # Custom React hooks
+│   ├── state/              # State management
+│   ├── types/              # TypeScript definitions
+│   └── utils/              # Utility functions
+├── src-tauri/              # Tauri desktop app
+├── docs/                   # Documentation
+│   ├── briefs/           # Feature briefs
+│   ├── prototypes/          # Prototype docs
+│   └── terms/               # Proprietary glossary
+├── prime-fabric/           # Prime Fabric (internal)
+└── supabase/               # Database schema
 ```
 
-## 🎨 **Design System**
+---
 
-### **Color Palette**
+## 🎨 Design System
+
+### Color Palette
+
 - **Mixx Blue**: `#56C8FF` - Calm, focused energy
-- **Prime Violet**: `#A57CFF` - Creative, energetic
+- **Prime Violet**: `#A57CFF` - Creative, energetic  
 - **Magenta**: `#FF67C7` - Bold, expressive
 - **Hot Pink**: `#FF4D8D` - Intense, passionate
 - **Ice Blue**: `#EAF2FF` - Clean, professional
 
-### **Typography**
-- **Headings**: Inter (clean, modern)
-- **Body**: System fonts (optimal performance)
-- **Accent**: Custom MixClub font for branding
+### Typography
 
-### **Components**
+- **Headings**: System fonts (Inter fallback)
+- **Body**: System fonts for optimal performance
+- **Code**: Monospace for technical content
+
+### Components
+
 - **Glass Morphism**: Translucent cards with backdrop blur
-- **Gradient Accents**: Velvet-inspired color transitions
-- **Micro-interactions**: Smooth animations and transitions
-- **Responsive Design**: Mobile-first approach
+- **ALS Feedback**: Temperature-based color and motion
+- **Bloom Menu**: Voice-aware, on-demand action surface
+- **Flow Dock**: Contextual tool dock
 
-## 🔧 **Development Guidelines**
+---
 
-### **Code Standards**
-- TypeScript strict mode enabled
-- ESLint + Prettier for code formatting
+## 🔧 Development Guidelines
+
+### Code Standards
+
+- **TypeScript** strict mode enabled
+- **ESLint** + **Prettier** for formatting
 - Component-driven development
 - Custom hooks for business logic
 - Zustand for state management
 
-### **Component Structure**
+### Flow Doctrine Compliance
+
+All code must align with the three doctrines:
+
+1. **Flow**: No friction, preserve momentum
+2. **Reduction**: Only what matters, strip noise
+3. **Mixx Recall**: System remembers context
+
+### Component Structure
+
 ```typescript
 // Example component structure
 interface ComponentProps {
@@ -148,62 +256,75 @@ export const Component: React.FC<ComponentProps> = ({ prop1, prop2 }) => {
 };
 ```
 
-## 🌐 **Deployment**
+---
 
-### **Production Build**
-```bash
-npm run build
-npm run preview
-```
+## 📚 Documentation
 
-### **Environment Variables**
-- Production Supabase credentials
-- Analytics tracking IDs
-- CDN configuration
-
-## 📈 **Roadmap**
-
-### **Phase 1: Foundation** ✅
-- [x] Project setup and architecture
-- [x] Authentication system
-- [x] Basic community features
-- [x] User profiles and roles
-
-### **Phase 2: Core Features** 🚧
-- [ ] Advanced collaboration tools
-- [ ] Real-time messaging
-- [ ] Project sharing and feedback
-- [ ] Skill-based matching
-
-### **Phase 3: Advanced** 📋
-- [ ] AI-powered recommendations
-- [ ] Advanced analytics
-- [ ] Mobile app
-- [ ] Integration with Mixx Club Studio
-
-## 🤝 **Contributing**
-
-We welcome contributions from the community! Please see our [Contributing Guidelines](CONTRIBUTING.md) for details.
-
-### **Development Workflow**
-1. Fork the repository
-2. Create a feature branch
-3. Make your changes
-4. Add tests if applicable
-5. Submit a pull request
-
-## 📞 **Support**
-
-- **Discord**: [MixClub Community](https://discord.gg/mixclub)
-- **Email**: support@mixclub.online
-- **Documentation**: [docs.mixclub.online](https://docs.mixclub.online)
-
-## 📄 **License**
-
-This project is licensed under the MIT License - see the [LICENSE](LICENSE) file for details.
+- **[Flow Contract](./docs/briefs/flow-contract.md)**: System architecture and signal flow
+- **[Proprietary Glossary](./docs/terms/proprietary-glossary.md)**: Domain-specific terminology
+- **[Adaptive Layout System](./src/core/responsive/ADAPTIVE_LAYOUT.md)**: Responsive design docs
+- **[Placeholder Audit](./PLACEHOLDER_AUDIT_PLAN.md)**: Known placeholders and TODOs
 
 ---
 
-**Built with ❤️ by the MixClub Team**
+## 🎯 Current Status
 
-*Where Culture, Sound, and Engineering Intersect*
+### ✅ Implemented
+
+- Five Pillars audio processing chain
+- Professional timeline with multi-region editing
+- Flow Console mixer with multiple view modes
+- ALS (Advanced Leveling System) metering
+- Adaptive layout system
+- Prime Brain AI integration
+- Quantum Neural Network
+- Tauri desktop app framework
+- Stem separation infrastructure
+
+### 🚧 In Progress
+
+- Rsbuild migration (parallel to Vite)
+- Professional track headers
+- Enhanced waveform visualization
+- Plugin parameter automation
+- Flow Loop learning system
+
+### 📋 Planned
+
+- Real Demucs model integration
+- TimeWarp engine implementation
+- Advanced HPSS algorithm
+- Prime Brain backend connection
+- Pattern learning system
+
+---
+
+## 🤝 Contributing
+
+This is a proprietary system built by Ravenis Prime. For collaboration inquiries, please reach out directly.
+
+### Development Workflow
+
+1. Create a feature branch
+2. Follow Flow Doctrine principles
+3. Ensure TypeScript strict compliance
+4. Test audio processing thoroughly
+5. Maintain ALS feedback integration
+
+---
+
+## 📄 License
+
+MIT License - See [LICENSE](./LICENSE) file for details.
+
+---
+
+## 👤 Author
+
+**Ravenis Prime** - Founder of Mixx Club
+
+---
+
+**Built with Flow, Reduction, and Mixx Recall**
+
+*Professional DAW for the Hip-Hop Generation*

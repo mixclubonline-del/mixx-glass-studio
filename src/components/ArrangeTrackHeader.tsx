@@ -102,11 +102,18 @@ const ArrangeTrackHeader: React.FC<ArrangeTrackHeaderProps> = ({
   };
 
   return (
-    <button
-      type="button"
-      className="group relative flex h-full w-full flex-col justify-between overflow-hidden border-b border-white/10 p-3 text-left transition-all duration-200 focus:outline-none focus-visible:ring-2 focus-visible:ring-cyan-400/70"
+    <div
+      role="button"
+      tabIndex={0}
+      className="group relative flex h-full w-full flex-col justify-between overflow-hidden border-b border-white/10 p-3 text-left transition-all duration-200 focus:outline-none focus-visible:ring-2 focus-visible:ring-cyan-400/70 cursor-pointer"
       style={rootStyle}
       onClick={handleSelectTrack}
+      onKeyDown={(e) => {
+        if (e.key === 'Enter' || e.key === ' ') {
+          e.preventDefault();
+          handleSelectTrack();
+        }
+      }}
     >
       <div className="absolute inset-0 z-[-1] opacity-0 transition-opacity duration-300 group-hover:opacity-100">
         <div
@@ -216,7 +223,7 @@ const ArrangeTrackHeader: React.FC<ArrangeTrackHeaderProps> = ({
       {!statusChips.length && (
         <div className="mt-4 h-[1px] w-full rounded-full bg-gradient-to-r from-transparent via-white/10 to-transparent" />
       )}
-    </button>
+    </div>
   );
 };
 

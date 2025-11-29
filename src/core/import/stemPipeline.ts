@@ -25,6 +25,7 @@ import {
   buildAndHydrateFromStem,
   type StemImportPayload,
 } from './trackBuilder';
+import { buildStemSeparationSnapshot } from './stemSeparationSnapshot';
 
 /**
  * Sanitize stems to avoid discarding very quiet content.
@@ -60,6 +61,7 @@ export interface FlowImportResult {
   timing: TimingAnalysis;
   metadata: StemMetadata;
   stems: Record<string, AudioBuffer | null>;
+  trackIds: string[]; // Track IDs that have clips placed (for state initialization)
 }
 
 /**
@@ -72,7 +74,8 @@ export interface FlowImportResult {
  */
 export async function runFlowStemPipeline(
   file: File,
-  audioContext: AudioContext
+  audioContext: AudioContext,
+  onSnapshot?: (snapshot: any) => void
 ): Promise<FlowImportResult> {
   // 1) file prep
   const prep = await prepFileForImport(file, audioContext);
@@ -80,9 +83,132 @@ export async function runFlowStemPipeline(
   // 2) classify main audio
   const classification = await classifyAudio(prep.audioBuffer);
   
+  // Track processing time for snapshot export
+  const processingStartTime = performance.now();
+  
   // 3) run stem separation
+  // Try revolutionary system first, fall back to standard engine if needed
   const optimalMode = determineOptimalMode(classification);
-  const stemResult = await stemSplitEngine(prep.audioBuffer, optimalMode, classification);
+  let stemResult;
+  let quantumFeatures: any = null;
+  let musicalContext: any = null;
+  
+  // Check if revolutionary system should be used
+  const useRevolutionary = 
+    classification.type === 'twotrack' || 
+    classification.type === 'full' ||
+    (typeof window !== 'undefined' && (window as any).__mixx_use_revolutionary_stems);
+  
+  if (useRevolutionary) {
+    console.log('[FLOW IMPORT] Using Revolutionary Stem Separation System...');
+    try {
+      // Try revolutionary proprietary system
+      const { getRevolutionaryStemEngine } = await import('./revolutionaryStemEngine');
+      const revolutionaryEngine = getRevolutionaryStemEngine();
+      
+      // Extract features and context for snapshot
+      const { getQuantumStemFeatureExtractor } = await import('./quantumStemEngine');
+      const { getMusicalContextStemEngine } = await import('./musicalContextStemEngine');
+      const featureExtractor = getQuantumStemFeatureExtractor();
+      const contextEngine = getMusicalContextStemEngine();
+      
+      // Get features and context from revolutionary engine
+      // The engine extracts these internally, so we extract them here for snapshot export
+      const featureExtractor = getQuantumStemFeatureExtractor();
+      const contextEngine = getMusicalContextStemEngine();
+      
+      quantumFeatures = await featureExtractor.extractFeatures(prep.audioBuffer, {
+        sampleRate: prep.audioBuffer.sampleRate,
+      });
+      
+      musicalContext = await contextEngine.analyzeMusicalContext(prep.audioBuffer);
+      
+      stemResult = await revolutionaryEngine.separateStems(prep.audioBuffer, classification, {
+        useTransformer: false, // Transformer requires training - use musical context for now
+        useMusicalContext: true,
+        useFivePillars: true,
+        preferQuality: true,
+      });
+      
+      console.log('[FLOW IMPORT] Revolutionary separation complete:', {
+        vocals: stemResult.vocals !== null,
+        drums: stemResult.drums !== null,
+        bass: stemResult.bass !== null,
+        harmonic: stemResult.harmonic !== null,
+      });
+    } catch (revolutionaryError) {
+      console.warn('[FLOW IMPORT] Revolutionary separation failed, trying AI model fallback:', revolutionaryError);
+      
+      // Fallback to AI model for two-track files
+      if (classification.type === 'twotrack') {
+        try {
+          const { default: StemSeparationIntegration } = await import('../../audio/StemSeparationIntegration');
+          const integration = new StemSeparationIntegration(audioContext, {
+            autoSeparate: true,
+            model: 'htdemucs_6stems',
+          });
+          
+          const aiStems = await integration.engine.separateStems(prep.audioBuffer, {
+            model: 'htdemucs_6stems',
+            output_format: 'wav',
+            normalize: true,
+          });
+          
+          // Map AI stems to our format
+          stemResult = {
+            vocals: aiStems.vocals || null,
+            drums: aiStems.drums || null,
+            bass: aiStems.bass || null,
+            music: aiStems.other || null,
+            perc: aiStems.drums || null,
+            harmonic: aiStems.other || aiStems.guitar || aiStems.piano || null,
+            sub: null,
+          };
+          
+          // Extract sub-bass
+          if (stemResult.bass) {
+            try {
+              const { extractSubBass } = await import('./extractSubBass');
+              stemResult.sub = await extractSubBass(stemResult.bass);
+            } catch (e) {
+              // Sub extraction is optional
+            }
+          }
+        } catch (aiError) {
+          console.warn('[FLOW IMPORT] AI model fallback failed, using standard engine:', aiError);
+          stemResult = await stemSplitEngine(prep.audioBuffer, optimalMode, classification);
+        }
+      } else {
+        // Use standard engine for other file types
+        stemResult = await stemSplitEngine(prep.audioBuffer, optimalMode, classification);
+      }
+    }
+  } else {
+    // Use standard engine for simple file types
+    stemResult = await stemSplitEngine(prep.audioBuffer, optimalMode, classification);
+  }
+  
+  // Export snapshot for training (if enabled and features available)
+  const processingTime = performance.now() - processingStartTime;
+  if (onSnapshot && quantumFeatures) {
+    try {
+      const snapshot = buildStemSeparationSnapshot({
+        audioBuffer: prep.audioBuffer,
+        quantumFeatures,
+        musicalContext: musicalContext || null,
+        stemResult,
+        classification,
+        processingTime,
+      });
+      onSnapshot(snapshot);
+      
+      if ((import.meta as any).env?.DEV) {
+        console.log('[FLOW IMPORT] Snapshot exported for training:', snapshot.id);
+      }
+    } catch (snapshotError) {
+      console.warn('[FLOW IMPORT] Failed to build snapshot for training:', snapshotError);
+    }
+  }
   
   // Convert StemResult to Record<string, AudioBuffer | null>
   const stems: Record<string, AudioBuffer | null> = {
@@ -169,6 +295,8 @@ export async function runFlowStemPipeline(
   const tracks = getTracks();
   const validKeys = new Set<string>(STEM_ORDER as unknown as string[]);
   let placed = 0;
+  const usedTrackIds = new Set<string>();
+  
   (Object.entries(normalizedStems) as Array<[string, AudioBuffer]>).forEach(([stemName, buffer]) => {
     if (!buffer) return;
     if (!validKeys.has(stemName)) return;
@@ -177,6 +305,8 @@ export async function runFlowStemPipeline(
     const bufferId = `buffer-stem-${stemName}-${Date.now()}-${placed}`;
     const clipId = `clip-stem-${stemName}-${Date.now()}-${placed}`;
     placed += 1;
+    usedTrackIds.add(targetId);
+    
     // Register buffer
     setAudioBuffer(bufferId, buffer);
     // Place clip aligned at start on target track
@@ -203,5 +333,6 @@ export async function runFlowStemPipeline(
     timing,
     metadata,
     stems,
+    trackIds: Array.from(usedTrackIds), // Return track IDs for state initialization
   };
 }

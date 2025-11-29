@@ -2,6 +2,31 @@
 
 A comprehensive responsive design system for consistent scaling across all screen resolutions and sizes.
 
+## New: Adaptive Layout System
+
+The responsive system now includes **Adaptive Layout** capabilities that adapt the Studio layout based on platform, screen size, and orientation. See [ADAPTIVE_LAYOUT.md](./ADAPTIVE_LAYOUT.md) for complete documentation.
+
+### Quick Start
+
+```tsx
+import { useAdaptiveLayout } from '@/core/responsive';
+
+function MyComponent() {
+  const layout = useAdaptiveLayout();
+  
+  // Use adaptive dimensions
+  const headerWidth = layout.trackHeaderWidth;
+  const padding = layout.timelinePadding;
+  
+  // Check visibility
+  if (layout.showBloom) {
+    // Show Bloom HUD
+  }
+  
+  return <div style={{ width: headerWidth, padding }}>...</div>;
+}
+```
+
 ## Features
 
 - **Viewport-based scaling**: UI elements scale proportionally based on screen size

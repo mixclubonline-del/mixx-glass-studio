@@ -139,10 +139,41 @@ export async function stemSplitEngine(
     return result;
   }
   
-  // 2TRACK MODE
+  // 2TRACK MODE - Use AI model for proper stem separation of final mixes
   if (mode === '2track') {
-    result.music = await renderPass((ctx, src) => src);
-    return result;
+    console.log('[FLOW IMPORT] Two-track detected - using AI model for stem separation...');
+    try {
+      // Try to use AI model for proper separation
+      const aiResult = await aiFullStemModel(audioBuffer);
+      
+      // Map AI results to our stem format
+      if (aiResult.vocals) result.vocals = aiResult.vocals;
+      if (aiResult.drums) result.drums = aiResult.drums;
+      if (aiResult.bass) result.bass = aiResult.bass;
+      if (aiResult.music) {
+        result.music = aiResult.music;
+        result.harmonic = aiResult.music; // Use music as harmonic for two-track
+      }
+      
+      // If we got some stems, return them
+      const stemCount = Object.values(result).filter(b => b !== null).length;
+      if (stemCount > 0) {
+        console.log('[FLOW IMPORT] AI separation complete for two-track:', {
+          vocals: result.vocals !== null,
+          drums: result.drums !== null,
+          bass: result.bass !== null,
+          music: result.music !== null,
+        });
+        return result;
+      }
+      
+      // Fall through to full mode if AI didn't produce stems
+      console.log('[FLOW IMPORT] AI separation returned no stems, falling back to full mode...');
+    } catch (aiError) {
+      console.warn('[FLOW IMPORT] AI separation failed, falling back to full mode:', aiError);
+      // Fall through to full mode
+    }
+    // Don't return here - let it fall through to FULL MODE for proper separation
   }
   
   // FULL MODE - Use HPSS + vocal extraction for proper stem separation
