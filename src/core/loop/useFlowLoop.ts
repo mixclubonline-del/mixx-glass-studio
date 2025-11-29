@@ -25,6 +25,7 @@ import { usePerformanceMode } from '../performance/usePerformanceMode';
 import { usePunchMode } from '../performance/punchMode';
 import { useAutoPunch } from '../performance/autoPunch';
 import { getBestTake } from '../performance/compBrain';
+import { hasAudioPlaying, isActuallyPlaying } from './audioLevelDetector';
 
 const LOOP_INTERVAL_MS = 40; // ~25fps, smooth but not excessive
 
@@ -46,12 +47,43 @@ export function useFlowLoop() {
       // Prune events first to keep memory usage constant and performance smooth
       pruneEvents();
       
+      // Step 0: Check for actual audio (contextual awareness)
+      // Get master analyser from window global (set by App.tsx)
+      const masterAnalyser = (window as any).__mixx_masterAnalyser as AnalyserNode | null;
+      const hasAudio = hasAudioPlaying(masterAnalyser);
+      
       // Step 1: Sense session signals (reads from window.__mixx_* globals)
       const signals = gatherSessionSignals();
       
+      // Contextual check: Only process if there's actual audio OR editing/recording activity
+      // This ensures components are contextual - they only show values when there's real activity
+      const isActive = hasAudio || signals.editing || signals.recording || signals.armedTrack;
+      
       // Step 2: Prime Brain interprets (behavior engine computes automatically)
-      primeBrain.updateFromSession(signals);
+      // But only if there's actual activity (audio or user interaction)
+      if (isActive) {
+        primeBrain.updateFromSession(signals);
+      } else {
+        // No audio and no activity - reset to idle state
+        primeBrain.updateFromSession({
+          ...signals,
+          playing: false, // Override playback state if no actual audio
+        });
+      }
+      
       let brainState = primeBrain.state;
+      
+      // Contextual adjustment: If no audio, reduce all values proportionally
+      if (!hasAudio && signals.playing) {
+        // Playback is "active" but no audio - reduce values
+        brainState = {
+          ...brainState,
+          flow: brainState.flow * 0.3,
+          pulse: brainState.pulse * 0.3,
+          momentum: brainState.momentum * 0.3,
+          tension: brainState.tension * 0.5,
+        };
+      }
       
       // Comping Brain feedback (if best take exists, subtly influence ALS)
       const bestTake = getBestTake();
@@ -123,23 +155,51 @@ export function useFlowLoop() {
         // Don't prepare Bloom context - keep it quiet
       } else {
         // Normal mode: ALS displays brain state (passive, only displays)
-        als.setState({
-          flow: brainState.flow,
-          pulse: brainState.pulse,
-          tension: brainState.tension,
-          momentum: brainState.momentum,
-          hushFlags: brainState.hushWarnings,
-        });
-        
-        // Step 4: Bloom prepares context (pre-charge, doesn't open)
-        bloom.prepare({
-          mode: brainState.mode,
-          flow: brainState.flow,
-          pulse: brainState.pulse,
-          tension: brainState.tension,
-          commonActions: [], // TODO: Learn from user patterns
-          predictions: [], // TODO: Predict next steps
-        });
+        // But only if there's actual audio or activity
+        if (isActive) {
+          als.setState({
+            flow: brainState.flow,
+            pulse: brainState.pulse,
+            tension: brainState.tension,
+            momentum: brainState.momentum,
+            hushFlags: brainState.hushWarnings,
+          });
+          
+          // Step 4: Bloom prepares context (pre-charge, doesn't open)
+          bloom.prepare({
+            mode: brainState.mode,
+            flow: brainState.flow,
+            pulse: brainState.pulse,
+            tension: brainState.tension,
+            commonActions: [], // TODO: Learn from user patterns
+            predictions: [], // TODO: Predict next steps
+          });
+        } else {
+          // No audio and no activity - reset ALS to zero
+          als.setState({
+            flow: 0,
+            pulse: 0,
+            tension: 0,
+            momentum: 0,
+            hushFlags: [],
+          });
+          
+          // Also reset window.__als global to ensure UI components see zero values
+          if (typeof window !== 'undefined') {
+            window.__als = window.__als || {
+              flow: 0,
+              temperature: 'cold',
+              guidance: '',
+              pulse: 0,
+            };
+            window.__als.pulse = 0;
+            window.__als.flow = 0;
+            window.__als.temperature = 'cold';
+            (window.__als as any).momentum = 0;
+            (window.__als as any).pressure = 0;
+            (window.__als as any).harmony = 0;
+          }
+        }
       }
       
       // Step 5: Session Core adapts behavior (includes Performance Mode settings)

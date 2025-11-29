@@ -1633,8 +1633,12 @@ const FlowRuntime: React.FC<FlowRuntimeProps> = ({ arrangeFocusToken }) => {
     const sessionProbeContext = sessionProbeState?.context ?? null;
 
     // Enhanced ALS channel calculation with Flow Context integration
-    const alsTemperature = clamp01(masterAnalysis.level);
-    let momentum = Math.max(flowContext.momentum, isPlaying ? 0.45 + masterAnalysis.level * 0.4 : 0.18);
+    // Contextual check: Only compute if there's actual audio
+    const hasAudio = masterAnalysis.level > 0.001;
+    const alsTemperature = hasAudio ? clamp01(masterAnalysis.level) : 0;
+    let momentum = hasAudio 
+      ? Math.max(flowContext.momentum, isPlaying ? 0.45 + masterAnalysis.level * 0.4 : 0.18)
+      : 0; // No audio = zero momentum
     if (mixerActionPulse) {
       momentum = Math.min(
         1,
@@ -1645,23 +1649,29 @@ const FlowRuntime: React.FC<FlowRuntimeProps> = ({ arrangeFocusToken }) => {
       (masterAnalysis.transient ? 0.55 + masterAnalysis.level * 0.4 : masterAnalysis.level * 0.6) +
       flowContext.momentumTrend * 0.35;
     const pressure = clamp01(importMessage ? Math.max(pressureBase, 0.65) : pressureBase);
-    const harmony = analysisResult
+    // Contextual harmony: Only compute if there's actual audio
+    const harmony = hasAudio && analysisResult
       ? clamp01((analysisResult.soul / 100) * 0.6 + (analysisResult.silk / 100) * 0.4)
-      : 0.38;
-    const harmonyWithFlow = clamp01(
-      harmony +
-        (flowContext.intensity === 'immersed'
-          ? 0.08
-          : flowContext.intensity === 'charged'
-          ? 0.04
-          : 0)
-    );
+      : 0; // No audio = zero harmony
+    const harmonyWithFlow = hasAudio
+      ? clamp01(
+          harmony +
+            (flowContext.intensity === 'immersed'
+              ? 0.08
+              : flowContext.intensity === 'charged'
+              ? 0.04
+              : 0)
+        )
+      : 0; // No audio = zero harmony
 
     // Incorporate Flow Context activity level into momentum calculation
-    if (flowContext.sessionContext?.activityLevel === 'intense') {
-      momentum = Math.min(1, momentum + 0.15);
-    } else if (flowContext.sessionContext?.activityLevel === 'active') {
-      momentum = Math.min(1, momentum + 0.08);
+    // But only if there's actual audio
+    if (hasAudio) {
+      if (flowContext.sessionContext?.activityLevel === 'intense') {
+        momentum = Math.min(1, momentum + 0.15);
+      } else if (flowContext.sessionContext?.activityLevel === 'active') {
+        momentum = Math.min(1, momentum + 0.08);
+      }
     }
 
     const alsChannels: PrimeBrainSnapshotInputs['alsChannels'] = [
@@ -5057,6 +5067,20 @@ const FlowRuntime: React.FC<FlowRuntimeProps> = ({ arrangeFocusToken }) => {
         } catch (err) {
           console.warn('[AUDIO] Failed to initialize Mixx Signal Matrix', err);
         }
+
+        // Apply initial master volume calibration (trim on top of LUFS gain)
+        masterNodesRef.current.setMasterTrim(masterVolume);
+
+        // Expose master chain state to Prime Brain (via window global)
+        const profile = masterNodesRef.current.getProfile();
+        if (typeof window !== 'undefined') {
+          window.__mixx_masterChain = {
+            targetLUFS: profile.targetLUFS,
+            profile: profile.name.toLowerCase().replace(/\s+/g, '-'),
+            calibrated: true, // Master chain is calibrated on build
+            masterVolume: masterVolume,
+          };
+        }
         const translationMatrix = new TranslationMatrix(createdCtx);
         translationMatrix.attach(masterNodesRef.current.output, createdCtx.destination);
         translationMatrix.activate(translationProfileRef.current);
@@ -5066,6 +5090,12 @@ const FlowRuntime: React.FC<FlowRuntimeProps> = ({ arrangeFocusToken }) => {
         masterAnalyser.smoothingTimeConstant = MASTER_ANALYSER_SMOOTHING;
         masterAnalyser.minDecibels = MIN_DECIBELS;
         masterAnalyser.maxDecibels = MAX_DECIBELS;
+        
+        // Expose master analyser to flow loop for contextual audio detection
+        // This is the "listening" part - flow loop can check for actual audio
+        if (typeof window !== 'undefined') {
+          (window as any).__mixx_masterAnalyser = masterAnalyser;
+        }
         masterMeterBufferRef.current = ensureMasterMeterBuffers(
           masterMeterBufferRef.current,
           masterAnalyser
@@ -5369,12 +5399,22 @@ const FlowRuntime: React.FC<FlowRuntimeProps> = ({ arrangeFocusToken }) => {
     }, [mixerSettings, tracks]);
 
     // Connect master volume and pan controls to the audio engine
+    // Master volume is a trim on top of calibrated LUFS gain (via setMasterTrim)
     useEffect(() => {
         if (masterNodesRef.current && audioContextRef.current) {
             const now = audioContextRef.current.currentTime;
-            masterNodesRef.current.output.gain.setTargetAtTime(masterVolume, now, 0.01);
+            // Use setMasterTrim to apply volume as trim on calibrated gain
+            masterNodesRef.current.setMasterTrim(masterVolume);
             if (masterNodesRef.current.panner) {
                 masterNodesRef.current.panner.pan.setTargetAtTime(masterBalance, now, 0.01);
+            }
+            
+            // Update Prime Brain with current master chain state
+            if (typeof window !== 'undefined' && window.__mixx_masterChain) {
+                const profile = masterNodesRef.current.getProfile();
+                window.__mixx_masterChain.masterVolume = masterVolume;
+                window.__mixx_masterChain.targetLUFS = profile.targetLUFS;
+                window.__mixx_masterChain.calibrated = true;
             }
         }
     }, [masterVolume, masterBalance]);

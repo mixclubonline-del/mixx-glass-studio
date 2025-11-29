@@ -18,11 +18,23 @@ export function computeMomentum(
   bpm: number | null,
   transientCount: number
 ): number {
+  // Contextual check: If no BPM and no transients, return 0
+  // This ensures momentum is only computed when there's actual audio
+  if (!bpm && transientCount === 0) {
+    return 0;
+  }
+  
   // Normalize transient count (assume ~10 transients per second for high-energy track)
   const t = transientCount / 10;
   
   // Use BPM if available, otherwise default to 120
-  const effectiveBPM = bpm || 120;
+  // But only if we have transients (indicates actual audio)
+  const effectiveBPM = bpm || (transientCount > 0 ? 120 : 0);
+  
+  // If no BPM and no meaningful transients, return 0
+  if (effectiveBPM === 0 && t < 0.1) {
+    return 0;
+  }
   
   // Weighted combination: BPM (40%) + Transients (60%)
   const score = (effectiveBPM * 0.4) + (t * 2);

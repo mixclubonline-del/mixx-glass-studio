@@ -21,6 +21,7 @@ import { useTimelineStore } from '../../state/timelineStore';
 import type { StemMetadata } from '../../core/import/metadata';
 import { computeFlowPulse } from '../../core/pulse/flowPulseEngine';
 import { syncALSToPulseResult, syncALSToPulse, updateGlobalALS } from '../../core/als/alsSync';
+import { hasAudioPlaying } from '../../core/loop/audioLevelDetector';
 import { ImportInspector, type ImportStep } from './ImportInspector';
 import type { FlowPulseResult } from '../../core/pulse/flowPulseEngine';
 
@@ -255,7 +256,9 @@ export const FileInput = forwardRef<FileInputHandle, FileInputProps>(({
         
         // Sync ALS to Pulse (Layer 6)
         const initialALS = syncALSToPulseResult(pulseResult, result.metadata);
-        updateGlobalALS(initialALS);
+        const masterAnalyser = (window as any).__mixx_masterAnalyser as AnalyserNode | null;
+        const hasAudio = hasAudioPlaying(masterAnalyser);
+        updateGlobalALS(initialALS, hasAudio);
         
         // Start pulse animation during import with full ALS sync
         let pulseIndex = 0;
@@ -276,7 +279,9 @@ export const FileInput = forwardRef<FileInputHandle, FileInputProps>(({
               pulseResult.energy,
               pulseResult.harmonicBoost
             );
-            updateGlobalALS(alsSync);
+            const masterAnalyser = (window as any).__mixx_masterAnalyser as AnalyserNode | null;
+            const hasAudio = hasAudioPlaying(masterAnalyser);
+            updateGlobalALS(alsSync, hasAudio);
             
             pulseIndex = (pulseIndex + 1) % pulseResult.pulse.length;
           }
@@ -383,7 +388,9 @@ export const FileInput = forwardRef<FileInputHandle, FileInputProps>(({
         const pulseResult = computeFlowPulse(mainBuffer, result.metadata);
         if (pulseResult.pulse.length > 0) {
           const finalALS = syncALSToPulseResult(pulseResult, result.metadata);
-          updateGlobalALS(finalALS);
+          const masterAnalyser = (window as any).__mixx_masterAnalyser as AnalyserNode | null;
+          const hasAudio = hasAudioPlaying(masterAnalyser);
+          updateGlobalALS(finalALS, hasAudio);
         }
       }
       
