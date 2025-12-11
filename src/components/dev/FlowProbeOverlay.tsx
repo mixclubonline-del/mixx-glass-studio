@@ -152,11 +152,8 @@ const FlowProbeOverlay: React.FC = () => {
           });
         }
         
-        // Debug: log status periodically to help diagnose
+        // Engine status available via status object
         if (status && (status.engine_running || status.is_playing)) {
-          console.log('[FlowProbe] Engine status:', {
-            is_playing: status.is_playing,
-            engine_running: status.engine_running,
             has_stats: !!status.engine,
             total_callbacks: status.engine?.total_callbacks ?? 0,
           });

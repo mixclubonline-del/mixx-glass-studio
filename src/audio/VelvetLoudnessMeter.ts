@@ -73,6 +73,12 @@ export class VelvetLoudnessMeter extends EventTarget {
     }
 
     // Fallback to analyser-based estimation
+    // Check if context is closed before creating analyser
+    if (context.state === 'closed') {
+      console.warn('[VELVET LOUDNESS] Cannot create analyser - context is closed');
+      return;
+    }
+    
     const analyser = context.createAnalyser();
     analyser.fftSize = 2048;
     const buffer = new Float32Array(analyser.fftSize);

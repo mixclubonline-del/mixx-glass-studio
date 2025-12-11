@@ -37,13 +37,18 @@ class AutoSaveService {
 
   /**
    * Initialize the auto-save service
+   * Safe to call multiple times - will only initialize once
    */
   async initialize(): Promise<void> {
+    // Prevent multiple initializations
+    if (this.db !== null) {
+      return;
+    }
+
     try {
       this.db = await this.openDatabase();
       this.loadSettings();
       this.startInterval();
-      console.log('[AutoSave] Service initialized');
     } catch (error) {
       console.error('[AutoSave] Failed to initialize:', error);
     }
@@ -209,8 +214,6 @@ class AutoSaveService {
       this.state.pendingChanges = false;
       this.state.saveInProgress = false;
       this.notifyStatusChange();
-
-      console.log('[AutoSave] Project state saved at', new Date(timestamp).toLocaleTimeString());
     } catch (error) {
       console.error('[AutoSave] Failed to save:', error);
       this.state.saveInProgress = false;

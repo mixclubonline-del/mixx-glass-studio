@@ -97,7 +97,6 @@ export class MixxTuneEngine implements IAudioEngine {
 
     this.updateParameters();
     this.isInitialized = true;
-    console.log("🎤 MixxTuneEngine ready");
   }
 
   isActive(): boolean {
@@ -228,6 +227,18 @@ export class MixxTuneEngine implements IAudioEngine {
 let singleton: MixxTuneEngine | null = null;
 
 export function getMixxTuneEngine(context: BaseAudioContext | null = null): MixxTuneEngine {
+  // If instance exists but context is closed or different, dispose and recreate
+  if (singleton) {
+    const existingContext = singleton.audioContext;
+    const contextClosed = existingContext && 'state' in existingContext && existingContext.state === 'closed';
+    const contextChanged = context && existingContext && existingContext !== context;
+    
+    if (contextClosed || contextChanged) {
+      singleton.dispose();
+      singleton = null;
+    }
+  }
+  
   if (!singleton) {
     singleton = new MixxTuneEngine(context);
   }

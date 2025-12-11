@@ -100,7 +100,6 @@ export async function runFlowStemPipeline(
     (typeof window !== 'undefined' && (window as any).__mixx_use_revolutionary_stems);
   
   if (useRevolutionary) {
-    console.log('[FLOW IMPORT] Using Revolutionary Stem Separation System...');
     try {
       // Try revolutionary proprietary system
       const { getRevolutionaryStemEngine } = await import('./revolutionaryStemEngine');
@@ -114,9 +113,6 @@ export async function runFlowStemPipeline(
       
       // Get features and context from revolutionary engine
       // The engine extracts these internally, so we extract them here for snapshot export
-      const featureExtractor = getQuantumStemFeatureExtractor();
-      const contextEngine = getMusicalContextStemEngine();
-      
       quantumFeatures = await featureExtractor.extractFeatures(prep.audioBuffer, {
         sampleRate: prep.audioBuffer.sampleRate,
       });
@@ -128,13 +124,6 @@ export async function runFlowStemPipeline(
         useMusicalContext: true,
         useFivePillars: true,
         preferQuality: true,
-      });
-      
-      console.log('[FLOW IMPORT] Revolutionary separation complete:', {
-        vocals: stemResult.vocals !== null,
-        drums: stemResult.drums !== null,
-        bass: stemResult.bass !== null,
-        harmonic: stemResult.harmonic !== null,
       });
     } catch (revolutionaryError) {
       console.warn('[FLOW IMPORT] Revolutionary separation failed, trying AI model fallback:', revolutionaryError);
@@ -201,10 +190,6 @@ export async function runFlowStemPipeline(
         processingTime,
       });
       onSnapshot(snapshot);
-      
-      if ((import.meta as any).env?.DEV) {
-        console.log('[FLOW IMPORT] Snapshot exported for training:', snapshot.id);
-      }
     } catch (snapshotError) {
       console.warn('[FLOW IMPORT] Failed to build snapshot for training:', snapshotError);
     }
@@ -251,8 +236,6 @@ export async function runFlowStemPipeline(
     const debugPeaks = Object.fromEntries(
       Object.entries(stems).map(([k, v]) => [k, peakOf(v)])
     );
-    // eslint-disable-next-line no-console
-    console.log('[DEBUG STEMS][pipeline]', debugPeaks);
     if (typeof window !== 'undefined') {
       (window as any).__flow_debug_last_stems = {
         ...(window as any).__flow_debug_last_stems,
@@ -265,16 +248,13 @@ export async function runFlowStemPipeline(
     // ignore debug failures
   }
   
-  console.log('[FLOW IMPORT] Stem separation result:', {
-    stemsCreated: Object.entries(stems).filter(([_, buf]) => buf !== null).length,
-    stemNames: Object.entries(stems).filter(([_, buf]) => buf !== null).map(([name]) => name),
-  });
-  
   // 4) timing / BPM / key / phrasing
-  const timing = analyzeTiming({
-    bpm: null, // you can pre-seed if something upstream knows it
-    key: 'C',
+  // Auto-detect BPM/key from audio buffer if not provided
+  const timing = await analyzeTiming({
+    bpm: null, // Auto-detect if not provided
+    key: 'C', // Auto-detect if not provided
     confidence: classification.confidence,
+    audioBuffer: prep.audioBuffer, // Pass buffer for auto-detection
   });
   
   // 5) Layer 4 metadata fusion

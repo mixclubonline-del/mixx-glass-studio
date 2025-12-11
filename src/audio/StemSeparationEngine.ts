@@ -57,12 +57,9 @@ class StemSeparationEngine {
   prewarm() {
     try {
       if (this.processingWorker) {
-        // eslint-disable-next-line no-console
-        console.log('[STEMS] INIT_MODEL → worker pre-warm');
         this.processingWorker.postMessage({ type: 'INIT_MODEL' });
       }
     } catch (err) {
-      // eslint-disable-next-line no-console
       console.warn('[STEMS] prewarm failed', err);
     }
   }
@@ -72,10 +69,7 @@ class StemSeparationEngine {
     try {
       await this.loadModel(this.currentModel);
       this.initialized = true;
-      // eslint-disable-next-line no-console
-      console.log('[STEMS] Model initialized:', this.currentModel);
     } catch (err) {
-      // eslint-disable-next-line no-console
       console.error('[STEMS] Model load failed, continuing with fallback DSP', err);
       this.initialized = false;
     }
@@ -173,8 +167,6 @@ class StemSeparationEngine {
         }
         return Number(peak.toFixed(6));
       });
-      // eslint-disable-next-line no-console
-      console.log('[DEBUG STEMS][engine]', { model: this.currentModel, peaks: peakPerStem });
       if (typeof window !== 'undefined') {
         (window as any).__flow_debug_last_stems = {
           source: 'engine',
@@ -204,7 +196,6 @@ class StemSeparationEngine {
     };
     const modelUrl = modelUrls[modelName];
     if (!modelUrl) throw new Error(`Unknown model: ${modelName}`);
-    console.log(`[STEMS] Loading model ${modelName} from ${modelUrl}`);
     this.currentModel = modelName;
     this.modelLoaded = true;
     // Actual model download/initialization would happen here.
@@ -289,45 +280,66 @@ class StemSeparationEngine {
 
   private async dispatchChunkToWorker(chunk: AudioBuffer, stemCount: number) {
     if (!this.processingWorker) return this.fallbackProcessChunk(chunk, stemCount);
-    return new Promise<Float32Array[]>((resolve, reject) => {
-      const requestId = ++this.workerRequestId;
-      this.workerResolvers.set(requestId, resolve);
-      this.workerRejectors.set(requestId, reject);
-      try {
-        const transferables: ArrayBuffer[] = [];
-        const channelBuffers: ArrayBuffer[] = [];
+    const requestId = ++this.workerRequestId;
+    let timeoutId: ReturnType<typeof setTimeout> | null = null;
+    
+    return Promise.race([
+      new Promise<Float32Array[]>((resolve, reject) => {
+        this.workerResolvers.set(requestId, resolve);
+        this.workerRejectors.set(requestId, reject);
+        try {
+          const transferables: ArrayBuffer[] = [];
+          const channelBuffers: ArrayBuffer[] = [];
 
-        if (chunk.numberOfChannels === 0) {
-          const silent = new Float32Array(chunk.length);
-          channelBuffers.push(silent.buffer);
-          transferables.push(silent.buffer);
-        } else {
-          for (let ch = 0; ch < chunk.numberOfChannels; ch += 1) {
-            const channelData = chunk.getChannelData(ch);
-            const copy = new Float32Array(channelData.length);
-            copy.set(channelData);
-            channelBuffers.push(copy.buffer);
-            transferables.push(copy.buffer);
+          if (chunk.numberOfChannels === 0) {
+            const silent = new Float32Array(chunk.length);
+            channelBuffers.push(silent.buffer);
+            transferables.push(silent.buffer);
+          } else {
+            for (let ch = 0; ch < chunk.numberOfChannels; ch += 1) {
+              const channelData = chunk.getChannelData(ch);
+              const copy = new Float32Array(channelData.length);
+              copy.set(channelData);
+              channelBuffers.push(copy.buffer);
+              transferables.push(copy.buffer);
+            }
           }
-        }
 
-        this.processingWorker!.postMessage(
-          {
-            type: 'PROCESS_CHUNK',
-            requestId,
-            channels: channelBuffers,
-            channelLength: chunk.length,
-            sampleRate: chunk.sampleRate,
-            stemCount,
-            model: this.currentModel,
-          },
-          transferables
-        );
-      } catch (error) {
-        this.workerResolvers.delete(requestId);
-        this.workerRejectors.delete(requestId);
-        reject(error as Error);
-      }
+          this.processingWorker!.postMessage(
+            {
+              type: 'PROCESS_CHUNK',
+              requestId,
+              channels: channelBuffers,
+              channelLength: chunk.length,
+              sampleRate: chunk.sampleRate,
+              stemCount,
+              model: this.currentModel,
+            },
+            transferables
+          );
+          
+          // Set timeout
+          timeoutId = setTimeout(() => {
+            this.workerResolvers.delete(requestId);
+            this.workerRejectors.delete(requestId);
+            reject(new Error('Worker timeout - using fallback DSP'));
+          }, 30000); // 30 second timeout
+        } catch (error) {
+          if (timeoutId) clearTimeout(timeoutId);
+          this.workerResolvers.delete(requestId);
+          this.workerRejectors.delete(requestId);
+          reject(error as Error);
+        }
+      }).then((result) => {
+        if (timeoutId) clearTimeout(timeoutId);
+        return result;
+      }),
+    ]).catch((error) => {
+      if (timeoutId) clearTimeout(timeoutId);
+      this.workerResolvers.delete(requestId);
+      this.workerRejectors.delete(requestId);
+      console.warn('[STEMS] Worker dispatch failed, using fallback:', error);
+      return this.fallbackProcessChunk(chunk, stemCount);
     });
   }
 

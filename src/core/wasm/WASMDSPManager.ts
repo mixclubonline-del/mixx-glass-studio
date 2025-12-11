@@ -107,7 +107,6 @@ class WASMDSPManager {
             performanceHint: 'AudioWorklet backend active - Optimized processing ready for WASM upgrade',
           };
           
-          console.log('🔮 WASM DSP Manager: AudioWorklet backend active (WASM-ready architecture)');
           return;
         }
       }
@@ -122,7 +121,6 @@ class WASMDSPManager {
           performanceHint: 'AudioWorklet backend active - Optimized processing',
         };
         
-        console.log('🔮 WASM DSP Manager: AudioWorklet backend active');
         return;
       }
       
@@ -134,8 +132,6 @@ class WASMDSPManager {
         latency: 2.0, // JS processing latency estimate
         performanceHint: 'JS backend active - Consider using Chrome/Edge for AudioWorklet acceleration',
       };
-      
-      console.log('🔮 WASM DSP Manager: JS backend active (fallback)');
     } catch (error) {
       this.status = {
         backend: 'js',

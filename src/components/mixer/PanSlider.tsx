@@ -1,4 +1,5 @@
 import React, { useState, useRef, useEffect, useCallback } from 'react';
+import { spacing, typography, layout, effects, transitions, composeStyles } from '../../design-system';
 
 interface PanSliderProps {
   value: number;
@@ -47,15 +48,61 @@ const PanSlider: React.FC<PanSliderProps> = ({ value, onChange, label, colorClas
 
   return (
     <div
-      className="w-full h-4 relative flex items-center justify-center cursor-ew-resize bg-gray-700/50 rounded-full border border-gray-600/50"
+      style={composeStyles(
+        layout.width.full,
+        layout.position.relative,
+        layout.flex.container('row'),
+        layout.flex.align.center,
+        layout.flex.justify.center,
+        effects.border.radius.full,
+        {
+          height: '16px',
+          cursor: 'ew-resize',
+          background: 'rgba(55, 65, 81, 0.5)',
+          border: '1px solid rgba(75, 85, 99, 0.5)',
+        }
+      )}
       onMouseDown={handleMouseDown}
     >
-      <div className="absolute w-0.5 h-full bg-gray-500 left-1/2 -translate-x-1/2" />
+      <div style={composeStyles(
+        layout.position.absolute,
+        { left: '50%' },
+        transitions.transform.combine('translateX(-50%)'),
+        {
+          width: '2px',
+          height: '100%',
+          background: 'rgba(107, 114, 128, 1)',
+        }
+      )} />
       <div
-        className={`absolute w-2 h-4 rounded-full shadow-md border ${colorClass}`}
-        style={{ left: `calc(${indicatorPosition}% - 4px)` }} // Adjust for knob width
+        style={composeStyles(
+          layout.position.absolute,
+          effects.border.radius.full,
+          {
+            width: '8px',
+            height: '16px',
+            left: `calc(${indicatorPosition}% - 4px)`,
+            boxShadow: '0 2px 4px rgba(0,0,0,0.2)',
+            border: '1px solid',
+            ...(colorClass.includes('amber') ? {
+              background: 'rgba(251, 191, 36, 1)',
+              borderColor: 'rgba(252, 211, 77, 1)',
+            } : {
+              background: 'rgba(107, 114, 128, 1)',
+              borderColor: 'rgba(156, 163, 175, 1)',
+            }),
+          }
+        )}
       />
-      <span className="absolute bottom-5 text-[10px] text-gray-400/80 font-semibold">{label}</span>
+      <span style={composeStyles(
+        layout.position.absolute,
+        { bottom: '20px' },
+        typography.weight('semibold'),
+        {
+          fontSize: '10px',
+          color: 'rgba(156, 163, 175, 0.8)',
+        }
+      )}>{label}</span>
     </div>
   );
 };

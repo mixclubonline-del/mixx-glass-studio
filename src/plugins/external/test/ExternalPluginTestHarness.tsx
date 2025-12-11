@@ -144,7 +144,7 @@ export const ExternalPluginTestHarness: React.FC<ExternalPluginTestHarnessProps>
     setPluginStates(prev => {
       const currentState = prev[selectedPlugin];
       const updated = typeof newState === 'function' 
-        ? (newState as Function)(currentState)
+        ? (newState as (prev: SpecificPluginSettingsMap[K]) => Partial<SpecificPluginSettingsMap[K]>)(currentState)
         : newState;
       
       return {
@@ -158,7 +158,6 @@ export const ExternalPluginTestHarness: React.FC<ExternalPluginTestHarnessProps>
   }, [selectedPlugin]);
 
   const handleMidiLearn = useCallback((paramName: string, min: number, max: number) => {
-    console.log('[TEST] MIDI Learn requested:', { plugin: selectedPlugin, paramName, min, max });
     // MIDI learn not implemented in test harness
   }, [selectedPlugin]);
 

@@ -10,6 +10,7 @@ import type {
   MixerBusStripData,
   MixerBusId,
 } from '../../App';
+import { spacing, typography, layout, effects, transitions, composeStyles } from '../../design-system';
 import FlowChannelStrip from './FlowChannelStrip';
 import FlowMasterStrip from './FlowMasterStrip';
 import FlowBusStrip from './FlowBusStrip';
@@ -288,14 +289,32 @@ const FlowConsole: React.FC<FlowConsoleProps> = ({
         return (
           <div 
             ref={scrollContainerRef}
-            className="relative h-full w-full overflow-x-auto"
+            style={composeStyles(
+              layout.position.relative,
+              layout.width.full,
+              { height: '100%' },
+              layout.overflow.x.auto
+            )}
             onWheel={handleWheel}
           >
             <div
-              className="relative mx-auto flex h-full flex-col"
-              style={{ width: stageWidth, height: stageHeights.stageHeight }}
+              style={composeStyles(
+                layout.position.relative,
+                { margin: '0 auto' },
+                layout.flex.container('col'),
+                { height: '100%' },
+                {
+                  width: stageWidth,
+                  height: stageHeights.stageHeight,
+                }
+              )}
             >
-              <div className="flex items-end justify_center gap-x-3">
+              <div style={composeStyles(
+                layout.flex.container('row'),
+                layout.flex.align.end,
+                layout.flex.justify.center,
+                { gap: '12px' }
+              )}>
               {tracks.map((track) => {
                 const analysis = trackAnalysis[track.id] ?? { level: 0, transient: false };
                 const settings =
@@ -391,7 +410,7 @@ const FlowConsole: React.FC<FlowConsoleProps> = ({
                   isActive={selectedBusId === bus.id}
                 />
               ))}
-              <div className="w-8 flex-shrink-0" />
+              <div style={{ width: '32px', flexShrink: 0 }} />
                 <FlowMasterStrip
                   volume={masterVolume}
                   onVolumeChange={onMasterVolumeChange}
@@ -410,13 +429,65 @@ const FlowConsole: React.FC<FlowConsoleProps> = ({
   };
 
   return (
-    <div className="flex h-full w-full flex-col gap-6 px-4 py-6 lg:flex-row">
-      <div className="relative flex-1 overflow-hidden rounded-[32px] border border-white/8 bg-[rgba(8,12,24,0.82)] shadow-[0_32px_90px_rgba(4,12,26,0.6)]">
-        <div className="pointer-events-none absolute inset-0">
-          <div className="absolute inset-x-0 top-0 h-32 bg-gradient-to-b from-[rgba(21,45,88,0.9)] via-transparent to-transparent" />
-          <div className="absolute inset-y-0 left-0 w-20 bg-gradient-to-r from-[rgba(12,28,58,0.75)] via-[rgba(12,28,58,0.2)] to-transparent" />
-          <div className="absolute inset-y-0 right-0 w-20 bg-gradient-to-l from-[rgba(12,28,58,0.75)] via-[rgba(12,28,58,0.2)] to-transparent" />
-          <div className="absolute left-1/2 top-8 h-1 w-2/3 -translate-x-1/2 rounded-full bg-gradient-to-r from-[rgba(64,120,210,0.45)] via-[rgba(126,162,235,0.35)] to-[rgba(64,120,210,0.45)] blur-sm" />
+    <div style={composeStyles(
+      layout.flex.container('col'),
+      { height: '100%', width: '100%' },
+      spacing.gap(6),
+      spacing.px(4),
+      spacing.py(6)
+    )}>
+      <div style={composeStyles(
+        layout.position.relative,
+        { flex: 1 },
+        layout.overflow.hidden,
+        effects.border.radius.custom('32px'),
+        {
+          border: '1px solid rgba(255, 255, 255, 0.08)',
+          background: 'rgba(8,12,24,0.82)',
+          boxShadow: '0 32px 90px rgba(4,12,26,0.6)',
+        }
+      )}>
+        <div style={composeStyles(
+          layout.position.absolute,
+          { inset: 0 },
+          { pointerEvents: 'none' }
+        )}>
+          <div style={composeStyles(
+            layout.position.absolute,
+            { left: 0, right: 0, top: 0 },
+            {
+              height: '128px',
+              background: 'linear-gradient(to bottom, rgba(21,45,88,0.9), transparent)',
+            }
+          )} />
+          <div style={composeStyles(
+            layout.position.absolute,
+            { top: 0, bottom: 0, left: 0 },
+            {
+              width: '80px',
+              background: 'linear-gradient(to right, rgba(12,28,58,0.75), rgba(12,28,58,0.2), transparent)',
+            }
+          )} />
+          <div style={composeStyles(
+            layout.position.absolute,
+            { top: 0, bottom: 0, right: 0 },
+            {
+              width: '80px',
+              background: 'linear-gradient(to left, rgba(12,28,58,0.75), rgba(12,28,58,0.2), transparent)',
+            }
+          )} />
+          <div style={composeStyles(
+            layout.position.absolute,
+            { left: '50%', top: '32px' },
+            transitions.transform.combine('translateX(-50%)'),
+            effects.border.radius.full,
+            {
+              height: '4px',
+              width: '66.666%',
+              background: 'linear-gradient(to right, rgba(64,120,210,0.45), rgba(126,162,235,0.35), rgba(64,120,210,0.45))',
+              filter: 'blur(4px)',
+            }
+          )} />
         </div>
         
         {/* Console Header */}
@@ -440,7 +511,13 @@ const FlowConsole: React.FC<FlowConsoleProps> = ({
         />
 
         {/* View Content */}
-        <div className="relative h-[calc(100%-80px)] w-full">
+        <div style={composeStyles(
+          layout.position.relative,
+          layout.width.full,
+          {
+            height: 'calc(100% - 80px)',
+          }
+        )}>
           {renderView()}
         </div>
       </div>

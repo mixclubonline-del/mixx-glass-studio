@@ -14,12 +14,12 @@
  */
 
 import React, { useEffect, useLayoutEffect, useRef, useMemo, useState, useCallback } from "react";
-import clsx from "clsx";
 import type { PrimeBrainStatus } from "../types/primeBrainStatus";
 import { PrimeBrainIcon } from "./flowdock/glyphs/PrimeBrainIcon";
 import { hexToRgba } from "../utils/ALS";
 import type { WaveformHeaderSettings } from "../types/waveformHeaderSettings";
 import { DEFAULT_WAVEFORM_HEADER_SETTINGS } from "../types/waveformHeaderSettings";
+import { spacing, typography, layout, effects, transitions, composeStyles } from "../design-system";
 
 interface AdaptiveWaveformHeaderProps {
   primeBrainStatus: PrimeBrainStatus;
@@ -434,49 +434,106 @@ const AdaptiveWaveformHeader: React.FC<AdaptiveWaveformHeaderProps> = ({
   return (
     <header
       ref={containerRef}
-      className={clsx(
-        "fixed top-0 left-0 right-0 z-40 border-b border-white/10 bg-[rgba(6,9,20,0.78)] backdrop-blur-2xl shadow-[0_15px_35px_rgba(2,6,23,0.6)] overflow-hidden",
-        className
+      style={composeStyles(
+        layout.position.fixed,
+        { top: 0, left: 0, right: 0, zIndex: 40 },
+        effects.border.bottom(),
+        layout.overflow.hidden,
+        {
+          borderBottom: '1px solid rgba(255,255,255,0.1)',
+          background: 'rgba(6,9,20,0.78)',
+          backdropFilter: 'blur(24px)',
+          boxShadow: '0 15px 35px rgba(2,6,23,0.6)',
+          ...(className ? { className } : {}),
+        }
       )}
     >
       {/* Waveform Canvas */}
       <canvas
         ref={canvasRef}
-        className="absolute inset-0 pointer-events-none w-full transition-all duration-800 ease-in-out"
-        style={{ 
-          height: `${waveformHeight}px`,
-          width: '100%',
-          left: 0,
-          right: 0,
-        }}
+        style={composeStyles(
+          layout.position.absolute,
+          { inset: 0 },
+          transitions.transition.standard('all', 800, 'ease-in-out'),
+          {
+            pointerEvents: 'none',
+            width: '100%',
+            height: `${waveformHeight}px`,
+            left: 0,
+            right: 0,
+          }
+        )}
       />
 
       {/* Information Overlay (fades in/out) */}
       <div
-        className="relative z-10 px-6 py-3 transition-opacity duration-800"
-        style={{ 
-          opacity: infoOpacity,
-          minHeight: `${waveformHeight}px`,
-        }}
+        style={composeStyles(
+          layout.position.relative,
+          { zIndex: 10 },
+          spacing.px(6),
+          spacing.py(3),
+          transitions.transition.standard('opacity', 800, 'ease-out'),
+          {
+            opacity: infoOpacity,
+            minHeight: `${waveformHeight}px`,
+          }
+        )}
       >
         {showInfo && (
-          <div className="flex items-center justify-between gap-4">
+          <div style={composeStyles(
+            layout.flex.container('row'),
+            layout.flex.align.center,
+            layout.flex.justify.between,
+            spacing.gap(4)
+          )}>
             {/* Left: Prime Brain indicator */}
-            <div className="flex items-center gap-3 min-w-[200px]">
+            <div style={composeStyles(
+              layout.flex.container('row'),
+              layout.flex.align.center,
+              spacing.gap(3),
+              { minWidth: '200px' }
+            )}>
               <div 
-                className="flex h-8 w-8 items-center justify-center rounded-full bg-white/10 shadow-lg"
-                style={{
-                  boxShadow: `0 0 20px ${health.glowColor}`,
-                }}
+                style={composeStyles(
+                  layout.flex.container('row'),
+                  layout.flex.align.center,
+                  layout.flex.justify.center,
+                  effects.border.radius.full,
+                  {
+                    width: '32px',
+                    height: '32px',
+                    background: 'rgba(255,255,255,0.1)',
+                    boxShadow: `0 0 20px ${health.glowColor}`,
+                  }
+                )}
               >
-                <PrimeBrainIcon className="w-4 h-4" style={{ color: health.color }} />
+                <PrimeBrainIcon style={{ width: '16px', height: '16px', color: health.color }} />
               </div>
-              <div className="flex flex-col">
-                <span className="text-[10px] uppercase tracking-[0.4em] text-white/40">
+              <div style={composeStyles(
+                layout.flex.container('col')
+              )}>
+                <span style={composeStyles(
+                  typography.transform('uppercase'),
+                  typography.tracking.widest,
+                  {
+                    fontSize: '10px',
+                    color: 'rgba(255,255,255,0.4)',
+                  }
+                )}>
                   {mode}
                 </span>
                 {guidance && (
-                  <span className="text-xs text-white/70 line-clamp-1 mt-0.5">
+                  <span style={composeStyles(
+                    spacing.mt(0.5),
+                    {
+                      fontSize: '0.75rem',
+                      color: 'rgba(255,255,255,0.7)',
+                      display: '-webkit-box',
+                      WebkitLineClamp: 1,
+                      WebkitBoxOrient: 'vertical',
+                      overflow: 'hidden',
+                    }
+                  )}>
                     {guidance}
                   </span>
                 )}
@@ -484,38 +541,60 @@ const AdaptiveWaveformHeader: React.FC<AdaptiveWaveformHeaderProps> = ({
             </div>
 
             {/* Right: Status indicators (visual only) */}
-            <div className="flex items-center gap-3">
+            <div style={composeStyles(
+              layout.flex.container('row'),
+              layout.flex.align.center,
+              spacing.gap(3)
+            )}>
               {/* Health indicator (color dot) */}
               {health.overall !== 'excellent' && health.overall !== 'good' && (
                 <div
-                  className="h-2 w-2 rounded-full animate-pulse"
-                  style={{
-                    backgroundColor: health.color,
-                    boxShadow: `0 0 12px ${health.glowColor}`,
-                  }}
+                  style={composeStyles(
+                    effects.border.radius.full,
+                    {
+                      width: '8px',
+                      height: '8px',
+                      backgroundColor: health.color,
+                      boxShadow: `0 0 12px ${health.glowColor}`,
+                      animation: 'pulse 2s cubic-bezier(0.4, 0, 0.6, 1) infinite',
+                    }
+                  )}
                 />
               )}
 
               {/* Hush indicator (subtle glow) */}
               {hushFeedback.isEngaged && (
                 <div
-                  className="h-2 w-2 rounded-full"
-                  style={{
-                    backgroundColor: hushFeedback.color,
-                    boxShadow: `0 0 10px ${hushFeedback.color}`,
-                  }}
+                  style={composeStyles(
+                    effects.border.radius.full,
+                    {
+                      width: '8px',
+                      height: '8px',
+                      backgroundColor: hushFeedback.color,
+                      boxShadow: `0 0 10px ${hushFeedback.color}`,
+                    }
+                  )}
                 />
               )}
 
               {/* Playback indicator (motion) */}
               {isPlaying && (
-                <div className="flex items-center gap-1.5">
+                <div style={composeStyles(
+                  layout.flex.container('row'),
+                  layout.flex.align.center,
+                  spacing.gap(1.5)
+                )}>
                   <div 
-                    className="h-1.5 w-1.5 rounded-full animate-pulse"
-                    style={{
-                      backgroundColor: '#86efac',
-                      boxShadow: '0 0 8px #86efac',
-                    }}
+                    style={composeStyles(
+                      effects.border.radius.full,
+                      {
+                        width: '6px',
+                        height: '6px',
+                        backgroundColor: '#86efac',
+                        boxShadow: '0 0 8px #86efac',
+                        animation: 'pulse 2s cubic-bezier(0.4, 0, 0.6, 1) infinite',
+                      }
+                    )}
                   />
                 </div>
               )}

@@ -237,3 +237,10 @@ async function applyVelvetCurveToStem(buffer: AudioBuffer): Promise<AudioBuffer>
   }
 }
 
+
+
+
+
+
+
+

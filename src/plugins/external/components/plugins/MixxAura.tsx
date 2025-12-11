@@ -1,7 +1,7 @@
 
 import React, { useEffect, useRef, useMemo } from 'react';
 import { PluginContainer } from '../shared/PluginContainer';
-import { Knob } from '../shared/Knob';
+import { MixxGlassKnob } from '../../../../components/mixxglass';
 import { MixxAuraSettings, PluginComponentProps, AudioSignal, GlobalSettings, SessionContext } from '../../types';
 import { PrimeBrainStub } from '../../lib/PrimeBrainStub';
 import { ToggleButton } from '../shared/ToggleButton';
@@ -186,12 +186,12 @@ export const MixxAura: React.FC<PluginComponentProps<MixxAuraSettings>> = ({
                 </div>
 
                 <div className="flex flex-wrap justify-center gap-4">
-                    <Knob label="Tone" value={tone} setValue={(val) => handleValueChange('tone', val)} paramName="tone" min={0} max={100} step={1} isLearning={isLearning('tone')} onMidiLearn={onMidiLearn} />
-                    <Knob label="Width" value={width} setValue={(val) => handleValueChange('width', val)} paramName="width" min={0} max={100} step={1} isLearning={isLearning('width')} onMidiLearn={onMidiLearn} />
-                    <Knob label="Shine" value={shine} setValue={(val) => handleValueChange('shine', val)} paramName="shine" min={0} max={100} step={1} isLearning={isLearning('shine')} onMidiLearn={onMidiLearn} />
-                    <Knob label="Mix" value={mix} setValue={(val) => handleValueChange('mix', val)} paramName="mix" isLearning={isLearning('mix')} onMidiLearn={onMidiLearn} />
+                    <MixxGlassKnob label="Tone" value={tone} setValue={(val) => handleValueChange('tone', val)} paramName="tone" min={0} max={100} step={1} isLearning={isLearning('tone')} onMidiLearn={onMidiLearn} />
+                    <MixxGlassKnob label="Width" value={width} setValue={(val) => handleValueChange('width', val)} paramName="width" min={0} max={100} step={1} isLearning={isLearning('width')} onMidiLearn={onMidiLearn} />
+                    <MixxGlassKnob label="Shine" value={shine} setValue={(val) => handleValueChange('shine', val)} paramName="shine" min={0} max={100} step={1} isLearning={isLearning('shine')} onMidiLearn={onMidiLearn} />
+                    <MixxGlassKnob label="Mix" value={mix} setValue={(val) => handleValueChange('mix', val)} paramName="mix" isLearning={isLearning('mix')} onMidiLearn={onMidiLearn} />
                     {/* FIX: Changed parameter name from 'v' to 'val' for consistency and to fix potential scope/linting errors. */}
-                    <Knob label="Output" value={output} setValue={(val) => handleValueChange('output', val)} paramName="output" isLearning={isLearning('output')} onMidiLearn={onMidiLearn} />
+                    <MixxGlassKnob label="Output" value={output} setValue={(val) => handleValueChange('output', val)} paramName="output" isLearning={isLearning('output')} onMidiLearn={onMidiLearn} />
                 </div>
                 
                 <div className="flex justify-center">

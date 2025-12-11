@@ -1692,7 +1692,8 @@ const FlowRuntime: React.FC<FlowRuntimeProps> = ({ arrangeFocusToken }) => {
           ? 'critical'
           : 'warn'
         : 'info';
-      const message = note.replace(/^[⚠️✅]\s*/, '');
+      // Remove emoji prefixes (⚠️ or ✅) from note messages
+      const message = note.replace(/^(⚠️|✅)\s*/u, '');
       return {
         category: 'capture',
         severity,
@@ -2780,7 +2781,6 @@ const FlowRuntime: React.FC<FlowRuntimeProps> = ({ arrangeFocusToken }) => {
 
         setClips((prev) => [...prev, ...separationResult.newClips]);
  
-         console.log(`[STEMS] Created ${separationResult.newTracks.length} stem tracks from ${request.fileName}.`);
          setTimeout(() => setImportMessage(null), 1200);
          if (jobId) {
            canonicalAllowed.forEach((stemKey) => {
@@ -2991,10 +2991,6 @@ const FlowRuntime: React.FC<FlowRuntimeProps> = ({ arrangeFocusToken }) => {
     let targetTrackMeta: TrackData | undefined;
 
     if (resetSession) {
-      console.log(
-        '%c[DAW CORE] New audio batch detected. Resetting project and starting ingestion.',
-        'color: orange; font-weight: bold;'
-      );
       const seededTracks = buildInitialTracks();
       const seededWithProcessing = seededTracks.map((track) =>
         track.id === TRACK_ROLE_TO_ID.twoTrack ? { ...track, isProcessing: true } : track
@@ -3246,7 +3242,6 @@ const FlowRuntime: React.FC<FlowRuntimeProps> = ({ arrangeFocusToken }) => {
       a.download = `flow-project-${new Date().toISOString()}.json`;
       a.click();
       URL.revokeObjectURL(url);
-      console.log("Project saved.");
   }, [
     audioBuffers,
     tracks,
@@ -3434,8 +3429,6 @@ const FlowRuntime: React.FC<FlowRuntimeProps> = ({ arrangeFocusToken }) => {
         zoomY: state.pianoRollZoom!.zoomY,
       }));
     }
-
-    console.log('[AutoSave] Project state restored from auto-save');
   }, [
     setTracks,
     setClips,
@@ -3678,8 +3671,6 @@ const FlowRuntime: React.FC<FlowRuntimeProps> = ({ arrangeFocusToken }) => {
         // Update refs
         tracksRef.current = zustandTracks;
         clipsRef.current = zustandClips;
-
-        console.log(`[INGEST] Imported ${zustandTracks.length} stem tracks from ${displayName}`);
       }
 
       controls.reportProgress({ percent: 100, message: `${displayName} • Complete` });
@@ -3848,8 +3839,6 @@ const FlowRuntime: React.FC<FlowRuntimeProps> = ({ arrangeFocusToken }) => {
           pendingQueueHydrationRef.current = projectState.ingestSnapshot;
         }
       }
-      
-      console.log("Project loaded.");
   };
 
   const handleFileLoad = async (event: React.ChangeEvent<HTMLInputElement>) => {
@@ -4009,11 +3998,10 @@ const FlowRuntime: React.FC<FlowRuntimeProps> = ({ arrangeFocusToken }) => {
           // Initialize engine if not already done, then start playback
           tauriInvoke('initialize_flow_engine')
             .then(() => {
-              console.log('✅ Flow Engine initialized');
               return tauriInvoke('flow_play');
             })
             .then(() => {
-              console.log('▶️ Flow Engine: PLAY');
+              // Flow Engine playing
             })
             .catch((error) => {
               console.warn('[FLOW] Failed to start engine:', error);
@@ -4022,7 +4010,7 @@ const FlowRuntime: React.FC<FlowRuntimeProps> = ({ arrangeFocusToken }) => {
           // Pause the engine
           tauriInvoke('flow_pause')
             .then(() => {
-              console.log('⏸️ Flow Engine: PAUSE');
+              // Flow Engine paused
             })
             .catch((error) => {
               console.warn('[FLOW] Failed to pause engine:', error);
@@ -4105,7 +4093,6 @@ const FlowRuntime: React.FC<FlowRuntimeProps> = ({ arrangeFocusToken }) => {
           clip.selected && splitTime > clip.start && splitTime < clip.start + clip.duration
       );
       if (!targets.length) {
-        console.log('[ARRANGE] No clips intersect playhead for split.');
         return;
       }
       targets.forEach((clip) => {
@@ -4304,7 +4291,6 @@ const FlowRuntime: React.FC<FlowRuntimeProps> = ({ arrangeFocusToken }) => {
               });
               setMasterVolume(0.8);
               setMasterBalance(0);
-              console.log("Mix settings reset.");
               break;
           case 'analyzeMaster':
               (async () => {
@@ -4316,12 +4302,10 @@ const FlowRuntime: React.FC<FlowRuntimeProps> = ({ arrangeFocusToken }) => {
                   }
                   const bufferToAnalyze = audioBuffers[firstClip.bufferId];
 
-                  console.log("%c[PRIME BRAIN] Analyzing sonic DNA...", "color: #f59e0b; font-weight: bold;");
                   setImportMessage("Prime Brain Analyzing...");
 
                   const analysis = await analyzeVelvetCurve(bufferToAnalyze);
                   
-                  console.log("[PRIME BRAIN] Analysis complete:", analysis);
                   setAnalysisResult(analysis);
                   
                   const velvetEngine = getVelvetCurveEngine();
@@ -5354,7 +5338,6 @@ const FlowRuntime: React.FC<FlowRuntimeProps> = ({ arrangeFocusToken }) => {
     let ctx: AudioContext | null = null;
 
     const setupAudio = async () => {
-        console.log("Setting up AudioContext and FX engines...");
         const AudioCtx = (window.AudioContext || (window as any).webkitAudioContext) as typeof AudioContext;
         const createdCtx = new AudioCtx();
 
@@ -5388,7 +5371,6 @@ const FlowRuntime: React.FC<FlowRuntimeProps> = ({ arrangeFocusToken }) => {
             return;
         }
         setAudioBuffers({ 'default': buffer });
-        console.log("Default audio buffer created.");
 
         masterNodesRef.current = await buildMasterChain(createdCtx);
         if (isCancelled || createdCtx.state === "closed") {
@@ -5489,7 +5471,6 @@ const FlowRuntime: React.FC<FlowRuntimeProps> = ({ arrangeFocusToken }) => {
           }
         }
 
-        console.log("[MIXER] Master Chain built and connected to destination.");
         setMasterReady(true);
         
         if (isCancelled || createdCtx.state === "closed") {
@@ -5508,25 +5489,40 @@ const FlowRuntime: React.FC<FlowRuntimeProps> = ({ arrangeFocusToken }) => {
             if (createdCtx.state === "closed") {
               break;
             }
-            const engine = plugin.engineInstance(createdCtx);
-            engineInstancesRef.current.set(plugin.id, engine);
-            if (typeof engine.initialize === 'function' && !engine.getIsInitialized()) {
-                if (isCancelled || createdCtx.state === "closed") {
-                  break;
+            
+            // Ensure context is in a valid state before creating engine
+            if (createdCtx.state === "closed" || createdCtx.state === "interrupted") {
+              console.warn(`[FX] Cannot create engine for '${plugin.id}' - context is ${createdCtx.state}`);
+              break;
+            }
+            
+            try {
+              const engine = plugin.engineInstance(createdCtx);
+              // Verify engine nodes belong to the correct context
+              if (engine.input && engine.output && 
+                  engine.input.context === createdCtx && engine.output.context === createdCtx) {
+                engineInstancesRef.current.set(plugin.id, engine);
+                if (typeof engine.initialize === 'function' && !engine.getIsInitialized()) {
+                    if (isCancelled || createdCtx.state === "closed") {
+                      break;
+                    }
+                    await engine.initialize(createdCtx);
                 }
-                await engine.initialize(createdCtx);
-                console.log(`Plugin engine for ${plugin.name} initialized.`);
+              } else {
+                console.warn(`[FX] Plugin '${plugin.id}' engine created with wrong context, skipping.`);
+              }
+            } catch (error) {
+              console.error(`[FX] Failed to create engine for '${plugin.id}':`, error);
+              // Continue with other plugins
             }
         }
         if (isCancelled) {
             return;
         }
-        console.log("All plugin engines initialized and stored.");
         
         // Set plugin registry AFTER engines are initialized
         // This ensures routing graph rebuild has engines available
         setPluginRegistry(initialPluginRegistry);
-        console.log("Plugin Registry loaded.");
 
         setFxBypassState(() => {
           const initialState: Record<FxWindowId, boolean> = {};
@@ -5583,7 +5579,6 @@ const FlowRuntime: React.FC<FlowRuntimeProps> = ({ arrangeFocusToken }) => {
 
     return () => {
         isCancelled = true;
-        console.log("Closing AudioContext.");
 
         // Disconnect track nodes
         Object.values(trackNodesRef.current).forEach(nodes => {
@@ -5725,7 +5720,6 @@ const FlowRuntime: React.FC<FlowRuntimeProps> = ({ arrangeFocusToken }) => {
             } catch (e) { console.warn(`Error disconnecting nodes for track ${id}:`, e); }
             delete trackNodesRef.current[id];
             delete trackMeterBuffersRef.current[id];
-            console.log(`%c[AUDIO] Disposed nodes for track: ${id}`, "color: grey");
         }
     });
   }, [tracks]);
@@ -5777,7 +5771,6 @@ const FlowRuntime: React.FC<FlowRuntimeProps> = ({ arrangeFocusToken }) => {
       // Check if we have engines for at least some plugins
       const hasEngines = engineInstancesRef.current.size > 0;
       if (!hasEngines) {
-        console.log('[FX] Waiting for engines to initialize before building routing graph...');
         return;
       }
       
@@ -5806,7 +5799,6 @@ const FlowRuntime: React.FC<FlowRuntimeProps> = ({ arrangeFocusToken }) => {
                 bypass.connect(engine.input); // Audio from input wrapper goes to engine's input
                 engine.output.connect(engine.makeup); // Engine's actual output to its makeup gain
                 engine.makeup.connect(output); // Engine's makeup gain to wrapper's output
-                console.log(`%c[FX] Initialized engine for plugin: ${id}`, "color: lightgreen");
               } else {
                 console.warn(`%c[FX] Plugin '${id}' engine nodes belong to different context, skipping connection.`, "color: orange");
                 bypass.connect(output);
@@ -5891,7 +5883,6 @@ const FlowRuntime: React.FC<FlowRuntimeProps> = ({ arrangeFocusToken }) => {
           return;
         }
 
-        console.log(">>> Rebuilding audio routing graph (Inserts-based)...");
         const masterInput = masterNodesRef.current.input;
         
         if (!masterInput) {
@@ -5962,14 +5953,6 @@ const FlowRuntime: React.FC<FlowRuntimeProps> = ({ arrangeFocusToken }) => {
         if (masterInput && masterReady) {
           try {
             currentOutput.connect(masterInput);
-            if ((import.meta as any).env?.DEV && track.id === tracks[0]?.id) {
-              console.log('[MIXER] Track connected to master:', {
-                trackId: track.id,
-                trackName: track.trackName,
-                masterInputExists: !!masterInput,
-                insertsCount: trackInserts.length,
-              });
-            }
           } catch (err) {
             console.error('[MIXER] Failed to connect track to master:', track.id, err);
           }
@@ -6006,8 +5989,6 @@ const FlowRuntime: React.FC<FlowRuntimeProps> = ({ arrangeFocusToken }) => {
                         audioProcessingEvent.outputBuffer.getChannelData(0).set(outputData);
                     };
                     hushProcessorNodeRef.current = processor;
-
-                    console.log("Microphone stream acquired and Hush processor created.");
                 } catch (err) {
                     console.error("Error acquiring microphone stream:", err);
                     setArmedTracks(new Set()); // Disarm tracks if permission is denied
@@ -6017,7 +5998,6 @@ const FlowRuntime: React.FC<FlowRuntimeProps> = ({ arrangeFocusToken }) => {
                 microphoneStreamRef.current = null;
                 micSourceNodeRef.current = null;
                 hushProcessorNodeRef.current = null; // Will be disconnected by routing effect
-                console.log("Microphone stream released.");
             }
         };
         manageStream();
@@ -6240,8 +6220,6 @@ const FlowRuntime: React.FC<FlowRuntimeProps> = ({ arrangeFocusToken }) => {
                 if (isLoopingRef.current) {
                     const timeOver = newTime - projectDurationRef.current;
                     newTime = timeOver % projectDurationRef.current;
-
-                    console.log(`%c[DAW CORE] Project Loop Wrap. New Time: ${newTime.toFixed(2)}`, "color: cyan; font-weight: bold;");
 
                     lastUpdateTimeRef.current = now - timeOver;
                     scheduleClips(newTime); // Reschedule clips for gapless loop
@@ -7282,18 +7260,7 @@ const FlowRuntime: React.FC<FlowRuntimeProps> = ({ arrangeFocusToken }) => {
         const compData = analyzeTakeForComp(takeMemory);
         
         if (import.meta.env.DEV) {
-          console.log('[TAKE MEMORY] Take recorded:', {
-            duration: `${(takeMemory.duration / 1000).toFixed(2)}s`,
-            barPosition: takeMemory.barPosition.toFixed(1),
-            flow: (takeMemory.flowDuringTake * 100).toFixed(0) + '%',
-            hushEvents: takeMemory.hushEvents,
-          });
-          console.log('[COMPING BRAIN] Take scored:', {
-            score: (compData.score * 100).toFixed(0) + '%',
-            timing: (compData.timingAccuracy * 100).toFixed(0) + '%',
-            noise: (compData.noiseScore * 100).toFixed(0) + '%',
-            energy: (compData.energySlope * 100).toFixed(0) + '%',
-          });
+          // Take recorded and scored
         }
       }
     }
@@ -7755,14 +7722,6 @@ const FlowRuntime: React.FC<FlowRuntimeProps> = ({ arrangeFocusToken }) => {
               
               // Sync Zustand tracks/clips to React state (MERGE, not replace)
               if (zustandTracks.length > 0 || zustandClips.length > 0) {
-                console.log('[FLOW IMPORT] Syncing Zustand to React state:', {
-                  tracks: zustandTracks.length,
-                  clips: zustandClips.length,
-                  buffers: Object.keys(zustandBuffers).length,
-                  existingTracks: tracks.length,
-                  existingClips: clips.length,
-                });
-                
                 // MERGE tracks: Keep existing tracks, add/update new ones from Zustand
                 setTracks(prev => {
                   const existingById = new Map(prev.map(t => [t.id, t]));
@@ -7780,12 +7739,6 @@ const FlowRuntime: React.FC<FlowRuntimeProps> = ({ arrangeFocusToken }) => {
                         merged[index] = { ...merged[index], ...zTrack };
                       }
                     }
-                  });
-                  
-                  console.log('[FLOW IMPORT] Merged tracks:', {
-                    before: prev.length,
-                    after: merged.length,
-                    added: merged.length - prev.length,
                   });
                   
                   return merged;
@@ -7808,12 +7761,6 @@ const FlowRuntime: React.FC<FlowRuntimeProps> = ({ arrangeFocusToken }) => {
                         merged[index] = { ...merged[index], ...zClip } as ArrangeClip;
                       }
                     }
-                  });
-                  
-                  console.log('[FLOW IMPORT] Merged clips:', {
-                    before: prev.length,
-                    after: merged.length,
-                    added: merged.length - prev.length,
                   });
                   
                   return merged;
@@ -7886,7 +7833,6 @@ const FlowRuntime: React.FC<FlowRuntimeProps> = ({ arrangeFocusToken }) => {
                 tracksRef.current = useTimelineStore.getState().getTracks();
                 clipsRef.current = useTimelineStore.getState().getClips();
                 
-                console.log('[FLOW IMPORT] React state synced from Zustand (merged)');
                 return; // Early return - Zustand is source of truth
               }
               
@@ -7994,17 +7940,6 @@ const FlowRuntime: React.FC<FlowRuntimeProps> = ({ arrangeFocusToken }) => {
               // CRITICAL: Batch all state updates together to ensure React sees the changes
               // This ensures ArrangeWindow re-renders with all new data at once
               
-              console.log('[FLOW IMPORT] Before state update:', {
-                currentTracksCount: tracks.length,
-                currentClipsCount: clips.length,
-                newTracksCount: newTracks.length,
-                newClipsCount: newClips.length,
-                newTrackIds: newTracks.map(t => t.id),
-                newClipTrackIds: newClips.map(c => c.trackId),
-                newClipIds: newClips.map(c => c.id),
-                bufferIds: Object.keys(newBuffers),
-              });
-              
               // CRITICAL: Initialize mixer settings FIRST before adding tracks
               // This prevents ArrangeTrackHeader from receiving undefined mixerSettings
               setMixerSettings(prev => {
@@ -8014,9 +7949,6 @@ const FlowRuntime: React.FC<FlowRuntimeProps> = ({ arrangeFocusToken }) => {
                     next[track.id] = { volume: 0.75, pan: 0, isMuted: false };
                   }
                 });
-                console.log('[FLOW IMPORT] Mixer settings initialized for tracks:', {
-                  trackIds: newTracks.map(t => t.id),
-                });
                 return next;
               });
               
@@ -8024,50 +7956,24 @@ const FlowRuntime: React.FC<FlowRuntimeProps> = ({ arrangeFocusToken }) => {
               // Add tracks to state (immutable update - new array reference)
               setTracks(prev => {
                 const updated = [...prev, ...newTracks];
-                console.log('[FLOW IMPORT] setTracks called:', {
-                  prevCount: prev.length,
-                  newCount: updated.length,
-                  allTrackIds: updated.map(t => t.id),
-                });
                 return updated;
               });
               
               // Add clips to state (immutable update - new array reference)
               setClips(prev => {
                 const updated = [...prev, ...newClips];
-                console.log('[FLOW IMPORT] setClips called:', {
-                  prevCount: prev.length,
-                  newCount: updated.length,
-                  allClipIds: updated.map(c => c.id),
-                  allClipTrackIds: updated.map(c => c.trackId),
-                });
                 return updated;
               });
               
               // Store audio buffers (immutable update - new object reference)
               setAudioBuffers(prev => {
                 const updated = { ...prev, ...newBuffers };
-                console.log('[FLOW IMPORT] setAudioBuffers called:', {
-                  prevCount: Object.keys(prev).length,
-                  newCount: Object.keys(updated).length,
-                  bufferIds: Object.keys(newBuffers),
-                });
                 return updated;
               });
-              
-              // Log for debugging - this confirms state updates are firing
-              console.log('[FLOW IMPORT] State hydration complete - all updates queued');
               
               // Force a microtask delay to ensure React has processed state updates
               // This guarantees ArrangeWindow receives the new props
               await new Promise(resolve => setTimeout(resolve, 100));
-              
-              // Verify state was actually updated
-              console.log('[FLOW IMPORT] After state update delay:', {
-                tracksState: tracks.length,
-                clipsState: clips.length,
-                note: 'These may still show old values due to closure - check ArrangeWindow props',
-              });
               
               // Initialize inserts for new tracks
               setInserts(prev => {
@@ -8131,15 +8037,7 @@ const FlowRuntime: React.FC<FlowRuntimeProps> = ({ arrangeFocusToken }) => {
                 window.__bloom_ready = true;
               }
               
-              // Log completion
-              if ((import.meta as any).env?.DEV) {
-                console.log('[FLOW IMPORT] Complete', {
-                  tracks: newTracks.length,
-                  clips: newClips.length,
-                  buffers: Object.keys(newBuffers).length,
-                  metadata: result.metadata,
-                });
-              }
+              // Import complete
             } catch (error) {
               console.error('[FLOW IMPORT] Error adding tracks to timeline:', error);
               if (typeof window !== 'undefined' && window.alert) {

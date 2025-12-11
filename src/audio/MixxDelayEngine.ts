@@ -182,6 +182,18 @@ export class MixxDelayEngine implements IAudioEngine {
 let delayInstance: MixxDelayEngine | null = null;
 
 export function getMixxDelayEngine(context: BaseAudioContext | null = null): MixxDelayEngine {
+  // If instance exists but context is closed or different, dispose and recreate
+  if (delayInstance) {
+    const existingContext = delayInstance.audioContext;
+    const contextClosed = existingContext && 'state' in existingContext && existingContext.state === 'closed';
+    const contextChanged = context && existingContext && existingContext !== context;
+    
+    if (contextClosed || contextChanged) {
+      delayInstance.dispose();
+      delayInstance = null;
+    }
+  }
+  
   if (!delayInstance) {
     delayInstance = new MixxDelayEngine(context);
   }

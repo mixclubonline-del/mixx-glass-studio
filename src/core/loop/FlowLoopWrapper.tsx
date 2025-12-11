@@ -5,7 +5,7 @@
  * This is the integration point between the canonical loop and the existing Studio architecture.
  */
 
-import React, { useEffect } from 'react';
+import React, { useEffect, Component, ErrorInfo, ReactNode } from 'react';
 import { PrimeBrainProvider } from './PrimeBrainContext';
 import { ALSProvider } from './ALSContext';
 import { BloomProvider } from './BloomContext';
@@ -15,6 +15,43 @@ import { getQuantumScheduler } from '../quantum';
 import { initializeWebGPUBackend } from '../quantum/WebGPUBackend';
 import { getQuantumNeuralNetwork } from '../../ai/QuantumNeuralNetwork';
 import type { PrimeBrainStatus } from '../../types/primeBrainStatus';
+
+// Error boundary for Flow Loop to handle context errors gracefully
+class FlowLoopErrorBoundary extends Component<
+  { children: ReactNode },
+  { hasError: boolean }
+> {
+  constructor(props: { children: ReactNode }) {
+    super(props);
+    this.state = { hasError: false };
+  }
+
+  static getDerivedStateFromError() {
+    return { hasError: true };
+  }
+
+  componentDidCatch(error: Error, errorInfo: ErrorInfo) {
+    // Only log in dev mode, and suppress context errors during StrictMode double-render
+    if (import.meta.env.DEV && !error.message.includes('usePrimeBrain must be used within PrimeBrainProvider')) {
+      console.warn('[Flow Loop] Error boundary caught:', error, errorInfo);
+    }
+  }
+
+  componentDidUpdate() {
+    // Reset error state on next render attempt
+    if (this.state.hasError) {
+      this.setState({ hasError: false });
+    }
+  }
+
+  render() {
+    if (this.state.hasError) {
+      // Return null to suppress error UI during recovery
+      return null;
+    }
+    return this.props.children;
+  }
+}
 
 interface FlowLoopWrapperProps {
   children: React.ReactNode;
@@ -30,15 +67,10 @@ function FlowLoopInner({
   useEffect(() => {
     // Initialize Quantum Scheduler
     const scheduler = getQuantumScheduler();
-    console.log('🔮 Quantum Scheduler active in Flow Loop - Protecting audio, enabling AI, batching UI');
     
     // Initialize WebGPU Backend (with CPU fallback)
     initializeWebGPUBackend().then((status) => {
-      if (status.type === 'webgpu') {
-        console.log('🔮 WebGPU Backend: Active - Quantum speed unlocked');
-      } else {
-        console.log('🔮 WebGPU Backend: CPU fallback active');
-      }
+      // WebGPU backend initialized
       
       // Pre-initialize and prefetch Quantum Neural Network (Phase 4 optimization)
       getQuantumNeuralNetwork().initialize().then(() => {
@@ -68,16 +100,18 @@ export function FlowLoopWrapper(props: FlowLoopWrapperProps) {
   const { children, primeBrainStatus } = props;
   
   return (
-    <PrimeBrainProvider primeBrainStatus={primeBrainStatus}>
-      <ALSProvider>
-        <BloomProvider>
-          <SessionCoreProvider>
-            <FlowLoopInner>
-              {children}
-            </FlowLoopInner>
-          </SessionCoreProvider>
-        </BloomProvider>
-      </ALSProvider>
-    </PrimeBrainProvider>
+    <FlowLoopErrorBoundary>
+      <PrimeBrainProvider primeBrainStatus={primeBrainStatus}>
+        <ALSProvider>
+          <BloomProvider>
+            <SessionCoreProvider>
+              <FlowLoopInner>
+                {children}
+              </FlowLoopInner>
+            </SessionCoreProvider>
+          </BloomProvider>
+        </ALSProvider>
+      </PrimeBrainProvider>
+    </FlowLoopErrorBoundary>
   );
 }

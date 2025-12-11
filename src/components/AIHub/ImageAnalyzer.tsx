@@ -1,11 +1,12 @@
 // components/AIHub/ImageAnalyzer.tsx
 import React, { useState, useRef, useCallback } from 'react';
-import { GoogleGenAI, Modality } from "@google/genai";
-import { getGeminiAI, fileToBase64 } from '../../utils/gemini';
+import { getPrimeBrainLLM } from '../../ai/PrimeBrainLLM';
+import { fileToBase64 } from '../../utils/gemini';
 import LoadingSpinner from '../common/LoadingSpinner';
 import { SparklesIcon, ImageIcon } from '../icons';
 import { ArrangeClip, ClipId } from '../../hooks/useArrange';
 import { TrackData } from '../../App';
+import { spacing, typography, layout, effects, transitions, composeStyles } from '../../design-system';
 
 interface ImageAnalyzerProps {
   clips: ArrangeClip[];
@@ -22,7 +23,7 @@ const ImageAnalyzer: React.FC<ImageAnalyzerProps> = ({ clips, tracks, selectedTr
   const [error, setError] = useState<string | null>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
 
-  const ai = useRef(getGeminiAI());
+  const ai = useRef(getPrimeBrainLLM());
 
   const handleImageUpload = useCallback((e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
@@ -52,22 +53,14 @@ const ImageAnalyzer: React.FC<ImageAnalyzerProps> = ({ clips, tracks, selectedTr
     try {
       const base64Image = await fileToBase64(imageFile);
 
-      const imagePart = {
-        inlineData: {
-          mimeType: imageFile.type,
-          data: base64Image,
-        },
-      };
-      const textPart = {
-        text: prompt,
-      };
+      // Use PrimeBrainLLM for image analysis
+      const result = await ai.current.analyzeImage(
+        base64Image,
+        prompt,
+        imageFile.type
+      );
 
-      const response = await ai.current.models.generateContent({
-        model: 'gemini-2.5-flash',
-        contents: { parts: [imagePart, textPart] },
-      });
-
-      setAnalysisResult(response.text ?? null);
+      setAnalysisResult(result);
 
     } catch (err: any) {
       console.error("Error analyzing image:", err);
@@ -79,41 +72,138 @@ const ImageAnalyzer: React.FC<ImageAnalyzerProps> = ({ clips, tracks, selectedTr
   }, [imageFile, prompt]);
 
   return (
-    <div className="flex flex-col h-full bg-gray-900/60 rounded-lg p-4 shadow-inner">
-      <div className="flex-shrink-0 flex items-center mb-4 space-x-4">
+    <div style={composeStyles(
+      layout.flex.container('col'),
+      { height: '100%' },
+      spacing.p(4),
+      effects.border.radius.lg,
+      {
+        background: 'rgba(17, 24, 39, 0.6)',
+        boxShadow: 'inset 0 2px 4px rgba(0,0,0,0.2)',
+      }
+    )}>
+      <div style={composeStyles(
+        { flexShrink: 0 },
+        layout.flex.container('row'),
+        layout.flex.align.center,
+        spacing.mb(4),
+        spacing.gap(4)
+      )}>
         <input
           type="file"
           ref={fileInputRef}
           accept="image/png, image/jpeg"
           onChange={handleImageUpload}
-          className="hidden"
+          style={{ display: 'none' }}
         />
         <button
           onClick={() => fileInputRef.current?.click()}
-          className="px-4 py-2 bg-indigo-700 text-white rounded-lg hover:bg-indigo-600 transition-colors flex items-center space-x-2"
+          style={composeStyles(
+            spacing.px(4),
+            spacing.py(2),
+            effects.border.radius.lg,
+            transitions.transition.standard('all', 200, 'ease-out'),
+            layout.flex.container('row'),
+            layout.flex.align.center,
+            spacing.gap(2),
+            {
+              background: 'rgba(67, 56, 202, 1)',
+              color: 'white',
+            }
+          )}
+          onMouseEnter={(e) => {
+            e.currentTarget.style.background = 'rgba(79, 70, 229, 1)';
+          }}
+          onMouseLeave={(e) => {
+            e.currentTarget.style.background = 'rgba(67, 56, 202, 1)';
+          }}
         >
-          <ImageIcon className="w-5 h-5" />
+          <ImageIcon style={{ width: '20px', height: '20px' }} />
           <span>Upload Image</span>
         </button>
-        {imageUrl && <span className="text-gray-300 truncate max-w-[200px]">{imageFile?.name}</span>}
+        {imageUrl && (
+          <span style={{
+            color: 'rgba(209, 213, 219, 1)',
+            overflow: 'hidden',
+            textOverflow: 'ellipsis',
+            whiteSpace: 'nowrap',
+            maxWidth: '200px',
+          }}>{imageFile?.name}</span>
+        )}
       </div>
 
-      <div className="flex-grow flex space-x-4 mb-4">
-        <div className="w-1/2 flex-shrink-0 flex items-center justify-center bg-gray-800/50 rounded-lg overflow-hidden relative p-2">
+      <div style={composeStyles(
+        { flexGrow: 1 },
+        layout.flex.container('row'),
+        spacing.gap(4),
+        spacing.mb(4)
+      )}>
+        <div style={composeStyles(
+          { width: '50%', flexShrink: 0 },
+          layout.flex.container('row'),
+          layout.flex.align.center,
+          layout.flex.justify.center,
+          effects.border.radius.lg,
+          layout.overflow.hidden,
+          layout.position.relative,
+          spacing.p(2),
+          {
+            background: 'rgba(31, 41, 55, 0.5)',
+          }
+        )}>
           {imageUrl ? (
-            <img src={imageUrl} alt="Uploaded for analysis" className="max-w-full max-h-full object-contain rounded-lg" />
+            <img 
+              src={imageUrl} 
+              alt="Uploaded for analysis" 
+              style={composeStyles(
+                effects.border.radius.lg,
+                {
+                  maxWidth: '100%',
+                  maxHeight: '100%',
+                  objectFit: 'contain',
+                }
+              )}
+            />
           ) : (
-            <div className="flex flex-col items-center text-gray-500">
-              <ImageIcon className="w-16 h-16 text-gray-600 mb-4" />
-              <p className="text-lg">Upload an image to analyze.</p>
+            <div style={composeStyles(
+              layout.flex.container('col'),
+              layout.flex.align.center,
+              {
+                color: 'rgba(107, 114, 128, 1)',
+              }
+            )}>
+              <ImageIcon style={{ width: '64px', height: '64px', color: 'rgba(75, 85, 99, 1)', marginBottom: '16px' }} />
+              <p style={{ fontSize: '1.125rem' }}>Upload an image to analyze.</p>
             </div>
           )}
         </div>
 
-        <div className="w-1/2 flex flex-col">
-          <form onSubmit={analyzeImage} className="flex-shrink-0 mb-4 space-y-4">
+        <div style={composeStyles(
+          { width: '50%' },
+          layout.flex.container('col')
+        )}>
+          <form onSubmit={analyzeImage} style={composeStyles(
+            { flexShrink: 0 },
+            spacing.mb(4),
+            spacing.gap(4),
+            {
+              display: 'flex',
+              flexDirection: 'column',
+            }
+          )}>
             <div>
-              <label htmlFor="analysisPrompt" className="block text-sm font-medium text-gray-300 mb-1">
+              <label 
+                htmlFor="analysisPrompt" 
+                style={composeStyles(
+                  typography.weight('medium'),
+                  spacing.mb(1),
+                  {
+                    display: 'block',
+                    fontSize: '0.875rem',
+                    color: 'rgba(209, 213, 219, 1)',
+                  }
+                )}
+              >
                 Your question about the image:
               </label>
               <textarea
@@ -122,30 +212,104 @@ const ImageAnalyzer: React.FC<ImageAnalyzerProps> = ({ clips, tracks, selectedTr
                 onChange={(e) => setPrompt(e.target.value)}
                 placeholder="Describe this image in detail."
                 rows={3}
-                className="w-full p-3 rounded-lg bg-gray-800 text-gray-100 border border-gray-700 focus:outline-none focus:ring-2 focus:ring-indigo-500"
+                style={composeStyles(
+                  layout.width.full,
+                  spacing.p(3),
+                  effects.border.radius.lg,
+                  {
+                    background: 'rgba(31, 41, 55, 1)',
+                    color: 'rgb(243, 244, 246)',
+                    border: '1px solid rgba(55, 65, 81, 1)',
+                    outline: 'none',
+                    resize: 'vertical',
+                  }
+                )}
+                onFocus={(e) => {
+                  e.currentTarget.style.borderColor = 'rgba(99, 102, 241, 1)';
+                  e.currentTarget.style.boxShadow = '0 0 0 2px rgba(99, 102, 241, 0.5)';
+                }}
+                onBlur={(e) => {
+                  e.currentTarget.style.borderColor = 'rgba(55, 65, 81, 1)';
+                  e.currentTarget.style.boxShadow = 'none';
+                }}
                 disabled={isLoading}
               />
             </div>
             <button
               type="submit"
-              className="w-full px-6 py-3 bg-indigo-600 text-white rounded-lg font-semibold hover:bg-indigo-500 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+              style={composeStyles(
+                layout.width.full,
+                spacing.px(6),
+                spacing.py(3),
+                effects.border.radius.lg,
+                typography.weight('semibold'),
+                transitions.transition.standard('all', 200, 'ease-out'),
+                {
+                  background: 'rgba(79, 70, 229, 1)',
+                  color: 'white',
+                }
+              )}
+              onMouseEnter={(e) => {
+                if (!isLoading && imageFile && prompt.trim()) {
+                  e.currentTarget.style.background = 'rgba(99, 102, 241, 1)';
+                }
+              }}
+              onMouseLeave={(e) => {
+                if (!isLoading && imageFile && prompt.trim()) {
+                  e.currentTarget.style.background = 'rgba(79, 70, 229, 1)';
+                }
+              }}
               disabled={isLoading || !imageFile || !prompt.trim()}
             >
               Analyze Image
             </button>
           </form>
 
-          <div className="flex-grow bg-gray-800/50 rounded-lg p-3 shadow-inner overflow-y-auto custom-scrollbar relative">
+          <div style={composeStyles(
+            { flexGrow: 1 },
+            effects.border.radius.lg,
+            spacing.p(3),
+            layout.overflow.y.auto,
+            layout.position.relative,
+            {
+              background: 'rgba(31, 41, 55, 0.5)',
+              boxShadow: 'inset 0 2px 4px rgba(0,0,0,0.2)',
+            }
+          )}>
             {isLoading && <LoadingSpinner message="Analyzing image..." color="indigo" />}
             {error && (
-              <div className="text-red-400 text-center p-4">{error}</div>
+              <div style={{
+                color: 'rgba(248, 113, 113, 1)',
+                textAlign: 'center',
+                padding: '16px',
+              }}>{error}</div>
             )}
             {analysisResult && !isLoading ? (
-              <p className="text-gray-200 whitespace-pre-wrap">{analysisResult}</p>
+              <p style={{
+                color: 'rgb(229, 231, 235)',
+                whiteSpace: 'pre-wrap',
+              }}>{analysisResult}</p>
             ) : !isLoading && !error && (
-              <div className="flex flex-col items-center justify-center h-full text-gray-500">
-                <SparklesIcon className="w-16 h-16 text-indigo-400 mb-4 animate-pulse" />
-                <p className="text-lg text-center">Analysis results will appear here.</p>
+              <div style={composeStyles(
+                layout.flex.container('col'),
+                layout.flex.align.center,
+                layout.flex.justify.center,
+                { height: '100%' },
+                {
+                  color: 'rgba(107, 114, 128, 1)',
+                }
+              )}>
+                <SparklesIcon style={{ 
+                  width: '64px', 
+                  height: '64px', 
+                  color: 'rgba(129, 140, 248, 1)',
+                  marginBottom: '16px',
+                  animation: 'pulse 2s cubic-bezier(0.4, 0, 0.6, 1) infinite',
+                }} />
+                <p style={{
+                  fontSize: '1.125rem',
+                  textAlign: 'center',
+                }}>Analysis results will appear here.</p>
               </div>
             )}
           </div>

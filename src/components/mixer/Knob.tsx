@@ -1,4 +1,5 @@
 import React, { useState, useRef, useEffect, useCallback } from 'react';
+import { spacing, typography, layout, effects, transitions, composeStyles } from '../../design-system';
 
 interface KnobProps {
     value: number; // -1 to 1
@@ -45,17 +46,61 @@ const Knob: React.FC<KnobProps> = ({ value, onChange }) => {
     return (
         <div 
             ref={knobRef}
-            className="relative w-12 h-12 flex items-center justify-center cursor-ns-resize"
+            style={composeStyles(
+              layout.position.relative,
+              layout.flex.container('row'),
+              layout.flex.align.center,
+              layout.flex.justify.center,
+              {
+                width: '48px',
+                height: '48px',
+                cursor: 'ns-resize',
+              }
+            )}
             onMouseDown={handleMouseDown}
         >
-            <div className="absolute w-full h-full rounded-full bg-gray-900 border-2 border-gray-700 shadow-inner"></div>
+            <div style={composeStyles(
+              layout.position.absolute,
+              layout.width.full,
+              layout.height.full,
+              effects.border.radius.full,
+              {
+                background: 'rgba(17, 24, 39, 1)',
+                border: '2px solid rgba(55, 65, 81, 1)',
+                boxShadow: 'inset 0 2px 4px rgba(0,0,0,0.3)',
+              }
+            )}></div>
             <div 
-                className="absolute w-full h-full"
-                style={{ transform: `rotate(${rotation}deg)`}}
+                style={composeStyles(
+                  layout.position.absolute,
+                  layout.width.full,
+                  layout.height.full,
+                  {
+                    transform: `rotate(${rotation}deg)`,
+                  }
+                )}
             >
-                <div className="absolute top-1 left-1/2 -translate-x-1/2 w-1.5 h-1.5 rounded-full bg-cyan-400 shadow-[0_0_5px_#06b6d4]"></div>
+                <div style={composeStyles(
+                  layout.position.absolute,
+                  { top: '4px', left: '50%' },
+                  transitions.transform.combine('translateX(-50%)'),
+                  effects.border.radius.full,
+                  {
+                    width: '6px',
+                    height: '6px',
+                    background: 'rgba(6, 182, 212, 1)',
+                    boxShadow: '0 0 5px #06b6d4',
+                  }
+                )}></div>
             </div>
-            <span className="text-[10px] text-gray-500 mt-1">PAN</span>
+            <span style={composeStyles(
+              typography.transform('uppercase'),
+              spacing.mt(1),
+              {
+                fontSize: '10px',
+                color: 'rgba(107, 114, 128, 1)',
+              }
+            )}>PAN</span>
         </div>
     );
 };

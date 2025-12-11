@@ -32,6 +32,7 @@ class AutoPullService {
   private pullTimer: number | null = null;
   private onStatusChange: ((status: AutoPullState) => void) | null = null;
   private invokeCommand: ((cmd: string, args?: any) => Promise<any>) | null = null;
+  private consumerCount: number = 0; // Track number of active consumers
 
   /**
    * Initialize the auto-pull service
@@ -39,7 +40,11 @@ class AutoPullService {
   async initialize(invokeCommandFn: (cmd: string, args?: any) => Promise<any>): Promise<void> {
     this.invokeCommand = invokeCommandFn;
     this.loadSettings();
-    console.log('[AutoPull] Service initialized');
+    
+    // Start interval if auto-pull was previously enabled
+    if (this.state.isEnabled) {
+      this.startInterval();
+    }
   }
 
   /**
@@ -120,6 +125,31 @@ class AutoPullService {
   }
 
   /**
+   * Increment consumer count (called when a component mounts)
+   */
+  addConsumer(): void {
+    this.consumerCount++;
+  }
+
+  /**
+   * Decrement consumer count (called when a component unmounts)
+   * Only shutdowns when the last consumer is removed
+   */
+  removeConsumer(): void {
+    this.consumerCount = Math.max(0, this.consumerCount - 1);
+    if (this.consumerCount === 0) {
+      this.shutdown();
+    }
+  }
+
+  /**
+   * Check if service has any active consumers
+   */
+  hasConsumers(): boolean {
+    return this.consumerCount > 0;
+  }
+
+  /**
    * Get current git status
    */
   async getGitStatus(): Promise<GitStatus | null> {
@@ -168,7 +198,6 @@ class AutoPullService {
       this.state.pullInProgress = false;
       this.notifyStatusChange();
 
-      console.log('[AutoPull] Repository pulled successfully');
       return { success: true, message: result || 'Pull completed successfully' };
     } catch (error: any) {
       const errorMessage = error?.message || 'Unknown error';
@@ -189,9 +218,7 @@ class AutoPullService {
       return;
     }
 
-    // Perform initial pull check
-    this.scheduleNextPull();
-
+    // Set up periodic pull interval
     this.pullTimer = window.setInterval(() => {
       if (this.state.isEnabled && !this.state.pullInProgress) {
         this.pullNow().catch((error) => {
@@ -199,20 +226,6 @@ class AutoPullService {
         });
       }
     }, this.state.interval);
-  }
-
-  /**
-   * Schedule next pull after current one completes
-   */
-  private scheduleNextPull(): void {
-    // This will be called after a pull completes
-    if (this.state.isEnabled && !this.state.pullInProgress) {
-      setTimeout(() => {
-        this.pullNow().catch((error) => {
-          console.error('[AutoPull] Scheduled pull failed:', error);
-        });
-      }, this.state.interval);
-    }
   }
 
   /**

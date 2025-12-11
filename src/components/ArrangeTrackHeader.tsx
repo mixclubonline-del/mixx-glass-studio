@@ -1,10 +1,10 @@
 
-
 import React, { useMemo } from 'react';
 import { TrackData, MixerSettings } from '../App';
 import { hexToRgba } from '../utils/ALS';
 import { TrackUIState } from '../types/tracks';
 import { MuteIcon, SoloIcon, ArmIcon } from './icons';
+import { spacing, typography, layout, effects, transitions, composeStyles } from '../design-system';
 
 type ArrangeTrackHeaderProps = {
   track: TrackData;
@@ -105,96 +105,275 @@ const ArrangeTrackHeader: React.FC<ArrangeTrackHeaderProps> = ({
     <div
       role="button"
       tabIndex={0}
-      className="group relative flex h-full w-full flex-col justify-between overflow-hidden border-b border-white/10 p-3 text-left transition-all duration-200 focus:outline-none focus-visible:ring-2 focus-visible:ring-cyan-400/70 cursor-pointer"
-      style={rootStyle}
+      style={composeStyles(
+        layout.position.relative,
+        layout.flex.container('col'),
+        layout.flex.justify.between,
+        layout.overflow.hidden,
+        spacing.p(3),
+        effects.border.bottom(),
+        transitions.transition.standard('all', 200, 'ease-out'),
+        {
+          height: '100%',
+          width: '100%',
+          textAlign: 'left',
+          cursor: 'pointer',
+          borderBottom: '1px solid rgba(255,255,255,0.1)',
+          outline: 'none',
+          ...rootStyle,
+        }
+      )}
       onClick={handleSelectTrack}
       onKeyDown={(e) => {
         if (e.key === 'Enter' || e.key === ' ') {
           e.preventDefault();
           handleSelectTrack();
         }
+        if (e.key === 'Tab' && !e.shiftKey) {
+          e.currentTarget.style.boxShadow = '0 0 0 2px rgba(6, 182, 212, 0.7)';
+        }
+      }}
+      onKeyUp={(e) => {
+        if (e.key === 'Tab') {
+          e.currentTarget.style.boxShadow = rootStyle.boxShadow || 'none';
+        }
+      }}
+      onMouseEnter={(e) => {
+        const glowEl = e.currentTarget.querySelector('[data-hover-glow]') as HTMLElement;
+        if (glowEl) glowEl.style.opacity = '1';
+      }}
+      onMouseLeave={(e) => {
+        const glowEl = e.currentTarget.querySelector('[data-hover-glow]') as HTMLElement;
+        if (glowEl) glowEl.style.opacity = '0';
       }}
     >
-      <div className="absolute inset-0 z-[-1] opacity-0 transition-opacity duration-300 group-hover:opacity-100">
+      <div 
+        data-hover-glow
+        style={composeStyles(
+          layout.position.absolute,
+          { inset: 0, zIndex: -1 },
+          transitions.transition.standard('opacity', 300, 'ease-out'),
+          {
+            opacity: 0,
+          }
+        )}
+      >
         <div
-          className="absolute inset-0"
-          style={{
-            background: `radial-gradient(circle at 12% 18%, ${hexToRgba(
-            glowColor,
-              0.22
-            )}, transparent 65%)`,
-            filter: 'blur(28px)',
-          }}
+          style={composeStyles(
+            layout.position.absolute,
+            { inset: 0 },
+            {
+              background: `radial-gradient(circle at 12% 18%, ${hexToRgba(glowColor, 0.22)}, transparent 65%)`,
+              filter: 'blur(28px)',
+            }
+          )}
         />
       </div>
-      <div className="flex items-start justify-between">
-        <div className="flex flex-col">
-          <span className="text-xs uppercase tracking-[0.32em] text-ink/60">
+      <div style={composeStyles(
+        layout.flex.container('row'),
+        layout.flex.align.start,
+        layout.flex.justify.between
+      )}>
+        <div style={composeStyles(
+          layout.flex.container('col')
+        )}>
+          <span style={composeStyles(
+            typography.transform('uppercase'),
+            typography.tracking.widest,
+            {
+              fontSize: '0.75rem',
+              color: 'rgba(230, 240, 255, 0.6)',
+            }
+          )}>
             {track.group?.toUpperCase() ?? 'FLOW LANES'}
           </span>
-          <span className="mt-1 line-clamp-1 text-lg font-semibold text-slate-100">{track.trackName}</span>
-          <span className="text-[11px] uppercase tracking-[0.28em] text-ink/50">
+          <span style={composeStyles(
+            typography.weight('semibold'),
+            spacing.mt(1),
+            {
+              fontSize: '1.125rem',
+              color: 'rgb(241, 245, 249)',
+              display: '-webkit-box',
+              WebkitLineClamp: 1,
+              WebkitBoxOrient: 'vertical',
+              overflow: 'hidden',
+            }
+          )}>{track.trackName}</span>
+          <span style={composeStyles(
+            typography.transform('uppercase'),
+            typography.tracking.widest,
+            {
+              fontSize: '11px',
+              color: 'rgba(230, 240, 255, 0.5)',
+            }
+          )}>
             {uiState.context?.toUpperCase() ?? 'PLAYBACK'}
           </span>
         </div>
-        <div className="flex items-center gap-2">
+        <div style={composeStyles(
+          layout.flex.container('row'),
+          layout.flex.align.center,
+          spacing.gap(2)
+        )}>
           {/* Mute/Solo/Arm Controls */}
-          <div className="flex items-center gap-1">
+          <div style={composeStyles(
+            layout.flex.container('row'),
+            layout.flex.align.center,
+            spacing.gap(1)
+          )}>
             <button
               onClick={(e) => {
                 e.stopPropagation();
                 onToggleMute?.(track.id);
               }}
-              className={`w-8 h-8 rounded-full border transition-all flex items-center justify-center ${
-                isMuted
-                  ? 'bg-red-500/30 border-red-400/60 text-red-200'
-                  : 'bg-white/5 border-white/10 text-ink/60 hover:bg-white/10 hover:text-ink'
-              }`}
+              style={composeStyles(
+                layout.flex.container('row'),
+                layout.flex.align.center,
+                layout.flex.justify.center,
+                effects.border.radius.full,
+                transitions.transition.standard('all', 200, 'ease-out'),
+                {
+                  width: '32px',
+                  height: '32px',
+                  border: isMuted ? '1px solid rgba(248, 113, 113, 0.6)' : '1px solid rgba(255,255,255,0.1)',
+                  background: isMuted ? 'rgba(239, 68, 68, 0.3)' : 'rgba(255,255,255,0.05)',
+                  color: isMuted ? 'rgb(254, 202, 202)' : 'rgba(230, 240, 255, 0.6)',
+                }
+              )}
+              onMouseEnter={(e) => {
+                if (!isMuted) {
+                  e.currentTarget.style.background = 'rgba(255,255,255,0.1)';
+                  e.currentTarget.style.color = 'rgba(230, 240, 255, 1)';
+                }
+              }}
+              onMouseLeave={(e) => {
+                if (!isMuted) {
+                  e.currentTarget.style.background = 'rgba(255,255,255,0.05)';
+                  e.currentTarget.style.color = 'rgba(230, 240, 255, 0.6)';
+                }
+              }}
               title={isMuted ? 'Unmute track' : 'Mute track'}
             >
-              <MuteIcon className="w-3.5 h-3.5" />
+              <MuteIcon style={{ width: '14px', height: '14px' }} />
             </button>
             <button
               onClick={(e) => {
                 e.stopPropagation();
                 onToggleSolo?.(track.id);
               }}
-              className={`w-8 h-8 rounded-full border transition-all flex items-center justify-center ${
-                isSoloed
-                  ? 'bg-yellow-500/30 border-yellow-400/60 text-yellow-200'
-                  : 'bg-white/5 border-white/10 text-ink/60 hover:bg-white/10 hover:text-ink'
-              }`}
+              style={composeStyles(
+                layout.flex.container('row'),
+                layout.flex.align.center,
+                layout.flex.justify.center,
+                effects.border.radius.full,
+                transitions.transition.standard('all', 200, 'ease-out'),
+                {
+                  width: '32px',
+                  height: '32px',
+                  border: isSoloed ? '1px solid rgba(250, 204, 21, 0.6)' : '1px solid rgba(255,255,255,0.1)',
+                  background: isSoloed ? 'rgba(234, 179, 8, 0.3)' : 'rgba(255,255,255,0.05)',
+                  color: isSoloed ? 'rgb(254, 240, 138)' : 'rgba(230, 240, 255, 0.6)',
+                }
+              )}
+              onMouseEnter={(e) => {
+                if (!isSoloed) {
+                  e.currentTarget.style.background = 'rgba(255,255,255,0.1)';
+                  e.currentTarget.style.color = 'rgba(230, 240, 255, 1)';
+                }
+              }}
+              onMouseLeave={(e) => {
+                if (!isSoloed) {
+                  e.currentTarget.style.background = 'rgba(255,255,255,0.05)';
+                  e.currentTarget.style.color = 'rgba(230, 240, 255, 0.6)';
+                }
+              }}
               title={isSoloed ? 'Unsolo track' : 'Solo track'}
             >
-              <SoloIcon className="w-3.5 h-3.5" />
+              <SoloIcon style={{ width: '14px', height: '14px' }} />
             </button>
             <button
               onClick={(e) => {
                 e.stopPropagation();
                 onToggleArm?.(track.id);
               }}
-              className={`w-8 h-8 rounded-full border transition-all flex items-center justify-center ${
-                isArmed
-                  ? 'bg-pink-500/30 border-pink-400/60 text-pink-200'
-                  : 'bg-white/5 border-white/10 text-ink/60 hover:bg-white/10 hover:text-ink'
-              }`}
+              style={composeStyles(
+                layout.flex.container('row'),
+                layout.flex.align.center,
+                layout.flex.justify.center,
+                effects.border.radius.full,
+                transitions.transition.standard('all', 200, 'ease-out'),
+                {
+                  width: '32px',
+                  height: '32px',
+                  border: isArmed ? '1px solid rgba(236, 72, 153, 0.6)' : '1px solid rgba(255,255,255,0.1)',
+                  background: isArmed ? 'rgba(236, 72, 153, 0.3)' : 'rgba(255,255,255,0.05)',
+                  color: isArmed ? 'rgb(251, 207, 232)' : 'rgba(230, 240, 255, 0.6)',
+                }
+              )}
+              onMouseEnter={(e) => {
+                if (!isArmed) {
+                  e.currentTarget.style.background = 'rgba(255,255,255,0.1)';
+                  e.currentTarget.style.color = 'rgba(230, 240, 255, 1)';
+                }
+              }}
+              onMouseLeave={(e) => {
+                if (!isArmed) {
+                  e.currentTarget.style.background = 'rgba(255,255,255,0.05)';
+                  e.currentTarget.style.color = 'rgba(230, 240, 255, 0.6)';
+                }
+              }}
               title={isArmed ? 'Disarm track' : 'Arm track for recording'}
             >
-              <ArmIcon className="w-3.5 h-3.5" />
+              <ArmIcon style={{ width: '14px', height: '14px' }} />
             </button>
           </div>
-          <div className="flex flex-col items-end gap-1">
+          <div style={composeStyles(
+            layout.flex.container('col'),
+            layout.flex.align.end,
+            spacing.gap(1)
+          )}>
             <div
-              className="h-1.5 w-20 overflow-hidden rounded-full bg-white/10 shadow-inner"
+              style={composeStyles(
+                layout.overflow.hidden,
+                effects.border.radius.full,
+                {
+                  height: '6px',
+                  width: '80px',
+                  background: 'rgba(255,255,255,0.1)',
+                  boxShadow: 'inset 0 2px 4px rgba(0,0,0,0.2)',
+                }
+              )}
               title={`Volume ${Math.round(volume * 100)}%`}
             >
               <div
-                className="h-full rounded-full bg-gradient-to-r from-cyan-400 via-blue-400 to-violet-400 transition-all duration-200"
-                style={{ width: `${Math.round(volume * 100)}%` }}
+                style={composeStyles(
+                  layout.height.full,
+                  effects.border.radius.full,
+                  transitions.transition.standard('all', 200, 'ease-out'),
+                  {
+                    background: 'linear-gradient(to right, rgba(6, 182, 212, 1), rgba(59, 130, 246, 1), rgba(139, 92, 246, 1))',
+                    width: `${Math.round(volume * 100)}%`,
+                  }
+                )}
               />
             </div>
             <div
-              className="flex h-5 w-20 items-center justify-center rounded-full border border-white/10 bg-white/5 text-[10px] uppercase tracking-[0.2em] text-ink/60"
+              style={composeStyles(
+                layout.flex.container('row'),
+                layout.flex.align.center,
+                layout.flex.justify.center,
+                effects.border.radius.full,
+                {
+                  height: '20px',
+                  width: '80px',
+                  border: '1px solid rgba(255,255,255,0.1)',
+                  background: 'rgba(255,255,255,0.05)',
+                  fontSize: '10px',
+                  color: 'rgba(230, 240, 255, 0.6)',
+                  textTransform: 'uppercase',
+                  letterSpacing: '0.2em',
+                }
+              )}
               title={`Pan ${pan >= 0 ? 'R' : 'L'}${Math.abs(pan * 100).toFixed(0)}%`}
             >
               {pan === 0 ? 'CENTER' : `${pan > 0 ? 'R' : 'L'} ${Math.abs(pan * 100).toFixed(0)}%`}
@@ -203,16 +382,31 @@ const ArrangeTrackHeader: React.FC<ArrangeTrackHeaderProps> = ({
         </div>
       </div>
       {statusChips.length > 0 && (
-        <div className="mt-3 flex flex-wrap gap-2">
+        <div style={composeStyles(
+          spacing.mt(3),
+          layout.flex.container('row'),
+          layout.flex.wrap.wrap,
+          spacing.gap(2)
+        )}>
           {statusChips.map((chip) => (
             <span
               key={chip.label}
-              className="rounded-full px-3 py-1 text-[10px] uppercase tracking-[0.22em] text-ink/70 backdrop-blur-sm transition-all duration-200"
-              style={{
-                background: hexToRgba(chip.accent, 0.18),
-                border: `1px solid ${hexToRgba(chip.accent, 0.45)}`,
-                boxShadow: `0 0 14px ${hexToRgba(chip.accent, 0.35)}`,
-              }}
+              style={composeStyles(
+                effects.border.radius.full,
+                spacing.px(3),
+                spacing.py(1),
+                typography.transform('uppercase'),
+                typography.tracking.widest,
+                transitions.transition.standard('all', 200, 'ease-out'),
+                {
+                  fontSize: '10px',
+                  color: 'rgba(230, 240, 255, 0.7)',
+                  backdropFilter: 'blur(4px)',
+                  background: hexToRgba(chip.accent, 0.18),
+                  border: `1px solid ${hexToRgba(chip.accent, 0.45)}`,
+                  boxShadow: `0 0 14px ${hexToRgba(chip.accent, 0.35)}`,
+                }
+              )}
               title={chip.description}
             >
               {chip.label}
@@ -221,7 +415,15 @@ const ArrangeTrackHeader: React.FC<ArrangeTrackHeaderProps> = ({
         </div>
       )}
       {!statusChips.length && (
-        <div className="mt-4 h-[1px] w-full rounded-full bg-gradient-to-r from-transparent via-white/10 to-transparent" />
+        <div style={composeStyles(
+          spacing.mt(4),
+          effects.border.radius.full,
+          layout.width.full,
+          {
+            height: '1px',
+            background: 'linear-gradient(to right, transparent, rgba(255,255,255,0.1), transparent)',
+          }
+        )} />
       )}
     </div>
   );

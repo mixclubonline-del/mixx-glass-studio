@@ -5,6 +5,7 @@
  * Applies thermal color filters to root element and glass containers.
  */
 
+import { useEffect } from 'react';
 import { applyThermalColorToRoot, getThermalColor } from './colors';
 
 declare global {
@@ -57,15 +58,9 @@ export function initThermalSync(updateInterval: number = 100): () => void {
  * @param updateInterval - Update interval in milliseconds (default 100)
  */
 export function useThermalSync(enabled: boolean = true, updateInterval: number = 100): void {
-  if (typeof window === 'undefined') {
-    return;
-  }
-  
-  const React = require('react');
-  const { useEffect } = React;
-  
+  // Hook must be called unconditionally (before any early returns)
   useEffect(() => {
-    if (!enabled) {
+    if (typeof window === 'undefined' || !enabled) {
       return;
     }
     

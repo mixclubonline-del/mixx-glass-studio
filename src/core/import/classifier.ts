@@ -144,38 +144,25 @@ function computeRMS(channelData: Float32Array): number {
 
 /**
  * Get spectral profile (low/mid/high frequency energy).
+ * Uses real FFT analysis via Web Audio API.
  */
-function getSpectralProfile(channelData: Float32Array, sampleRate: number): SpectralProfile {
-  // Simple frequency analysis using FFT approximation
-  // For production, use proper FFT (Web Audio API AnalyserNode)
+async function getSpectralProfile(channelData: Float32Array, sampleRate: number): Promise<SpectralProfile> {
+  // Create audio buffer from channel data
+  const audioBuffer = new AudioBuffer({
+    length: channelData.length,
+    sampleRate: sampleRate,
+    numberOfChannels: 1,
+  });
+  audioBuffer.copyToChannel(channelData, 0);
   
-  const fftSize = 2048;
-  const hopSize = fftSize / 4;
+  // Use real FFT analysis
+  const { analyzeBufferFFT, getBandEnergy } = await import('../audio/fftAnalysis');
+  const freqData = await analyzeBufferFFT(audioBuffer, 2048);
+  
   const nyquist = sampleRate / 2;
-  
-  let lowEnergy = 0;
-  let midEnergy = 0;
-  let highEnergy = 0;
-  let count = 0;
-  
-  // Analyze chunks
-  for (let i = 0; i < channelData.length - fftSize; i += hopSize) {
-    const chunk = channelData.slice(i, i + fftSize);
-    
-    // Simple frequency domain analysis (placeholder for real FFT)
-    const rms = computeRMS(chunk);
-    
-    // Estimate frequency content (simplified - real implementation uses FFT)
-    // Low: 0-200Hz, Mid: 200-3000Hz, High: 3000Hz+
-    const lowFreq = estimateFrequencyBand(chunk, sampleRate, 0, 200);
-    const midFreq = estimateFrequencyBand(chunk, sampleRate, 200, 3000);
-    const highFreq = estimateFrequencyBand(chunk, sampleRate, 3000, nyquist);
-    
-    lowEnergy += lowFreq * rms;
-    midEnergy += midFreq * rms;
-    highEnergy += highFreq * rms;
-    count++;
-  }
+  const lowEnergy = getBandEnergy(freqData, sampleRate, 0, 200);
+  const midEnergy = getBandEnergy(freqData, sampleRate, 200, 3000);
+  const highEnergy = getBandEnergy(freqData, sampleRate, 3000, nyquist);
   
   const total = lowEnergy + midEnergy + highEnergy;
   

@@ -1,8 +1,9 @@
 import React, { useState, useMemo, useRef, useCallback, useEffect } from 'react';
-import { PlayIcon, PauseIcon, RewindIcon, FastForwardIcon, LoopIcon, HushIcon, SaveIcon, LoadIcon, SlidersIcon, MixerIcon, SparklesIcon, ArrangeViewIcon, PianoIcon, EditSurfaceIcon, SamplerIcon, SquaresPlusIcon, PlusCircleIcon, SplitIcon, MergeIcon, RefreshIcon, BulbIcon, StarIcon } from '../icons';
+import { PlayIcon, PauseIcon, RewindIcon, FastForwardIcon, LoopIcon, HushIcon, SaveIcon, LoadIcon, SlidersIcon, BloomModuleIcon, MixerIcon, SparklesIcon, ArrangeViewIcon, PianoIcon, EditSurfaceIcon, SamplerIcon, SquaresPlusIcon, PlusCircleIcon, SplitIcon, MergeIcon, RefreshIcon, BulbIcon, StarIcon } from '../icons';
 import { ArrangeClip, ClipId } from '../../hooks/useArrange';
-import FXMenu from '../FXMenu';
+import PluginBrowser from '../PluginBrowser';
 import { FxWindowConfig, FxWindowId } from '../../App';
+import type { PluginInventoryItem } from '../../audio/pluginTypes';
 import { hexToRgba, ALSActionPulse } from '../../utils/ALS';
 import type { PulsePalette } from '../../utils/ALS';
 import type { BloomActionMeta } from '../../types/bloom';
@@ -185,6 +186,11 @@ interface BloomDockProps {
     mixerActionPulse?: { trackId: string; pulse: ALSActionPulse; message: string } | null;
     onBloomAction?: (action: string, payload?: any, meta?: BloomActionMeta) => void;
     onSetTranslationProfile?: (action: string, payload?: any, meta?: BloomActionMeta) => void;
+    pluginInventory?: PluginInventoryItem[];
+    pluginFavorites?: Record<FxWindowId, boolean>;
+    onAddPlugin?: (trackId: string, pluginId: FxWindowId) => void;
+    onTogglePluginFavorite?: (pluginId: FxWindowId) => void;
+    tracks?: Array<{ id: string; trackName?: string }>;
 }
 
 export const BloomDock: React.FC<BloomDockProps> = (props) => {
@@ -202,6 +208,11 @@ export const BloomDock: React.FC<BloomDockProps> = (props) => {
         recordingOptions,
         onToggleRecordingOption,
         onDropTakeMarker,
+        pluginInventory = [],
+        pluginFavorites = {},
+        onAddPlugin,
+        onTogglePluginFavorite,
+        tracks = [],
     } = props;
     
     const containerRef = useRef<HTMLDivElement>(null);
@@ -210,7 +221,7 @@ export const BloomDock: React.FC<BloomDockProps> = (props) => {
     const hasDraggedRef = useRef(false);
     const cleanupDragListenersRef = useRef<(() => void) | null>(null);
     const [isDragging, setIsDragging] = useState(false);
-    const [isFxMenuOpen, setIsFxMenuOpen] = useState(false);
+    const [isPluginBrowserOpen, setIsPluginBrowserOpen] = useState(false);
     const [transportPulse, setTransportPulse] = useState<TransportPulseType | null>(null);
     const transportPulseTimeoutRef = useRef<number | null>(null);
     const holdTimeoutRef = useRef<number | null>(null);
@@ -977,19 +988,29 @@ export const BloomDock: React.FC<BloomDockProps> = (props) => {
                                 availableModes={availableViewModes}
                             />
                             <button
-                                onClick={() => setIsFxMenuOpen((prev) => !prev)}
+                                onClick={() => setIsPluginBrowserOpen((prev) => !prev)}
                                 className="w-11 h-11 rounded-full bg-glass-surface-soft flex items-center justify-center text-ink/70 hover:bg-glass-surface hover:text-ink transition-colors shadow-[inset_0_0_15px_rgba(4,12,26,0.4)]"
-                                aria-label="Toggle FX menu"
-                                title="Toggle FX menu"
+                                aria-label="Open plugin browser"
+                                title="Open plugin browser"
                             >
-                                <SlidersIcon className="w-5 h-5" />
+                                <BloomModuleIcon className="w-5 h-5" />
                             </button>
-                            {isFxMenuOpen && (
-                                <FXMenu
-                                    fxWindows={fxWindows.map((fw) => ({ id: fw.id, title: fw.name }))}
-                                    fxVisibility={fxVisibility}
-                                    onToggleFxVisibility={onToggleFxVisibility}
-                                    onClose={() => setIsFxMenuOpen(false)}
+                            {isPluginBrowserOpen && onAddPlugin && (
+                                <PluginBrowser
+                                    trackId={selectedTrackId || tracks[0]?.id || 'default'}
+                                    trackName={selectedTrackId ? tracks.find(t => t.id === selectedTrackId)?.trackName : 'Master Chain'}
+                                    activeInserts={fxWindows.filter(fw => fxVisibility[fw.id]).map(fw => fw.id)}
+                                    inventory={pluginInventory}
+                                    favorites={pluginFavorites}
+                                    onAddPlugin={(trackId, pluginId) => {
+                                        if (selectedTrackId) {
+                                            onAddPlugin(selectedTrackId, pluginId);
+                                        } else if (tracks.length > 0) {
+                                            onAddPlugin(tracks[0].id, pluginId);
+                                        }
+                                    }}
+                                    onToggleFavorite={onTogglePluginFavorite || (() => {})}
+                                    onClose={() => setIsPluginBrowserOpen(false)}
                                 />
                             )}
                             <button

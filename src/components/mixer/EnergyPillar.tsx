@@ -1,5 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { TrackData } from '../../App';
+import { spacing, typography, layout, effects, transitions, composeStyles } from '../../design-system';
 
 type TrackColor = TrackData['trackColor'];
 
@@ -43,14 +44,37 @@ const EnergyPillar: React.FC<EnergyPillarProps> = ({ level, transient, isPlaying
     const baseColor = selectedColor.base;
 
     return (
-        <div className="relative w-full h-full flex flex-col justify-end items-center">
+        <div style={composeStyles(
+          layout.position.relative,
+          layout.width.full,
+          { height: '100%' },
+          layout.flex.container('col'),
+          layout.flex.justify.end,
+          layout.flex.align.center
+        )}>
              {/* Shockwave Container */}
-            <div className="absolute bottom-0 w-full h-16 flex items-center justify-center">
+            <div style={composeStyles(
+              layout.position.absolute,
+              { bottom: 0 },
+              layout.width.full,
+              layout.flex.container('row'),
+              layout.flex.align.center,
+              layout.flex.justify.center,
+              { height: '64px' }
+            )}>
                  {shockwaves.map(sw => (
                     <div
                         key={sw.id}
-                        className="absolute w-full h-full rounded-full border-2 shockwave-animate"
-                        style={{ borderColor: baseColor }}
+                        style={composeStyles(
+                          layout.position.absolute,
+                          layout.width.full,
+                          layout.height.full,
+                          effects.border.radius.full,
+                          {
+                            border: `2px solid ${baseColor}`,
+                            animation: 'shockwave-animate 0.6s ease-out forwards',
+                          }
+                        )}
                         onAnimationEnd={() => handleAnimationEnd(sw.id)}
                     />
                 ))}
@@ -58,21 +82,32 @@ const EnergyPillar: React.FC<EnergyPillarProps> = ({ level, transient, isPlaying
 
             {/* Main Pillar */}
             <div
-                className="w-4 rounded-t-full transition-all duration-75 ease-out"
-                style={{
+                style={composeStyles(
+                  effects.border.radius.top.full(),
+                  transitions.transition.standard('all', 75, 'ease-out'),
+                  {
+                    width: '16px',
                     height: `${height}%`,
                     background: `linear-gradient(to top, ${baseColor}, transparent)`,
-                    boxShadow: `0 0 10px ${glowColor}, 0 0 20px ${glowColor}`
-                }}
+                    boxShadow: `0 0 10px ${glowColor}, 0 0 20px ${glowColor}`,
+                  }
+                )}
             />
             {/* Base Glow */}
             <div 
-                className="absolute bottom-0 w-6 h-2 rounded-full transition-opacity duration-200"
-                style={{
+                style={composeStyles(
+                  layout.position.absolute,
+                  { bottom: 0 },
+                  effects.border.radius.full,
+                  transitions.transition.standard('opacity', 200, 'ease-out'),
+                  {
+                    width: '24px',
+                    height: '8px',
                     background: baseColor,
                     filter: 'blur(5px)',
                     opacity: level > 0.1 ? 0.8 : 0,
-                }}
+                  }
+                )}
             />
         </div>
     );

@@ -31,7 +31,7 @@ export interface UseMeterReadingOptions {
  *   analyser: trackNodes.preFaderMeter,
  *   enableTruePeak: true,
  *   onUpdate: (reading) => {
- *     console.log('Peak:', reading.peak, 'RMS:', reading.rms);
+ *     // Use reading.peak and reading.rms for ALS feedback
  *   }
  * });
  * ```

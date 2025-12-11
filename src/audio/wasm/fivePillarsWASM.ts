@@ -135,14 +135,12 @@ export async function createVelvetFloorStageWithFallback(
   if (ctx instanceof AudioContext) {
     const wasmStage = await createVelvetFloorStageWASM(ctx, settings);
     if (wasmStage) {
-      console.log('[Five Pillars] Using AudioWorklet-accelerated Velvet Floor');
       return wasmStage;
     }
   }
   
   // Fallback to JS implementation
   const { createVelvetFloorStage } = await import('../fivePillars');
-  console.log('[Five Pillars] Using JS implementation for Velvet Floor');
   return createVelvetFloorStage(ctx, settings);
 }
 

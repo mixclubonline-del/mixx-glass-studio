@@ -68,7 +68,6 @@ export class PrimeEQEngine implements IAudioEngine {
 
     this.updateParameters();
     this.isInitialized = true;
-    console.log("🎛️ PrimeEQEngine initialized");
   }
 
   isActive(): boolean {
@@ -162,6 +161,18 @@ export class PrimeEQEngine implements IAudioEngine {
 let instance: PrimeEQEngine | null = null;
 
 export function getPrimeEQEngine(context: BaseAudioContext | null = null): PrimeEQEngine {
+  // If instance exists but context is closed or different, dispose and recreate
+  if (instance) {
+    const existingContext = instance.audioContext;
+    const contextClosed = existingContext && 'state' in existingContext && existingContext.state === 'closed';
+    const contextChanged = context && existingContext && existingContext !== context;
+    
+    if (contextClosed || contextChanged) {
+      instance.dispose();
+      instance = null;
+    }
+  }
+  
   if (!instance) {
     instance = new PrimeEQEngine(context);
   }

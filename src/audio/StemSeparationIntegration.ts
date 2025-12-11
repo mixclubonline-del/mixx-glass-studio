@@ -98,11 +98,8 @@ export class StemSeparationIntegration {
 
   prewarm() {
     try {
-      // eslint-disable-next-line no-console
-      console.log('[STEMS] Integration prewarm → INIT_MODEL');
       (this.engine as any)?.prewarm?.();
     } catch (err) {
-      // eslint-disable-next-line no-console
       console.warn('[STEMS] Integration prewarm failed', err);
     }
   }
@@ -135,6 +132,12 @@ export class StemSeparationIntegration {
             output_format: 'wav',
             normalize: true,
           });
+          
+          // Validate stems were created
+          if (!stems || (!stems.vocals && !stems.drums && !stems.bass && !stems.other)) {
+            throw new Error('Stem separation returned empty or invalid stems');
+          }
+          
           result.stems = stems;
           this.notifyProgress('Stems separated, generating tracks…', 70);
           const stemCreationResult = this.createStemTracks(
@@ -144,12 +147,23 @@ export class StemSeparationIntegration {
             startTime,
             allowedStemKeys
           );
+          
+          // Validate tracks were created
+          if (stemCreationResult.tracks.length === 0 || stemCreationResult.clips.length === 0) {
+            console.warn('[STEMS] No tracks/clips created from stems, falling back to single track import');
+            throw new Error('No tracks created from stems');
+          }
+          
           result.newTracks = stemCreationResult.tracks;
           result.newClips = stemCreationResult.clips;
           result.newBuffers = stemCreationResult.buffers;
           result.mixerSettings = stemCreationResult.mixerSettings;
         } catch (stemError) {
           console.warn('[STEMS] Separation failed, falling back to single track import:', stemError);
+          console.warn('[STEMS] Error details:', {
+            message: stemError instanceof Error ? stemError.message : String(stemError),
+            stack: stemError instanceof Error ? stemError.stack : undefined,
+          });
           const fallbackResult = this.createSingleTrackImport(
             audioBuffer,
             fileName,
@@ -220,6 +234,20 @@ export class StemSeparationIntegration {
 
     stemEntries.forEach(([stemKey, stemBuffer]) => {
       if (!stemBuffer) return;
+      
+      // Validate stem has audio content (not silent)
+      try {
+        const channelData = stemBuffer.getChannelData(0);
+        const hasAudio = channelData.some(sample => Math.abs(sample) > 0.001);
+        if (!hasAudio) {
+          console.warn(`[STEMS] Skipping silent stem: ${stemKey}`);
+          return;
+        }
+      } catch (e) {
+        console.warn(`[STEMS] Error validating stem ${stemKey}:`, e);
+        return;
+      }
+      
       const lowerKey = stemKey.toLowerCase();
       const canonicalKey = STEM_CANONICAL_MAP[lowerKey] ?? lowerKey;
       if (allowedSet && !allowedSet.has(canonicalKey)) {

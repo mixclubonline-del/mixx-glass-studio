@@ -1,7 +1,7 @@
 
 import React from 'react';
 import { PluginContainer } from '../shared/PluginContainer';
-import { Knob } from '../shared/Knob';
+import { MixxGlassKnob } from '../../../../components/mixxglass';
 import { MixxGlueSettings, PluginComponentProps, AudioSignal, GlobalSettings } from '../../types';
 import { PrimeBrainStub } from '../../lib/PrimeBrainStub';
 import { ToggleButton } from '../shared/ToggleButton';
@@ -138,11 +138,11 @@ export const MixxGlue: React.FC<PluginComponentProps<MixxGlueSettings>> = ({
             <div className="w-full h-full flex flex-wrap items-center justify-around gap-4 p-4">
                 <CompressionVisualizer visualizerData={visualizerData as GlueVisualizerData | null} sidechainActive={sidechainActive} />
                 <div className="flex flex-wrap justify-center gap-4">
-                    <Knob label="Threshold" value={threshold} setValue={(v) => handleValueChange('threshold', v)} paramName="threshold" min={-60} max={0} isLearning={isLearning('threshold')} onMidiLearn={onMidiLearn} />
-                    <Knob label="Ratio" value={ratio} setValue={(v) => handleValueChange('ratio', v)} min={1} max={20} step={0.5} paramName="ratio" isLearning={isLearning('ratio')} onMidiLearn={onMidiLearn} />
-                    <Knob label="Release" value={release} setValue={(v) => handleValueChange('release', v)} min={10} max={2000} step={10} paramName="release" isLearning={isLearning('release')} onMidiLearn={onMidiLearn} />
-                    <Knob label="Mix" value={mix} setValue={(v) => handleValueChange('mix', v)} paramName="mix" isLearning={isLearning('mix')} onMidiLearn={onMidiLearn} />
-                    <Knob label="Output" value={output} setValue={(v) => handleValueChange('output', v)} paramName="output" isLearning={isLearning('output')} onMidiLearn={onMidiLearn} />
+                    <MixxGlassKnob label="Threshold" value={threshold} setValue={(v) => handleValueChange('threshold', v)} paramName="threshold" min={-60} max={0} isLearning={isLearning('threshold')} onMidiLearn={onMidiLearn} />
+                    <MixxGlassKnob label="Ratio" value={ratio} setValue={(v) => handleValueChange('ratio', v)} min={1} max={20} step={0.5} paramName="ratio" isLearning={isLearning('ratio')} onMidiLearn={onMidiLearn} />
+                    <MixxGlassKnob label="Release" value={release} setValue={(v) => handleValueChange('release', v)} min={10} max={2000} step={10} paramName="release" isLearning={isLearning('release')} onMidiLearn={onMidiLearn} />
+                    <MixxGlassKnob label="Mix" value={mix} setValue={(v) => handleValueChange('mix', v)} paramName="mix" isLearning={isLearning('mix')} onMidiLearn={onMidiLearn} />
+                    <MixxGlassKnob label="Output" value={output} setValue={(v) => handleValueChange('output', v)} paramName="output" isLearning={isLearning('output')} onMidiLearn={onMidiLearn} />
                     <div className="w-28 flex justify-center items-end">
                       <ToggleButton label="SIDECHAIN" value={sidechainActive} onChange={(v) => handleValueChange('sidechainActive', v)} disabled={!isSidechainTarget} color="cyan" />
                     </div>

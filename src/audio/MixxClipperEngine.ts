@@ -164,6 +164,18 @@ export class MixxClipperEngine implements IAudioEngine {
 let clipInstance: MixxClipperEngine | null = null;
 
 export function getMixxClipperEngine(context: BaseAudioContext | null = null): MixxClipperEngine {
+  // If instance exists but context is closed or different, dispose and recreate
+  if (clipInstance) {
+    const existingContext = clipInstance.audioContext;
+    const contextClosed = existingContext && 'state' in existingContext && existingContext.state === 'closed';
+    const contextChanged = context && existingContext && existingContext !== context;
+    
+    if (contextClosed || contextChanged) {
+      clipInstance.dispose();
+      clipInstance = null;
+    }
+  }
+  
   if (!clipInstance) {
     clipInstance = new MixxClipperEngine(context);
   }

@@ -417,7 +417,6 @@ let globalScheduler: QuantumScheduler | null = null;
 export function getQuantumScheduler(): QuantumScheduler {
   if (!globalScheduler) {
     globalScheduler = new QuantumScheduler();
-    console.log('🔮 Quantum Scheduler initialized - Protecting audio, enabling AI, batching UI');
   }
   return globalScheduler;
 }

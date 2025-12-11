@@ -88,7 +88,6 @@ class WebGPUBackendManager {
               performanceHint: 'WebGPU acceleration active - 10-100x speedup expected',
             };
             
-            console.log('🔮 WebGPU Backend: ACTIVE - Quantum speed unlocked');
             return;
           }
         } catch (webgpuError) {
@@ -111,8 +110,6 @@ class WebGPUBackendManager {
             : 'WebGPU not supported in this browser, using CPU fallback',
           performanceHint: 'CPU backend active - consider using Chrome/Edge for WebGPU acceleration',
         };
-        
-        console.log('🔮 WebGPU Backend: CPU fallback active');
       } catch (cpuError) {
         this.status = {
           type: 'cpu',

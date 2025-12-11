@@ -57,7 +57,10 @@ export function PrimeBrainProvider({ children, primeBrainStatus }: PrimeBrainPro
       },
       30, // 30ms budget for behavior computation
       (actualMs, budgetMs) => {
-        console.warn(`[Prime Brain] Behavior computation overrun: ${actualMs.toFixed(2)}ms (budget: ${budgetMs}ms)`);
+        // Only log overruns in dev mode and if significantly over budget (2x)
+        if (import.meta.env.DEV && actualMs > budgetMs * 2) {
+          console.warn(`[Prime Brain] Behavior computation overrun: ${actualMs.toFixed(2)}ms (budget: ${budgetMs}ms)`);
+        }
       }
     );
   }, []);

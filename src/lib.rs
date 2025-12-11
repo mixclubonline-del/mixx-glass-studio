@@ -1,5 +1,6 @@
 mod engine;
 mod ffi;
+mod mixx_audio_core;
 
 pub use engine::{
     current_stats, init_engine, pop_metric, shutdown_engine, start_engine, stop_engine,
@@ -10,5 +11,8 @@ pub use ffi::{
     mixx_engine_shutdown, mixx_engine_start, mixx_engine_stop, MixxEngineConfig, MixxEngineMetric,
     MixxEngineStats,
 };
+
+// Export MixxAudioCore modules
+pub use mixx_audio_core::*;
 
 

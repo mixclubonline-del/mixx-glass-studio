@@ -133,6 +133,18 @@ export class MixxLimiterEngine implements IAudioEngine {
 let limiterInstance: MixxLimiterEngine | null = null;
 
 export function getMixxLimiterEngine(context: BaseAudioContext | null = null): MixxLimiterEngine {
+  // If instance exists but context is closed or different, dispose and recreate
+  if (limiterInstance) {
+    const existingContext = limiterInstance.audioContext;
+    const contextClosed = existingContext && 'state' in existingContext && existingContext.state === 'closed';
+    const contextChanged = context && existingContext && existingContext !== context;
+    
+    if (contextClosed || contextChanged) {
+      limiterInstance.dispose();
+      limiterInstance = null;
+    }
+  }
+  
   if (!limiterInstance) {
     limiterInstance = new MixxLimiterEngine(context);
   }

@@ -12,20 +12,70 @@ export interface TimingAnalysis {
   // future: swing, grid, bar alignment, etc.
 }
 
+// Lazy-loaded detection functions
+let bpmDetector: ((buffer: AudioBuffer) => number | null) | null = null;
+let keyDetector: ((buffer: AudioBuffer) => string) | null = null;
+
+async function loadBPMDetector() {
+  if (!bpmDetector) {
+    const module = await import('./bpm');
+    bpmDetector = module.detectBPM;
+  }
+  return bpmDetector;
+}
+
+async function loadKeyDetector() {
+  if (!keyDetector) {
+    const module = await import('./key');
+    keyDetector = module.detectKey;
+  }
+  return keyDetector;
+}
+
 /**
- * Basic timing analysis stub.
- * You can hook detectBPM/detectKey here or keep it as a pass-through
- * if you're already populating from upstream.
+ * Timing analysis with automatic BPM/key detection.
+ * 
+ * If BPM/key are not provided, automatically detects them from the audio buffer.
+ * This ensures timing analysis always has complete data.
+ * 
+ * Flow Doctrine: Professional audio analysis - complete data, no placeholders.
  */
-export function analyzeTiming(input: {
+export async function analyzeTiming(input: {
   bpm?: number | null;
   key?: string;
   confidence?: number;
-}): TimingAnalysis {
+  audioBuffer?: AudioBuffer; // Optional buffer for detection
+}): Promise<TimingAnalysis> {
+  let detectedBPM = input.bpm ?? null;
+  let detectedKey = input.key ?? 'C';
+  let confidence = input.confidence ?? 0.7;
+
+  // Auto-detect if not provided and buffer is available
+  if (input.audioBuffer) {
+    if (!detectedBPM) {
+      // Lazy-load BPM detection
+      const detectBPM = await loadBPMDetector();
+      detectedBPM = detectBPM(input.audioBuffer);
+      if (detectedBPM) {
+        confidence = Math.max(confidence, 0.6); // BPM detection adds confidence
+      }
+    }
+
+    if (!detectedKey || detectedKey === 'C') {
+      // Lazy-load key detection
+      const detectKey = await loadKeyDetector();
+      const key = detectKey(input.audioBuffer);
+      if (key && key !== 'C') {
+        detectedKey = key;
+        confidence = Math.max(confidence, 0.5); // Key detection adds confidence
+      }
+    }
+  }
+
   return {
-    bpm: input.bpm ?? null,
-    key: input.key ?? 'C',
-    confidence: input.confidence ?? 0.7,
+    bpm: detectedBPM,
+    key: detectedKey,
+    confidence,
   };
 }
 
