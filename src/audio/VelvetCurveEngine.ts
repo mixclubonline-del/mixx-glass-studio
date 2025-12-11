@@ -22,6 +22,7 @@
 import { FourAnchors, MusicalContext } from '../types/sonic-architecture';
 import { IAudioEngine } from '../types/audio-graph';
 import { breathingPattern, warmthModulation } from '../core/beat-locked-lfo';
+import { als } from '../utils/alsFeedback';
 
 export interface VelvetCurveState {
   warmth: number;
@@ -359,7 +360,11 @@ export class VelvetCurveEngine implements IAudioEngine {
       case 'emotion': this.setEmotion(value); break;
       case 'power': this.setPower(value); break;
       case 'balance': this.setBalance(value); break;
-      default: console.warn(`VelvetCurveEngine: Unknown parameter ${paramName}`);
+      default: 
+        // Unknown parameter - log in DEV mode only
+        if (import.meta.env.DEV) {
+          als.warning(`VelvetCurveEngine: Unknown parameter ${paramName}`);
+        }
     }
   }
 

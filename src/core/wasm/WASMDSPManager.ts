@@ -8,6 +8,8 @@
  * @version 1.0.0 - Phase 3 WASM DSP Integration
  */
 
+import { als } from '../../utils/alsFeedback';
+
 export type DSPBackend = 'wasm' | 'worklet' | 'js';
 
 export interface DSPBackendStatus {
@@ -141,7 +143,7 @@ class WASMDSPManager {
         error: error instanceof Error ? error.message : String(error),
       };
       
-      console.error('[WASM DSP Manager] Initialization failed:', error);
+      als.error('[WASM DSP Manager] Initialization failed', error);
       throw error;
     } finally {
       this.initializationPromise = null;

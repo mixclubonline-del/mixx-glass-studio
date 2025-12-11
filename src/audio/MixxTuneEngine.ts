@@ -5,6 +5,7 @@
  * how: Blend a lightweight pitch/formant shaper with wet/dry mixing and output gain. (Flow / Recall)
  */
 import { IAudioEngine } from "../types/audio-graph";
+import { als } from "../utils/alsFeedback";
 
 type MixxTuneParams = {
   retuneSpeed: number;
@@ -49,7 +50,7 @@ export class MixxTuneEngine implements IAudioEngine {
   async initialize(ctx: BaseAudioContext): Promise<void> {
     if (this.isInitialized) return;
     if ((ctx.state as string) === "closed") {
-      console.warn("[MIXX TUNE] Cannot initialize engine on closed AudioContext");
+      als.warning("[MIXX TUNE] Cannot initialize engine on closed AudioContext");
       return;
     }
 

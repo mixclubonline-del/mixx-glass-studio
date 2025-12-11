@@ -16,6 +16,7 @@
 
 import { IAudioEngine } from '../types/audio-graph';
 import { breathingPattern, warmthModulation } from '../core/beat-locked-lfo';
+import { als } from '../utils/alsFeedback';
 
 export interface HarmonicLatticeState {
   warmth: {
@@ -219,7 +220,11 @@ export class HarmonicLattice implements IAudioEngine {
     switch (name) {
       case 'emotionalBias': this.setEmotionalBias(value); break;
       // Add more specific parameter setters here if HarmonicLattice exposes them
-      default: console.warn(`HarmonicLattice: Unknown parameter ${name}`);
+      default: 
+        // Unknown parameter - log in DEV mode only
+        if (import.meta.env.DEV) {
+          als.warning(`HarmonicLattice: Unknown parameter ${name}`);
+        }
     }
   }
 

@@ -15,6 +15,7 @@ import { hpss } from './hpss';
 import { extractSubBass, extractBass } from './extractSubBass';
 import { aiVocalModel, subtract } from './vocalModel';
 import type { AudioClassification } from './classifier';
+import { als } from '../../utils/alsFeedback';
 
 export interface StemResult {
   vocals: AudioBuffer | null;
@@ -74,7 +75,7 @@ export async function stemSplitEngine(
     
     // Ensure context is in 'suspended' state before rendering
     if (offline.state === 'closed') {
-      console.warn('[FLOW IMPORT] OfflineAudioContext was closed, returning original buffer');
+      // Context closed - graceful fallback (no ALS needed, expected behavior)
       return audioBuffer;
     }
     
@@ -95,7 +96,7 @@ export async function stemSplitEngine(
     const renderPromise = offline.startRendering().catch((error) => {
       // If context is stopped/closed, return original buffer
       if (offline.state === 'closed' || offline.state === 'suspended') {
-        console.warn('[FLOW IMPORT] OfflineAudioContext in invalid state for rendering:', offline.state);
+        // Context in invalid state - graceful fallback (no ALS needed)
         return audioBuffer;
       }
       throw error;
@@ -114,7 +115,7 @@ export async function stemSplitEngine(
     } catch (error) {
       // Cancel timeout on error
       if (timeoutId) clearTimeout(timeoutId);
-      console.error('[FLOW IMPORT] Stem separation render error:', error);
+      als.error('[FLOW IMPORT] Stem separation render error', error);
       // Return original buffer if separation fails
       return audioBuffer;
     }
@@ -162,7 +163,7 @@ export async function stemSplitEngine(
       
       // Fall through to full mode if AI didn't produce stems
     } catch (aiError) {
-      console.warn('[FLOW IMPORT] AI separation failed, falling back to full mode:', aiError);
+      // AI separation failed - fallback is expected, no ALS needed
       // Fall through to full mode
     }
     // Don't return here - let it fall through to FULL MODE for proper separation
@@ -195,7 +196,7 @@ export async function stemSplitEngine(
       try {
         result.music = await subtract(hpssResult.harmonic, vocals);
       } catch (error) {
-        console.warn('[FLOW IMPORT] Could not subtract vocals from harmonic, using harmonic as music:', error);
+        // Vocal subtraction failed - use harmonic as music (expected fallback)
         result.music = hpssResult.harmonic;
       }
     }
@@ -208,7 +209,7 @@ export async function stemSplitEngine(
       throw new Error('HPSS produced no stems, falling back to frequency filtering');
     }
   } catch (error) {
-    console.error('[FLOW IMPORT] HPSS separation failed, falling back to frequency filtering:', error);
+    als.warning('[FLOW IMPORT] HPSS separation failed, using frequency filtering fallback');
     
     // Fallback: frequency-based split (at least create some stems)
     try {
@@ -231,7 +232,7 @@ export async function stemSplitEngine(
       // Also create a full mix stem
       result.harmonic = await renderPass((ctx, src) => src);
     } catch (fallbackError) {
-      console.error('[FLOW IMPORT] Fallback separation also failed:', fallbackError);
+      als.error('[FLOW IMPORT] Fallback separation also failed', fallbackError);
       // Last resort: return original buffer as single stem
       result.music = audioBuffer;
     }

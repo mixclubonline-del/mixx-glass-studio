@@ -7,6 +7,7 @@
 
 import { useCallback, useEffect, useRef, useState } from 'react';
 import type { StemSeparationSnapshot } from './stemSeparationSnapshot';
+import { als } from '../../utils/alsFeedback';
 
 const MAX_QUEUE_SIZE = 50; // Larger queue for stem separation (less frequent than Prime Brain)
 const MAX_RETRIES = 5;
@@ -86,7 +87,7 @@ export function useStemSeparationExporter(options: StemSeparationExporterOptions
               if (item.attempts >= MAX_RETRIES) {
                 const dropped = queueRef.current.shift();
                 if (debug && dropped) {
-                  console.warn('[STEM SEPARATION] Max retries reached, dropping snapshot:', dropped.snapshot.id);
+                  // Max retries reached - debug only (no ALS needed for training data export)
                 }
               } else {
                 // Move to end of queue for retry
@@ -99,7 +100,7 @@ export function useStemSeparationExporter(options: StemSeparationExporterOptions
             if (item.attempts >= MAX_RETRIES) {
               const dropped = queueRef.current.shift();
               if (debug && dropped) {
-                console.warn('[STEM SEPARATION] Export failed, dropping snapshot:', dropped.snapshot.id, error);
+                // Export failed - debug only (no ALS needed for training data export)
               }
             } else {
               queueRef.current.push(queueRef.current.shift()!);
@@ -126,25 +127,18 @@ export function useStemSeparationExporter(options: StemSeparationExporterOptions
         if (queueRef.current.length > MAX_QUEUE_SIZE) {
           const dropped = queueRef.current.shift();
           if (debug && dropped) {
-            console.warn(
-              '[STEM SEPARATION] Queue overflow, dropping oldest snapshot',
-              dropped.snapshot.id
-            );
+            // Queue overflow - debug only (no ALS needed for training data export)
           }
         }
         
         if (debug) {
-          console.debug(
-            '[STEM SEPARATION] Snapshot queued',
-            snapshot.id,
-            `(queue size: ${queueRef.current.length}/${MAX_QUEUE_SIZE})`
-          );
+          // Debug log - keep in DEV mode only
         }
         
         void flushQueue(exportUrl);
       } catch (error) {
         if (debug) {
-          console.warn('[STEM SEPARATION] Failed to queue snapshot', error);
+          // Failed to queue snapshot - debug only (no ALS needed for training data export)
         }
       }
     },

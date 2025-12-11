@@ -8,6 +8,7 @@
  */
 
 import React, { useEffect, useRef } from "react";
+import { als } from "../../utils/alsFeedback";
 
 type WaveformDisplayMode = "peak" | "rms";
 
@@ -206,8 +207,9 @@ export const WaveformRenderer: React.FC<WaveformRendererProps> = ({
     }
 
     const renderTime = performance.now() - renderStart;
-    if (renderTime > 16) {
-      console.warn(`[WaveformRenderer] Render took ${renderTime.toFixed(2)}ms at zoom ${zoom}`);
+    if (renderTime > 16 && import.meta.env.DEV) {
+      // Performance warning - DEV mode only
+      als.warning(`[WaveformRenderer] Render took ${renderTime.toFixed(2)}ms at zoom ${zoom}`);
     }
 
     ctx.restore();

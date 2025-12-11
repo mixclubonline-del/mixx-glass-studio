@@ -9,6 +9,7 @@
 
 import React, { memo } from "react";
 import { useFlowMotion, usePulseAnimation } from "../mixxglass";
+import { MixxGlassMeter } from "../mixxglass";
 import type { MixerBusId } from "../../App";
 import { hexToRgba } from "../../utils/ALS";
 import {
@@ -29,6 +30,9 @@ export interface FlowBusStripProps {
   alsGlow: string;
   alsHaloColor?: string;
   alsGlowStrength?: number;
+  busLevel?: number; // Actual bus audio level (0-1) from analyser
+  busPeak?: number; // Peak level from analyser
+  busTransient?: boolean; // Transient detection
   onSelectBus?: (busId: MixerBusId) => void;
   isActive?: boolean;
 }
@@ -44,6 +48,9 @@ const FlowBusStrip: React.FC<FlowBusStripProps> = memo(
     alsGlow,
     alsHaloColor,
     alsGlowStrength,
+    busLevel,
+    busPeak,
+    busTransient,
     onSelectBus,
     isActive,
   }) => {
@@ -55,6 +62,11 @@ const FlowBusStrip: React.FC<FlowBusStripProps> = memo(
 
     const glowSource = alsHaloColor ?? alsGlow;
     const glowAlpha = Math.min(Math.max(alsGlowStrength ?? (0.25 + alsIntensity * 0.35), 0), 1);
+    
+    // Use actual bus level if available, otherwise fall back to send-based intensity
+    const displayLevel = busLevel !== undefined ? busLevel : alsIntensity;
+    const displayPeak = busPeak !== undefined ? busPeak : alsIntensity;
+    const displayTransient = busTransient ?? false;
 
     // Animated entrance and selection
     const entranceStyle = useFlowMotion(
@@ -102,7 +114,7 @@ const FlowBusStrip: React.FC<FlowBusStripProps> = memo(
             {
               border: '1px solid rgba(102, 140, 198, 0.45)',
               background: 'rgba(6,14,28,0.78)',
-              fontSize: '0.45rem',
+              fontSize: '0.6875rem', // 11px minimum
               color: '#e6f0ff',
               opacity: memberPulse.opacity,
             }
@@ -141,20 +153,48 @@ const FlowBusStrip: React.FC<FlowBusStripProps> = memo(
       >
         <div style={composeStyles(
           layout.width.full,
-          spacing.px(2),
-          spacing.pt(2),
+          spacing.px(3),
+          spacing.pt(3),
           layout.flex.container('row'),
           layout.flex.align.center,
           layout.flex.justify.between,
-          typography.transform('uppercase'),
-          typography.tracking.widest,
+          typography.preset.label(),
           {
-            fontSize: '0.55rem',
-            color: '#e6f0ff',
+            // Professional label styling
           }
         )}>
           <span>{name}</span>
-          <span style={{ color: 'rgba(230, 240, 255, 0.5)' }}>{members.length}</span>
+          <span style={{ 
+            color: 'rgba(230, 240, 255, 0.65)',
+            fontWeight: '500',
+          }}>{members.length}</span>
+        </div>
+
+        {/* Bus Meter - Shows actual bus audio level */}
+        <div style={composeStyles(
+          layout.width.full,
+          layout.flex.container('row'),
+          layout.flex.align.end,
+          layout.flex.justify.center,
+          spacing.px(2),
+          spacing.py(2),
+          effects.border.radius.xl,
+          {
+            border: '1px solid rgba(102, 140, 198, 0.45)',
+            background: 'rgba(8,18,34,0.72)',
+            height: '64px',
+          }
+        )}>
+          <MixxGlassMeter
+            level={Math.min(1, Math.max(0, displayLevel))}
+            peak={Math.min(1, Math.max(displayLevel, displayPeak))}
+            transient={displayTransient}
+            alsChannel="pressure"
+            color={alsColor}
+            glowColor={alsGlow}
+            height={48}
+            width={32}
+          />
         </div>
 
         <div
@@ -164,18 +204,17 @@ const FlowBusStrip: React.FC<FlowBusStripProps> = memo(
             layout.flex.justify.center,
             effects.border.radius.full,
             spacing.mt(2),
-            typography.transform('uppercase'),
-            typography.tracking.widest,
+            typography.preset.label(),
             {
-              width: '40px',
-              height: '40px',
-              border: '1px solid rgba(102, 140, 198, 0.45)',
-              fontSize: '0.5rem',
-              color: '#e6f0ff',
-              boxShadow: `0 0 20px ${hexToRgba(glowSource, glowAlpha)}`,
+              width: '36px',
+              height: '36px',
+              border: '1px solid rgba(102, 140, 198, 0.35)',
+              fontSize: '0.6875rem', // 11px minimum
+              color: 'rgba(230, 240, 255, 0.85)',
+              boxShadow: `0 2px 8px ${hexToRgba(glowSource, glowAlpha * 0.4)}`,
               background: `radial-gradient(circle, ${hexToRgba(
                 glowSource,
-                glowAlpha * 0.9
+                glowAlpha * 0.6
               )} 0%, transparent 70%)`,
               opacity: busPulse.opacity,
               transform: `scale(${busPulse.scale})`,
@@ -194,6 +233,7 @@ const FlowBusStrip: React.FC<FlowBusStripProps> = memo(
           layout.flex.justify.between,
           spacing.gap(2)
         )}>
+          {/* Intensity bar - shows bus level or send intensity */}
           <div style={composeStyles(
             layout.position.relative,
             layout.overflow.hidden,
@@ -209,10 +249,10 @@ const FlowBusStrip: React.FC<FlowBusStripProps> = memo(
                 { top: 0, bottom: 0, left: 0 },
                 effects.border.radius.full,
                 {
-                  width: `${alsIntensity * 100}%`,
+                  width: `${displayLevel * 100}%`,
                   background: `linear-gradient(90deg, ${hexToRgba(
                     alsColor,
-                    Math.min(0.6 + alsIntensity * 0.3, 1)
+                    Math.min(0.6 + displayLevel * 0.3, 1)
                   )}, ${hexToRgba(glowSource, glowAlpha)})`,
                   boxShadow: `0 0 12px ${hexToRgba(glowSource, glowAlpha)}`,
                   opacity: intensityBarPulse.opacity,
@@ -247,7 +287,7 @@ const FlowBusStrip: React.FC<FlowBusStripProps> = memo(
                 {
                   border: '1px solid rgba(102, 140, 198, 0.45)',
                   background: 'rgba(6,14,28,0.78)',
-                  fontSize: '0.45rem',
+                  fontSize: '0.6875rem', // 11px minimum
                   color: 'rgba(230, 240, 255, 0.7)',
                 }
               )}>
@@ -315,7 +355,7 @@ const FlowBusStrip: React.FC<FlowBusStripProps> = memo(
                 typography.transform('uppercase'),
                 typography.tracking.widest,
                 {
-                  fontSize: '0.45rem',
+                  fontSize: '0.6875rem', // 11px minimum
                   color: 'rgba(230, 240, 255, 0.55)',
                 }
               )}>

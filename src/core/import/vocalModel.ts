@@ -7,6 +7,8 @@
  * This is a placeholder that will hook up to your real AI model.
  */
 
+import { als } from '../../utils/alsFeedback';
+
 declare global {
   interface Window {
     __mixx_ai_vocal?: (buffer: AudioBuffer) => Promise<AudioBuffer>;
@@ -116,7 +118,7 @@ async function fallbackVocalExtraction(audioBuffer: AudioBuffer): Promise<AudioB
   try {
     return await ctx.startRendering();
   } catch (error) {
-    console.warn('[FLOW IMPORT] Vocal extraction failed, returning original buffer:', error);
+    // Vocal extraction failed - return original (expected fallback)
     return audioBuffer;
   }
 }
@@ -172,7 +174,7 @@ export async function subtract(
   try {
     return await ctx.startRendering();
   } catch (error) {
-    console.warn('[FLOW IMPORT] Vocal subtraction failed, returning full mix:', error);
+    // Vocal subtraction failed - return full mix (expected fallback)
     return fullMix;
   }
 }

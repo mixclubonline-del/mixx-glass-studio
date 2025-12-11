@@ -299,7 +299,7 @@ export class RevolutionaryStemEngine {
       buffer.getChannelData(0).set(data);
       return buffer;
     } catch (error) {
-      console.warn('[REVOLUTIONARY STEM] Failed to convert Float32Array to AudioBuffer:', error);
+      // Conversion failed - return null (expected fallback, no ALS needed)
       return null;
     }
   }

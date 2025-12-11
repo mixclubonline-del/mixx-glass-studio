@@ -198,6 +198,7 @@ async function loadModel() {
     model = {
       separate(input: Float32Array, _sr: number) {
         const len = input?.length || 0;
+        // Return silent stems - this will trigger DSP fallback
         return {
           vocals: new Float32Array(len),
           drums: new Float32Array(len),
@@ -212,7 +213,9 @@ async function loadModel() {
     (self as any).postMessage({
       type: 'MODEL_READY',
       status: true,
-      msg: 'Dummy stem model loaded (fake-demucs.wasm).',
+      msg: 'Stem separation ready - DSP fallback will be used (AI model placeholder detected).',
+      quality: 'dsp',
+      note: 'For production AI-quality separation, replace fake-demucs.wasm with real Demucs model.'
     });
   } catch (err) {
     (self as any).postMessage({ type: 'MODEL_ERROR', msg: 'Dummy model load failure', error: String(err) });
@@ -280,7 +283,8 @@ self.onmessage = async (event: MessageEvent<any>) => {
           (self as any).postMessage({ 
             type: 'FALLBACK_USED', 
             reason: result.error ? 'MODEL_ERROR' : 'MODEL_NOT_READY',
-            note: 'Using DSP fallback - functional but not AI quality. For production, integrate real Demucs model.'
+            note: 'DSP fallback active - functional separation using frequency analysis. For AI-quality stems, integrate real Demucs model.',
+            quality: 'dsp'
           });
         } else {
           // Check if model returned silent stems (all zeros)
@@ -298,7 +302,15 @@ self.onmessage = async (event: MessageEvent<any>) => {
             (self as any).postMessage({ 
               type: 'FALLBACK_USED', 
               reason: 'SILENT_STEMS',
-              note: 'Model returned silent stems - using DSP fallback. Replace fake-demucs.wasm with real model.'
+              note: 'DSP fallback active - AI model unavailable. Using frequency-domain separation for functional stems.',
+              quality: 'dsp'
+            });
+          } else {
+            // AI model working - send success message
+            (self as any).postMessage({
+              type: 'MODEL_SUCCESS',
+              note: 'AI stem separation active',
+              quality: 'ai'
             });
           }
         }

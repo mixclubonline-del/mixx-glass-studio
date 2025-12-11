@@ -11,6 +11,8 @@
  * Flow Doctrine: Professional audio separation - frequency-aware processing.
  */
 
+import { als } from '../../utils/alsFeedback';
+
 export interface HPSSResult {
   harmonic: AudioBuffer;
   percussive: AudioBuffer;
@@ -106,7 +108,7 @@ export async function hpss(audioBuffer: AudioBuffer): Promise<HPSSResult> {
   try {
     harmonic = await harmonicCtx.startRendering();
   } catch (error) {
-    console.warn('[FLOW IMPORT] Harmonic extraction failed, using original buffer:', error);
+    // Harmonic extraction failed - use original buffer (expected fallback)
     harmonic = audioBuffer;
   }
   
@@ -149,7 +151,7 @@ export async function hpss(audioBuffer: AudioBuffer): Promise<HPSSResult> {
   try {
     percussive = await percussiveCtx.startRendering();
   } catch (error) {
-    console.warn('[FLOW IMPORT] Percussive extraction failed, using original buffer:', error);
+    // Percussive extraction failed - use original buffer (expected fallback)
     percussive = audioBuffer;
   }
   

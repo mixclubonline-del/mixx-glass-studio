@@ -16,6 +16,7 @@ import {
 } from '../fivePillars';
 import { getWASMDSPManager, isWorkletActive } from '../../core/wasm/WASMDSPManager';
 import { scheduleAudioTask } from '../../core/quantum';
+import { als } from '../../utils/alsFeedback';
 
 /**
  * Create Velvet Floor stage with WASM/AudioWorklet acceleration
@@ -84,7 +85,7 @@ export async function createVelvetFloorStageWASM(
     
     return { input, output, setSettings };
   } catch (error) {
-    console.warn('[Velvet Floor WASM] Failed to create AudioWorklet, falling back to JS:', error);
+    // AudioWorklet failed - JS fallback will be used (expected)
     return null; // Fallback to JS implementation
   }
 }

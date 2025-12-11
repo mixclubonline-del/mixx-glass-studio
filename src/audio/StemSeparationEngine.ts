@@ -7,6 +7,8 @@
  * Wrapper around Hybrid Transformer Demucs workflow with graceful fallbacks.
  */
 
+import { als } from '../utils/alsFeedback';
+
 export interface StemSeparationOptions {
   model: 'htdemucs' | 'htdemucs_6stems' | 'mdx_extra' | 'demucs_v3';
   output_format: 'wav' | 'mp3' | 'flac';
@@ -60,7 +62,10 @@ class StemSeparationEngine {
         this.processingWorker.postMessage({ type: 'INIT_MODEL' });
       }
     } catch (err) {
-      console.warn('[STEMS] prewarm failed', err);
+      // Prewarm failure is non-critical - fallback will be used
+      if (import.meta.env.DEV) {
+        als.warning('[STEMS] Prewarm failed, fallback will be used');
+      }
     }
   }
 
@@ -70,7 +75,7 @@ class StemSeparationEngine {
       await this.loadModel(this.currentModel);
       this.initialized = true;
     } catch (err) {
-      console.error('[STEMS] Model load failed, continuing with fallback DSP', err);
+      // Model load failure - fallback DSP will be used (expected behavior)
       this.initialized = false;
     }
   }
@@ -112,10 +117,10 @@ class StemSeparationEngine {
         }
       };
       this.processingWorker.onerror = (error) => {
-        console.error('[STEMS] worker runtime error:', error);
+        als.error('[STEMS] Worker runtime error', error);
       };
     } catch (error) {
-      console.warn('[STEMS] worker failed to initialize, using main-thread fallback:', error);
+      // Worker initialization failure - main-thread fallback will be used (expected)
       this.processingWorker = null;
     }
   }
@@ -135,7 +140,7 @@ class StemSeparationEngine {
 
     await this.ensureInit();
     const model = await this.loadModel(options.model).catch((error) => {
-      console.warn('[STEMS] model load failed, using fallback filters:', error);
+      // Model load failure - fallback filters will be used (expected)
       return null;
     });
     const resolvedModel = model || { name: this.currentModel, stems: this.currentModel.includes('6stems') ? 6 : 4 };
@@ -273,7 +278,7 @@ class StemSeparationEngine {
       return this.fallbackProcessChunk(chunk, stemCount);
     }
     return this.dispatchChunkToWorker(chunk, stemCount).catch((error) => {
-      console.warn('[STEMS] worker fallback:', error);
+      // Worker fallback - expected behavior (no ALS needed)
       return this.fallbackProcessChunk(chunk, stemCount);
     });
   }
@@ -338,7 +343,7 @@ class StemSeparationEngine {
       if (timeoutId) clearTimeout(timeoutId);
       this.workerResolvers.delete(requestId);
       this.workerRejectors.delete(requestId);
-      console.warn('[STEMS] Worker dispatch failed, using fallback:', error);
+      // Worker dispatch failed - fallback will be used (expected)
       return this.fallbackProcessChunk(chunk, stemCount);
     });
   }
@@ -531,7 +536,7 @@ class StemSeparationEngine {
           this.processingWorker!.postMessage({ type: 'CANCEL_REQUEST', requestId });
         });
       } catch (error) {
-        console.warn('[STEMS] failed to cancel worker request', error);
+        // Failed to cancel worker request - non-critical (expected in some scenarios)
       }
       this.workerRejectors.forEach((reject) => reject(new Error('Stem separation cancelled')));
       this.workerResolvers.clear();

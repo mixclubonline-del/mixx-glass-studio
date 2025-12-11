@@ -25,6 +25,7 @@ import { GlassPanOrb } from "./GlassPanOrb";
 import { WidthLens } from "./WidthLens";
 import { MicroTrim } from "./MicroTrim";
 import { MuteIcon, SoloIcon, ArmIcon } from "../icons";
+import { als } from "../../utils/alsFeedback";
 import {
   MIXER_STRIP_WIDTH,
   MIXER_STRIP_MIN_WIDTH,
@@ -550,7 +551,7 @@ const FlowChannelStrip: React.FC<FlowChannelStripProps> = memo(
         // Prevent adding core processors through UI (engine-level only)
         const CORE_PROCESSOR_IDS: FxWindowId[] = ['velvet-curve', 'phase-weave', 'velvet-floor', 'harmonic-lattice'];
         if (CORE_PROCESSOR_IDS.includes(pluginId)) {
-          console.warn(`[FLOW] Core processor ${pluginId} cannot be added via UI - it's engine-level only`);
+          als.warning(`[FLOW] Core processor ${pluginId} cannot be added via UI - it's engine-level only`);
           return;
         }
         onAddPlugin?.(track.id, pluginId);
@@ -883,7 +884,7 @@ const FlowChannelStrip: React.FC<FlowChannelStripProps> = memo(
                 typography.transform('uppercase'),
                 typography.tracking.widest,
                 {
-                  fontSize: '0.45rem',
+                  fontSize: '0.6875rem', // 11px minimum
                 }
               )}>
                 Pan Balance
@@ -1044,7 +1045,7 @@ const FlowChannelStrip: React.FC<FlowChannelStripProps> = memo(
                   typography.transform('uppercase'),
                   typography.tracking.widest,
                   {
-                    fontSize: '0.45rem',
+                    fontSize: '0.6875rem', // 11px minimum
                     color: 'rgba(230, 240, 255, 0.5)',
                   }
                 )}>
@@ -1069,7 +1070,7 @@ const FlowChannelStrip: React.FC<FlowChannelStripProps> = memo(
                         {
                           border: '1px solid rgba(102, 140, 198, 0.45)',
                           background: 'rgba(6,14,28,0.78)',
-                          fontSize: '0.45rem',
+                          fontSize: '0.6875rem', // 11px minimum
                           color: 'rgba(230, 240, 255, 0.75)',
                           boxShadow: `0 0 8px ${hexToRgba(plugin.glow ?? plugin.color, 0.22)}`,
                         }
@@ -1083,7 +1084,7 @@ const FlowChannelStrip: React.FC<FlowChannelStripProps> = memo(
                     typography.transform('uppercase'),
                     typography.tracking.widest,
                     {
-                      fontSize: '0.45rem',
+                      fontSize: '0.6875rem', // 11px minimum
                       color: 'rgba(230, 240, 255, 0.45)',
                     }
                   )}>
@@ -1147,7 +1148,7 @@ const FlowChannelStrip: React.FC<FlowChannelStripProps> = memo(
                         {
                           border: '1px solid rgba(102, 140, 198, 0.45)',
                           background: 'rgba(6,14,28,0.78)',
-                          fontSize: '0.45rem',
+                          fontSize: '0.6875rem', // 11px minimum
                           color: 'rgba(230, 240, 255, 0.65)',
                         }
                       )}
@@ -1160,7 +1161,7 @@ const FlowChannelStrip: React.FC<FlowChannelStripProps> = memo(
                     typography.transform('uppercase'),
                     typography.tracking.widest,
                     {
-                      fontSize: '0.45rem',
+                      fontSize: '0.6875rem', // 11px minimum
                       color: 'rgba(230, 240, 255, 0.45)',
                     }
                   )}>
@@ -1396,7 +1397,7 @@ const FlowChannelStrip: React.FC<FlowChannelStripProps> = memo(
                           typography.tracking.widest,
                           transitions.transition.standard('all', 200, 'ease-out'),
                           {
-                            fontSize: '0.45rem',
+                            fontSize: '0.6875rem', // 11px minimum
                             border: '1px solid rgba(102, 140, 198, 0.8)',
                             background: plugin.isBypassed
                               ? 'rgba(239, 68, 68, 0.7)'
@@ -1428,7 +1429,7 @@ const FlowChannelStrip: React.FC<FlowChannelStripProps> = memo(
                           typography.tracking.widest,
                           transitions.transition.standard('all', 200, 'ease-out'),
                           {
-                            fontSize: '0.45rem',
+                            fontSize: '0.6875rem', // 11px minimum
                             color: 'rgba(230, 240, 255, 0.8)',
                             border: '1px solid rgba(102, 140, 198, 0.8)',
                             background: 'transparent',
@@ -1452,7 +1453,7 @@ const FlowChannelStrip: React.FC<FlowChannelStripProps> = memo(
                           effects.border.radius.full,
                           transitions.transition.standard('all', 200, 'ease-out'),
                           {
-                            fontSize: '0.45rem',
+                            fontSize: '0.6875rem', // 11px minimum
                             color: 'rgba(230, 240, 255, 0.7)',
                             border: '1px solid rgba(102, 140, 198, 0.8)',
                             background: 'transparent',
@@ -1484,7 +1485,7 @@ const FlowChannelStrip: React.FC<FlowChannelStripProps> = memo(
                           effects.border.radius.full,
                           transitions.transition.standard('all', 200, 'ease-out'),
                           {
-                            fontSize: '0.45rem',
+                            fontSize: '0.6875rem', // 11px minimum
                             color: 'rgba(230, 240, 255, 0.7)',
                             border: '1px solid rgba(102, 140, 198, 0.8)',
                             background: 'transparent',
@@ -1516,7 +1517,7 @@ const FlowChannelStrip: React.FC<FlowChannelStripProps> = memo(
                           effects.border.radius.full,
                           transitions.transition.standard('all', 200, 'ease-out'),
                           {
-                            fontSize: '0.45rem',
+                            fontSize: '0.6875rem', // 11px minimum
                             color: 'rgba(252, 165, 165, 1)',
                             border: '1px solid rgba(248, 113, 113, 0.4)',
                             background: 'transparent',
@@ -1555,7 +1556,7 @@ const FlowChannelStrip: React.FC<FlowChannelStripProps> = memo(
                         typography.transform('uppercase'),
                         typography.tracking.widest,
                         {
-                          fontSize: '0.45rem',
+                          fontSize: '0.6875rem', // 11px minimum
                           color: 'rgba(230, 240, 255, 0.55)',
                         }
                       )}>
@@ -1611,7 +1612,7 @@ const FlowChannelStrip: React.FC<FlowChannelStripProps> = memo(
                                   {
                                     border: '1px solid rgba(102, 140, 198, 0.8)',
                                     background: 'rgba(4,10,20,0.85)',
-                                    fontSize: '0.45rem',
+                                    fontSize: '0.6875rem', // 11px minimum
                                     color: 'rgba(230, 240, 255, 0.7)',
                                     textAlign: 'left',
                                     cursor: 'pointer',
@@ -1637,7 +1638,7 @@ const FlowChannelStrip: React.FC<FlowChannelStripProps> = memo(
                                   effects.border.radius.md,
                                   transitions.transition.standard('color', 200, 'ease-out'),
                                   {
-                                    fontSize: '0.45rem',
+                                    fontSize: '0.6875rem', // 11px minimum
                                     color: 'rgba(230, 240, 255, 0.5)',
                                     background: 'transparent',
                                     border: 'none',
@@ -1748,7 +1749,7 @@ const FlowChannelStrip: React.FC<FlowChannelStripProps> = memo(
                 {
                   border: '1px solid rgba(110, 231, 183, 0.7)',
                   background: 'transparent',
-                  fontSize: '0.45rem',
+                  fontSize: '0.6875rem', // 11px minimum
                   color: 'rgba(167, 243, 208, 1)',
                   cursor: 'pointer',
                 }
@@ -1777,7 +1778,7 @@ const FlowChannelStrip: React.FC<FlowChannelStripProps> = memo(
                 {
                   border: '1px solid rgba(110, 231, 183, 0.4)',
                   background: 'transparent',
-                  fontSize: '0.45rem',
+                  fontSize: '0.6875rem', // 11px minimum
                   color: 'rgba(167, 243, 208, 0.6)',
                   cursor: 'pointer',
                 }
@@ -1908,7 +1909,7 @@ const FlowChannelStrip: React.FC<FlowChannelStripProps> = memo(
                 {
                   border: '1px solid rgba(102, 140, 198, 0.6)',
                   background: 'rgba(6,14,28,0.78)',
-                  fontSize: '0.45rem',
+                  fontSize: '0.6875rem', // 11px minimum
                   color: 'rgba(230, 240, 255, 0.5)',
                 }
               )}>
@@ -1955,7 +1956,7 @@ const FlowChannelStrip: React.FC<FlowChannelStripProps> = memo(
                   {
                     border: '1px solid rgba(102, 140, 198, 0.7)',
                     background: 'rgba(6,14,28,0.82)',
-                    fontSize: '0.45rem',
+                    fontSize: '0.6875rem', // 11px minimum
                     color: 'rgba(230, 240, 255, 0.7)',
                     boxShadow: `0 0 8px ${hexToRgba(send.glow, 0.25)}`,
                   }
@@ -1969,7 +1970,7 @@ const FlowChannelStrip: React.FC<FlowChannelStripProps> = memo(
                 typography.transform('uppercase'),
                 typography.tracking.widest,
                 {
-                  fontSize: '0.45rem',
+                  fontSize: '0.6875rem', // 11px minimum
                   color: 'rgba(230, 240, 255, 0.45)',
                 }
               )}>
@@ -2032,7 +2033,7 @@ const FlowChannelStrip: React.FC<FlowChannelStripProps> = memo(
                     {
                       border: '1px solid rgba(102, 140, 198, 0.7)',
                       background: 'rgba(6,14,28,0.85)',
-                      fontSize: '0.45rem',
+                      fontSize: '0.6875rem', // 11px minimum
                       color: 'rgba(230, 240, 255, 0.7)',
                     }
                   )}
@@ -2045,7 +2046,7 @@ const FlowChannelStrip: React.FC<FlowChannelStripProps> = memo(
                 typography.transform('uppercase'),
                 typography.tracking.widest,
                 {
-                  fontSize: '0.45rem',
+                  fontSize: '0.6875rem', // 11px minimum
                   color: 'rgba(230, 240, 255, 0.45)',
                 }
               )}>
@@ -2119,7 +2120,7 @@ const FlowChannelStrip: React.FC<FlowChannelStripProps> = memo(
                       {
                         border: '1px solid rgba(102, 140, 198, 0.7)',
                         background: 'rgba(6,14,28,0.82)',
-                        fontSize: '0.45rem',
+                        fontSize: '0.6875rem', // 11px minimum
                         color: 'rgba(230, 240, 255, 0.7)',
                       }
                     )}
@@ -2132,7 +2133,7 @@ const FlowChannelStrip: React.FC<FlowChannelStripProps> = memo(
                   typography.transform('uppercase'),
                   typography.tracking.widest,
                   {
-                    fontSize: '0.45rem',
+                    fontSize: '0.6875rem', // 11px minimum
                     color: 'rgba(230, 240, 255, 0.45)',
                   }
                 )}>
@@ -2170,7 +2171,7 @@ const FlowChannelStrip: React.FC<FlowChannelStripProps> = memo(
                 typography.transform('uppercase'),
                 typography.tracking.widest,
                 {
-                  fontSize: '0.45rem',
+                  fontSize: '0.6875rem', // 11px minimum
                   color: 'rgba(230, 240, 255, 0.45)',
                 }
               )}>
@@ -2197,7 +2198,7 @@ const FlowChannelStrip: React.FC<FlowChannelStripProps> = memo(
                       typography.tracking.widest,
                       transitions.transition.standard('all', 200, 'ease-out'),
                       {
-                        fontSize: '0.45rem',
+                        fontSize: '0.6875rem', // 11px minimum
                         border: isActive
                           ? '1px solid rgba(110, 231, 183, 0.7)'
                           : '1px solid rgba(102, 140, 198, 0.45)',
@@ -2380,7 +2381,7 @@ const FlowChannelStrip: React.FC<FlowChannelStripProps> = memo(
                 typography.transform('uppercase'),
                 typography.tracking.widest,
                 {
-                  fontSize: '0.45rem',
+                  fontSize: '0.6875rem', // 11px minimum
                   color: 'rgba(230, 240, 255, 0.6)',
                   overflow: 'hidden',
                   textOverflow: 'ellipsis',
@@ -2591,7 +2592,7 @@ const FlowChannelStrip: React.FC<FlowChannelStripProps> = memo(
                   {
                     border: '1px solid rgba(103, 232, 249, 0.6)',
                     background: 'rgba(6,18,34,0.85)',
-                    fontSize: '0.45rem',
+                    fontSize: '0.6875rem', // 11px minimum
                     color: 'rgba(207, 250, 254, 1)',
                   }
                 )}

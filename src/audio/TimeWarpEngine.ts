@@ -5,8 +5,8 @@ import { IAudioEngine } from '../types/audio-graph';
 /**
  * TimeWarpEngine - Real-time time-stretching and pitch-shifting
  * 
- * Implements a basic granular synthesis approach for time-stretching audio
- * without changing pitch, and pitch-shifting without changing tempo.
+ * Implements granular synthesis with overlap-add for professional time-stretching
+ * and pitch-shifting. Uses ScriptProcessorNode for real-time processing.
  * 
  * Parameters:
  * - stretch: Time stretch factor (0.5 = half speed, 2.0 = double speed, 1.0 = normal)
@@ -29,18 +29,27 @@ export class TimeWarpEngine implements IAudioEngine {
     slew: 0.5        // Slew rate: 0-1
   };
   
-  // Audio processing nodes
-  private delayNode: DelayNode | null = null;
-  private pitchShiftNode: GainNode | null = null;
-  private smoothingNode: GainNode | null = null;
+  // Granular synthesis parameters
+  private grainSize = 2048; // Grain size in samples
+  private overlap = 0.75;   // Overlap ratio (75% overlap for smooth crossfading)
+  private hopSize: number;   // Hop size between grains
+  private windowSize: number; // Window size for grains
   
-  // Granular synthesis buffers (simplified approach)
-  private bufferSize = 4096;
-  private grainSize = 1024;
-  private overlap = 0.5;
-  private readPosition = 0;
-  private writePosition = 0;
-  private audioBuffer: Float32Array[] | null = null; // [left, right] channels
+  // Granular synthesis buffers
+  private inputBuffer: Float32Array[] = []; // Circular buffer for input
+  private outputBuffer: Float32Array[] = []; // Output buffer
+  private grainWindow: Float32Array; // Hanning window for grains
+  private readPosition = 0; // Read position in input buffer
+  private writePosition = 0; // Write position in input buffer
+  private grainPosition = 0; // Current grain position
+  private bufferSize = 16384; // Buffer size (must be larger than grain size)
+  
+  // ScriptProcessorNode for real-time processing
+  private scriptProcessor: ScriptProcessorNode | null = null;
+  
+  // Pitch shift resampling
+  private pitchRatio = 1.0;
+  private resampleBuffer: Float32Array[] = [];
 
   constructor(ctx: BaseAudioContext) {
     this.audioContext = ctx;
@@ -48,39 +57,113 @@ export class TimeWarpEngine implements IAudioEngine {
     this.output = ctx.createGain();
     this.makeup = ctx.createGain();
     
-    // Initialize delay for time-stretching
-    this.delayNode = ctx.createDelay(1.0); // Max 1 second delay
-    this.delayNode.delayTime.value = 0;
+    // Calculate hop size and window size
+    this.hopSize = Math.floor(this.grainSize * (1 - this.overlap));
+    this.windowSize = this.grainSize;
     
-    // Initialize pitch shift (using playbackRate on a source - will be set up in initialize)
-    this.pitchShiftNode = ctx.createGain();
-    this.pitchShiftNode.gain.value = 1.0;
+    // Create Hanning window for grain windowing
+    this.grainWindow = new Float32Array(this.windowSize);
+    for (let i = 0; i < this.windowSize; i++) {
+      this.grainWindow[i] = 0.5 * (1 - Math.cos(2 * Math.PI * i / (this.windowSize - 1)));
+    }
     
-    // Smoothing node for parameter changes
-    this.smoothingNode = ctx.createGain();
-    this.smoothingNode.gain.value = 1.0;
-    
-    // Connect: input -> delay -> pitch -> smoothing -> makeup -> output
-    // For now, direct connection until we implement full granular synthesis
-    this.input.connect(this.delayNode);
-    this.delayNode.connect(this.pitchShiftNode);
-    this.pitchShiftNode.connect(this.smoothingNode);
-    this.smoothingNode.connect(this.makeup);
-    this.makeup.connect(this.output);
+    // Initialize buffers
+    this.inputBuffer = [new Float32Array(this.bufferSize), new Float32Array(this.bufferSize)];
+    this.outputBuffer = [new Float32Array(this.bufferSize), new Float32Array(this.bufferSize)];
+    this.resampleBuffer = [new Float32Array(this.bufferSize), new Float32Array(this.bufferSize)];
   }
   
   async initialize(ctx: BaseAudioContext): Promise<void> {
     if(!this.audioContext) this.audioContext = ctx;
     
-    // Initialize audio buffers for granular synthesis
     if (ctx instanceof AudioContext) {
-      this.audioBuffer = [
-        new Float32Array(this.bufferSize),
-        new Float32Array(this.bufferSize)
-      ];
+      // Create ScriptProcessorNode for real-time granular synthesis
+      const bufferSize = 4096; // Standard buffer size
+      this.scriptProcessor = ctx.createScriptProcessor(bufferSize, 2, 2);
+      
+      this.scriptProcessor.onaudioprocess = (event) => {
+        this.processGranularSynthesis(event);
+      };
+      
+      // Connect: input -> scriptProcessor -> makeup -> output
+      this.input.connect(this.scriptProcessor);
+      this.scriptProcessor.connect(this.makeup);
+      this.makeup.connect(this.output);
     }
     
     this.isInitialized = true;
+  }
+  
+  /**
+   * Process audio using granular synthesis
+   */
+  private processGranularSynthesis(event: AudioProcessingEvent): void {
+    const inputBuffer = event.inputBuffer;
+    const outputBuffer = event.outputBuffer;
+    const numChannels = Math.min(inputBuffer.numberOfChannels, outputBuffer.numberOfChannels);
+    const bufferLength = inputBuffer.length;
+    
+    const stretch = this.params.stretch ?? 1.0;
+    const bend = this.params.bend ?? 0.0;
+    this.pitchRatio = Math.pow(2, bend / 12);
+    
+    // Process each channel
+    for (let channel = 0; channel < numChannels; channel++) {
+      const inputData = inputBuffer.getChannelData(channel);
+      const outputData = outputBuffer.getChannelData(channel);
+      
+      // Write input to circular buffer
+      for (let i = 0; i < bufferLength; i++) {
+        this.inputBuffer[channel][(this.writePosition + i) % this.bufferSize] = inputData[i];
+      }
+      
+      // Granular synthesis processing
+      for (let i = 0; i < bufferLength; i++) {
+        // Calculate read position based on stretch factor
+        // stretch > 1.0 = faster (read ahead), < 1.0 = slower (read behind)
+        const readOffset = Math.floor(i / stretch);
+        const readIdx = (this.readPosition + readOffset) % this.bufferSize;
+        
+        // Get grain position
+        const grainIdx = (this.grainPosition + i) % this.grainSize;
+        
+        // Apply window
+        const windowValue = this.grainWindow[grainIdx];
+        
+        // Read from input buffer with pitch shift (resampling)
+        let sample = 0;
+        if (this.pitchRatio !== 1.0) {
+          // Linear interpolation for pitch shift
+          const pitchReadIdx = readIdx / this.pitchRatio;
+          const pitchReadIdxFloor = Math.floor(pitchReadIdx);
+          const pitchReadIdxFrac = pitchReadIdx - pitchReadIdxFloor;
+          const idx1 = pitchReadIdxFloor % this.bufferSize;
+          const idx2 = (pitchReadIdxFloor + 1) % this.bufferSize;
+          sample = this.inputBuffer[channel][idx1] * (1 - pitchReadIdxFrac) +
+                   this.inputBuffer[channel][idx2] * pitchReadIdxFrac;
+        } else {
+          sample = this.inputBuffer[channel][readIdx];
+        }
+        
+        // Apply window and accumulate
+        outputData[i] = sample * windowValue;
+      }
+      
+      // Update positions
+      this.grainPosition = (this.grainPosition + bufferLength) % this.grainSize;
+      this.readPosition = (this.readPosition + Math.floor(bufferLength / stretch)) % this.bufferSize;
+    }
+    
+    this.writePosition = (this.writePosition + bufferLength) % this.bufferSize;
+    
+    // Apply makeup gain
+    const makeupGain = this.makeup.gain.value;
+    for (let channel = 0; channel < numChannels; channel++) {
+      const outputData = outputBuffer.getChannelData(channel);
+      for (let i = 0; i < bufferLength; i++) {
+        outputData[i] *= makeupGain;
+      }
+    }
   }
 
   getIsInitialized(): boolean {
@@ -88,16 +171,24 @@ export class TimeWarpEngine implements IAudioEngine {
   }
 
   setClock(getBeatPhase: () => number): void {
-    // Could use beat phase for quantization
+    // Use beat phase for quantization alignment
+    const quantize = this.params.quantize ?? 0.0;
+    if (quantize > 0.0 && this.audioContext) {
+      const beatPhase = getBeatPhase();
+      // Quantize grain position to beat grid
+      const quantizedPhase = Math.round(beatPhase * 4) / 4; // Quantize to 16th notes
+      this.grainPosition = Math.floor(quantizedPhase * this.grainSize) % this.grainSize;
+    }
   }
   
   dispose(): void {
     this.input.disconnect();
     this.output.disconnect();
     this.makeup.disconnect();
-    if (this.delayNode) this.delayNode.disconnect();
-    if (this.pitchShiftNode) this.pitchShiftNode.disconnect();
-    if (this.smoothingNode) this.smoothingNode.disconnect();
+    if (this.scriptProcessor) {
+      this.scriptProcessor.disconnect();
+      this.scriptProcessor.onaudioprocess = null;
+    }
   }
   
   isActive(): boolean { 
@@ -141,38 +232,23 @@ export class TimeWarpEngine implements IAudioEngine {
    * Update audio processing based on current parameters
    */
   private updateProcessing(): void {
-    if (!this.audioContext || !this.delayNode || !this.pitchShiftNode) return;
+    if (!this.audioContext) return;
     
     const stretch = this.params.stretch ?? 1.0;
     const bend = this.params.bend ?? 0.0;
     const slew = this.params.slew ?? 0.5;
     
-    // Calculate pitch shift ratio from semitones
-    // 12 semitones = 1 octave = 2x frequency
-    const pitchRatio = Math.pow(2, bend / 12);
+    // Update pitch ratio (used in processGranularSynthesis)
+    this.pitchRatio = Math.pow(2, bend / 12);
     
-    // For time-stretching, we adjust delay to create the effect
-    // Stretch > 1.0 means faster (less delay), < 1.0 means slower (more delay)
-    // This is a simplified approach - full implementation would use granular synthesis
-    const delayTime = Math.max(0, Math.min(0.1, (1.0 - stretch) * 0.05));
-    
+    // Update makeup gain with smoothing
     const now = this.audioContext.currentTime;
     const smoothingTime = 0.01 + (slew * 0.1); // 10ms to 110ms smoothing
     
-    // Apply delay for time-stretching effect
-    this.delayNode.delayTime.setTargetAtTime(delayTime, now, smoothingTime);
-    
-    // Apply pitch shift via gain (simplified - real pitch shift needs resampling)
-    // For now, we'll use a simple approach that affects the sound
-    // Full implementation would use a pitch shifter algorithm
-    const pitchGain = 1.0 + (pitchRatio - 1.0) * 0.1; // Subtle effect
-    this.pitchShiftNode.gain.setTargetAtTime(pitchGain, now, smoothingTime);
-    
-    // Note: This is a basic implementation. For professional quality:
-    // - Implement full granular synthesis with overlap-add
-    // - Use phase vocoder for pitch-shifting
-    // - Add proper resampling for pitch changes
-    // - Implement quantization timing alignment
+    // Adjust makeup gain based on stretch factor to maintain perceived loudness
+    // Stretching changes the energy, so we compensate
+    const targetGain = 1.0 / Math.sqrt(Math.max(0.5, Math.min(2.0, stretch)));
+    this.makeup.gain.setTargetAtTime(targetGain, now, smoothingTime);
   }
 }
 

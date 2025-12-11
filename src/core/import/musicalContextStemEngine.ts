@@ -18,6 +18,7 @@ import { detectTransients, type TransientMarker } from './transients';
 import { type AudioClassification } from './classifier';
 import { getQuantumStemFeatureExtractor, type QuantumStemFeatures } from './quantumStemEngine';
 import type { StemResult } from './stemEngine';
+import { als } from '../../utils/alsFeedback';
 
 export interface MusicalContext {
   key: string; // Musical key (e.g., "C", "F#")
@@ -180,7 +181,7 @@ export class MusicalContextStemEngine {
     try {
       return await ctx.startRendering();
     } catch (error) {
-      console.warn('[MUSICAL CONTEXT] Vocal extraction failed:', error);
+      // Vocal extraction failed - return null (expected fallback)
       return null;
     }
   }
@@ -228,7 +229,7 @@ export class MusicalContextStemEngine {
     try {
       return await ctx.startRendering();
     } catch (error) {
-      console.warn('[MUSICAL CONTEXT] Drum extraction failed:', error);
+      // Drum extraction failed - return null (expected fallback)
       return null;
     }
   }
@@ -267,7 +268,7 @@ export class MusicalContextStemEngine {
     try {
       return await ctx.startRendering();
     } catch (error) {
-      console.warn('[MUSICAL CONTEXT] Bass extraction failed:', error);
+      // Bass extraction failed - return null (expected fallback)
       return null;
     }
   }
@@ -319,7 +320,7 @@ export class MusicalContextStemEngine {
     try {
       return await ctx.startRendering();
     } catch (error) {
-      console.warn('[MUSICAL CONTEXT] Harmonic extraction failed:', error);
+      // Harmonic extraction failed - return null (expected fallback)
       return null;
     }
   }

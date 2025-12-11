@@ -107,78 +107,101 @@ export const typography = {
   },
   
   /**
-   * Preset typography styles
+   * Preset typography styles (Professional DAW standards)
    */
   preset: {
     /**
-     * Body text
+     * Body text - Primary readable text (13px)
      */
     body: () => ({
       ...typography.size('base'),
       ...typography.weight('normal'),
       ...typography.leading.normal,
       ...typography.color.ink.DEFAULT,
+      color: 'rgba(230, 240, 255, 0.95)', // High contrast for readability
     }),
     
     /**
-     * Heading 1
+     * Heading - Clear hierarchy (17px)
+     */
+    heading: () => ({
+      ...typography.size('xl'),
+      ...typography.weight('semibold'),
+      ...typography.leading.tight,
+      color: 'rgba(230, 240, 255, 0.95)',
+    }),
+    
+    /**
+     * Heading 1 - Large display (24px)
      */
     h1: () => ({
-      ...typography.size('4xl'),
-      ...typography.weight('bold'),
-      ...typography.leading.tight,
-      ...typography.color.ink.DEFAULT,
-    }),
-    
-    /**
-     * Heading 2
-     */
-    h2: () => ({
       ...typography.size('3xl'),
       ...typography.weight('bold'),
       ...typography.leading.tight,
-      ...typography.color.ink.DEFAULT,
+      color: 'rgba(230, 240, 255, 0.95)',
     }),
     
     /**
-     * Heading 3
+     * Heading 2 - Section heading (20px)
+     */
+    h2: () => ({
+      ...typography.size('2xl'),
+      ...typography.weight('bold'),
+      ...typography.leading.tight,
+      color: 'rgba(230, 240, 255, 0.95)',
+    }),
+    
+    /**
+     * Heading 3 - Subsection (17px)
      */
     h3: () => ({
-      ...typography.size('2xl'),
+      ...typography.size('xl'),
       ...typography.weight('semibold'),
       ...typography.leading.snug,
-      ...typography.color.ink.DEFAULT,
+      color: 'rgba(230, 240, 255, 0.95)',
     }),
     
     /**
-     * Small text
+     * Label - Clear, scannable (12px, semibold, uppercase)
+     */
+    label: () => ({
+      ...typography.size('sm'),
+      ...typography.weight('semibold'),
+      ...typography.transform('uppercase'),
+      ...typography.tracking.wide,
+      color: 'rgba(230, 240, 255, 0.85)',
+      letterSpacing: '0.05em',
+    }),
+    
+    /**
+     * Small text - Secondary info (12px)
      */
     small: () => ({
       ...typography.size('sm'),
       ...typography.weight('normal'),
       ...typography.leading.normal,
-      ...typography.color.ink.muted,
+      color: 'rgba(230, 240, 255, 0.75)',
     }),
     
     /**
-     * Caption text
+     * Caption - Tertiary info (11px minimum)
      */
     caption: () => ({
       ...typography.size('xs'),
       ...typography.weight('normal'),
       ...typography.leading.relaxed,
-      ...typography.color.ink.muted,
+      color: 'rgba(230, 240, 255, 0.65)',
     }),
     
     /**
-     * Label text (uppercase, tracking)
+     * Value - Numeric display (13px, medium weight)
      */
-    label: () => ({
-      ...typography.size('xs'),
-      ...typography.weight('semibold'),
-      ...typography.transform('uppercase'),
-      ...typography.tracking.widest,
-      ...typography.color.ink.soft,
+    value: () => ({
+      ...typography.size('base'),
+      ...typography.weight('medium'),
+      ...typography.leading.normal,
+      color: 'rgba(230, 240, 255, 0.9)',
+      fontVariantNumeric: 'tabular-nums', // Aligned numbers
     }),
   },
 };

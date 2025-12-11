@@ -16,6 +16,17 @@ export type MixxBuses = {
   air: GainNode;
 };
 
+export type MixxBusAnalysers = {
+  twoTrack: AnalyserNode;
+  vocals: AnalyserNode;
+  drums: AnalyserNode;
+  bass: AnalyserNode;
+  music: AnalyserNode;
+  stemMix: AnalyserNode;
+  masterTap: AnalyserNode;
+  air: AnalyserNode;
+};
+
 export function createSignalMatrix(ctx: AudioContext, masterInput: AudioNode) {
   const buses: MixxBuses = {
     twoTrack: ctx.createGain(),
@@ -27,6 +38,34 @@ export function createSignalMatrix(ctx: AudioContext, masterInput: AudioNode) {
     masterTap: ctx.createGain(),
     air: ctx.createGain(),
   };
+
+  // Create analysers for each bus to enable metering
+  const analysers: MixxBusAnalysers = {
+    twoTrack: ctx.createAnalyser(),
+    vocals: ctx.createAnalyser(),
+    drums: ctx.createAnalyser(),
+    bass: ctx.createAnalyser(),
+    music: ctx.createAnalyser(),
+    stemMix: ctx.createAnalyser(),
+    masterTap: ctx.createAnalyser(),
+    air: ctx.createAnalyser(),
+  };
+
+  // Configure analysers for bus metering
+  Object.values(analysers).forEach(analyser => {
+    analyser.fftSize = 2048;
+    analyser.smoothingTimeConstant = 0.8; // Smooth meter readings
+  });
+
+  // Connect each bus to its analyser (tap before routing to next stage)
+  buses.twoTrack.connect(analysers.twoTrack);
+  buses.vocals.connect(analysers.vocals);
+  buses.drums.connect(analysers.drums);
+  buses.bass.connect(analysers.bass);
+  buses.music.connect(analysers.music);
+  buses.stemMix.connect(analysers.stemMix);
+  buses.masterTap.connect(analysers.masterTap);
+  buses.air.connect(analysers.air);
 
   // Default Mixx gain staging
   buses.twoTrack.gain.value = 0.65; // ~ -3.5 dB
@@ -68,7 +107,7 @@ export function createSignalMatrix(ctx: AudioContext, masterInput: AudioNode) {
     return buses.stemMix;
   };
 
-  return { buses, routeTrack };
+  return { buses, routeTrack, analysers };
 }
 
 

@@ -7,6 +7,7 @@ import { SparklesIcon, ImageIcon } from '../icons';
 import { ArrangeClip, ClipId } from '../../hooks/useArrange';
 import { TrackData } from '../../App';
 import { spacing, typography, layout, effects, transitions, composeStyles } from '../../design-system';
+import { als } from '../../utils/alsFeedback';
 
 interface ImageAnalyzerProps {
   clips: ArrangeClip[];
@@ -63,7 +64,7 @@ const ImageAnalyzer: React.FC<ImageAnalyzerProps> = ({ clips, tracks, selectedTr
       setAnalysisResult(result);
 
     } catch (err: any) {
-      console.error("Error analyzing image:", err);
+      als.error("Error analyzing image", err);
       setError(`Failed to analyze image: ${err.message || 'Unknown error'}`);
       setAnalysisResult('Error: Could not analyze the image.');
     } finally {

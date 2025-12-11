@@ -503,12 +503,12 @@ export const BloomDock: React.FC<BloomDockProps> = (props) => {
     const canReingest = Boolean(singleSelectedClip?.sourceJobId);
     const canOpenClipEditor = Boolean(singleSelectedClip?.bufferId);
     
-    const actionButton = (icon: React.ReactNode, action: string, payload?: any, tooltip?: string, disabled?: boolean) => (
+    const actionButton = (icon: React.ReactNode, action: string, payload?: any, tooltip?: string, disabled?: boolean, variant: 'primary' | 'secondary' = 'secondary') => (
         <button
             onClick={() => onAction(action, payload, { source: "bloom-dock" })}
             title={tooltip}
             disabled={disabled}
-            className="w-11 h-11 rounded-full bg-glass-surface-soft flex items-center justify-center text-ink/70 hover:bg-glass-surface hover:text-ink disabled:text-ink/40 disabled:bg-glass-surface disabled:cursor-not-allowed transition-colors shadow-[inset_0_0_18px_rgba(4,12,26,0.4)]"
+            className={`button-mixx ${variant} w-11 h-11 rounded-full bg-glass-surface-soft flex items-center justify-center text-ink/70 hover:bg-glass-surface hover:text-ink disabled:text-ink/40 disabled:bg-glass-surface disabled:cursor-not-allowed transition-colors shadow-[inset_0_0_18px_rgba(4,12,26,0.4)]`}
         >
             {icon}
         </button>
@@ -545,7 +545,8 @@ export const BloomDock: React.FC<BloomDockProps> = (props) => {
                 'recallLastImport',
                 undefined,
                 'Recall last import',
-                !canRecallLastImport
+                !canRecallLastImport,
+                'primary'
             )}
         </div>
     );
@@ -617,7 +618,7 @@ export const BloomDock: React.FC<BloomDockProps> = (props) => {
 
     const mixCluster = (
         <div className="flex items-center gap-2.5">
-            {actionButton(<SaveIcon className="w-5 h-5" />, 'saveProject', undefined, 'Save project')}
+            {actionButton(<SaveIcon className="w-5 h-5" />, 'saveProject', undefined, 'Save project', false, 'primary')}
             {actionButton(<LoadIcon className="w-5 h-5" />, 'loadProject', undefined, 'Load project file')}
             {actionButton(
                 <PlusCircleIcon className="w-5 h-5 text-emerald-200" />,
@@ -795,9 +796,7 @@ export const BloomDock: React.FC<BloomDockProps> = (props) => {
                     title={isPlaying ? 'Pause' : 'Play'}
                     onPointerDown={handlePlayPointerDown}
                     onPointerUp={() => clearSeekTimers()}
-                    className={`relative flex items-center justify-center w-14 h-14 rounded-full border transition-all text-white ${
-                        isPlaying ? 'bg-[rgba(24,32,76,0.78)] border-white/18' : 'bg-[rgba(18,48,84,0.82)] border-white/14'
-                    }`}
+                    className={`button-mixx primary relative flex items-center justify-center w-14 h-14 rounded-full border transition-all text-white`}
                     style={
                         transportPulse === 'play' || transportPulse === 'pause'
                             ? {

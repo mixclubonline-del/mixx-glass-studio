@@ -1,3 +1,5 @@
+import { als } from '../utils/alsFeedback';
+
 export async function createTruePeakLimiterNode(
   context: AudioContext | OfflineAudioContext,
   thresholdDb = -1
@@ -19,7 +21,7 @@ export async function createTruePeakLimiterNode(
       node.parameters.get('threshold')?.setValueAtTime(thresholdDb, context.currentTime);
       return node;
     } catch (error) {
-      console.warn('[VELVET TRUE PEAK] Failed to load worklet, using fallback limiter.', error);
+      // AudioWorklet failed - fallback compressor will be used (expected)
     }
   }
 

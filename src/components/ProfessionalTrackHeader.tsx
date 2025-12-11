@@ -561,6 +561,7 @@ const ProfessionalTrackHeader: React.FC<ProfessionalTrackHeaderProps> = ({
                 e.stopPropagation();
                 onToggleArm?.(track.id);
               }}
+              className={`button-mixx ${isArmed ? 'primary' : 'icon'}`}
               style={composeStyles(
                 layout.flex.container('row'),
                 layout.flex.align.center,

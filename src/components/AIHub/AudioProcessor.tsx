@@ -5,6 +5,7 @@ import { decode, decodeAudioData, encode, createBlob } from '../../utils/gemini'
 import LoadingSpinner from '../common/LoadingSpinner';
 import { MicrophoneIcon, SpeakerWaveIcon, SparklesIcon } from '../icons';
 import { spacing, typography, layout, effects, transitions, composeStyles } from '../../design-system';
+import { als } from '../../utils/alsFeedback';
 
 const AudioProcessor: React.FC<{ audioContext: AudioContext | null }> = ({ audioContext }) => {
   // Transcription state
@@ -154,7 +155,7 @@ const AudioProcessor: React.FC<{ audioContext: AudioContext | null }> = ({ audio
 
           },
           onerror: (e: ErrorEvent) => {
-            console.error('Live session error:', e);
+            als.error('Live session error', e);
             setTtsError(`Live session error: ${e.message}`);
             stopRecording();
           },
@@ -174,7 +175,7 @@ const AudioProcessor: React.FC<{ audioContext: AudioContext | null }> = ({ audio
       scriptProcessor.connect(audioContext.destination);
 
     } catch (err: any) {
-      console.error("Error accessing microphone or starting session:", err);
+      als.error("Error accessing microphone or starting session", err);
       setTtsError(`Microphone access denied or session failed: ${err.message}`);
       setIsLiveLoading(false);
       setIsRecording(false);
@@ -257,7 +258,7 @@ const AudioProcessor: React.FC<{ audioContext: AudioContext | null }> = ({ audio
             setIsTtsLoading(false);
         }
     } catch (err: any) {
-        console.error("Error generating speech:", err);
+        als.error("Error generating speech", err);
         setTtsError(`Failed to generate speech: ${err.message || 'Unknown error'}`);
         setIsTtsLoading(false);
     }

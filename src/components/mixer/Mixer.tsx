@@ -406,6 +406,9 @@ const FlowConsole: React.FC<FlowConsoleProps> = ({
                   alsGlow={bus.alsGlow}
                   alsHaloColor={bus.alsHaloColor}
                   alsGlowStrength={bus.alsGlowStrength}
+                  busLevel={bus.busLevel}
+                  busPeak={bus.busPeak}
+                  busTransient={bus.busTransient}
                   onSelectBus={onSelectBus}
                   isActive={selectedBusId === bus.id}
                 />

@@ -24,6 +24,7 @@ import { syncALSToPulseResult, syncALSToPulse, updateGlobalALS } from '../../cor
 import { hasAudioPlaying } from '../../core/loop/audioLevelDetector';
 import { ImportInspector, type ImportStep } from './ImportInspector';
 import type { FlowPulseResult } from '../../core/pulse/flowPulseEngine';
+import { als } from '../../utils/alsFeedback';
 
 declare global {
   interface Window {
@@ -410,7 +411,7 @@ export const FileInput = forwardRef<FileInputHandle, FileInputProps>(({
         inputRef.current.value = '';
       }
     } catch (error) {
-      console.error('[FLOW IMPORT] Error:', error);
+      als.error('[FLOW IMPORT] Import error', error);
       
       // Stop pulse animation on error
       if (pulseIntervalRef.current) {

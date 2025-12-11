@@ -6,6 +6,7 @@ import { getGeminiAI } from '../../utils/gemini';
 import LoadingSpinner from '../common/LoadingSpinner';
 import RadioButton from '../common/RadioButton';
 import { ImageIcon } from '../icons';
+import { als } from '../../utils/alsFeedback';
 
 type ImageAspectRatio = "1:1" | "3:4" | "4:3" | "9:16" | "16:9";
 
@@ -47,7 +48,7 @@ const ImageGenerator: React.FC = () => {
         setError("No image was generated. Please try a different prompt.");
       }
     } catch (err: any) {
-      console.error("Error generating image:", err);
+      als.error("Error generating image", err);
       setError(`Failed to generate image: ${err.message || 'Unknown error'}`);
     } finally {
       setIsLoading(false);

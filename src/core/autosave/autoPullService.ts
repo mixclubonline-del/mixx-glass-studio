@@ -5,6 +5,8 @@
  * how: Periodic git pull operations via Tauri commands
  */
 
+import { als } from '../../utils/alsFeedback';
+
 interface AutoPullState {
   isEnabled: boolean;
   lastPullTime: number | null;
@@ -59,7 +61,10 @@ class AutoPullService {
         this.state.interval = settings.interval || 300000;
       }
     } catch (error) {
-      console.warn('[AutoPull] Failed to load settings:', error);
+      // Settings load failure is non-critical - continue with defaults
+      if (import.meta.env.DEV) {
+        als.warning('[AutoPull] Failed to load settings, using defaults');
+      }
     }
   }
 
@@ -76,7 +81,10 @@ class AutoPullService {
         })
       );
     } catch (error) {
-      console.warn('[AutoPull] Failed to save settings:', error);
+      // Settings save failure is non-critical
+      if (import.meta.env.DEV) {
+        als.warning('[AutoPull] Failed to save settings');
+      }
     }
   }
 
@@ -161,7 +169,7 @@ class AutoPullService {
       const status = await this.invokeCommand('git_status');
       return status as GitStatus;
     } catch (error) {
-      console.error('[AutoPull] Failed to get git status:', error);
+      als.error('[AutoPull] Failed to get git status', error);
       return null;
     }
   }
@@ -205,7 +213,7 @@ class AutoPullService {
       this.state.pullInProgress = false;
       this.notifyStatusChange();
 
-      console.error('[AutoPull] Failed to pull:', error);
+      als.error('[AutoPull] Failed to pull', error);
       return { success: false, message: errorMessage };
     }
   }
@@ -222,7 +230,7 @@ class AutoPullService {
     this.pullTimer = window.setInterval(() => {
       if (this.state.isEnabled && !this.state.pullInProgress) {
         this.pullNow().catch((error) => {
-          console.error('[AutoPull] Interval pull failed:', error);
+          als.error('[AutoPull] Interval pull failed', error);
         });
       }
     }, this.state.interval);

@@ -15,6 +15,7 @@ import { getQuantumScheduler } from '../quantum';
 import { initializeWebGPUBackend } from '../quantum/WebGPUBackend';
 import { getQuantumNeuralNetwork } from '../../ai/QuantumNeuralNetwork';
 import type { PrimeBrainStatus } from '../../types/primeBrainStatus';
+import { als } from '../../utils/alsFeedback';
 
 // Error boundary for Flow Loop to handle context errors gracefully
 class FlowLoopErrorBoundary extends Component<
@@ -33,7 +34,7 @@ class FlowLoopErrorBoundary extends Component<
   componentDidCatch(error: Error, errorInfo: ErrorInfo) {
     // Only log in dev mode, and suppress context errors during StrictMode double-render
     if (import.meta.env.DEV && !error.message.includes('usePrimeBrain must be used within PrimeBrainProvider')) {
-      console.warn('[Flow Loop] Error boundary caught:', error, errorInfo);
+      als.warning('[Flow Loop] Error boundary caught', error, errorInfo);
     }
   }
 
@@ -77,10 +78,16 @@ function FlowLoopInner({
         // Prefetch models for faster inference
         return getQuantumNeuralNetwork().prefetch();
       }).catch((error) => {
-        console.warn('[Flow Loop] Quantum Neural Network initialization deferred:', error);
+        // Quantum Neural Network initialization deferred - non-critical (expected in some scenarios)
+        if (import.meta.env.DEV) {
+          als.warning('[Flow Loop] Quantum Neural Network initialization deferred');
+        }
       });
     }).catch((error) => {
-      console.warn('[Flow Loop] WebGPU Backend initialization failed:', error);
+      // WebGPU Backend initialization failed - CPU fallback will be used (expected)
+      if (import.meta.env.DEV) {
+        als.warning('[Flow Loop] WebGPU Backend initialization failed, using CPU fallback');
+      }
     });
     
     // Expose to window for debugging

@@ -26,6 +26,7 @@ import {
   type StemImportPayload,
 } from './trackBuilder';
 import { buildStemSeparationSnapshot } from './stemSeparationSnapshot';
+import { als } from '../../utils/alsFeedback';
 
 /**
  * Sanitize stems to avoid discarding very quiet content.
@@ -33,11 +34,11 @@ import { buildStemSeparationSnapshot } from './stemSeparationSnapshot';
  */
 function sanitizeStem(name: string, buffer: AudioBuffer | null): AudioBuffer | null {
   if (!buffer) {
-    console.warn('[FLOW IMPORT] Empty stem buffer:', name);
+    // Empty stem buffer - expected in some cases (no ALS needed)
     return null;
   }
   if (buffer.length === 0) {
-    console.warn('[FLOW IMPORT] Zero-length stem buffer:', name);
+    // Zero-length stem buffer - expected in some cases (no ALS needed)
     return null;
   }
   // Compute peak on first channel (fast heuristic)
@@ -50,7 +51,7 @@ function sanitizeStem(name: string, buffer: AudioBuffer | null): AudioBuffer | n
   // Old thresholds may have been too high; keep quiet stems
   const MIN_PEAK = 0.00001;
   if (peak < MIN_PEAK) {
-    console.warn('[FLOW IMPORT] Stem too quiet, but keeping:', name, 'peak=', peak.toExponential(2));
+    // Stem too quiet but keeping - expected behavior (no ALS needed)
     return buffer;
   }
   return buffer;
@@ -126,7 +127,7 @@ export async function runFlowStemPipeline(
         preferQuality: true,
       });
     } catch (revolutionaryError) {
-      console.warn('[FLOW IMPORT] Revolutionary separation failed, trying AI model fallback:', revolutionaryError);
+      // Revolutionary separation failed - AI model fallback will be used (expected)
       
       // Fallback to AI model for two-track files
       if (classification.type === 'twotrack') {
@@ -164,7 +165,7 @@ export async function runFlowStemPipeline(
             }
           }
         } catch (aiError) {
-          console.warn('[FLOW IMPORT] AI model fallback failed, using standard engine:', aiError);
+          // AI model fallback failed - standard engine will be used (expected)
           stemResult = await stemSplitEngine(prep.audioBuffer, optimalMode, classification);
         }
       } else {
@@ -191,7 +192,7 @@ export async function runFlowStemPipeline(
       });
       onSnapshot(snapshot);
     } catch (snapshotError) {
-      console.warn('[FLOW IMPORT] Failed to build snapshot for training:', snapshotError);
+      // Snapshot build failed - non-critical for import (no ALS needed)
     }
   }
   

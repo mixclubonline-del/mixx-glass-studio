@@ -17,7 +17,8 @@
     "tauri:build": "tauri build",
     "test:stem-system": "npx ts-node scripts/test-revolutionary-stem-system.ts",
     "setup:data-collection": "npx ts-node scripts/setup-data-collection.ts",
-    "test:endpoint": "node scripts/test-endpoint-simulator.js"
+    "test:endpoint": "node scripts/test-endpoint-simulator.js",
+    "test:clara": "npx ts-node scripts/test-clara-prototype.ts"
   },
   "dependencies": {
     "@google/genai": "^1.28.0",

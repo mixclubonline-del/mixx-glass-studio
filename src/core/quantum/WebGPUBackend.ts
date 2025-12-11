@@ -9,6 +9,7 @@
  */
 
 import * as tf from '@tensorflow/tfjs';
+import { als } from '../../utils/alsFeedback';
 
 export type BackendType = 'webgpu' | 'cpu' | 'webgl';
 
@@ -91,7 +92,7 @@ class WebGPUBackendManager {
             return;
           }
         } catch (webgpuError) {
-          console.warn('[WebGPU Backend] WebGPU initialization failed, falling back to CPU:', webgpuError);
+          // WebGPU initialization failed - CPU fallback will be used (expected)
           // Fall through to CPU fallback
         }
       }
@@ -118,7 +119,7 @@ class WebGPUBackendManager {
           error: `CPU backend initialization failed: ${cpuError}`,
         };
         
-        console.error('[WebGPU Backend] CPU fallback also failed:', cpuError);
+        als.error('[WebGPU Backend] CPU fallback also failed', cpuError);
         throw cpuError;
       }
     } catch (error) {

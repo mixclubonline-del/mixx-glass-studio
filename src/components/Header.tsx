@@ -22,7 +22,7 @@ const Header: React.FC<HeaderProps> = ({
   className,
 }) => {
   const { mode, modeCaption, guidanceLine, bloomSummary, lastAction, health, alsChannels } = primeBrainStatus;
-  const guidance = guidanceLine ?? bloomSummary ?? lastAction ?? "Flow is standing by.";
+  const guidance = guidanceLine ?? bloomSummary ?? lastAction ?? "Flow ready — transport armed.";
 
   const alsChannelBlocks = useMemo(() => {
     return alsChannels.slice(0, 6);

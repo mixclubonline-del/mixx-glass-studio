@@ -4,6 +4,7 @@ import { getPrimeBrainLLM } from '../../ai/PrimeBrainLLM';
 import LoadingSpinner from '../common/LoadingSpinner';
 import { SparklesIcon } from '../icons';
 import { spacing, typography, layout, effects, transitions, composeStyles } from '../../design-system';
+import { als } from '../../utils/alsFeedback';
 
 interface ChatMessage {
   role: 'user' | 'model';
@@ -85,7 +86,7 @@ Be helpful, concise, and accurate about the studio's automatic stem separation w
         });
       }
     } catch (error) {
-      console.error("Error sending message to Gemini:", error);
+      als.error("Error sending message to Gemini", error);
       setMessages((prev) => [...prev, { role: 'model', text: 'Error: Could not get a response. Please try again.', isThinking: false }]);
     } finally {
       setIsLoading(false);

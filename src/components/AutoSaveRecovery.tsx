@@ -8,6 +8,7 @@
 import React, { useState, useEffect } from 'react';
 import { useAutoSave } from '../hooks/useAutoSave';
 import type { PersistedProjectState } from '../App';
+import { als } from '../utils/alsFeedback';
 
 interface AutoSaveRecoveryProps {
   isOpen: boolean;
@@ -35,7 +36,7 @@ export const AutoSaveRecovery: React.FC<AutoSaveRecoveryProps> = ({
           setLoading(false);
         })
         .catch((error) => {
-          console.error('[AutoSaveRecovery] Failed to load saves:', error);
+          als.error('[AutoSaveRecovery] Failed to load saves', error);
           setSaves([]);
           setLoading(false);
         });

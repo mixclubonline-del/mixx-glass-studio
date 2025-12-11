@@ -41,9 +41,9 @@ const PulsingLabels: React.FC<{ labels: string[] }> = ({ labels }) => {
             typography.transform('uppercase'),
             typography.tracking.widest,
             {
-              fontSize: '0.45rem',
-              border: '1px solid rgba(102, 140, 198, 0.45)',
-              color: 'rgba(230, 240, 255, 0.7)',
+              fontSize: '0.6875rem', // 11px minimum
+              border: '1px solid rgba(102, 140, 198, 0.35)',
+              color: 'rgba(230, 240, 255, 0.85)',
               background: 'rgba(14,32,62,0.65)',
               opacity: pulseOpacity,
             }
@@ -184,16 +184,16 @@ const FlowMasterStrip: React.FC<FlowMasterStripProps> = ({
               typography.transform('uppercase'),
               typography.tracking.widest,
               {
-                fontSize: '0.55rem',
-                color: '#e6f0ff',
+                fontSize: '0.75rem', // 12px professional
+                color: 'rgba(230, 240, 255, 0.95)',
               }
             )}>Master</span>
             <span style={composeStyles(
               typography.transform('uppercase'),
               typography.tracking.widest,
               {
-                fontSize: '0.45rem',
-                color: 'rgba(230, 240, 255, 0.6)',
+                fontSize: '0.6875rem', // 11px minimum
+                color: 'rgba(230, 240, 255, 0.75)',
               }
             )}>Flow</span>
           </div>
