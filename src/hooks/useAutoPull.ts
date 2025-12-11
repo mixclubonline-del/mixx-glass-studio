@@ -26,27 +26,40 @@ export function useAutoPull() {
     interval: 300000,
   });
   const initializedRef = useRef(false);
+  const consumerAddedRef = useRef(false); // Track if we've added ourselves as a consumer
 
   // Initialize service
   useEffect(() => {
     if (!initializedRef.current) {
       const invokeCommand = async (cmd: string, args?: any) => {
-        try {
-          return await invoke(cmd, args);
-        } catch (error) {
-          throw error;
-        }
+        return await invoke(cmd, args);
       };
 
-      autoPullService.initialize(invokeCommand).then(() => {
-        autoPullService.onStatusChangeCallback(setStatus);
-        initializedRef.current = true;
-      });
+      autoPullService
+        .initialize(invokeCommand)
+        .then(() => {
+          autoPullService.onStatusChangeCallback(setStatus);
+          autoPullService.addConsumer();
+          consumerAddedRef.current = true;
+          initializedRef.current = true;
+        })
+        .catch((error) => {
+          console.error('[useAutoPull] Failed to initialize auto-pull service:', error);
+          // Mark as initialized to prevent infinite retry loops
+          // Service will remain non-functional, but won't spam console
+          initializedRef.current = true;
+        });
     }
 
     return () => {
+      // Always remove consumer if we added one, even if initialization didn't complete
+      // This prevents consumer count leaks when components unmount before init completes
+      if (consumerAddedRef.current) {
+        autoPullService.removeConsumer();
+        consumerAddedRef.current = false;
+      }
       if (initializedRef.current) {
-        autoPullService.shutdown();
+        initializedRef.current = false;
       }
     };
   }, []);

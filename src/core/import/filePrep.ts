@@ -131,10 +131,18 @@ export async function toMono(audioBuffer: AudioBuffer): Promise<AudioBuffer> {
   } catch (error) {
     // If context is interrupted, return original buffer
     if (ctx.state === 'interrupted') {
-      console.warn('[FLOW IMPORT] OfflineAudioContext interrupted in toMono, returning original buffer');
+      // Context interrupted - graceful fallback (no ALS needed, expected behavior)
       return audioBuffer;
     }
-    console.warn('[FLOW IMPORT] toMono rendering error, returning original buffer:', error);
+    // Rendering error - use ALS for user feedback
+    if (typeof window !== 'undefined' && (window as any).__als) {
+      // Use dynamic import without await to avoid blocking
+      import('../../utils/alsFeedback').then(({ als }) => {
+        als.warning('[FLOW IMPORT] toMono rendering error, using original buffer');
+      }).catch(() => {
+        // Ignore import errors
+      });
+    }
     return audioBuffer;
   }
 }
@@ -194,10 +202,18 @@ export async function normalizeBuffer(
   const renderPromise = ctx.startRendering().catch((error) => {
     // If context is interrupted, return original buffer
     if (ctx.state === 'interrupted') {
-      console.warn('[FLOW IMPORT] OfflineAudioContext interrupted during normalization, returning original buffer');
+      // Context interrupted - graceful fallback (no ALS needed)
       return audioBuffer;
     }
-    console.warn('[FLOW IMPORT] Normalization rendering error:', error);
+    // Normalization error - use ALS for user feedback
+    if (typeof window !== 'undefined' && (window as any).__als) {
+      // Use dynamic import without await to avoid blocking
+      import('../../utils/alsFeedback').then(({ als }) => {
+        als.warning('[FLOW IMPORT] Normalization rendering error');
+      }).catch(() => {
+        // Ignore import errors
+      });
+    }
     return audioBuffer;
   });
   const timeoutPromise = new Promise<AudioBuffer>((_, reject) => {
@@ -214,7 +230,15 @@ export async function normalizeBuffer(
   } catch (error) {
     // Cancel timeout on error
     if (timeoutId) clearTimeout(timeoutId);
-    console.error('[FLOW IMPORT] Normalization error:', error);
+    // Critical error - use ALS
+    if (typeof window !== 'undefined' && (window as any).__als) {
+      // Use dynamic import without await to avoid blocking
+      import('../../utils/alsFeedback').then(({ als }) => {
+        als.error('[FLOW IMPORT] Normalization error', error);
+      }).catch(() => {
+        // Ignore import errors
+      });
+    }
     // Return original buffer if normalization fails
     return audioBuffer;
   }

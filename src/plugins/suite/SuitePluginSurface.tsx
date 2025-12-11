@@ -35,7 +35,7 @@ import {
   SuitePluginSurfaceProps,
 } from './types';
 import { ResizableContainer } from './components/shared/ResizableContainer';
-import { motion, AnimatePresence } from 'framer-motion';
+import { useFlowMotion, useAnimatePresence, AnimatePresence } from '../../components/mixxglass';
 import { useMidi } from './hooks/useMidi';
 import { isControlChange } from './lib/midi';
 import { usePresets } from './hooks/usePresets';
@@ -45,6 +45,77 @@ import { SidePanel } from './components/SidePanel';
 import { PrimeBrainStub } from './lib/PrimeBrainStub';
 import { NeuralGridBackground } from './components/shared/NeuralGridBackground';
 import { useSimulatedAudio } from './hooks/useSimulatedAudio';
+
+// Header with transition
+const HeaderWithTransition: React.FC<{
+  isTransitioning: boolean;
+  children: React.ReactNode;
+}> = ({ isTransitioning, children }) => {
+  const headerStyle = useFlowMotion(
+    { opacity: isTransitioning ? 0 : 1 },
+    { duration: 200 }
+  );
+  return (
+    <header 
+      className="absolute top-4 left-4 right-4 flex items-center justify-between z-20"
+      style={{ opacity: headerStyle.opacity }}
+    >
+      {children}
+    </header>
+  );
+};
+
+// Halo View Component
+const HaloView: React.FC<{
+  setActivePlugin: (p: PluginKey) => void;
+  sessionContext: any;
+  pluginStates: any;
+}> = ({ setActivePlugin, sessionContext, pluginStates }) => {
+  const haloAnimation = useAnimatePresence({
+    isVisible: true,
+    initial: { opacity: 0 },
+    animate: { opacity: 1 },
+    exit: { opacity: 0 },
+    transition: { duration: 300 },
+  });
+
+  return (
+    <div className="w-full h-full" style={haloAnimation.style}>
+      <HaloSchematic 
+        setActivePlugin={setActivePlugin}
+        sessionContext={sessionContext}
+        pluginStates={pluginStates} 
+      />
+    </div>
+  );
+};
+
+// Routing Panel Component
+const RoutingPanel: React.FC<{
+  sidechainLinks: any;
+  onAddLink: any;
+  onRemoveLink: any;
+  onClose: () => void;
+}> = ({ sidechainLinks, onAddLink, onRemoveLink, onClose }) => {
+  const routingAnimation = useAnimatePresence({
+    isVisible: true,
+    initial: { opacity: 0 },
+    animate: { opacity: 1 },
+    exit: { opacity: 0 },
+    transition: { duration: 300 },
+  });
+
+  return (
+    <div className="fixed inset-0 z-[100]" style={routingAnimation.style}>
+      <RoutingView 
+        sidechainLinks={sidechainLinks}
+        onAddLink={onAddLink}
+        onRemoveLink={onRemoveLink}
+        onClose={onClose}
+      />
+    </div>
+  );
+};
 
 const tierColorMap: Record<TierName, string> = {
   'Core Tier': 'var(--glow-cyan)',
@@ -138,7 +209,7 @@ const SuitePluginSurface: React.FC<SuitePluginSurfaceProps> = ({
       let updatedPartialState: Partial<SpecificPluginSettingsMap[K]>;
 
       if (typeof newState === 'function') {
-        updatedPartialState = (newState as Function)(currentPluginState);
+        updatedPartialState = (newState as (prevState: SpecificPluginSettingsMap[K]) => Partial<SpecificPluginSettingsMap[K]>)(currentPluginState);
       } else {
         updatedPartialState = newState;
       }
@@ -307,11 +378,7 @@ const SuitePluginSurface: React.FC<SuitePluginSurfaceProps> = ({
     <div className="text-white min-h-screen bg-[#020010]">
       <NeuralGridBackground glowColor={gridGlow.color} glowOpacity={gridGlow.opacity} />
       <div className="relative flex flex-col h-screen p-4 gap-4">
-        <motion.header 
-          className="absolute top-4 left-4 right-4 flex items-center justify-between z-20"
-          animate={{ opacity: isTransitioning ? 0 : 1 }}
-          transition={{ duration: 0.2 }}
-        >
+        <HeaderWithTransition isTransitioning={isTransitioning}>
           <div className="flex items-center gap-4">
             <MixxClubLogo className="h-8 w-8 transition-all duration-200 hover:scale-105" />
             <div className="flex flex-col">
@@ -381,21 +448,20 @@ const SuitePluginSurface: React.FC<SuitePluginSurfaceProps> = ({
               </button>
             )}
           </div>
-        </motion.header>
+        </HeaderWithTransition>
 
         <main className="flex-1 flex items-center justify-center transition-all duration-500 pt-16">
           <AnimatePresence mode="wait">
             {view === 'halo' ? (
-              <motion.div key="halo" initial={{opacity: 0}} animate={{opacity: 1}} exit={{opacity: 0}} className="w-full h-full">
-                <HaloSchematic 
-                  setActivePlugin={(p: PluginKey) => { 
-                    handleSelectPlugin(p); 
-                    setView('plugin');
-                  }} 
-                  sessionContext={sessionContext}
-                  pluginStates={pluginStates} 
-                />
-              </motion.div>
+              <HaloView
+                key="halo"
+                setActivePlugin={(p: PluginKey) => { 
+                  handleSelectPlugin(p); 
+                  setView('plugin');
+                }}
+                sessionContext={sessionContext}
+                pluginStates={pluginStates}
+              />
             ) : (
                activePlugin ? (
                   <div key="plugin-active" className="w-full h-full">{renderActivePlugin()}</div>
@@ -416,19 +482,12 @@ const SuitePluginSurface: React.FC<SuitePluginSurfaceProps> = ({
 
         <AnimatePresence>
           {activePanel === 'routing' && (
-            <motion.div
-              initial={{ opacity: 0 }}
-              animate={{ opacity: 1 }}
-              exit={{ opacity: 0 }}
-              className="fixed inset-0 z-[100]"
-            >
-              <RoutingView 
-                sidechainLinks={sidechainLinks}
-                onAddLink={handleAddLink}
-                onRemoveLink={handleRemoveLink}
-                onClose={() => setActivePanel(null)}
-              />
-            </motion.div>
+            <RoutingPanel
+              sidechainLinks={sidechainLinks}
+              onAddLink={handleAddLink}
+              onRemoveLink={handleRemoveLink}
+              onClose={() => setActivePanel(null)}
+            />
           )}
         </AnimatePresence>
         

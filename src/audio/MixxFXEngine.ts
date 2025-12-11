@@ -65,7 +65,6 @@ export class MixxFXEngine implements IAudioEngine {
 
     this.updateMix(); // Set initial mix level
     this.isInitialized = true;
-    console.log('🎛️ MIXX FX Engine Initialized');
   }
 
   isActive(): boolean {
@@ -90,7 +89,6 @@ export class MixxFXEngine implements IAudioEngine {
     this.makeup?.disconnect();
     this.output?.disconnect();
     this.isInitialized = false;
-    console.log('MIXX FX Engine disposed.');
   }
 
   private updateMix(): void {
@@ -115,7 +113,6 @@ export class MixxFXEngine implements IAudioEngine {
   setParameter(name: string, value: number): void {
     if (name in this.params) {
       (this.params as any)[name] = value;
-      // console.log(`MIXX FX: Set ${name} to ${value}`);
       if (name === 'mix') {
         this.updateMix();
       } else if (name === 'drive') {
@@ -147,6 +144,18 @@ export class MixxFXEngine implements IAudioEngine {
 let mixxFXInstance: MixxFXEngine | null = null;
 
 export function getMixxFXEngine(audioContext: BaseAudioContext | null = null): MixxFXEngine {
+  // If instance exists but context is closed or different, dispose and recreate
+  if (mixxFXInstance) {
+    const existingContext = mixxFXInstance.audioContext;
+    const contextClosed = existingContext && 'state' in existingContext && existingContext.state === 'closed';
+    const contextChanged = audioContext && existingContext && existingContext !== audioContext;
+    
+    if (contextClosed || contextChanged) {
+      mixxFXInstance.dispose();
+      mixxFXInstance = null;
+    }
+  }
+  
   if (!mixxFXInstance) {
     mixxFXInstance = new MixxFXEngine(audioContext);
   } else if (audioContext && !mixxFXInstance.audioContext) {

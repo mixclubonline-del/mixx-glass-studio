@@ -99,13 +99,6 @@ export class VelvetProcessor {
     // Render the processed audio
     const processedBuffer = await offlineContext.startRendering();
     
-    console.log('🎼 VELVET PROCESSING COMPLETE');
-    console.log(`   🎵 Velvet Floor: ${profile.velvetFloor.depth}% depth, ${profile.velvetFloor.translation} translation`);
-    console.log(`   🎶 Harmonic Lattice: ${profile.harmonicLattice.character} character, ${profile.harmonicLattice.presence}% presence`);
-    console.log(`   🌀 Phase Weave: ${profile.phaseWeave.width}% width, ${profile.phaseWeave.monoCompatibility}% mono safe`);
-    console.log(`   👑 Velvet Curve: Applied`);
-    console.log(`   🎯 Target LUFS: ${targetLUFS}`);
-    
     return processedBuffer;
   }
 

@@ -59,8 +59,6 @@ function handleGamepadConnected(e: GamepadEvent): void {
   activeGamepad = e.gamepad;
   gamepadConnected = true;
   buttonStates = new Array(activeGamepad.buttons.length).fill(false);
-  
-  console.log("[Flow Dock] Gamepad connected:", activeGamepad.id);
 }
 
 /**
@@ -70,8 +68,6 @@ function handleGamepadDisconnected(): void {
   activeGamepad = null;
   gamepadConnected = false;
   buttonStates = [];
-  
-  console.log("[Flow Dock] Gamepad disconnected");
 }
 
 /**

@@ -22,6 +22,7 @@
 import { FourAnchors, MusicalContext } from '../types/sonic-architecture';
 import { IAudioEngine } from '../types/audio-graph';
 import { breathingPattern, warmthModulation } from '../core/beat-locked-lfo';
+import { als } from '../utils/alsFeedback';
 
 export interface VelvetCurveState {
   warmth: number;
@@ -120,8 +121,6 @@ export class VelvetCurveEngine implements IAudioEngine {
   adaptToAnchors(anchors: FourAnchors): void {
     if (!this.isInitialized || !this.audioContext) return;
 
-    console.log(`[VELVET CURVE] Adapting to Prime Brain analysis:`, anchors);
-
     // Normalize anchor values (0-100) to parameter range (0-1)
     const bodyNorm = anchors.body / 100;
     const soulNorm = anchors.soul / 100;
@@ -141,7 +140,6 @@ export class VelvetCurveEngine implements IAudioEngine {
     this.state.emotion = Math.max(0, Math.min(1, this.state.emotion));
 
     this.updateProcessingParameters();
-    console.log(`[VELVET CURVE] New state after adaptation:`, this.getState());
   }
 
   /**
@@ -149,7 +147,6 @@ export class VelvetCurveEngine implements IAudioEngine {
    * This is the core of the "Cultural Intelligence".
    */
   setContext(context: MusicalContext): void {
-    console.log(`[VELVET CURVE] Adapting to new context: ${context.genre} / ${context.mood}`);
     const { genre, mood } = context;
 
     // Base settings for genres
@@ -265,8 +262,6 @@ export class VelvetCurveEngine implements IAudioEngine {
     this.updateProcessingParameters();
 
     this.isInitialized = true;
-
-    console.log('🎵 VELVET CURVE ENGINE INITIALIZED - THE KING OF OUR CASTLE!');
   }
 
   /**
@@ -365,7 +360,11 @@ export class VelvetCurveEngine implements IAudioEngine {
       case 'emotion': this.setEmotion(value); break;
       case 'power': this.setPower(value); break;
       case 'balance': this.setBalance(value); break;
-      default: console.warn(`VelvetCurveEngine: Unknown parameter ${paramName}`);
+      default: 
+        // Unknown parameter - log in DEV mode only
+        if (import.meta.env.DEV) {
+          als.warning(`VelvetCurveEngine: Unknown parameter ${paramName}`);
+        }
     }
   }
 
@@ -468,6 +467,18 @@ let velvetCurveInstance: VelvetCurveEngine | null = null;
  * Get the global Velvet Curve Engine instance (singleton pattern)
  */
 export function getVelvetCurveEngine(audioContext: BaseAudioContext | null = null): VelvetCurveEngine {
+  // If instance exists but context is closed or different, dispose and recreate
+  if (velvetCurveInstance) {
+    const existingContext = velvetCurveInstance.audioContext;
+    const contextClosed = existingContext && 'state' in existingContext && existingContext.state === 'closed';
+    const contextChanged = audioContext && existingContext && existingContext !== audioContext;
+    
+    if (contextClosed || contextChanged) {
+      velvetCurveInstance.dispose();
+      velvetCurveInstance = null;
+    }
+  }
+  
   if (!velvetCurveInstance) {
     velvetCurveInstance = new VelvetCurveEngine(audioContext);
   } else if (audioContext && !velvetCurveInstance.audioContext) {

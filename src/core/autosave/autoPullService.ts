@@ -5,6 +5,8 @@
  * how: Periodic git pull operations via Tauri commands
  */
 
+import { als } from '../../utils/alsFeedback';
+
 interface AutoPullState {
   isEnabled: boolean;
   lastPullTime: number | null;
@@ -32,6 +34,7 @@ class AutoPullService {
   private pullTimer: number | null = null;
   private onStatusChange: ((status: AutoPullState) => void) | null = null;
   private invokeCommand: ((cmd: string, args?: any) => Promise<any>) | null = null;
+  private consumerCount: number = 0; // Track number of active consumers
 
   /**
    * Initialize the auto-pull service
@@ -39,7 +42,11 @@ class AutoPullService {
   async initialize(invokeCommandFn: (cmd: string, args?: any) => Promise<any>): Promise<void> {
     this.invokeCommand = invokeCommandFn;
     this.loadSettings();
-    console.log('[AutoPull] Service initialized');
+    
+    // Start interval if auto-pull was previously enabled
+    if (this.state.isEnabled) {
+      this.startInterval();
+    }
   }
 
   /**
@@ -54,7 +61,10 @@ class AutoPullService {
         this.state.interval = settings.interval || 300000;
       }
     } catch (error) {
-      console.warn('[AutoPull] Failed to load settings:', error);
+      // Settings load failure is non-critical - continue with defaults
+      if (import.meta.env.DEV) {
+        als.warning('[AutoPull] Failed to load settings, using defaults');
+      }
     }
   }
 
@@ -71,7 +81,10 @@ class AutoPullService {
         })
       );
     } catch (error) {
-      console.warn('[AutoPull] Failed to save settings:', error);
+      // Settings save failure is non-critical
+      if (import.meta.env.DEV) {
+        als.warning('[AutoPull] Failed to save settings');
+      }
     }
   }
 
@@ -120,6 +133,31 @@ class AutoPullService {
   }
 
   /**
+   * Increment consumer count (called when a component mounts)
+   */
+  addConsumer(): void {
+    this.consumerCount++;
+  }
+
+  /**
+   * Decrement consumer count (called when a component unmounts)
+   * Only shutdowns when the last consumer is removed
+   */
+  removeConsumer(): void {
+    this.consumerCount = Math.max(0, this.consumerCount - 1);
+    if (this.consumerCount === 0) {
+      this.shutdown();
+    }
+  }
+
+  /**
+   * Check if service has any active consumers
+   */
+  hasConsumers(): boolean {
+    return this.consumerCount > 0;
+  }
+
+  /**
    * Get current git status
    */
   async getGitStatus(): Promise<GitStatus | null> {
@@ -131,7 +169,7 @@ class AutoPullService {
       const status = await this.invokeCommand('git_status');
       return status as GitStatus;
     } catch (error) {
-      console.error('[AutoPull] Failed to get git status:', error);
+      als.error('[AutoPull] Failed to get git status', error);
       return null;
     }
   }
@@ -168,7 +206,6 @@ class AutoPullService {
       this.state.pullInProgress = false;
       this.notifyStatusChange();
 
-      console.log('[AutoPull] Repository pulled successfully');
       return { success: true, message: result || 'Pull completed successfully' };
     } catch (error: any) {
       const errorMessage = error?.message || 'Unknown error';
@@ -176,7 +213,7 @@ class AutoPullService {
       this.state.pullInProgress = false;
       this.notifyStatusChange();
 
-      console.error('[AutoPull] Failed to pull:', error);
+      als.error('[AutoPull] Failed to pull', error);
       return { success: false, message: errorMessage };
     }
   }
@@ -189,30 +226,14 @@ class AutoPullService {
       return;
     }
 
-    // Perform initial pull check
-    this.scheduleNextPull();
-
+    // Set up periodic pull interval
     this.pullTimer = window.setInterval(() => {
       if (this.state.isEnabled && !this.state.pullInProgress) {
         this.pullNow().catch((error) => {
-          console.error('[AutoPull] Interval pull failed:', error);
+          als.error('[AutoPull] Interval pull failed', error);
         });
       }
     }, this.state.interval);
-  }
-
-  /**
-   * Schedule next pull after current one completes
-   */
-  private scheduleNextPull(): void {
-    // This will be called after a pull completes
-    if (this.state.isEnabled && !this.state.pullInProgress) {
-      setTimeout(() => {
-        this.pullNow().catch((error) => {
-          console.error('[AutoPull] Scheduled pull failed:', error);
-        });
-      }, this.state.interval);
-    }
   }
 
   /**

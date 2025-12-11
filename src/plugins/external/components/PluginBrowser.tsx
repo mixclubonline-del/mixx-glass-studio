@@ -1,11 +1,11 @@
 
 import React, { useState, useMemo } from 'react';
-import { motion, AnimatePresence } from 'framer-motion';
+import { useFlowMotion, useAnimatePresence, AnimatePresence } from '../../../../components/mixxglass';
 import { PLUGIN_TIERS, TierName, PluginKey, findPlugin } from '../constants';
 import { pluginPreviews } from './shared/MiniVisualizers';
 import { PluginBrowserProps, Plugin } from '../types';
 import { SearchIcon, MenuIcon, RefreshCwIcon, ArrowUpDownIcon, CheckCircleIcon } from './shared/Icons';
-import { Knob } from './shared/Knob';
+import { MixxGlassKnob } from '../../../../components/mixxglass';
 
 const allPluginsWithKeys = Object.entries(PLUGIN_TIERS).flatMap(([tierName, tierData]) =>
   Object.entries(tierData).map(([pluginKey, pluginData]) => ({
@@ -28,6 +28,105 @@ const tierColorMap: Record<string, { text: string, border: string, bg: string }>
     master: { text: 'text-amber-400', border: 'border-amber-400', bg: 'bg-amber-400' },
     signature: { text: 'text-rose-400', border: 'border-rose-400', bg: 'bg-rose-400' },
     system: { text: 'text-violet-400', border: 'border-violet-400', bg: 'bg-violet-400' },
+};
+
+// Plugin Card Component - uses hook at component level
+const PluginCard: React.FC<{
+    plugin: Plugin & { pluginKey: PluginKey };
+    hoveredPlugin: Plugin & { pluginKey: PluginKey } | null;
+    setHoveredPlugin: (plugin: Plugin & { pluginKey: PluginKey }) => void;
+    onSelectPlugin: (pluginKey: PluginKey) => void;
+    tierColorMap: Record<string, { text: string, border: string, bg: string }>;
+    showAiRecommendations: boolean;
+}> = ({ plugin, hoveredPlugin, setHoveredPlugin, onSelectPlugin, tierColorMap, showAiRecommendations }) => {
+    const PreviewComponent = pluginPreviews[plugin.pluginKey as PluginKey];
+    const colors = tierColorMap[plugin.tier];
+    const isSelected = hoveredPlugin?.id === plugin.id;
+    
+    // Hook is now called at component level
+    const pluginAnimation = useAnimatePresence({
+        isVisible: true,
+        initial: { opacity: 0, scale: 0.9 },
+        animate: { opacity: 1, scale: 1 },
+        exit: { opacity: 0, scale: 0.9 },
+        transition: { duration: 200 },
+    });
+
+    return (
+        <div
+            onMouseEnter={() => setHoveredPlugin(plugin)}
+            className="w-full"
+            style={pluginAnimation.style}
+        >
+            <div
+                onClick={() => onSelectPlugin(plugin.pluginKey)}
+                className={`relative w-full h-48 p-4 flex flex-col justify-between rounded-lg border-2 transition-all duration-200 cursor-pointer
+                    ${isSelected && colors ? `${colors.border} bg-[#0d1117]/50` : 'border-gray-700 bg-[#0d1117]/80 hover:border-gray-500'}
+                `}
+            >
+                <div>
+                    <h3 className={`font-bold ${colors ? colors.text : 'text-gray-400'}`}>{plugin.name}</h3>
+                    <p className="text-xs text-gray-400">{plugin.description}</p>
+                </div>
+                <div className="w-full h-12">
+                    {PreviewComponent && <PreviewComponent />}
+                </div>
+                {showAiRecommendations && plugin.suggestedBy && (
+                    <div className="absolute bottom-2 right-2 flex items-center gap-1 text-xs text-cyan-400">
+                        <CheckCircleIcon className="w-3 h-3" />
+                        <span>Suggested by {plugin.suggestedBy}</span>
+                    </div>
+                )}
+            </div>
+        </div>
+    );
+};
+
+// Inspector Panel Component
+const InspectorPanel: React.FC<{
+    hoveredPlugin: Plugin & { pluginKey: PluginKey };
+    onSelectPlugin: (pluginKey: PluginKey) => void;
+    tierCategoryMap: Record<string, string>;
+}> = ({ hoveredPlugin, onSelectPlugin, tierCategoryMap }) => {
+    const panelAnimation = useAnimatePresence({
+        isVisible: true,
+        initial: { opacity: 0, x: 20 },
+        animate: { opacity: 1, x: 0 },
+        exit: { opacity: 0, x: 20 },
+        transition: { duration: 200 },
+    });
+
+    return (
+        <div
+            className="w-72 flex-shrink-0 bg-[#0d1117] rounded-lg border border-gray-700 p-6 flex flex-col justify-between"
+            style={panelAnimation.style}
+        >
+            <div>
+                <h2 className="font-orbitron text-2xl font-bold text-white">{hoveredPlugin.name}</h2>
+                <p className="text-gray-400">{tierCategoryMap[hoveredPlugin.tier]}</p>
+
+                <div className="my-8 flex items-center justify-center">
+                    <MixxGlassKnob value={50} setValue={() => {}} label="" paramName="" isLearning={false} onMidiLearn={() => {}} size={120} />
+                </div>
+
+                <p className="text-sm text-gray-300">
+                    A powerful {tierCategoryMap[hoveredPlugin.tier].toLowerCase()} tool for professional {hoveredPlugin.description.toLowerCase()}
+                </p>
+            </div>
+            <div className="flex flex-col gap-2">
+                <button
+                    onClick={() => onSelectPlugin(hoveredPlugin.pluginKey)}
+                    className="w-full py-3 bg-cyan-500 text-black font-bold rounded-md hover:bg-cyan-400 transition-colors"
+                >
+                    Load
+                </button>
+                <div className="flex gap-2">
+                    <button className="flex-1 py-2 bg-gray-700 text-white rounded-md hover:bg-gray-600 transition-colors">Favorite</button>
+                    <button className="flex-1 py-2 bg-gray-700 text-white rounded-md hover:bg-gray-600 transition-colors">Demo</button>
+                </div>
+            </div>
+        </div>
+    );
 };
 
 
@@ -98,93 +197,38 @@ export const PluginBrowser: React.FC<PluginBrowserProps> = ({ onSelectPlugin }) 
             <div className="flex-1 flex mt-4 overflow-hidden gap-4">
                 {/* Plugin Grid */}
                 <div className="flex-1 overflow-y-auto custom-scrollbar pr-4">
-                    <motion.div layout className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5 gap-4">
+                    <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5 gap-4">
                         <AnimatePresence>
-                        {filteredPlugins.map(plugin => {
-                            const PreviewComponent = pluginPreviews[plugin.pluginKey as PluginKey];
-                            const colors = tierColorMap[plugin.tier];
-                            const isSelected = hoveredPlugin?.id === plugin.id;
-
-                            return (
-                                <motion.div
-                                    key={plugin.id}
-                                    layout
-                                    initial={{ opacity: 0, scale: 0.9 }}
-                                    animate={{ opacity: 1, scale: 1 }}
-                                    exit={{ opacity: 0, scale: 0.9 }}
-                                    onHoverStart={() => setHoveredPlugin(plugin)}
-                                    className="w-full"
-                                >
-                                    <div
-                                        onClick={() => onSelectPlugin(plugin.pluginKey)}
-                                        className={`relative w-full h-48 p-4 flex flex-col justify-between rounded-lg border-2 transition-all duration-200 cursor-pointer
-                                            ${isSelected && colors ? `${colors.border} bg-[#0d1117]/50` : 'border-gray-700 bg-[#0d1117]/80 hover:border-gray-500'}
-                                        `}
-                                    >
-                                        <div>
-                                            <h3 className={`font-bold ${colors ? colors.text : 'text-gray-400'}`}>{plugin.name}</h3>
-                                            <p className="text-xs text-gray-400">{plugin.description}</p>
-                                        </div>
-                                        <div className="w-full h-12">
-                                            {PreviewComponent && <PreviewComponent />}
-                                        </div>
-                                        {showAiRecommendations && plugin.suggestedBy && (
-                                             <div className="absolute bottom-2 right-2 flex items-center gap-1 text-xs text-cyan-400">
-                                                <CheckCircleIcon className="w-3 h-3" />
-                                                <span>Suggested by {plugin.suggestedBy}</span>
-                                            </div>
-                                        )}
-                                    </div>
-                                </motion.div>
-                            )
-                        })}
+                        {filteredPlugins.map(plugin => (
+                            <PluginCard
+                                key={plugin.id}
+                                plugin={plugin}
+                                hoveredPlugin={hoveredPlugin}
+                                setHoveredPlugin={setHoveredPlugin}
+                                onSelectPlugin={onSelectPlugin}
+                                tierColorMap={tierColorMap}
+                                showAiRecommendations={showAiRecommendations}
+                            />
+                        ))}
                         </AnimatePresence>
-                    </motion.div>
+                    </div>
                 </div>
 
                 {/* Inspector Panel */}
                 <AnimatePresence mode="wait">
-                <motion.div 
-                    key={hoveredPlugin ? hoveredPlugin.id : 'empty'}
-                    initial={{ opacity: 0, x: 20 }}
-                    animate={{ opacity: 1, x: 0 }}
-                    exit={{ opacity: 0, x: 20 }}
-                    transition={{ duration: 0.2 }}
-                    className="w-72 flex-shrink-0 bg-[#0d1117] rounded-lg border border-gray-700 p-6 flex flex-col justify-between"
-                >
-                    {hoveredPlugin ? (
-                        <>
-                            <div>
-                                <h2 className="font-orbitron text-2xl font-bold text-white">{hoveredPlugin.name}</h2>
-                                <p className="text-gray-400">{tierCategoryMap[hoveredPlugin.tier]}</p>
-
-                                <div className="my-8 flex items-center justify-center">
-                                    <Knob value={50} setValue={() => {}} label="" paramName="" isLearning={false} onMidiLearn={() => {}} size={120} />
-                                </div>
-
-                                <p className="text-sm text-gray-300">
-                                    A powerful {tierCategoryMap[hoveredPlugin.tier].toLowerCase()} tool for professional {hoveredPlugin.description.toLowerCase()}
-                                </p>
-                            </div>
-                             <div className="flex flex-col gap-2">
-                                <button
-                                    onClick={() => onSelectPlugin(hoveredPlugin.pluginKey)}
-                                    className="w-full py-3 bg-cyan-500 text-black font-bold rounded-md hover:bg-cyan-400 transition-colors"
-                                >
-                                    Load
-                                </button>
-                                <div className="flex gap-2">
-                                    <button className="flex-1 py-2 bg-gray-700 text-white rounded-md hover:bg-gray-600 transition-colors">Favorite</button>
-                                    <button className="flex-1 py-2 bg-gray-700 text-white rounded-md hover:bg-gray-600 transition-colors">Demo</button>
-                                </div>
-                            </div>
-                        </>
-                    ) : (
-                         <div className="text-center text-gray-500">
-                            <p>Hover over a plugin to see details.</p>
-                        </div>
-                    )}
-                </motion.div>
+                {hoveredPlugin && (
+                    <InspectorPanel
+                        key={hoveredPlugin.id}
+                        hoveredPlugin={hoveredPlugin}
+                        onSelectPlugin={onSelectPlugin}
+                        tierCategoryMap={tierCategoryMap}
+                    />
+                )}
+                {!hoveredPlugin && (
+                    <div className="w-72 flex-shrink-0 bg-[#0d1117] rounded-lg border border-gray-700 p-6 flex flex-col justify-center text-center text-gray-500">
+                        <p>Hover over a plugin to see details.</p>
+                    </div>
+                )}
                 </AnimatePresence>
             </div>
 
@@ -197,7 +241,7 @@ export const PluginBrowser: React.FC<PluginBrowserProps> = ({ onSelectPlugin }) 
                  <div className="flex items-center gap-3">
                     <label htmlFor="ai-recs" className="text-gray-400 font-semibold">AI Recommendations</label>
                     <button onClick={() => setShowAiRecommendations(!showAiRecommendations)} className={`w-10 h-5 rounded-full p-0.5 transition-colors ${showAiRecommendations ? 'bg-cyan-500' : 'bg-gray-600'}`}>
-                        <motion.div layout className={`w-4 h-4 bg-white rounded-full`} />
+                        <div className={`w-4 h-4 bg-white rounded-full transition-transform ${showAiRecommendations ? 'translate-x-5' : 'translate-x-0'}`} />
                     </button>
                 </div>
             </footer>

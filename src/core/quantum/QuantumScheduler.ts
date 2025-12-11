@@ -13,6 +13,8 @@
  * @version 1.0.0 - Phase 1 Foundation
  */
 
+import { als } from '../../utils/alsFeedback';
+
 export type TaskPriority = 'audio' | 'ai' | 'ui';
 
 export interface QuantumTask {
@@ -182,7 +184,7 @@ class QuantumScheduler {
         this.stats.lastAudioTaskTime = taskEnd;
         
       } catch (error) {
-        console.error('[QuantumScheduler] Audio task error:', error);
+        als.error('[QuantumScheduler] Audio task error', error);
         taskEnd = performance.now();
       }
       
@@ -245,7 +247,7 @@ class QuantumScheduler {
         processed++;
         
       } catch (error) {
-        console.error('[QuantumScheduler] AI task error:', error);
+        als.error('[QuantumScheduler] AI task error', error);
         taskEnd = performance.now();
       }
       
@@ -302,7 +304,7 @@ class QuantumScheduler {
         }
         
       } catch (error) {
-        console.error('[QuantumScheduler] UI task error:', error);
+        als.error('[QuantumScheduler] UI task error', error);
         taskEnd = performance.now();
       }
       
@@ -329,7 +331,7 @@ class QuantumScheduler {
       const oldestTask = this.audioQueue[0];
       if (oldestTask && performance.now() - oldestTask.metadata?.queuedAt > this.audioStarvationThreshold) {
         this.stats.audioStarvationWarnings++;
-        console.warn('[QuantumScheduler] Audio starvation detected - queue backlog:', this.audioQueue.length);
+        als.warning(`[QuantumScheduler] Audio starvation detected - queue backlog: ${this.audioQueue.length}`);
       }
     }
   }
@@ -417,7 +419,6 @@ let globalScheduler: QuantumScheduler | null = null;
 export function getQuantumScheduler(): QuantumScheduler {
   if (!globalScheduler) {
     globalScheduler = new QuantumScheduler();
-    console.log('🔮 Quantum Scheduler initialized - Protecting audio, enabling AI, batching UI');
   }
   return globalScheduler;
 }

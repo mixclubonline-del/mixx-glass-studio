@@ -3,6 +3,7 @@ import { createRoot } from 'react-dom/client';
 import App from './App';
 import './index.css';
 import './core/responsive/responsive.css';
+import './styles/mixx-button.css';
 import { initResponsiveScale } from './core/responsive';
 
 // Initialize responsive scale system

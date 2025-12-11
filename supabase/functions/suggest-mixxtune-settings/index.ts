@@ -1,4 +1,5 @@
 import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
+import { callGeminiAPI, extractGeminiText } from "../_shared/gemini-api.ts";
 
 const corsHeaders = {
   'Access-Control-Allow-Origin': '*',
@@ -13,9 +14,9 @@ serve(async (req) => {
   try {
     const { audioFeatures, vocalStyle, genre } = await req.json();
     
-    const LOVABLE_API_KEY = Deno.env.get('LOVABLE_API_KEY');
-    if (!LOVABLE_API_KEY) {
-      throw new Error('LOVABLE_API_KEY not configured');
+    const GEMINI_API_KEY = Deno.env.get('GEMINI_API_KEY');
+    if (!GEMINI_API_KEY) {
+      throw new Error('GEMINI_API_KEY not configured');
     }
 
     const prompt = `You are an expert audio engineer specializing in modern hip-hop, trap, and R&B vocal production.
@@ -43,37 +44,24 @@ Consider:
 
 Respond with specific numbers and brief explanation.`;
 
-    const response = await fetch('https://ai.gateway.lovable.dev/v1/chat/completions', {
-      method: 'POST',
-      headers: {
-        'Authorization': `Bearer ${LOVABLE_API_KEY}`,
-        'Content-Type': 'application/json',
-      },
-      body: JSON.stringify({
-        model: 'google/gemini-2.5-flash',
-        messages: [
-          {
-            role: 'system',
-            content: 'You are a professional audio engineer expert in modern vocal production for hip-hop, trap, and R&B. Provide precise, actionable settings recommendations.'
-          },
-          {
-            role: 'user',
-            content: prompt
-          }
-        ],
-        temperature: 0.4,
-        max_tokens: 400
-      }),
-    });
+    // Call Gemini API directly
+    const geminiResponse = await callGeminiAPI({
+      model: 'gemini-2.5-flash',
+      messages: [
+        {
+          role: 'system',
+          content: 'You are a professional audio engineer expert in modern vocal production for hip-hop, trap, and R&B. Provide precise, actionable settings recommendations.'
+        },
+        {
+          role: 'user',
+          content: prompt
+        }
+      ],
+      temperature: 0.4,
+      maxOutputTokens: 400
+    }, GEMINI_API_KEY);
 
-    if (!response.ok) {
-      const errorText = await response.text();
-      console.error('AI Gateway error:', response.status, errorText);
-      throw new Error(`AI Gateway error: ${response.status}`);
-    }
-
-    const aiData = await response.json();
-    const recommendation = aiData.choices[0].message.content;
+    const recommendation = extractGeminiText(geminiResponse);
 
     // Parse AI response
     const settings = {

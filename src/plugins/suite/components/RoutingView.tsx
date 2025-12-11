@@ -1,5 +1,4 @@
 import React, { useState, useRef, useLayoutEffect, useCallback } from 'react';
-import { motion } from 'framer-motion';
 import { PLUGIN_TIERS, TierName, PluginKey, findPlugin } from '../constants';
 import { SidechainLink } from '../types';
 import { XIcon } from './shared/Icons';

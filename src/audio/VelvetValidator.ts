@@ -53,7 +53,7 @@ function computeBiquad(
       a1 = -2 * cosw0;
       a2 = 1 - alpha;
       break;
-    case 'highshelf':
+    case 'highshelf': {
       const common = 2 * Math.sqrt(A) * alpha;
       b0 = A * ((A + 1) + (A - 1) * cosw0 + common);
       b1 = -2 * A * ((A - 1) + (A + 1) * cosw0);
@@ -62,6 +62,7 @@ function computeBiquad(
       a1 = 2 * ((A - 1) + (A + 1) * cosw0);
       a2 = (A + 1) - (A - 1) * cosw0 - common;
       break;
+    }
     default:
       b0 = 1;
       b1 = 0;

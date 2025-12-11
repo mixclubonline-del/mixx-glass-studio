@@ -3,6 +3,7 @@ import { subscribeToFlow } from "./flowSignals";
 import type { TrackALSFeedback } from "../utils/ALS";
 import type { SessionProbeContext } from "./sessionProbe";
 import { subscribeToSessionProbe, getSessionProbeSnapshot } from "./sessionProbe";
+import { als } from "../utils/alsFeedback";
 
 type FlowIntensity = "calm" | "charged" | "immersed";
 
@@ -179,7 +180,10 @@ const updateSnapshot = (
     try {
       listener();
     } catch (error) {
-      console.warn("[FlowContextService] listener error", error);
+      // Listener error - non-critical (expected in some scenarios)
+      if (import.meta.env.DEV) {
+        als.warning("[FlowContextService] listener error", error);
+      }
     }
   });
 };

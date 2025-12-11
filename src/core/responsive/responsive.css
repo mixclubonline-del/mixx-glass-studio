@@ -22,22 +22,22 @@
   --adaptive-platform: desktop;
   --adaptive-orientation: landscape;
   
-  /* Spacing scale (scaled based on viewport) */
-  --flow-spacing-xs: 0.125rem;
-  --flow-spacing-sm: 0.25rem;
-  --flow-spacing-md: 0.5rem;
-  --flow-spacing-lg: 1rem;
-  --flow-spacing-xl: 1.5rem;
-  --flow-spacing-2xl: 2rem;
+  /* Spacing scale (Professional 4px base unit rhythm) */
+  --flow-spacing-xs: 0.25rem;    /* 4px - Tight spacing */
+  --flow-spacing-sm: 0.5rem;     /* 8px - Compact spacing */
+  --flow-spacing-md: 0.75rem;    /* 12px - Standard spacing */
+  --flow-spacing-lg: 1rem;      /* 16px - Comfortable spacing */
+  --flow-spacing-xl: 1.5rem;     /* 24px - Generous spacing */
+  --flow-spacing-2xl: 2rem;      /* 32px - Spacious spacing */
   
-  /* Font scale (scaled based on viewport) */
-  --flow-font-xs: 0.625rem;
-  --flow-font-sm: 0.75rem;
-  --flow-font-md: 0.875rem;
-  --flow-font-lg: 1rem;
-  --flow-font-xl: 1.125rem;
-  --flow-font-2xl: 1.5rem;
-  --flow-font-3xl: 2rem;
+  /* Font scale (Professional DAW standard - minimum 11px for readability) */
+  --flow-font-xs: 0.6875rem;    /* 11px - Minimum readable, captions */
+  --flow-font-sm: 0.75rem;       /* 12px - Small labels, secondary text */
+  --flow-font-md: 0.8125rem;     /* 13px - Body text, primary readable */
+  --flow-font-lg: 0.9375rem;    /* 15px - Emphasized text */
+  --flow-font-xl: 1.0625rem;    /* 17px - Headings */
+  --flow-font-2xl: 1.25rem;     /* 20px - Large headings */
+  --flow-font-3xl: 1.5rem;      /* 24px - Display text */
   
   /* Border radius scale */
   --flow-radius-sm: 0.25rem;

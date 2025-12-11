@@ -1,9 +1,10 @@
 // components/AIHub/AIChatbot.tsx
 import React, { useState, useRef, useEffect, useCallback } from 'react';
-import { GoogleGenAI, GenerateContentResponse } from "@google/genai";
-import { getGeminiAI } from '../../utils/gemini';
+import { getPrimeBrainLLM } from '../../ai/PrimeBrainLLM';
 import LoadingSpinner from '../common/LoadingSpinner';
 import { SparklesIcon } from '../icons';
+import { spacing, typography, layout, effects, transitions, composeStyles } from '../../design-system';
+import { als } from '../../utils/alsFeedback';
 
 interface ChatMessage {
   role: 'user' | 'model';
@@ -18,7 +19,7 @@ const AIChatbot: React.FC = () => {
   const [isThinkingMode, setIsThinkingMode] = useState(false); // New state for thinking mode
   const chatContainerRef = useRef<HTMLDivElement>(null);
 
-  const ai = useRef(getGeminiAI()); // Use ref for Gemini AI instance
+  const ai = useRef(getPrimeBrainLLM()); // Use PrimeBrainLLM abstraction
 
   // Scroll to bottom on new message
   useEffect(() => {
@@ -40,7 +41,6 @@ const AIChatbot: React.FC = () => {
       const model = isThinkingMode ? 'gemini-2.5-pro' : 'gemini-2.5-flash';
       
       // System instruction explaining MixClub Studio's workflow
-      // Prepend to first message or include in conversation history
       const systemInstruction = `You are an AI assistant for MixClub Studio, a professional digital audio workstation (DAW) with advanced stem separation capabilities.
 
 CRITICAL WORKFLOW UNDERSTANDING:
@@ -65,37 +65,28 @@ Be helpful, concise, and accurate about the studio's automatic stem separation w
         ? `${systemInstruction}\n\nUser question: ${input}`
         : input;
 
-      const config: any = {
-        model: model,
-        contents: userContent,
-      };
-
-      if (isThinkingMode) {
-        config.config = {
-          thinkingConfig: { thinkingBudget: 32768 }, // Max budget for 2.5 Pro
-        };
-      }
-
-      const responseStream = await ai.current.models.generateContentStream(config);
-
+      // Use PrimeBrainLLM streaming
       let fullResponse = '';
       setMessages((prev) => [...prev, { role: 'model', text: '', isThinking: isThinkingMode }]); // Add initial empty model message
 
-      for await (const chunk of responseStream) {
-        const textChunk = chunk.text;
-        if (textChunk) {
-          fullResponse += textChunk;
-          setMessages((prev) => {
-            const lastMessage = prev[prev.length - 1];
-            if (lastMessage.role === 'model') {
-              return [...prev.slice(0, -1), { ...lastMessage, text: fullResponse }];
-            }
-            return prev;
-          });
-        }
+      const stream = ai.current.generateTextStream(userContent, undefined, {
+        model,
+        systemPrompt: isFirstMessage ? systemInstruction : undefined,
+        thinkingConfig: isThinkingMode ? { thinkingBudget: 32768 } : undefined,
+      });
+
+      for await (const chunk of stream) {
+        fullResponse += chunk;
+        setMessages((prev) => {
+          const lastMessage = prev[prev.length - 1];
+          if (lastMessage.role === 'model') {
+            return [...prev.slice(0, -1), { ...lastMessage, text: fullResponse }];
+          }
+          return prev;
+        });
       }
     } catch (error) {
-      console.error("Error sending message to Gemini:", error);
+      als.error("Error sending message to Gemini", error);
       setMessages((prev) => [...prev, { role: 'model', text: 'Error: Could not get a response. Please try again.', isThinking: false }]);
     } finally {
       setIsLoading(false);
@@ -110,62 +101,217 @@ Be helpful, concise, and accurate about the studio's automatic stem separation w
   }, [input, isLoading, isThinkingMode]);
 
   return (
-    <div className="flex flex-col h-full bg-gray-900/60 rounded-lg p-4 shadow-inner">
-      <div ref={chatContainerRef} className="flex-grow overflow-y-auto custom-scrollbar p-2 mb-4 space-y-4">
+    <div style={composeStyles(
+      layout.flex.container('col'),
+      { height: '100%' },
+      spacing.p(4),
+      effects.border.radius.lg,
+      {
+        background: 'rgba(17, 24, 39, 0.6)',
+        boxShadow: 'inset 0 2px 4px rgba(0,0,0,0.2)',
+      }
+    )}>
+      <div 
+        ref={chatContainerRef} 
+        style={composeStyles(
+          { flexGrow: 1 },
+          layout.overflow.y.auto,
+          spacing.p(2),
+          spacing.mb(4),
+          spacing.gap(4),
+          {
+            display: 'flex',
+            flexDirection: 'column',
+          }
+        )}
+      >
         {messages.length === 0 && (
-          <div className="flex flex-col items-center justify-center h-full text-gray-500">
-            <SparklesIcon className="w-16 h-16 text-indigo-400 mb-4 animate-pulse" />
-            <p className="text-lg font-semibold">Start a conversation with Gemini!</p>
-            <p className="text-sm">Ask anything about your music, or just general questions.</p>
+          <div style={composeStyles(
+            layout.flex.container('col'),
+            layout.flex.align.center,
+            layout.flex.justify.center,
+            { height: '100%' },
+            {
+              color: 'rgba(107, 114, 128, 1)',
+            }
+          )}>
+            <SparklesIcon style={{ 
+              width: '64px', 
+              height: '64px', 
+              color: 'rgba(129, 140, 248, 1)',
+              marginBottom: '16px',
+              animation: 'pulse 2s cubic-bezier(0.4, 0, 0.6, 1) infinite',
+            }} />
+            <p style={composeStyles(
+              typography.weight('semibold'),
+              {
+                fontSize: '1.125rem',
+              }
+            )}>Start a conversation with Gemini!</p>
+            <p style={{
+              fontSize: '0.875rem',
+            }}>Ask anything about your music, or just general questions.</p>
           </div>
         )}
         {messages.map((msg, index) => (
-          <div key={index} className={`flex ${msg.role === 'user' ? 'justify-end' : 'justify-start'}`}>
-            <div className={`max-w-[70%] rounded-xl p-3 shadow-md ${
-              msg.role === 'user'
-                ? 'bg-blue-600 text-white'
-                : 'bg-gray-700 text-gray-100'
-            }`}>
-              <p className="font-semibold mb-1">{msg.role === 'user' ? 'You' : 'Gemini'}</p>
+          <div 
+            key={index} 
+            style={composeStyles(
+              layout.flex.container('row'),
+              layout.flex.justify[msg.role === 'user' ? 'end' : 'start']
+            )}
+          >
+            <div style={composeStyles(
+              { maxWidth: '70%' },
+              effects.border.radius.xl,
+              spacing.p(3),
+              {
+                background: msg.role === 'user' 
+                  ? 'rgba(37, 99, 235, 1)'
+                  : 'rgba(55, 65, 81, 1)',
+                color: msg.role === 'user' 
+                  ? 'white'
+                  : 'rgb(243, 244, 246)',
+                boxShadow: '0 4px 6px rgba(0,0,0,0.1)',
+              }
+            )}>
+              <p style={composeStyles(
+                typography.weight('semibold'),
+                spacing.mb(1)
+              )}>{msg.role === 'user' ? 'You' : 'Gemini'}</p>
               <p>{msg.text}</p>
               {msg.isThinking && msg.role === 'model' && (
-                <div className="flex items-center text-sm mt-2 text-indigo-300">
+                <div style={composeStyles(
+                  layout.flex.container('row'),
+                  layout.flex.align.center,
+                  spacing.mt(2),
+                  {
+                    fontSize: '0.875rem',
+                    color: 'rgba(196, 181, 253, 1)',
+                  }
+                )}>
                   <LoadingSpinner size="sm" color="indigo" message="" />
-                  <span className="ml-2">Thinking deeply...</span>
+                  <span style={spacing.ml(2)}>Thinking deeply...</span>
                 </div>
               )}
             </div>
           </div>
         ))}
         {isLoading && !isThinkingMode && (
-          <div className="flex justify-start">
-            <div className="bg-gray-700 text-gray-100 max-w-[70%] rounded-xl p-3 shadow-md">
+          <div style={composeStyles(
+            layout.flex.container('row'),
+            layout.flex.justify.start
+          )}>
+            <div style={composeStyles(
+              { maxWidth: '70%' },
+              effects.border.radius.xl,
+              spacing.p(3),
+              {
+                background: 'rgba(55, 65, 81, 1)',
+                color: 'rgb(243, 244, 246)',
+                boxShadow: '0 4px 6px rgba(0,0,0,0.1)',
+              }
+            )}>
               <LoadingSpinner size="sm" color="cyan" message="Gemini is typing..." />
             </div>
           </div>
         )}
       </div>
-      <form onSubmit={sendMessage} className="flex-shrink-0 flex items-center space-x-2">
-        <label className="flex items-center space-x-2 cursor-pointer bg-gray-800/50 p-2 rounded-lg">
+      <form 
+        onSubmit={sendMessage} 
+        style={composeStyles(
+          { flexShrink: 0 },
+          layout.flex.container('row'),
+          layout.flex.align.center,
+          spacing.gap(2)
+        )}
+      >
+        <label style={composeStyles(
+          layout.flex.container('row'),
+          layout.flex.align.center,
+          spacing.gap(2),
+          spacing.p(2),
+          effects.border.radius.lg,
+          {
+            cursor: 'pointer',
+            background: 'rgba(31, 41, 55, 0.5)',
+          }
+        )}>
           <input
             type="checkbox"
             checked={isThinkingMode}
             onChange={() => setIsThinkingMode(!isThinkingMode)}
-            className="form-checkbox h-4 w-4 text-indigo-500 rounded border-gray-600 focus:ring-indigo-500"
+            style={composeStyles(
+              effects.border.radius.default,
+              {
+                width: '16px',
+                height: '16px',
+                accentColor: 'rgba(99, 102, 241, 1)',
+                border: '1px solid rgba(75, 85, 99, 1)',
+              }
+            )}
+            onFocus={(e) => {
+              e.currentTarget.style.outline = '2px solid rgba(99, 102, 241, 1)';
+              e.currentTarget.style.outlineOffset = '2px';
+            }}
+            onBlur={(e) => {
+              e.currentTarget.style.outline = 'none';
+            }}
           />
-          <span className="text-gray-300 text-sm">Deep Think Mode (Pro Model)</span>
+          <span style={{
+            fontSize: '0.875rem',
+            color: 'rgba(209, 213, 219, 1)',
+          }}>Deep Think Mode (Pro Model)</span>
         </label>
         <input
           type="text"
           value={input}
           onChange={(e) => setInput(e.target.value)}
           placeholder={isThinkingMode ? "Ask a complex question for deep thought..." : "Type your message..."}
-          className="flex-grow p-3 rounded-lg bg-gray-800 text-gray-100 border border-gray-700 focus:outline-none focus:ring-2 focus:ring-indigo-500"
+          style={composeStyles(
+            { flexGrow: 1 },
+            spacing.p(3),
+            effects.border.radius.lg,
+            {
+              background: 'rgba(31, 41, 55, 1)',
+              color: 'rgb(243, 244, 246)',
+              border: '1px solid rgba(55, 65, 81, 1)',
+              outline: 'none',
+            }
+          )}
+          onFocus={(e) => {
+            e.currentTarget.style.borderColor = 'rgba(99, 102, 241, 1)';
+            e.currentTarget.style.boxShadow = '0 0 0 2px rgba(99, 102, 241, 0.5)';
+          }}
+          onBlur={(e) => {
+            e.currentTarget.style.borderColor = 'rgba(55, 65, 81, 1)';
+            e.currentTarget.style.boxShadow = 'none';
+          }}
           disabled={isLoading}
         />
         <button
           type="submit"
-          className="px-6 py-3 bg-indigo-600 text-white rounded-lg font-semibold hover:bg-indigo-500 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+          style={composeStyles(
+            spacing.px(6),
+            spacing.py(3),
+            effects.border.radius.lg,
+            typography.weight('semibold'),
+            transitions.transition.standard('all', 200, 'ease-out'),
+            {
+              background: 'rgba(79, 70, 229, 1)',
+              color: 'white',
+            }
+          )}
+          onMouseEnter={(e) => {
+            if (!isLoading && input.trim()) {
+              e.currentTarget.style.background = 'rgba(99, 102, 241, 1)';
+            }
+          }}
+          onMouseLeave={(e) => {
+            if (!isLoading && input.trim()) {
+              e.currentTarget.style.background = 'rgba(79, 70, 229, 1)';
+            }
+          }}
           disabled={isLoading || !input.trim()}
         >
           Send

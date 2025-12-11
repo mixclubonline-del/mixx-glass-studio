@@ -112,7 +112,14 @@ const emit = () => {
     try {
       listener();
     } catch (error) {
-      console.warn("[SessionProbe] Listener error", error);
+      // Listener error - non-critical (expected in some scenarios)
+      if (import.meta.env.DEV && typeof window !== 'undefined') {
+        import('../utils/alsFeedback').then(({ als }) => {
+          als.warning("[SessionProbe] Listener error", error);
+        }).catch(() => {
+          // Ignore import errors
+        });
+      }
     }
   });
 };

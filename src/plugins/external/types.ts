@@ -92,7 +92,7 @@ export interface MixxMorphSettings extends BasePluginSettings {
   morphDepth: number;
   syncMode: 'bpm' | 'free';
 }
-export interface PrimeBrainStemSettings extends BasePluginSettings {}
+export type PrimeBrainStemSettings = BasePluginSettings;
 
 // --- MASTER TIER ---
 export interface MixxLimiterSettings extends BasePluginSettings {
@@ -155,14 +155,14 @@ export interface MixxSpiritSettings extends BasePluginSettings {
 }
 
 // --- SYSTEM TIER ---
-export interface MixxAnalyzerProSettings extends BasePluginSettings {}
-export interface PrimeRouterSettings extends BasePluginSettings {}
+export type MixxAnalyzerProSettings = BasePluginSettings;
+export type PrimeRouterSettings = BasePluginSettings;
 export interface MixxPortSettings extends BasePluginSettings {
   format: 'wav' | 'mp3' | 'mixx';
   quality: number;
 }
-export interface TelemetryCollectorSettings extends BasePluginSettings {}
-export interface PrimeBotConsoleSettings extends BasePluginSettings {}
+export type TelemetryCollectorSettings = BasePluginSettings;
+export type PrimeBotConsoleSettings = BasePluginSettings;
 
 // Map of PluginKey to its specific settings interface
 export interface SpecificPluginSettingsMap {

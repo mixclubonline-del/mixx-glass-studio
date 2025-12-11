@@ -1,6 +1,8 @@
-// FIX: Corrected a syntax error in the import statement.
 import React, { useState } from 'react';
 import { TrackData } from '../App';
+import { MixxGlassDialog, MixxGlassDialogContent, MixxGlassDialogFooter } from './mixxglass';
+import { MixxGlassButton } from './mixxglass';
+import { spacing, typography, layout, effects, transitions, composeStyles } from '../design-system';
 
 interface ChangeColorModalProps {
   currentColor: TrackData['trackColor'];
@@ -10,36 +12,88 @@ interface ChangeColorModalProps {
 
 const colors: TrackData['trackColor'][] = ['cyan', 'magenta', 'blue', 'green', 'purple', 'crimson'];
 
+const colorMap: Record<TrackData['trackColor'], string> = {
+  cyan: 'rgba(6, 182, 212, 1)',
+  magenta: 'rgba(217, 70, 239, 1)',
+  blue: 'rgba(59, 130, 246, 1)',
+  green: 'rgba(34, 197, 94, 1)',
+  purple: 'rgba(139, 92, 246, 1)',
+  crimson: 'rgba(244, 63, 94, 1)',
+};
+
 const ChangeColorModal: React.FC<ChangeColorModalProps> = ({ currentColor, onClose, onChangeColor }) => {
+  const [open, setOpen] = useState(true);
   const [selectedColor, setSelectedColor] = useState(currentColor);
 
   const handleSubmit = () => {
-      onChangeColor(selectedColor);
-  }
+    onChangeColor(selectedColor);
+    setOpen(false);
+    onClose();
+  };
+
+  const handleClose = () => {
+    setOpen(false);
+    onClose();
+  };
 
   return (
-    <div className="fixed inset-0 bg-black/70 flex items-center justify-center z-[100] backdrop-filter backdrop-blur-md" onClick={onClose}>
-      <div 
-        className="relative w-96 rounded-2xl bg-gradient-to-br from-gray-900 via-black to-gray-900 border border-gray-100/20 flex flex-col p-6 shadow-2xl shadow-violet-500/20" 
-        onClick={(e) => e.stopPropagation()}
-      >
-        <h2 className="text-lg font-bold tracking-widest text-gray-200 mb-6 text-center">CHANGE TRACK COLOR</h2>
-        
-        <div className="grid grid-cols-3 gap-4 mb-6 justify-items-center">
-          <div onClick={() => setSelectedColor('cyan')} className={`w-10 h-10 rounded-full bg-cyan-500 cursor-pointer transition-all ${selectedColor === 'cyan' ? 'ring-2 ring-offset-2 ring-offset-gray-800 ring-white' : ''}`}></div>
-          <div onClick={() => setSelectedColor('magenta')} className={`w-10 h-10 rounded-full bg-fuchsia-500 cursor-pointer transition-all ${selectedColor === 'magenta' ? 'ring-2 ring-offset-2 ring-offset-gray-800 ring-white' : ''}`}></div>
-          <div onClick={() => setSelectedColor('blue')} className={`w-10 h-10 rounded-full bg-blue-500 cursor-pointer transition-all ${selectedColor === 'blue' ? 'ring-2 ring-offset-2 ring-offset-gray-800 ring-white' : ''}`}></div>
-          <div onClick={() => setSelectedColor('green')} className={`w-10 h-10 rounded-full bg-green-500 cursor-pointer transition-all ${selectedColor === 'green' ? 'ring-2 ring-offset-2 ring-offset-gray-800 ring-white' : ''}`}></div>
-          <div onClick={() => setSelectedColor('purple')} className={`w-10 h-10 rounded-full bg-violet-500 cursor-pointer transition-all ${selectedColor === 'purple' ? 'ring-2 ring-offset-2 ring-offset-gray-800 ring-white' : ''}`}></div>
-          <div onClick={() => setSelectedColor('crimson')} className={`w-10 h-10 rounded-full bg-rose-500 cursor-pointer transition-all ${selectedColor === 'crimson' ? 'ring-2 ring-offset-2 ring-offset-gray-800 ring-white' : ''}`}></div>
+    <MixxGlassDialog
+      open={open}
+      onOpenChange={handleClose}
+      title="CHANGE TRACK COLOR"
+      size="sm"
+    >
+      <MixxGlassDialogContent>
+        <div style={composeStyles(
+          layout.grid.container(3),
+          spacing.gap(4),
+          spacing.mb(6),
+          {
+            justifyItems: 'center',
+          }
+        )}>
+          {colors.map((color) => (
+            <div
+              key={color}
+              onClick={() => setSelectedColor(color)}
+              style={composeStyles(
+                effects.border.radius.full,
+                transitions.transition.standard('all', 200, 'ease-out'),
+                {
+                  width: '40px',
+                  height: '40px',
+                  background: colorMap[color],
+                  cursor: 'pointer',
+                  transform: selectedColor === color ? 'scale(1.1)' : 'scale(1)',
+                  border: selectedColor === color ? '2px solid white' : 'none',
+                  boxShadow: selectedColor === color 
+                    ? '0 0 0 2px rgba(31, 41, 55, 1), 0 0 0 4px white'
+                    : 'none',
+                }
+              )}
+              onMouseEnter={(e) => {
+                if (selectedColor !== color) {
+                  e.currentTarget.style.transform = 'scale(1.05)';
+                }
+              }}
+              onMouseLeave={(e) => {
+                if (selectedColor !== color) {
+                  e.currentTarget.style.transform = 'scale(1)';
+                }
+              }}
+            />
+          ))}
         </div>
-
-        <div className="flex justify-end space-x-4">
-          <button type="button" onClick={onClose} className="px-4 py-2 rounded-lg bg-gray-700/50 hover:bg-gray-700 transition-colors">Cancel</button>
-          <button type="button" onClick={handleSubmit} className="px-4 py-2 rounded-lg bg-violet-600 hover:bg-violet-500 text-white font-bold transition-colors">Set Color</button>
-        </div>
-      </div>
-    </div>
+      </MixxGlassDialogContent>
+      <MixxGlassDialogFooter>
+        <MixxGlassButton variant="secondary" onClick={handleClose}>
+          Cancel
+        </MixxGlassButton>
+        <MixxGlassButton variant="primary" onClick={handleSubmit}>
+          Set Color
+        </MixxGlassButton>
+      </MixxGlassDialogFooter>
+    </MixxGlassDialog>
   );
 };
 

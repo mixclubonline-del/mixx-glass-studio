@@ -1,5 +1,6 @@
-
 import React, { useState } from 'react';
+import { MixxGlassDialog, MixxGlassDialogContent, MixxGlassDialogFooter } from './mixxglass';
+import { MixxGlassButton } from './mixxglass';
 
 interface StemSeparationModalProps {
   onClose: () => void;
@@ -13,6 +14,7 @@ const availableStems = [
 ];
 
 const StemSeparationModal: React.FC<StemSeparationModalProps> = ({ onClose, onSeparate }) => {
+  const [open, setOpen] = useState(true);
   const [selectedStems, setSelectedStems] = useState<Set<string>>(new Set(['Vocals', 'Drums', 'Bass', 'Other Instruments']));
 
   const handleToggleStem = (stem: string) => {
@@ -34,19 +36,26 @@ const StemSeparationModal: React.FC<StemSeparationModalProps> = ({ onClose, onSe
       return;
     }
     onSeparate(Array.from(selectedStems));
+    setOpen(false);
+    onClose();
+  };
+
+  const handleClose = () => {
+    setOpen(false);
+    onClose();
   };
 
   return (
-    <div className="fixed inset-0 bg-black/70 flex items-center justify-center z-[100] backdrop-filter backdrop-blur-md" onClick={onClose}>
-      <div 
-        className="relative w-[500px] max-h-[80vh] rounded-2xl bg-gradient-to-br from-indigo-900/50 to-purple-900/50 border border-indigo-500/50 flex flex-col p-6 shadow-2xl shadow-indigo-500/20" 
-        onClick={(e) => e.stopPropagation()}
-      >
-        <h2 className="text-xl font-bold tracking-widest text-gray-200 mb-2 text-center">DYNAMIC STEM SEPARATION</h2>
-        <p className="text-sm text-gray-400 mb-6 text-center">Select the stems you wish to extract from the source audio.</p>
-        
-        <form onSubmit={handleSubmit} className="flex flex-col flex-grow overflow-hidden">
-          <div className="grid grid-cols-2 gap-x-6 gap-y-3 pr-4 overflow-y-auto">
+    <MixxGlassDialog
+      open={open}
+      onOpenChange={handleClose}
+      title="DYNAMIC STEM SEPARATION"
+      description="Select the stems you wish to extract from the source audio."
+      size="md"
+    >
+      <form onSubmit={handleSubmit} className="flex flex-col flex-grow overflow-hidden">
+        <MixxGlassDialogContent>
+          <div className="grid grid-cols-2 gap-x-6 gap-y-3 pr-4 overflow-y-auto max-h-[50vh]">
             {availableStems.map(stem => (
               <label key={stem} className="flex items-center space-x-3 p-2 rounded-md hover:bg-white/10 transition-colors cursor-pointer">
                 <input
@@ -59,16 +68,22 @@ const StemSeparationModal: React.FC<StemSeparationModalProps> = ({ onClose, onSe
               </label>
             ))}
           </div>
-
-          <div className="flex justify-end space-x-4 pt-6 mt-auto border-t border-white/10">
-            <button type="button" onClick={onClose} className="px-4 py-2 rounded-lg bg-gray-700/50 hover:bg-gray-700 transition-colors">Cancel</button>
-            <button type="submit" className="px-6 py-2 rounded-lg bg-indigo-600 hover:bg-indigo-500 text-white font-bold transition-colors shadow-[0_0_10px_rgba(99,102,241,0.5)]">
-              Separate ({selectedStems.size}) Stems
-            </button>
-          </div>
-        </form>
-      </div>
-    </div>
+        </MixxGlassDialogContent>
+        <MixxGlassDialogFooter>
+          <MixxGlassButton type="button" variant="secondary" onClick={handleClose}>
+            Cancel
+          </MixxGlassButton>
+          <MixxGlassButton 
+            type="submit"
+            variant="primary" 
+            alsChannel="momentum"
+            alsValue={selectedStems.size / availableStems.length}
+          >
+            Separate ({selectedStems.size}) Stems
+          </MixxGlassButton>
+        </MixxGlassDialogFooter>
+      </form>
+    </MixxGlassDialog>
   );
 };
 

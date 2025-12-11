@@ -1,23 +1,16 @@
 
 import React from 'react';
-import { motion, AnimatePresence, Variants } from 'framer-motion';
+import { useAnimatePresence, AnimatePresence } from '../../../components/mixxglass';
 import { SettingsPanelProps } from '../types';
 import { XIcon } from './shared/Icons';
-import { PrecisionSlider } from './shared/PrecisionSlider'; // Assuming Knob/Slider for settings
+import { MixxGlassSlider } from '../../../components/mixxglass';
 import { PrimeBrainStub } from '../lib/PrimeBrainStub'; // For sending settings change events
 import { mapRange } from '../lib/utils'; // Import mapRange
 import { ToggleButton } from './shared/ToggleButton'; // Import the ToggleButton
 
 export const SettingsPanel: React.FC<SettingsPanelProps> = ({ isActive, onClose, globalSettings, setGlobalSettings }) => {
-    // Calculate dynamic transition properties based on globalSettings.animationIntensity
-    const dynamicStiffness = mapRange(globalSettings.animationIntensity, 0, 100, 350, 500);
-    const dynamicDamping = mapRange(globalSettings.animationIntensity, 0, 100, 35, 20);
-
-    const panelVariants: Variants = {
-        hidden: { x: '-100%', opacity: 0 },
-        visible: { x: '0%', opacity: 1, transition: { type: 'spring', stiffness: dynamicStiffness, damping: dynamicDamping } },
-        exit: { x: '-100%', opacity: 0, transition: { type: 'spring', stiffness: dynamicStiffness + 50, damping: dynamicDamping + 5 } }, // Slightly different exit transition
-    };
+    // Calculate dynamic transition duration based on globalSettings.animationIntensity
+    const dynamicDuration = mapRange(globalSettings.animationIntensity, 0, 100, 300, 200);
 
     const handleThemeChange = (theme: 'dark' | 'light' | 'dynamic') => {
         setGlobalSettings({ uiTheme: theme });
@@ -33,16 +26,27 @@ export const SettingsPanel: React.FC<SettingsPanelProps> = ({ isActive, onClose,
 
     const panelBorderColor = 'border-cyan-400 shadow-[0_0_20px_rgba(56,189,248,0.4)]';
 
+    const panelAnimation = useAnimatePresence({
+        isVisible: isActive,
+        initial: { x: '-100%', opacity: 0 },
+        animate: { x: '0%', opacity: 1 },
+        exit: { x: '-100%', opacity: 0 },
+        transition: {
+            duration: dynamicDuration,
+            easing: 'ease-out',
+        },
+    });
+
     return (
         <AnimatePresence>
             {isActive && (
-                <motion.div
+                <div
                     key="settings-panel"
                     className="fixed top-0 left-0 h-full w-64 z-[60] pt-4 pb-4 pl-4"
-                    variants={panelVariants}
-                    initial="hidden"
-                    animate="visible"
-                    exit="exit"
+                    style={{
+                        transform: panelAnimation.style.transform || 'translateX(0%)',
+                        opacity: panelAnimation.style.opacity,
+                    }}
                 >
                     <div className={`relative h-full bg-gradient-to-br from-black/50 to-transparent backdrop-blur-2xl border-r ${panelBorderColor} rounded-2xl transition-all duration-300`}>
                         <button 
@@ -75,10 +79,19 @@ export const SettingsPanel: React.FC<SettingsPanelProps> = ({ isActive, onClose,
 
                                 <div>
                                     <label className="text-xs text-white/70 block mb-1 font-bold tracking-wider">ANIMATION INTENSITY</label>
-                                    <PrecisionSlider 
-                                        min={0} max={100} step={1} 
-                                        value={globalSettings.animationIntensity} 
-                                        setValue={handleAnimationIntensityChange}
+                                    <MixxGlassSlider
+                                        value={globalSettings.animationIntensity / 100} // Normalize to 0-1
+                                        onChange={(normalized) => handleAnimationIntensityChange(normalized * 100)}
+                                        min={0}
+                                        max={1}
+                                        step={0.01}
+                                        alsChannel="momentum"
+                                        enableFineTuning={true}
+                                        enableKeyboard={true}
+                                        enableWheel={true}
+                                        enableDoubleClickReset={true}
+                                        defaultValue={50 / 100}
+                                        size="sm"
                                     />
                                     <span className="text-xs text-white/50">{globalSettings.animationIntensity}%</span>
                                 </div>
@@ -102,7 +115,7 @@ export const SettingsPanel: React.FC<SettingsPanelProps> = ({ isActive, onClose,
                             </div>
                         </div>
                     </div>
-                </motion.div>
+                </div>
             )}
         </AnimatePresence>
     );

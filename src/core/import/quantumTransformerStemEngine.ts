@@ -337,7 +337,6 @@ export class QuantumTransformerStemModel {
     });
 
     this.initialized = true;
-    console.log('[QUANTUM TRANSFORMER] Model initialized');
   }
 
   /**
@@ -439,7 +438,6 @@ export class QuantumTransformerStemModel {
     });
 
     // Train model (this is a placeholder - real training would be more sophisticated)
-    console.log('[QUANTUM TRANSFORMER] Training model...');
     
     // Cleanup
     xTrain.dispose();
@@ -488,7 +486,6 @@ export class QuantumTransformerStemModel {
     }
 
     // Load weights (simplified)
-    console.log('[QUANTUM TRANSFORMER] Loading weights...');
   }
 
   dispose(): void {
@@ -511,4 +508,6 @@ export function getQuantumTransformerStemModel(
   }
   return globalTransformer;
 }
+
+
 

@@ -7,6 +7,8 @@
 
 import React from 'react';
 import type { WaveformHeaderSettings } from '../types/waveformHeaderSettings';
+import { MixxGlassSlider } from './mixxglass';
+import { spacing, typography, layout, effects, transitions, composeStyles } from '../design-system';
 
 interface WaveformHeaderSettingsPanelProps {
   settings: WaveformHeaderSettings;
@@ -33,23 +35,51 @@ const Slider: React.FC<SliderProps> = ({
   onChange,
   formatValue = (v) => v.toFixed(2),
 }) => {
+  // Normalize value to 0-1 range for MixxGlassSlider
+  const normalizedValue = (value - min) / (max - min);
+  const handleChange = (normalized: number) => {
+    const denormalized = min + normalized * (max - min);
+    onChange(denormalized);
+  };
+
   return (
-    <div className="space-y-2">
-      <div className="flex items-center justify-between text-xs">
-        <span className="text-white/70 uppercase tracking-wide">{label}</span>
-        <span className="text-white/50 font-mono">{formatValue(value)}</span>
+    <div style={composeStyles(
+      spacing.gap(2),
+      {
+        display: 'flex',
+        flexDirection: 'column',
+      }
+    )}>
+      <div style={composeStyles(
+        layout.flex.container('row'),
+        layout.flex.align.center,
+        layout.flex.justify.between,
+        {
+          fontSize: '0.75rem',
+        }
+      )}>
+        <span style={composeStyles(
+          typography.transform('uppercase'),
+          typography.tracking.wide,
+          {
+            color: 'rgba(255,255,255,0.7)',
+          }
+        )}>{label}</span>
+        <span style={{
+          color: 'rgba(255,255,255,0.5)',
+          fontFamily: 'monospace',
+        }}>{formatValue(value)}</span>
       </div>
-      <input
-        type="range"
-        min={min}
-        max={max}
-        step={step}
-        value={value}
-        onChange={(e) => onChange(parseFloat(e.target.value))}
-        className="w-full h-1.5 bg-white/10 rounded-full appearance-none cursor-pointer accent-cyan-400/80"
-        style={{
-          background: `linear-gradient(to right, rgba(34, 211, 238, 0.3) 0%, rgba(34, 211, 238, 0.3) ${((value - min) / (max - min)) * 100}%, rgba(255, 255, 255, 0.1) ${((value - min) / (max - min)) * 100}%, rgba(255, 255, 255, 0.1) 100%)`,
-        }}
+      <MixxGlassSlider
+        value={normalizedValue}
+        onChange={handleChange}
+        min={0}
+        max={1}
+        step={step / (max - min)} // Normalize step
+        alsChannel="momentum"
+        size="sm"
+        showValue={false}
+        style={{ width: '100%' }}
       />
     </div>
   );
@@ -77,36 +107,93 @@ const DualSlider: React.FC<DualSliderProps> = ({
   formatValue = (v) => v.toFixed(2),
 }) => {
   return (
-    <div className="space-y-3">
-      <div className="flex items-center justify-between text-xs">
-        <span className="text-white/70 uppercase tracking-wide">{label}</span>
+    <div style={composeStyles(
+      spacing.gap(3),
+      {
+        display: 'flex',
+        flexDirection: 'column',
+      }
+    )}>
+      <div style={composeStyles(
+        layout.flex.container('row'),
+        layout.flex.align.center,
+        layout.flex.justify.between,
+        {
+          fontSize: '0.75rem',
+        }
+      )}>
+        <span style={composeStyles(
+          typography.transform('uppercase'),
+          typography.tracking.wide,
+          {
+            color: 'rgba(255,255,255,0.7)',
+          }
+        )}>{label}</span>
       </div>
-      <div className="space-y-2">
-        <div className="flex items-center gap-2">
-          <span className="text-[10px] text-white/50 w-16">Ambient</span>
-          <input
-            type="range"
-            min={min}
-            max={max}
-            step={step}
-            value={ambient}
-            onChange={(e) => onChange(parseFloat(e.target.value), active)}
-            className="flex-1 h-1 bg-white/10 rounded-full appearance-none cursor-pointer accent-cyan-400/60"
+      <div style={composeStyles(
+        spacing.gap(2),
+        {
+          display: 'flex',
+          flexDirection: 'column',
+        }
+      )}>
+        <div style={composeStyles(
+          layout.flex.container('row'),
+          layout.flex.align.center,
+          spacing.gap(2)
+        )}>
+          <span style={{
+            fontSize: '10px',
+            color: 'rgba(255,255,255,0.5)',
+            width: '64px',
+          }}>Ambient</span>
+          <MixxGlassSlider
+            value={(ambient - min) / (max - min)}
+            onChange={(normalized) => onChange(min + normalized * (max - min), active)}
+            min={0}
+            max={1}
+            step={step / (max - min)}
+            alsChannel="momentum"
+            size="sm"
+            showValue={false}
+            style={{ flex: 1 }}
           />
-          <span className="text-[10px] text-white/40 font-mono w-12 text-right">{formatValue(ambient)}</span>
+          <span style={{
+            fontSize: '10px',
+            color: 'rgba(255,255,255,0.4)',
+            fontFamily: 'monospace',
+            width: '48px',
+            textAlign: 'right',
+          }}>{formatValue(ambient)}</span>
         </div>
-        <div className="flex items-center gap-2">
-          <span className="text-[10px] text-white/50 w-16">Active</span>
-          <input
-            type="range"
-            min={min}
-            max={max}
-            step={step}
-            value={active}
-            onChange={(e) => onChange(ambient, parseFloat(e.target.value))}
-            className="flex-1 h-1 bg-white/10 rounded-full appearance-none cursor-pointer accent-cyan-400/80"
+        <div style={composeStyles(
+          layout.flex.container('row'),
+          layout.flex.align.center,
+          spacing.gap(2)
+        )}>
+          <span style={{
+            fontSize: '10px',
+            color: 'rgba(255,255,255,0.5)',
+            width: '64px',
+          }}>Active</span>
+          <MixxGlassSlider
+            value={(active - min) / (max - min)}
+            onChange={(normalized) => onChange(ambient, min + normalized * (max - min))}
+            min={0}
+            max={1}
+            step={step / (max - min)}
+            alsChannel="momentum"
+            size="sm"
+            showValue={false}
+            style={{ flex: 1 }}
           />
-          <span className="text-[10px] text-white/40 font-mono w-12 text-right">{formatValue(active)}</span>
+          <span style={{
+            fontSize: '10px',
+            color: 'rgba(255,255,255,0.4)',
+            fontFamily: 'monospace',
+            width: '48px',
+            textAlign: 'right',
+          }}>{formatValue(active)}</span>
         </div>
       </div>
     </div>
@@ -123,23 +210,83 @@ export const WaveformHeaderSettingsPanel: React.FC<WaveformHeaderSettingsPanelPr
   };
 
   return (
-    <div className="p-6 space-y-6 max-h-[70vh] overflow-y-auto">
-      <div className="flex items-center justify-between border-b border-white/10 pb-3">
-        <h3 className="text-sm font-semibold text-white uppercase tracking-wide">
+    <div style={composeStyles(
+      spacing.p(6),
+      spacing.gap(6),
+      layout.overflow.y.auto,
+      {
+        maxHeight: '70vh',
+        display: 'flex',
+        flexDirection: 'column',
+      }
+    )}>
+      <div style={composeStyles(
+        layout.flex.container('row'),
+        layout.flex.align.center,
+        layout.flex.justify.between,
+        effects.border.bottom(),
+        spacing.pb(3),
+        {
+          borderBottom: '1px solid rgba(255,255,255,0.1)',
+        }
+      )}>
+        <h3 style={composeStyles(
+          typography.weight('semibold'),
+          typography.transform('uppercase'),
+          typography.tracking.wide,
+          {
+            fontSize: '0.875rem',
+            color: 'white',
+          }
+        )}>
           Waveform Header
         </h3>
         <button
           onClick={onReset}
-          className="text-xs text-white/50 hover:text-cyan-300 transition-colors uppercase tracking-wide"
+          style={composeStyles(
+            typography.transform('uppercase'),
+            typography.tracking.wide,
+            transitions.transition.standard('color', 200, 'ease-out'),
+            {
+              fontSize: '0.75rem',
+              color: 'rgba(255,255,255,0.5)',
+            }
+          )}
+          onMouseEnter={(e) => {
+            e.currentTarget.style.color = 'rgba(103, 232, 249, 1)';
+          }}
+          onMouseLeave={(e) => {
+            e.currentTarget.style.color = 'rgba(255,255,255,0.5)';
+          }}
         >
           Reset
         </button>
       </div>
 
       {/* Amplitude Section */}
-      <div className="space-y-4">
-        <h4 className="text-xs text-white/50 uppercase tracking-wider">Amplitude</h4>
-        <div className="space-y-3 pl-2">
+      <div style={composeStyles(
+        spacing.gap(4),
+        {
+          display: 'flex',
+          flexDirection: 'column',
+        }
+      )}>
+        <h4 style={composeStyles(
+          typography.transform('uppercase'),
+          typography.tracking.wider,
+          {
+            fontSize: '0.75rem',
+            color: 'rgba(255,255,255,0.5)',
+          }
+        )}>Amplitude</h4>
+        <div style={composeStyles(
+          spacing.gap(3),
+          spacing.pl(2),
+          {
+            display: 'flex',
+            flexDirection: 'column',
+          }
+        )}>
           <Slider
             label="Base Height"
             value={settings.baseAmplitude}
@@ -171,9 +318,29 @@ export const WaveformHeaderSettingsPanel: React.FC<WaveformHeaderSettingsPanelPr
       </div>
 
       {/* Thickness Section */}
-      <div className="space-y-4">
-        <h4 className="text-xs text-white/50 uppercase tracking-wider">Thickness</h4>
-        <div className="space-y-3 pl-2">
+      <div style={composeStyles(
+        spacing.gap(4),
+        {
+          display: 'flex',
+          flexDirection: 'column',
+        }
+      )}>
+        <h4 style={composeStyles(
+          typography.transform('uppercase'),
+          typography.tracking.wider,
+          {
+            fontSize: '0.75rem',
+            color: 'rgba(255,255,255,0.5)',
+          }
+        )}>Thickness</h4>
+        <div style={composeStyles(
+          spacing.gap(3),
+          spacing.pl(2),
+          {
+            display: 'flex',
+            flexDirection: 'column',
+          }
+        )}>
           <DualSlider
             label="Main Stroke"
             ambient={settings.mainStrokeWidth.ambient}
@@ -208,9 +375,29 @@ export const WaveformHeaderSettingsPanel: React.FC<WaveformHeaderSettingsPanelPr
       </div>
 
       {/* Visual Effects Section */}
-      <div className="space-y-4">
-        <h4 className="text-xs text-white/50 uppercase tracking-wider">Visual Effects</h4>
-        <div className="space-y-3 pl-2">
+      <div style={composeStyles(
+        spacing.gap(4),
+        {
+          display: 'flex',
+          flexDirection: 'column',
+        }
+      )}>
+        <h4 style={composeStyles(
+          typography.transform('uppercase'),
+          typography.tracking.wider,
+          {
+            fontSize: '0.75rem',
+            color: 'rgba(255,255,255,0.5)',
+          }
+        )}>Visual Effects</h4>
+        <div style={composeStyles(
+          spacing.gap(3),
+          spacing.pl(2),
+          {
+            display: 'flex',
+            flexDirection: 'column',
+          }
+        )}>
           <DualSlider
             label="Glow Intensity"
             ambient={settings.glowIntensity.ambient}
@@ -244,9 +431,29 @@ export const WaveformHeaderSettingsPanel: React.FC<WaveformHeaderSettingsPanelPr
       </div>
 
       {/* Animation Section */}
-      <div className="space-y-4">
-        <h4 className="text-xs text-white/50 uppercase tracking-wider">Animation</h4>
-        <div className="space-y-3 pl-2">
+      <div style={composeStyles(
+        spacing.gap(4),
+        {
+          display: 'flex',
+          flexDirection: 'column',
+        }
+      )}>
+        <h4 style={composeStyles(
+          typography.transform('uppercase'),
+          typography.tracking.wider,
+          {
+            fontSize: '0.75rem',
+            color: 'rgba(255,255,255,0.5)',
+          }
+        )}>Animation</h4>
+        <div style={composeStyles(
+          spacing.gap(3),
+          spacing.pl(2),
+          {
+            display: 'flex',
+            flexDirection: 'column',
+          }
+        )}>
           <DualSlider
             label="Phase Speed"
             ambient={settings.phaseSpeed.ambient}
@@ -269,9 +476,29 @@ export const WaveformHeaderSettingsPanel: React.FC<WaveformHeaderSettingsPanelPr
       </div>
 
       {/* Waveform Generation Section */}
-      <div className="space-y-4">
-        <h4 className="text-xs text-white/50 uppercase tracking-wider">Waveform Shape</h4>
-        <div className="space-y-3 pl-2">
+      <div style={composeStyles(
+        spacing.gap(4),
+        {
+          display: 'flex',
+          flexDirection: 'column',
+        }
+      )}>
+        <h4 style={composeStyles(
+          typography.transform('uppercase'),
+          typography.tracking.wider,
+          {
+            fontSize: '0.75rem',
+            color: 'rgba(255,255,255,0.5)',
+          }
+        )}>Waveform Shape</h4>
+        <div style={composeStyles(
+          spacing.gap(3),
+          spacing.pl(2),
+          {
+            display: 'flex',
+            flexDirection: 'column',
+          }
+        )}>
           <Slider
             label="Fundamental"
             value={settings.fundamentalStrength}

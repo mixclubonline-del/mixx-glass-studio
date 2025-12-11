@@ -8,6 +8,8 @@
  * @version 1.0.0 - Phase 3 WASM DSP Integration
  */
 
+import { als } from '../../utils/alsFeedback';
+
 export type DSPBackend = 'wasm' | 'worklet' | 'js';
 
 export interface DSPBackendStatus {
@@ -107,7 +109,6 @@ class WASMDSPManager {
             performanceHint: 'AudioWorklet backend active - Optimized processing ready for WASM upgrade',
           };
           
-          console.log('🔮 WASM DSP Manager: AudioWorklet backend active (WASM-ready architecture)');
           return;
         }
       }
@@ -122,7 +123,6 @@ class WASMDSPManager {
           performanceHint: 'AudioWorklet backend active - Optimized processing',
         };
         
-        console.log('🔮 WASM DSP Manager: AudioWorklet backend active');
         return;
       }
       
@@ -134,8 +134,6 @@ class WASMDSPManager {
         latency: 2.0, // JS processing latency estimate
         performanceHint: 'JS backend active - Consider using Chrome/Edge for AudioWorklet acceleration',
       };
-      
-      console.log('🔮 WASM DSP Manager: JS backend active (fallback)');
     } catch (error) {
       this.status = {
         backend: 'js',
@@ -145,7 +143,7 @@ class WASMDSPManager {
         error: error instanceof Error ? error.message : String(error),
       };
       
-      console.error('[WASM DSP Manager] Initialization failed:', error);
+      als.error('[WASM DSP Manager] Initialization failed', error);
       throw error;
     } finally {
       this.initializationPromise = null;

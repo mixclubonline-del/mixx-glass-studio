@@ -1,3 +1,5 @@
+import { als } from '../utils/alsFeedback';
+
 export async function createDitherNode(
   context: AudioContext | OfflineAudioContext
 ): Promise<AudioWorkletNode | GainNode> {
@@ -16,7 +18,7 @@ export async function createDitherNode(
         }
       );
     } catch (error) {
-      console.warn('[VELVET DITHER] Falling back to noise generator', error);
+      // AudioWorklet failed - gain node fallback will be used (expected)
     }
   }
 

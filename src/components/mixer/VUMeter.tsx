@@ -1,6 +1,6 @@
 
-
 import React, { useState, useEffect, useRef } from 'react';
+import { spacing, typography, layout, effects, transitions, composeStyles } from '../../design-system';
 
 interface VUMeterProps {
     level: number; // RMS level, 0 to 1
@@ -48,8 +48,17 @@ const VUMeter: React.FC<VUMeterProps> = ({ level }) => {
     const angle = dbNormalized * 90 - 45;
 
     return (
-        <div className="w-full h-full flex items-center justify-center">
-            <svg viewBox="0 0 100 60" className="w-full h-auto">
+        <div style={composeStyles(
+          layout.width.full,
+          { height: '100%' },
+          layout.flex.container('row'),
+          layout.flex.align.center,
+          layout.flex.justify.center
+        )}>
+            <svg viewBox="0 0 100 60" style={composeStyles(
+              layout.width.full,
+              { height: 'auto' }
+            )}>
                 {/* Background Arc */}
                 <path d="M 10 50 A 40 40 0 0 1 90 50" stroke="#4a4a4a" strokeWidth="2" fill="none" />
 

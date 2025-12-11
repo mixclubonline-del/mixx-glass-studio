@@ -1,7 +1,7 @@
 
 import React, { useState, useRef, useCallback, useEffect } from 'react';
 import { PluginPosition, PluginSize, GlobalSettings } from '../../types';
-import { motion } from 'framer-motion';
+import { useFlowMotion } from '../../../../components/mixxglass';
 import { mapRange } from '../../lib/utils'; // Import mapRange
 
 interface ResizableContainerProps {
@@ -157,25 +157,30 @@ export const ResizableContainer: React.FC<ResizableContainerProps> = ({
   // Dynamic z-index to bring active plugin to front
   const currentZIndex = (isDragging || isResizing) ? zIndex + 10 : zIndex;
 
-  // Calculate dynamic Framer Motion transition properties
-  const dynamicStiffness = mapRange(globalSettings.animationIntensity, 0, 100, 200, 500);
-  const dynamicDamping = mapRange(globalSettings.animationIntensity, 0, 100, 40, 20);
+  // Calculate dynamic transition duration based on animation intensity
+  const dynamicDuration = mapRange(globalSettings.animationIntensity, 0, 100, 400, 200);
+
+  // Animate position and size changes
+  const animatedStyle = useFlowMotion(
+    { x: position.x, y: position.y, width: size.width, height: size.height },
+    { duration: dynamicDuration, easing: 'ease-out' }
+  );
 
   return (
-    <motion.div
+    <div
       ref={containerRef}
       className={`
         absolute rounded-2xl border-2
         ${isDragging ? 'border-cyan-500 shadow-lg shadow-cyan-500/50' : 'border-transparent'} 
         ${isResizing ? '!border-pink-500 shadow-lg shadow-pink-500/50' : ''}
       `}
-      style={{ zIndex: currentZIndex }}
-      layoutId={layoutId}
-      initial={{ x: initialPosition.x, y: initialPosition.y, width: initialSize.width, height: initialSize.height }}
-      animate={{ x: position.x, y: position.y, width: size.width, height: size.height }}
-      transition={{ type: 'spring', stiffness: dynamicStiffness, damping: dynamicDamping }}
-      onMouseDown={handleDragMouseDown} // Attach drag handler to the container itself
-      onAnimationComplete={onAnimationComplete}
+      style={{
+        zIndex: currentZIndex,
+        transform: `translate(${animatedStyle.x}px, ${animatedStyle.y}px)`,
+        width: `${animatedStyle.width}px`,
+        height: `${animatedStyle.height}px`,
+      }}
+      onMouseDown={handleDragMouseDown}
     >
       {childWithProps}
       <div
@@ -185,6 +190,6 @@ export const ResizableContainer: React.FC<ResizableContainerProps> = ({
       >
         <svg className="w-3 h-3" fill="currentColor" viewBox="0 0 20 20"><path d="M10 18a8 8 0 100-16 8 8 0 000 16zM6 9a1 1 0 000 2h8a1 1 0 100-2H6z"/></svg>
       </div>
-    </motion.div>
+    </div>
   );
 };

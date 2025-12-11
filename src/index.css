@@ -1,12 +1,45 @@
-@import url("https://fonts.googleapis.com/css2?family=Orbitron:wght@400;700&display=swap");
+/* Orbitron font - self-hosted to remove Google Fonts dependency */
+@font-face {
+  font-family: "Orbitron";
+  font-style: normal;
+  font-weight: 400;
+  font-display: swap;
+  src: url("/fonts/orbitron-v31-latin-regular.woff2") format("woff2"),
+       url("/fonts/orbitron-v31-latin-regular.woff") format("woff");
+}
+
+@font-face {
+  font-family: "Orbitron";
+  font-style: normal;
+  font-weight: 700;
+  font-display: swap;
+  src: url("/fonts/orbitron-v31-latin-700.woff2") format("woff2"),
+       url("/fonts/orbitron-v31-latin-700.woff") format("woff");
+}
 
 @tailwind base;
 @tailwind components;
 @tailwind utilities;
 
+/* Mixx button styles are imported in index.tsx */
+
 :root {
   color-scheme: dark;
-  font-family: "Inter", "SF Pro Display", "Segoe UI", system-ui, -apple-system, BlinkMacSystemFont, sans-serif;
+  font-family: "Inter Variable", "Inter", "SF Pro Display", "Segoe UI", system-ui, -apple-system, BlinkMacSystemFont, sans-serif;
+  
+  /* Professional color system */
+  --bg: #F6F6FA;
+  --glass-tint: rgba(238, 232, 255, 0.56);
+  --glass-border: rgba(255, 255, 255, 0.55);
+  --accent: #8B7BFF;
+  --accent-strong: #6E56FF;
+  --muted: #4B4B57;
+  --elevation-shadow: 0 8px 30px rgba(26, 21, 44, 0.08);
+  --glass-inset: inset 0 1px 0 rgba(255, 255, 255, 0.45);
+  --als-glow: #A98EFF;
+  --als-glow-gradient: linear-gradient(180deg, #D9D3FF, #9C8BFF);
+  
+  /* Legacy support (gradual migration) */
   --bg-gradient-start: #040d1f;
   --bg-gradient-end: #0d1f3c;
   --bg-glow-color: rgba(72, 132, 255, 0.32);
@@ -14,11 +47,11 @@
   --als-glow-color: rgba(96, 200, 255, 0.65);
   --glass-surface: rgba(9, 18, 36, 0.82);
   --glass-surface-soft: rgba(12, 24, 46, 0.68);
-  --glass-border: rgba(102, 140, 198, 0.45);
+  --glass-border-legacy: rgba(102, 140, 198, 0.45);
   --glass-border-soft: rgba(102, 140, 198, 0.26);
   --glass-shadow: 0 35px 80px rgba(4, 12, 26, 0.58);
-  --ink-foreground: #e6f0ff;
-  --ink-muted: rgba(196, 210, 240, 0.72);
+  --ink-foreground: #111111;
+  --ink-muted: #4B4B57;
 }
 
 body {

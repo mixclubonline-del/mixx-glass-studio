@@ -9,7 +9,7 @@
  */
 
 import React, { useState, useEffect, useRef } from 'react';
-import { motion, AnimatePresence } from 'framer-motion';
+import { useAnimatePresence, AnimatePresence, usePulseAnimation } from '../mixxglass';
 import { getThermalColor } from '../../core/als/colors';
 import type { FlowPulseResult } from '../../core/pulse/flowPulseEngine';
 import './ImportInspector.css';
@@ -177,11 +177,6 @@ export function ImportInspector({
     };
   }, [visible]);
   
-  if (!visible) return null;
-  
-  const activeStep = steps.find(s => !s.done);
-  const guidanceText = primeBrainGuidance || activeStep?.hint || 'Preparing arrangement...';
-  
   // Get temperature color
   const getTemperatureColor = () => {
     switch (alsTemperature) {
@@ -197,14 +192,25 @@ export function ImportInspector({
     }
   };
   
+  // Hook must be called before any conditional returns
+  const overlayAnimation = useAnimatePresence({
+    isVisible: visible,
+    initial: { opacity: 0 },
+    animate: { opacity: 1 },
+    exit: { opacity: 0 },
+    transition: { duration: 300 },
+  });
+  
+  if (!visible) return null;
+  
+  const activeStep = steps.find(s => !s.done);
+  const guidanceText = primeBrainGuidance || activeStep?.hint || 'Preparing arrangement...';
+
   return (
     <AnimatePresence>
-      <motion.div
+      <div
         className="flow-import-overlay"
-        initial={{ opacity: 0 }}
-        animate={{ opacity: 1 }}
-        exit={{ opacity: 0 }}
-        transition={{ duration: 0.3 }}
+        style={overlayAnimation.style}
       >
         {/* Flow Fingerprint Canvas (Spectral Halo Animation) */}
         <canvas
@@ -222,13 +228,7 @@ export function ImportInspector({
         />
         
         {/* Main glass panel */}
-        <motion.div
-          className="flow-import-glass"
-          initial={{ scale: 0.96, opacity: 0 }}
-          animate={{ scale: 1, opacity: 1 }}
-          exit={{ scale: 0.96, opacity: 0 }}
-          transition={{ duration: 0.4, ease: [0.25, 0.46, 0.45, 0.94] }}
-        >
+        <ImportGlassPanel>
           {/* ALS bar at top */}
           <div className="flow-import-als-bar">
             <div className="flow-import-als-label">FLOW</div>
@@ -258,88 +258,170 @@ export function ImportInspector({
               const isDone = step.done;
               
               return (
-                <motion.div
+                <ImportStep
                   key={index}
-                  className={`flow-step ${isDone ? 'done' : ''} ${isActive ? 'active' : ''}`}
-                  initial={{ opacity: 0.6, x: -20 }}
-                  animate={{ 
-                    opacity: isDone ? 1 : isActive ? 0.9 : 0.6,
-                    x: 0,
-                  }}
-                  transition={{ duration: 0.3, delay: index * 0.1 }}
-                >
-                  <div className="flow-step-indicator">
-                    {isDone ? (
-                      <motion.div
-                        className="flow-step-check"
-                        initial={{ scale: 0 }}
-                        animate={{ scale: 1 }}
-                        transition={{ type: 'spring', stiffness: 500, damping: 25 }}
-                      >
-                        ✓
-                      </motion.div>
-                    ) : (
-                      <motion.div
-                        className={`flow-step-dot ${isActive ? 'breathing' : ''}`}
-                        animate={isActive ? {
-                          scale: breathingScale,
-                          opacity: [0.7, 1, 0.7],
-                        } : {}}
-                        transition={isActive ? {
-                          duration: 1.8,
-                          repeat: Infinity,
-                          ease: 'easeInOut',
-                        } : {}}
-                        style={{
-                          boxShadow: isActive 
-                            ? `0 0 12px ${getTemperatureColor()}65`
-                            : '0 0 8px rgba(203, 170, 255, 0.3)',
-                        }}
-                      />
-                    )}
-                  </div>
-                  <span className="flow-step-label">{step.label}</span>
-                  {step.progress !== undefined && step.progress > 0 && step.progress < 100 && (
-                    <div className="flow-step-progress">
-                      <div 
-                        className="flow-step-progress-bar"
-                        style={{ width: `${step.progress}%` }}
-                      />
-                    </div>
-                  )}
-                </motion.div>
+                  isDone={isDone}
+                  isActive={isActive}
+                  index={index}
+                  step={step}
+                  breathingScale={breathingScale}
+                  getTemperatureColor={getTemperatureColor}
+                />
               );
             })}
           </div>
           
           {/* Prime Brain Guidance */}
-          <motion.div
-            className="flow-import-guidance"
-            key={guidanceText}
-            initial={{ opacity: 0, y: 10 }}
-            animate={{ opacity: 0.8, y: 0 }}
-            exit={{ opacity: 0, y: -10 }}
-            transition={{ duration: 0.4 }}
-          >
-            {guidanceText}
-          </motion.div>
+          <ImportGuidance guidanceText={guidanceText} />
           
           {/* Orbital glow rings */}
-          <div className="flow-import-orbits">
-            <motion.div
-              className="flow-orbit-ring ring-1"
-              animate={{ rotate: 360 }}
-              transition={{ duration: 20, repeat: Infinity, ease: 'linear' }}
-            />
-            <motion.div
-              className="flow-orbit-ring ring-2"
-              animate={{ rotate: -360 }}
-              transition={{ duration: 30, repeat: Infinity, ease: 'linear' }}
-            />
-          </div>
-        </motion.div>
-      </motion.div>
+          <ImportOrbitRings />
+        </ImportGlassPanel>
+      </div>
     </AnimatePresence>
   );
 }
+
+// Component for import glass panel
+const ImportGlassPanel: React.FC<{
+  children: React.ReactNode;
+}> = ({ children }) => {
+  const panelAnimation = useAnimatePresence({
+    isVisible: true,
+    initial: { scale: 0.96, opacity: 0 },
+    animate: { scale: 1, opacity: 1 },
+    exit: { scale: 0.96, opacity: 0 },
+    transition: { duration: 400, easing: 'cubic-bezier(0.25, 0.46, 0.45, 0.94)' },
+  });
+
+  return (
+    <div
+      className="flow-import-glass"
+      style={{
+        transform: `scale(${panelAnimation.style.scale})`,
+        opacity: panelAnimation.style.opacity,
+      }}
+    >
+      {children}
+    </div>
+  );
+};
+
+// Component for import step
+const ImportStep: React.FC<{
+  isDone: boolean;
+  isActive: boolean;
+  index: number;
+  step: ImportStep;
+  breathingScale: number;
+  getTemperatureColor: () => string;
+}> = ({ isDone, isActive, index, step, breathingScale, getTemperatureColor }) => {
+  const stepAnimation = useAnimatePresence({
+    isVisible: true,
+    initial: { opacity: 0.6, x: -20 },
+    animate: { 
+      opacity: isDone ? 1 : isActive ? 0.9 : 0.6,
+      x: 0,
+    },
+    transition: { duration: 300, delay: index * 100 },
+  });
+
+  const checkAnimation = useAnimatePresence({
+    isVisible: isDone,
+    initial: { scale: 0 },
+    animate: { scale: 1 },
+    transition: { duration: 300, easing: 'ease-out' },
+  });
+
+  const dotOpacity = usePulseAnimation(0.7, 1, 1800, 'ease-in-out');
+  const dotScale = usePulseAnimation(1, breathingScale, 1800, 'ease-in-out');
+
+  return (
+    <div
+      className={`flow-step ${isDone ? 'done' : ''} ${isActive ? 'active' : ''}`}
+      style={{
+        opacity: stepAnimation.style.opacity,
+        transform: `translateX(${stepAnimation.style.x}px)`,
+      }}
+    >
+      <div className="flow-step-indicator">
+        {isDone ? (
+          <div
+            className="flow-step-check"
+            style={{
+              transform: `scale(${checkAnimation.style.scale})`,
+            }}
+          >
+            ✓
+          </div>
+        ) : (
+          <div
+            className={`flow-step-dot ${isActive ? 'breathing' : ''}`}
+            style={{
+              transform: isActive ? `scale(${dotScale})` : 'scale(1)',
+              opacity: isActive ? dotOpacity : 0.6,
+              boxShadow: isActive 
+                ? `0 0 12px ${getTemperatureColor()}65`
+                : '0 0 8px rgba(203, 170, 255, 0.3)',
+            }}
+          />
+        )}
+      </div>
+      <span className="flow-step-label">{step.label}</span>
+      {step.progress !== undefined && step.progress > 0 && step.progress < 100 && (
+        <div className="flow-step-progress">
+          <div 
+            className="flow-step-progress-bar"
+            style={{ width: `${step.progress}%` }}
+          />
+        </div>
+      )}
+    </div>
+  );
+};
+
+// Component for import guidance
+const ImportGuidance: React.FC<{
+  guidanceText: string;
+}> = ({ guidanceText }) => {
+  const guidanceAnimation = useAnimatePresence({
+    isVisible: true,
+    initial: { opacity: 0, y: 10 },
+    animate: { opacity: 0.8, y: 0 },
+    exit: { opacity: 0, y: -10 },
+    transition: { duration: 400 },
+  });
+
+  return (
+    <div
+      className="flow-import-guidance"
+      style={guidanceAnimation.style}
+    >
+      {guidanceText}
+    </div>
+  );
+};
+
+// Component for import orbit rings
+const ImportOrbitRings: React.FC = () => {
+  const ring1Rotation = usePulseAnimation(0, 360, 20000, 'linear');
+  const ring2Rotation = usePulseAnimation(0, -360, 30000, 'linear');
+
+  return (
+    <div className="flow-import-orbits">
+      <div
+        className="flow-orbit-ring ring-1"
+        style={{
+          transform: `rotate(${ring1Rotation}deg)`,
+        }}
+      />
+      <div
+        className="flow-orbit-ring ring-2"
+        style={{
+          transform: `rotate(${ring2Rotation}deg)`,
+        }}
+      />
+    </div>
+  );
+};
 

@@ -46,14 +46,11 @@ export class RevolutionaryStemEngine {
     classification: AudioClassification,
     options: RevolutionaryStemOptions = {}
   ): Promise<StemResult> {
-    console.log('[REVOLUTIONARY STEM] Starting revolutionary separation...');
-
     const useTransformer = options.useTransformer ?? false; // Default false until trained
     const useMusicalContext = options.useMusicalContext ?? true;
     const useFivePillars = options.useFivePillars ?? true;
 
     // Layer 1: Extract quantum features
-    console.log('[REVOLUTIONARY STEM] Extracting quantum features...');
     const features = await this.featureExtractor.extractFeatures(audioBuffer, {
       sampleRate: audioBuffer.sampleRate,
     });
@@ -61,7 +58,6 @@ export class RevolutionaryStemEngine {
     // Layer 2: Analyze musical context
     let context: MusicalContext | null = null;
     if (useMusicalContext) {
-      console.log('[REVOLUTIONARY STEM] Analyzing musical context...');
       context = await this.contextEngine.analyzeMusicalContext(audioBuffer);
     }
 
@@ -70,7 +66,6 @@ export class RevolutionaryStemEngine {
     
     if (useTransformer) {
       // Use transformer model (requires trained weights)
-      console.log('[REVOLUTIONARY STEM] Using quantum transformer model...');
       const transformerStems = await this.transformer.separate(features, audioBuffer);
       
       // Convert transformer output to StemResult format
@@ -106,7 +101,6 @@ export class RevolutionaryStemEngine {
       };
     } else if (context && useMusicalContext) {
       // Use musical context-aware separation
-      console.log('[REVOLUTIONARY STEM] Using musical context-aware separation...');
       const contextOptions: ContextAwareSeparationOptions = {
         classification,
         preferCleanSeparation: options.preferQuality,
@@ -130,13 +124,11 @@ export class RevolutionaryStemEngine {
       };
     } else {
       // Fallback: use quantum features for basic separation
-      console.log('[REVOLUTIONARY STEM] Using quantum feature-based separation...');
       result = await this.separateWithQuantumFeatures(audioBuffer, features);
     }
 
     // Layer 4: Apply Five Pillars post-processing
     if (useFivePillars && result) {
-      console.log('[REVOLUTIONARY STEM] Applying Five Pillars post-processing...');
       const fivePillarsOptions: FivePillarsPostProcessOptions = {
         applyToBass: true,
         applyToHarmonic: true,
@@ -147,7 +139,6 @@ export class RevolutionaryStemEngine {
       result = await applyFivePillarsToStems(result, fivePillarsOptions);
     }
 
-    console.log('[REVOLUTIONARY STEM] Separation complete');
     return result;
   }
 
@@ -177,10 +168,6 @@ export class RevolutionaryStemEngine {
     if (useMusicalContext) {
       context = await this.contextEngine.analyzeMusicalContext(audioBuffer);
     }
-
-    // Call the internal separation logic directly to avoid double feature extraction
-    const useTransformer = options.useTransformer ?? false;
-    const useFivePillars = options.useFivePillars ?? true;
 
     // Layer 3: Separate stems
     let result: StemResult;
@@ -312,7 +299,7 @@ export class RevolutionaryStemEngine {
       buffer.getChannelData(0).set(data);
       return buffer;
     } catch (error) {
-      console.warn('[REVOLUTIONARY STEM] Failed to convert Float32Array to AudioBuffer:', error);
+      // Conversion failed - return null (expected fallback, no ALS needed)
       return null;
     }
   }

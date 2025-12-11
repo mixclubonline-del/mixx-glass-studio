@@ -6,6 +6,7 @@
 import { useEffect, useRef, useState } from 'react';
 import { computeMeterReading, type MeterReading } from '../core/meters/meterUtils';
 import { detectTruePeakFromAnalyser } from '../core/meters/truePeak';
+import { als } from '../utils/alsFeedback';
 
 /**
  * Options for meter reading hook.
@@ -31,7 +32,7 @@ export interface UseMeterReadingOptions {
  *   analyser: trackNodes.preFaderMeter,
  *   enableTruePeak: true,
  *   onUpdate: (reading) => {
- *     console.log('Peak:', reading.peak, 'RMS:', reading.rms);
+ *     // Use reading.peak and reading.rms for ALS feedback
  *   }
  * });
  * ```
@@ -76,8 +77,7 @@ export function useMeterReading(options: UseMeterReadingOptions) {
             lastTruePeak = detectTruePeakFromAnalyser(currentAnalyser, oversampleFactor);
             meterReading.truePeak = lastTruePeak;
           } catch (err) {
-            // True peak computation failed, continue without it
-            console.warn('[FLOW METER] True peak detection failed:', err);
+            // True peak computation failed, continue without it (expected fallback)
           }
         }
 
@@ -91,7 +91,7 @@ export function useMeterReading(options: UseMeterReadingOptions) {
         // Schedule next update
         frameRef.current = requestAnimationFrame(update);
       } catch (err) {
-        console.error('[FLOW METER] Meter reading failed:', err);
+        als.error('[FLOW METER] Meter reading failed', err);
         setIsActive(false);
       }
     };

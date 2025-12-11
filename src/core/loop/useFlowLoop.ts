@@ -26,6 +26,7 @@ import { usePunchMode } from '../performance/punchMode';
 import { useAutoPunch } from '../performance/autoPunch';
 import { getBestTake } from '../performance/compBrain';
 import { hasAudioPlaying, isActuallyPlaying } from './audioLevelDetector';
+import { flowLoopLearning, recordActionFromSignals } from './flowLoopLearning';
 
 const LOOP_INTERVAL_MS = 40; // ~25fps, smooth but not excessive
 
@@ -72,6 +73,17 @@ export function useFlowLoop() {
       }
       
       let brainState = primeBrain.state;
+      
+      // Record actions for learning (after brain state is computed)
+      if (isActive) {
+        recordActionFromSignals({
+          ...signals,
+          flow: brainState.flow,
+          pulse: brainState.pulse,
+          tension: brainState.tension,
+          mode: brainState.mode,
+        });
+      }
       
       // Contextual adjustment: If no audio, reduce all values proportionally
       if (!hasAudio && signals.playing) {
@@ -166,13 +178,22 @@ export function useFlowLoop() {
           });
           
           // Step 4: Bloom prepares context (pre-charge, doesn't open)
+          // Get learned patterns and predictions
+          const commonActions = flowLoopLearning.getCommonActions(10);
+          const predictions = flowLoopLearning.predictNextActions({
+            flow: brainState.flow,
+            pulse: brainState.pulse,
+            tension: brainState.tension,
+            mode: brainState.mode,
+          }, 5);
+          
           bloom.prepare({
             mode: brainState.mode,
             flow: brainState.flow,
             pulse: brainState.pulse,
             tension: brainState.tension,
-            commonActions: [], // TODO: Learn from user patterns
-            predictions: [], // TODO: Predict next steps
+            commonActions,
+            predictions,
           });
         } else {
           // No audio and no activity - reset ALS to zero

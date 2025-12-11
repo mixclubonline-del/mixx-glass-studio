@@ -1,5 +1,5 @@
 import React, { useEffect, useState } from 'react';
-import { motion } from 'framer-motion';
+import { useAnimatePresence, AnimatePresence } from '../mixxglass';
 
 interface StemSeparationModalProps {
   onClose: () => void;
@@ -51,23 +51,37 @@ const StemSeparationModal: React.FC<StemSeparationModalProps> = ({ onClose, onSe
     onSeparate(Array.from(selectedStems));
   };
 
+  const overlayAnimation = useAnimatePresence({
+    isVisible: true,
+    initial: { opacity: 0 },
+    animate: { opacity: 1 },
+    exit: { opacity: 0 },
+    transition: { duration: 300, easing: 'cubic-bezier(0.25, 0.46, 0.45, 0.94)' },
+  });
+
+  const modalAnimation = useAnimatePresence({
+    isVisible: true,
+    initial: { opacity: 0, scale: 0.96 },
+    animate: { opacity: 1, scale: 1 },
+    exit: { opacity: 0, scale: 0.96 },
+    transition: { duration: 350, easing: 'cubic-bezier(0.25, 0.46, 0.45, 0.94)' },
+  });
+
   return (
-    <motion.div
-      initial={{ opacity: 0 }}
-      animate={{ opacity: 1 }}
-      exit={{ opacity: 0 }}
-      transition={{ duration: 0.3, ease: [0.25, 0.46, 0.45, 0.94] }}
-      className="fixed inset-0 z-[100] flex items-center justify-center bg-black/70 backdrop-blur-md"
-      onClick={onClose}
-    >
-      <motion.div
-        initial={{ opacity: 0, scale: 0.96 }}
-        animate={{ opacity: 1, scale: 1 }}
-        exit={{ opacity: 0, scale: 0.96 }}
-        transition={{ duration: 0.35, ease: [0.25, 0.46, 0.45, 0.94] }}
-        className="relative flex max-h-[80vh] w-[480px] flex-col rounded-2xl border border-indigo-500/50 bg-gradient-to-br from-indigo-900/50 to-purple-900/50 p-6 shadow-2xl shadow-indigo-500/20"
-        onClick={(event) => event.stopPropagation()}
+    <AnimatePresence>
+      <div
+        className="fixed inset-0 z-[100] flex items-center justify-center bg-black/70 backdrop-blur-md"
+        onClick={onClose}
+        style={overlayAnimation.style}
       >
+        <div
+          className="relative flex max-h-[80vh] w-[480px] flex-col rounded-2xl border border-indigo-500/50 bg-gradient-to-br from-indigo-900/50 to-purple-900/50 p-6 shadow-2xl shadow-indigo-500/20"
+          onClick={(event) => event.stopPropagation()}
+          style={{
+            opacity: modalAnimation.style.opacity,
+            transform: `scale(${modalAnimation.style.scale})`,
+          }}
+        >
         <h2 className="mb-2 text-center text-xl font-bold tracking-[0.4em] text-gray-200">
           STEM SEPARATION
         </h2>
@@ -111,8 +125,9 @@ const StemSeparationModal: React.FC<StemSeparationModalProps> = ({ onClose, onSe
             </button>
           </div>
         </form>
-      </motion.div>
-    </motion.div>
+      </div>
+    </div>
+    </AnimatePresence>
   );
 };
 

@@ -49,7 +49,7 @@ export const useMidi = () => {
         midiAccess.onstatechange = null;
       }
     };
-  // eslint-disable-next-line react-hooks/exhaustive-deps
+   
   }, []); 
 
   useEffect(() => {

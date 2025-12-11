@@ -5,6 +5,7 @@ import { WaveformRenderer } from "../WaveformRenderer";
 import { hexToRgba, TrackALSFeedback } from "../../utils/ALS";
 import { findNearestZeroCrossing } from "../../utils/zeroCrossing";
 import { XIcon, DuplicateIcon, SplitIcon, MergeIcon, SlidersIcon, BulbIcon } from "../icons";
+import { als } from "../../utils/alsFeedback";
 
 type ZoomPresetKey = "macro" | "focus" | "micro";
 
@@ -145,7 +146,7 @@ const ClipEditSurface: React.FC<ClipEditSurfaceProps> = ({
   const alignToZero = useCallback(
     (edge: "start" | "end") => {
       if (!audioBuffer) {
-        console.warn("[ClipEdit] No buffer available for zero alignment.");
+        // No buffer available - expected in some scenarios (no ALS needed)
         return;
       }
       const sourceOffset =
@@ -156,7 +157,7 @@ const ClipEditSurface: React.FC<ClipEditSurfaceProps> = ({
         windowSec: 0.006,
       });
       if (zeroTime === null) {
-        console.warn("[ClipEdit] Zero crossing not found within tolerance.");
+        // Zero crossing not found - expected in some scenarios (no ALS needed)
         return;
       }
 

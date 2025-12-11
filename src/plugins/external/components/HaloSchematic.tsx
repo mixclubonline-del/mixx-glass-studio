@@ -2,7 +2,6 @@
 import React from 'react';
 import { HALO_SCHEMATIC_RINGS, findPlugin, PluginKey, PLUGIN_TIERS } from '../constants'; 
 import { SessionContext, PluginStates, SpecificPluginSettingsMap } from '../types';
-import { motion } from 'framer-motion';
 
 interface HaloSchematicProps {
   setActivePlugin: (plugin: PluginKey) => void;
@@ -127,12 +126,10 @@ export const HaloSchematic: React.FC<HaloSchematicProps> = ({ setActivePlugin, s
                 const scaledNodeSize = nodeSize * dynamicScale;
                 
                 return (
-                  <motion.div key={pluginKey} className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 group" 
+                  <div key={pluginKey} className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 group transition-transform hover:scale-125" 
                     style={{ 
                         transform: `translate(${pos.x}px, ${pos.y}px) rotate(-${ringIndex * 10}deg)`,
                     }}
-                    whileHover={{ scale: 1.25 }}
-                    transition={{ type: 'spring', stiffness: 400, damping: 20 }}
                   >
                     <div
                       className="w-full h-full rounded-full cursor-pointer relative transition-all duration-300 ease-out hover:shadow-cyan-400/50"
@@ -154,7 +151,7 @@ export const HaloSchematic: React.FC<HaloSchematicProps> = ({ setActivePlugin, s
                         <span className="font-bold block font-orbitron tracking-wider text-cyan-300">{plugin.name}</span>
                         <span className="text-white/80">{plugin.description}</span>
                     </div>
-                  </motion.div>
+                  </div>
                 );
               })}
             </div>

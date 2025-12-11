@@ -288,17 +288,8 @@ export const ArrangeWindow: React.FC<Props> = (props) => {
 
   const timelineViewportRef = useRef<HTMLDivElement>(null);
   const [viewportWidth, setViewportWidth] = useState(0);
-  // Debug: Log when tracks/clips props change
-  useEffect(() => {
-    console.log('[ArrangeWindow] Props updated:', {
-      tracksCount: tracks.length,
-      clipsCount: clips.length,
-      trackIds: tracks.map(t => t.id),
-      clipIds: clips.map(c => c.id),
-      clipTrackIds: clips.map(c => c.trackId),
-    });
-    console.log('[ARRANGE] Hydration Safe Layer Active');
-  }, [tracks, clips]);
+  // Track/clips props are monitored via React's dependency system
+  // No debug logging needed - ALS provides visual feedback
   
   const projectDuration = useMemo(() => clips.reduce((max, clip) => Math.max(max, clip.start + clip.duration), 60), [clips]);
   const contentWidth = useMemo(() => Math.max((projectDuration + 60) * pixelsPerSecond, 4000), [projectDuration, pixelsPerSecond]);

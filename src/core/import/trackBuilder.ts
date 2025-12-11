@@ -208,15 +208,10 @@ export function buildTrackAndClipFromStem(
 export function hydrateTrackToTimeline(track: TrackData, clip: ArrangeClip, buffer: AudioBuffer) {
   const { addTrack, addClip, setAudioBuffer } = useTimelineStore.getState();
   
-  console.log(`[FLOW IMPORT] Hydrating track "${track.trackName}" (${track.id}) with clip "${clip.name}" (${clip.id})`);
-  console.log(`[FLOW IMPORT] Buffer: ${buffer.duration.toFixed(2)}s, ${buffer.sampleRate}Hz, ${buffer.numberOfChannels}ch`);
-  
   // MUST be immutable updates inside addTrack/addClip.
   setAudioBuffer(clip.bufferId, buffer);
   addTrack(track);
   addClip(track.id, clip);
-  
-  console.log(`[FLOW IMPORT] Track "${track.trackName}" hydrated successfully`);
 }
 
 /**

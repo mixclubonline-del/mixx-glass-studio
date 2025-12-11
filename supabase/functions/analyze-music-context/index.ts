@@ -1,4 +1,5 @@
 import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
+import { callGeminiAPI, extractGeminiText } from "../_shared/gemini-api.ts";
 
 const corsHeaders = {
   'Access-Control-Allow-Origin': '*',
@@ -13,9 +14,9 @@ serve(async (req) => {
   try {
     const { chroma, bpm, timeSignature } = await req.json();
     
-    const LOVABLE_API_KEY = Deno.env.get('LOVABLE_API_KEY');
-    if (!LOVABLE_API_KEY) {
-      throw new Error('LOVABLE_API_KEY not configured');
+    const GEMINI_API_KEY = Deno.env.get('GEMINI_API_KEY');
+    if (!GEMINI_API_KEY) {
+      throw new Error('GEMINI_API_KEY not configured');
     }
 
     // Prepare context for AI
@@ -39,37 +40,24 @@ Based on this audio analysis, determine:
 
 Respond with musical theory knowledge to identify the key and chords accurately.`;
 
-    const response = await fetch('https://ai.gateway.lovable.dev/v1/chat/completions', {
-      method: 'POST',
-      headers: {
-        'Authorization': `Bearer ${LOVABLE_API_KEY}`,
-        'Content-Type': 'application/json',
-      },
-      body: JSON.stringify({
-        model: 'google/gemini-2.5-flash',
-        messages: [
-          {
-            role: 'system',
-            content: 'You are a music theory expert analyzing audio chromagrams. Provide concise, accurate musical analysis.'
-          },
-          {
-            role: 'user',
-            content: prompt
-          }
-        ],
-        temperature: 0.3,
-        max_tokens: 300
-      }),
-    });
+    // Call Gemini API directly
+    const geminiResponse = await callGeminiAPI({
+      model: 'gemini-2.5-flash',
+      messages: [
+        {
+          role: 'system',
+          content: 'You are a music theory expert analyzing audio chromagrams. Provide concise, accurate musical analysis.'
+        },
+        {
+          role: 'user',
+          content: prompt
+        }
+      ],
+      temperature: 0.3,
+      maxOutputTokens: 300
+    }, GEMINI_API_KEY);
 
-    if (!response.ok) {
-      const errorText = await response.text();
-      console.error('AI Gateway error:', response.status, errorText);
-      throw new Error(`AI Gateway error: ${response.status}`);
-    }
-
-    const aiData = await response.json();
-    const analysisText = aiData.choices[0].message.content;
+    const analysisText = extractGeminiText(geminiResponse);
 
     // Parse AI response
     const context = {

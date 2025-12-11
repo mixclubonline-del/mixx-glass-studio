@@ -100,7 +100,6 @@ export class MixxAuraEngine implements IAudioEngine {
 
     this.updateParameters();
     this.isInitialized = true;
-    console.log("🌌 MixxAuraEngine online");
   }
 
   isActive(): boolean {
@@ -181,6 +180,18 @@ export class MixxAuraEngine implements IAudioEngine {
 let instance: MixxAuraEngine | null = null;
 
 export function getMixxAuraEngine(context: BaseAudioContext | null = null): MixxAuraEngine {
+  // If instance exists but context is closed or different, dispose and recreate
+  if (instance) {
+    const existingContext = instance.audioContext;
+    const contextClosed = existingContext && 'state' in existingContext && existingContext.state === 'closed';
+    const contextChanged = context && existingContext && existingContext !== context;
+    
+    if (contextClosed || contextChanged) {
+      instance.dispose();
+      instance = null;
+    }
+  }
+  
   if (!instance) {
     instance = new MixxAuraEngine(context);
   }

@@ -15,6 +15,7 @@ import { createPhaseWeaveStage } from '../../audio/fivePillars';
 import { createVelvetCurveStage } from '../../audio/fivePillars';
 import type { MasteringProfile } from '../../types/sonic-architecture';
 import type { StemResult } from './stemEngine';
+import { als } from '../../utils/alsFeedback';
 
 export interface FivePillarsPostProcessOptions {
   profile?: MasteringProfile;
@@ -137,8 +138,8 @@ async function applyVelvetFloorToStem(
   try {
     return await ctx.startRendering();
   } catch (error) {
-    console.warn('[FIVE PILLARS] Velvet Floor processing failed:', error);
-    return buffer; // Return original if processing fails
+    // Velvet Floor processing failed - return original (expected fallback)
+    return buffer;
   }
 }
 
@@ -168,8 +169,8 @@ async function applyHarmonicLatticeToStem(
   try {
     return await ctx.startRendering();
   } catch (error) {
-    console.warn('[FIVE PILLARS] Harmonic Lattice processing failed:', error);
-    return buffer; // Return original if processing fails
+    // Harmonic Lattice processing failed - return original (expected fallback)
+    return buffer;
   }
 }
 
@@ -204,8 +205,8 @@ async function applyPhaseWeaveToStem(
   try {
     return await ctx.startRendering();
   } catch (error) {
-    console.warn('[FIVE PILLARS] Phase Weave processing failed:', error);
-    return buffer; // Return original if processing fails
+    // Phase Weave processing failed - return original (expected fallback)
+    return buffer;
   }
 }
 
@@ -232,8 +233,15 @@ async function applyVelvetCurveToStem(buffer: AudioBuffer): Promise<AudioBuffer>
   try {
     return await ctx.startRendering();
   } catch (error) {
-    console.warn('[FIVE PILLARS] Velvet Curve processing failed:', error);
-    return buffer; // Return original if processing fails
+    // Velvet Curve processing failed - return original (expected fallback)
+    return buffer;
   }
 }
+
+
+
+
+
+
+
 

@@ -50,7 +50,6 @@ export class QuantumStemFeatureExtractor {
     if (this.initialized) return;
     await this.qnn.initialize();
     this.initialized = true;
-    console.log('[QUANTUM STEM] Feature extractor initialized');
   }
 
   /**
@@ -465,4 +464,6 @@ export function getQuantumStemFeatureExtractor(): QuantumStemFeatureExtractor {
   }
   return globalExtractor;
 }
+
+
 

@@ -63,11 +63,17 @@ export function registerShortcut(id: string, config: ShortcutConfig, handler: Sh
 }
 
 export function unregisterShortcut(id: string) {
-  const index = shortcuts.findIndex((shortcut) => shortcut.id === id);
-  if (index >= 0) {
-    shortcuts.splice(index, 1);
+  // Remove all shortcuts with this ID (not just the first) to handle duplicates
+  let removed = false;
+  for (let i = shortcuts.length - 1; i >= 0; i--) {
+    if (shortcuts[i].id === id) {
+      shortcuts.splice(i, 1);
+      removed = true;
+    }
   }
-  detachListenerIfUnused();
+  if (removed) {
+    detachListenerIfUnused();
+  }
 }
 
 export function clearShortcuts() {

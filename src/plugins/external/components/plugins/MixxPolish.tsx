@@ -64,6 +64,18 @@ class MixxPolishVstBridge extends VstBridge<MixxPolishSettings> {
 // --- UI Components ---
 
 const CrystalVisualizer: React.FC<{ visualizerData: PolishVisualizerData | null }> = ({ visualizerData }) => {
+    // Hook must be called before any conditional returns
+    const sparkles = useMemo(() => {
+        if (!visualizerData) return [];
+        return Array.from({length: visualizerData.sparkleCount}).map((_, i) => ({
+        id: i,
+        left: `${Math.random() * 100}%`,
+        top: `${Math.random() * 100}%`,
+        animation: `sparkle-animation ${1 + Math.random() * 2}s infinite ease-in-out`,
+        animationDelay: `${Math.random() * 3}s`,
+    }));
+    }, [visualizerData?.sparkleCount]);
+
     if (!visualizerData) return <div className="relative w-full h-full" />;
 
     const {
@@ -76,14 +88,6 @@ const CrystalVisualizer: React.FC<{ visualizerData: PolishVisualizerData | null 
         crystalTransform,
         auraBackground
     } = visualizerData;
-
-    const sparkles = useMemo(() => Array.from({length: sparkleCount}).map((_, i) => ({
-        id: i,
-        left: `${Math.random() * 100}%`,
-        top: `${Math.random() * 100}%`,
-        animation: `sparkle-animation ${1 + Math.random() * 2}s infinite ease-in-out`,
-        animationDelay: `${Math.random() * 3}s`,
-    })), [sparkleCount]);
 
     return (
         <div className="relative w-full h-full flex items-center justify-center [perspective:600px]">

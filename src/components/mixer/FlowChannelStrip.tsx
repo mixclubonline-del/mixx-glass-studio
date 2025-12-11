@@ -5,7 +5,7 @@ import React, {
   useMemo,
   useState,
 } from "react";
-import { motion } from "framer-motion";
+import { useFlowMotion, usePulseAnimation } from "../mixxglass";
 import type {
   TrackData,
   MixerSettings,
@@ -18,18 +18,21 @@ import type { PluginPreset } from "../../utils/pluginState";
 import type { PluginInventoryItem } from "../../audio/pluginTypes";
 import FlowMeter from "./FlowMeter";
 import FlowFader from "./FlowFader";
+import { MixxGlassFader, MixxGlassMeter } from "../mixxglass";
 import { GlassFader } from "./GlassFader";
 import { ZMeter3D } from "./ZMeter3D";
 import { GlassPanOrb } from "./GlassPanOrb";
 import { WidthLens } from "./WidthLens";
 import { MicroTrim } from "./MicroTrim";
 import { MuteIcon, SoloIcon, ArmIcon } from "../icons";
+import { als } from "../../utils/alsFeedback";
 import {
   MIXER_STRIP_WIDTH,
   MIXER_STRIP_MIN_WIDTH,
   MIXER_STRIP_MAX_WIDTH,
   MIXER_STRIP_GAP_PX,
 } from "./mixerConstants";
+import { spacing, typography, layout, effects, transitions, composeStyles } from "../../design-system";
 
 interface ChannelDynamicsSettings {
   drive: number;
@@ -127,6 +130,103 @@ interface FlowChannelStripProps {
   followPlayhead?: boolean;
 }
 
+// Component for pulsing send indicator
+const PulsingSendIndicator: React.FC<{
+  level: number;
+  color: string;
+  glow: string;
+  isSelected: boolean;
+}> = ({ level, color, glow, isSelected }) => {
+  const pulseOpacity = usePulseAnimation(0.6, 1, 1400, 'ease-in-out');
+  return (
+    <div
+      style={composeStyles(
+        layout.position.absolute,
+        effects.border.radius.full,
+        {
+          inset: '0 0 0 0',
+          left: 0,
+          width: `${Math.min(1, Math.max(0, level)) * 100}%`,
+          background: `linear-gradient(90deg, ${hexToRgba(
+            color,
+            isSelected ? 0.95 : 0.75
+          )}, ${hexToRgba(glow, isSelected ? 0.55 : 0.35)})`,
+          boxShadow: `0 0 12px ${hexToRgba(glow, isSelected ? 0.45 : 0.3)}`,
+          opacity: pulseOpacity,
+        }
+      )}
+    />
+  );
+};
+
+// Component for action pulse animation
+const ActionPulseContainer: React.FC<{
+  actionPulse: ALSActionPulse | null | undefined;
+  children: React.ReactNode;
+}> = ({ actionPulse, children }) => {
+  const pulseGlow = usePulseAnimation(0.25, 0.4, 1400, 'ease-in-out');
+  const pulseHalo = usePulseAnimation(0.25, 0.4, 1400, 'ease-in-out');
+  
+  if (!actionPulse) {
+    return <>{children}</>;
+  }
+
+  const boxShadow = actionPulse
+    ? `0 0 ${8 + pulseGlow * 2}px ${hexToRgba(actionPulse.glow, 0.25 + pulseGlow * 0.15)}, 0 0 ${14 + pulseHalo * 8}px ${hexToRgba(actionPulse.halo, 0.25 + pulseHalo * 0.15)}`
+    : undefined;
+
+  return (
+    <div
+      style={composeStyles(
+        layout.flex.container('col'),
+        spacing.gap(2),
+        spacing.px(2),
+        spacing.py(2),
+        effects.border.radius.xl,
+        {
+          border: `1px solid ${hexToRgba(actionPulse.accent, 0.58)}`,
+          background: 'rgba(9,18,36,0.72)',
+          boxShadow,
+        }
+      )}
+    >
+      {children}
+    </div>
+  );
+};
+
+// Component for picker open animation
+const PickerOpenContainer: React.FC<{
+  isPickerOpen: boolean;
+  trackGlowColor: string;
+  children: React.ReactNode;
+}> = ({ isPickerOpen, trackGlowColor, children }) => {
+  const pulseGlow = usePulseAnimation(0.25, 0.4, 1200, 'ease-in-out');
+  
+  const boxShadow = isPickerOpen
+    ? `0 0 ${6 + pulseGlow * 2}px ${hexToRgba(trackGlowColor, 0.25 + pulseGlow * 0.15)}, 0 0 ${12 + pulseGlow * 6}px ${hexToRgba(trackGlowColor, 0.25 + pulseGlow * 0.15)}`
+    : undefined;
+
+  return (
+    <div
+      style={composeStyles(
+        layout.flex.container('col'),
+        spacing.gap(1),
+        spacing.px(2),
+        spacing.py(2),
+        effects.border.radius.xl,
+        {
+          border: '1px solid rgba(102, 140, 198, 0.45)',
+          background: 'rgba(9,18,36,0.75)',
+          boxShadow,
+        }
+      )}
+    >
+      {children}
+    </div>
+  );
+};
+
 const SendIndicator: React.FC<{
   label: string;
   fullLabel: string;
@@ -137,33 +237,57 @@ const SendIndicator: React.FC<{
   onChange?: (value: number) => void;
 }> = ({ label, fullLabel, level, color, glow, isSelected, onChange }) => (
   <div
-    className={`flex items-center gap-2 rounded-xl px-2 py-1 transition-colors ${
-      isSelected ? "bg-glass-surface-soft" : "bg-transparent"
-    }`}
+    style={composeStyles(
+      layout.flex.container('row'),
+      layout.flex.align.center,
+      spacing.gap(2),
+      spacing.px(2),
+      spacing.py(1),
+      effects.border.radius.xl,
+      transitions.transition.colors(200),
+      {
+        background: isSelected ? 'rgba(12,24,46,0.68)' : 'transparent',
+      }
+    )}
   >
     <div
-      className={`w-6 h-6 rounded-full border flex items-center justify-center text-[0.45rem] uppercase tracking-[0.3em] ${
-        isSelected
-          ? "border-cyan-300/70 text-cyan-100 bg-[rgba(16,50,95,0.6)]"
-          : "border-glass-border/60 text-ink/70"
-      }`}
+      style={composeStyles(
+        layout.flex.container('row'),
+        layout.flex.align.center,
+        layout.flex.justify.center,
+        effects.border.radius.full,
+        typography.transform('uppercase'),
+        typography.tracking.widest,
+        {
+          width: '24px',
+          height: '24px',
+          fontSize: '0.45rem',
+          border: isSelected
+            ? '1px solid rgba(103, 232, 249, 0.7)'
+            : '1px solid rgba(102, 140, 198, 0.6)',
+          color: isSelected ? 'rgba(207, 250, 254, 1)' : 'rgba(230, 240, 255, 0.7)',
+          background: isSelected ? 'rgba(16,50,95,0.6)' : 'transparent',
+        }
+      )}
       title={fullLabel}
     >
       {label}
     </div>
-    <div className="flex-1 h-1.5 bg-[rgba(9,18,36,0.6)] rounded-full overflow-hidden relative">
-      <motion.div
-        className="absolute inset-y-0 left-0 rounded-full"
-        style={{
-          width: `${Math.min(1, Math.max(0, level)) * 100}%`,
-          background: `linear-gradient(90deg, ${hexToRgba(
-            color,
-            isSelected ? 0.95 : 0.75
-          )}, ${hexToRgba(glow, isSelected ? 0.55 : 0.35)})`,
-          boxShadow: `0 0 12px ${hexToRgba(glow, isSelected ? 0.45 : 0.3)}`,
-        }}
-        animate={{ opacity: [0.6, 1, 0.6] }}
-        transition={{ duration: 1.4, repeat: Infinity, ease: "easeInOut" }}
+    <div style={composeStyles(
+      { flex: 1 },
+      layout.position.relative,
+      layout.overflow.hidden,
+      effects.border.radius.full,
+      {
+        height: '6px',
+        background: 'rgba(9,18,36,0.6)',
+      }
+    )}>
+      <PulsingSendIndicator
+        level={level}
+        color={color}
+        glow={glow}
+        isSelected={isSelected}
       />
       <input
         type="range"
@@ -174,13 +298,93 @@ const SendIndicator: React.FC<{
         onChange={(event) =>
           onChange?.(Math.min(1, Math.max(0, parseFloat(event.target.value))))
         }
-        className="absolute inset-0 w-full h-full opacity-0 cursor-pointer"
+        style={composeStyles(
+          layout.position.absolute,
+          { inset: 0 },
+          layout.width.full,
+          layout.height.full,
+          {
+            opacity: 0,
+            cursor: 'pointer',
+          }
+        )}
         onClick={(event) => event.stopPropagation()}
         aria-label={`Send level ${fullLabel}`}
       />
     </div>
   </div>
 );
+
+// Component for pulsing channel background
+const PulsingChannelBackground: React.FC<{
+  channelColor: string;
+  channelGlow: string;
+  intensity: number;
+}> = ({ channelColor, channelGlow, intensity }) => {
+  const pulseOpacity = usePulseAnimation({
+    duration: 2500,
+    minOpacity: 0.6,
+    maxOpacity: 1,
+    easing: 'ease-in-out',
+  });
+  return (
+    <div
+      style={composeStyles(
+        layout.position.absolute,
+        { inset: 0 },
+        {
+          background: `radial-gradient(circle at 50% 20%, ${hexToRgba(
+            channelGlow,
+            0.25 + intensity * 0.3
+          )} 0%, transparent 100%)`,
+          boxShadow: `inset 0 0 ${20 + intensity * 15}px ${hexToRgba(channelGlow, 0.15 + intensity * 0.25)}`,
+          opacity: pulseOpacity.opacity,
+        }
+      )}
+    />
+  );
+};
+
+// Component for pulsing pan indicator
+const PulsingPanIndicator: React.FC<{
+  pan: number;
+  channelColor: string;
+  channelGlow: string;
+  intensity: number;
+}> = ({ pan, channelColor, channelGlow, intensity }) => {
+  const pulseOpacity = usePulseAnimation({
+    duration: 2200,
+    minOpacity: 0.7,
+    maxOpacity: 1,
+    easing: 'ease-in-out',
+  });
+  
+  // Map pan from -1 to +1 to 0% to 100% position
+  const position = ((pan + 1) / 2) * 100;
+  
+  return (
+    <div
+      style={composeStyles(
+        layout.position.absolute,
+        transitions.transform.combine('translateX(-50%)'),
+        {
+          left: `${position}%`,
+          top: '50%',
+          width: '6px',
+          height: '6px',
+          borderRadius: '50%',
+          background: `radial-gradient(circle, ${hexToRgba(
+            channelGlow,
+            0.9 + intensity * 0.1
+          )} 0%, ${hexToRgba(channelColor, 0.6 + intensity * 0.2)} 100%)`,
+          boxShadow: `0 0 ${8 + intensity * 6}px ${hexToRgba(channelGlow, 0.6 + intensity * 0.3)}`,
+          opacity: pulseOpacity.opacity,
+          pointerEvents: 'none',
+        }
+      )}
+    />
+  );
+};
 
 const FlowChannelStrip: React.FC<FlowChannelStripProps> = memo(
   ({
@@ -347,7 +551,7 @@ const FlowChannelStrip: React.FC<FlowChannelStripProps> = memo(
         // Prevent adding core processors through UI (engine-level only)
         const CORE_PROCESSOR_IDS: FxWindowId[] = ['velvet-curve', 'phase-weave', 'velvet-floor', 'harmonic-lattice'];
         if (CORE_PROCESSOR_IDS.includes(pluginId)) {
-          console.warn(`[FLOW] Core processor ${pluginId} cannot be added via UI - it's engine-level only`);
+          als.warning(`[FLOW] Core processor ${pluginId} cannot be added via UI - it's engine-level only`);
           return;
         }
         onAddPlugin?.(track.id, pluginId);
@@ -452,61 +656,124 @@ const FlowChannelStrip: React.FC<FlowChannelStripProps> = memo(
       )} 0%, transparent 100%)`;
 
       return (
-        <div className="flex flex-1 gap-3">
-          <div className="flex flex-col flex-1 gap-3">
+        <div style={composeStyles(
+          layout.flex.container('row'),
+          { flex: 1 },
+          spacing.gap(3)
+        )}>
+          <div style={composeStyles(
+            layout.flex.container('col'),
+            { flex: 1 },
+            spacing.gap(3)
+          )}>
             <div
-              className="relative flex items-end justify-center rounded-xl border border-glass-border/70 bg-[rgba(8,18,34,0.72)] px-2 py-2"
-              style={{ height: `${meterHeight}px` }}
+              style={composeStyles(
+                layout.position.relative,
+                layout.flex.container('row'),
+                layout.flex.align.end,
+                layout.flex.justify.center,
+                spacing.px(2),
+                spacing.py(2),
+                effects.border.radius.xl,
+                {
+                  border: '1px solid rgba(102, 140, 198, 0.7)',
+                  background: 'rgba(8,18,34,0.72)',
+                  height: `${meterHeight}px`,
+                }
+              )}
             >
-              <div className="absolute inset-0 pointer-events-none">
+              <div style={composeStyles(
+                layout.position.absolute,
+                { inset: 0 },
+                { pointerEvents: 'none' }
+              )}>
                 <div
-                  className="absolute inset-0"
-                  style={{ background: primaryGlow, opacity: 0.75 }}
+                  style={composeStyles(
+                    layout.position.absolute,
+                    { inset: 0 },
+                    { background: primaryGlow, opacity: 0.75 }
+                  )}
                 />
                 <div
-                  className="absolute inset-0"
-                  style={{ background: accentGlow, opacity: 0.6 }}
+                  style={composeStyles(
+                    layout.position.absolute,
+                    { inset: 0 },
+                    { background: accentGlow, opacity: 0.6 }
+                  )}
                 />
               </div>
-              <div className="relative w-full flex items-end justify-center">
-                {/* Restored FlowMeter with ALS Pulse Sync + Flow-Follow Mode */}
-                <FlowMeter
+              <div style={composeStyles(
+                layout.position.relative,
+                layout.width.full,
+                layout.flex.container('row'),
+                layout.flex.align.end,
+                layout.flex.justify.center
+              )}>
+                {/* MixxGlassMeter with glass aesthetic and ALS integration */}
+                <MixxGlassMeter
                   level={Math.min(1, Math.max(0, analysis?.rms ?? intensity))}
                   peak={Math.min(1, Math.max(analysis?.peak ?? intensity, intensity))}
                   transient={analysis?.transient ?? false}
+                  alsChannel="pressure"
                   color={channelColor}
-                  glow={channelGlow}
-                  pulse={pulse} // ALS Pulse Sync
-                  flowFollow={(() => {
-                    // Flow-Follow Mode: 0 = idle, 0.5 = scrolling, 1.0 = playhead moving
-                    if (isPlaying) return 1.0; // Playhead moving
-                    if (followPlayhead) return 0.5; // Scrolling/following
-                    return 0; // Idle
-                  })()}
+                  glowColor={channelGlow}
+                  height={meterHeight}
+                  width={44}
                 />
               </div>
             </div>
 
             <div
-              className="rounded-xl border border-glass-border bg-[rgba(8,18,34,0.72)] px-2 py-2 flex items-center justify-center"
-              style={{ height: `${faderHeight}px` }}
+              style={composeStyles(
+                layout.flex.container('row'),
+                layout.flex.align.center,
+                layout.flex.justify.center,
+                spacing.px(2),
+                spacing.py(2),
+                effects.border.radius.xl,
+                {
+                  border: '1px solid rgba(102, 140, 198, 0.45)',
+                  background: 'rgba(8,18,34,0.72)',
+                  height: `${faderHeight}px`,
+                }
+              )}
             >
-              {/* Restored FlowFader with dB bubble + keyboard control */}
-              <FlowFader
+              {/* MixxGlassFader with glass aesthetic and ALS integration */}
+              <MixxGlassFader
                 value={settings.volume}
                 onChange={(value) => onMixerChange(track.id, "volume", value)}
-                alsFeedback={alsFeedback}
+                alsChannel="momentum"
+                alsIntensity={alsFeedback?.intensity}
+                alsPulse={alsFeedback?.pulse}
                 trackColor={channelColor}
                 glowColor={channelGlow}
                 name={track.trackName}
+                height={faderHeight}
                 showDB={true}
               />
             </div>
 
             {/* Pan Control - Restored original form factor with drag interaction */}
-            <div className="rounded-xl border border-glass-border/70 bg-[rgba(8,18,34,0.72)] px-3 py-2">
+            <div style={composeStyles(
+              spacing.px(3),
+              spacing.py(2),
+              effects.border.radius.xl,
+              {
+                border: '1px solid rgba(102, 140, 198, 0.7)',
+                background: 'rgba(8,18,34,0.72)',
+              }
+            )}>
               <div 
-                className="h-1 bg-[rgba(9,18,36,0.6)] rounded-full overflow-hidden relative cursor-pointer"
+                style={composeStyles(
+                  layout.position.relative,
+                  layout.overflow.hidden,
+                  effects.border.radius.full,
+                  {
+                    height: '4px',
+                    background: 'rgba(9,18,36,0.6)',
+                    cursor: 'pointer',
+                  }
+                )}
                 onPointerDown={(e) => {
                   const rect = e.currentTarget.getBoundingClientRect();
                   const x = e.clientX - rect.left;
@@ -514,65 +781,78 @@ const FlowChannelStrip: React.FC<FlowChannelStripProps> = memo(
                   onMixerChange(track.id, "pan", Math.min(1, Math.max(-1, pan)));
                 }}
               >
-                <motion.div
-                  className="absolute left-1/2 top-0 bottom-0 w-px bg-cyan-300/40"
-                  style={{ transform: "translateX(-50%)" }}
+                <div
+                  style={composeStyles(
+                    layout.position.absolute,
+                    transitions.transform.combine('translateX(-50%)'),
+                    {
+                      left: '50%',
+                      top: 0,
+                      bottom: 0,
+                      width: '1px',
+                      background: 'rgba(103, 232, 249, 0.4)',
+                    }
+                  )}
                 />
-                <motion.div
-                  className="h-full rounded-full"
-                  style={{
-                    background: `linear-gradient(90deg, ${hexToRgba(
-                      channelColor,
-                      0.8
-                    )}, ${hexToRgba(channelGlow, 0.4)})`,
-                    width: `${Math.abs(settings.pan) * 100}%`,
-                    left:
-                      settings.pan >= 0
-                        ? "50%"
-                        : `${50 - Math.abs(settings.pan) * 50}%`,
-                    opacity: 0.45 + intensity * 0.35,
-                  }}
-                  animate={{
-                    boxShadow: [
-                      `0 0 4px ${hexToRgba(channelGlow, 0.25)}`,
-                      `0 0 10px ${hexToRgba(channelGlow, 0.45)}`,
-                      `0 0 4px ${hexToRgba(channelGlow, 0.25)}`,
-                    ],
-                  }}
-                  transition={{ duration: 2, repeat: Infinity }}
+                <PulsingPanIndicator
+                  pan={settings.pan}
+                  channelColor={channelColor}
+                  channelGlow={channelGlow}
+                  intensity={intensity}
                 />
               </div>
             </div>
 
             {/* Legacy pan visualization (kept for reference, can be removed later) */}
-            <div className="rounded-xl border border-glass-border bg-[rgba(8,18,34,0.72)] px-2 py-2 hidden">
-              <div className="h-1 bg-[rgba(9,18,36,0.6)] rounded-full overflow-hidden relative">
-                <motion.div
-                  className="absolute left-1/2 top-0 bottom-0 w-px bg-cyan-300/40"
-                  style={{ transform: "translateX(-50%)" }}
+            <div style={composeStyles(
+              spacing.px(2),
+              spacing.py(2),
+              effects.border.radius.xl,
+              {
+                border: '1px solid rgba(102, 140, 198, 0.45)',
+                background: 'rgba(8,18,34,0.72)',
+                display: 'none',
+              }
+            )}>
+              <div style={composeStyles(
+                layout.position.relative,
+                layout.overflow.hidden,
+                effects.border.radius.full,
+                {
+                  height: '4px',
+                  background: 'rgba(9,18,36,0.6)',
+                }
+              )}>
+                <div
+                  style={composeStyles(
+                    layout.position.absolute,
+                    transitions.transform.combine('translateX(-50%)'),
+                    {
+                      left: '50%',
+                      top: 0,
+                      bottom: 0,
+                      width: '1px',
+                      background: 'rgba(103, 232, 249, 0.4)',
+                    }
+                  )}
                 />
-                <motion.div
-                  className="h-full rounded-full"
-                  style={{
-                    background: `linear-gradient(90deg, ${hexToRgba(
-                      channelColor,
-                      0.8
-                    )}, ${hexToRgba(channelGlow, 0.4)})`,
-                    width: `${Math.abs(settings.pan) * 100}%`,
-                    left:
-                      settings.pan >= 0
-                        ? "50%"
-                        : `${50 - Math.abs(settings.pan) * 50}%`,
-                    opacity: 0.45 + intensity * 0.35,
-                  }}
-                  animate={{
-                    boxShadow: [
-                      `0 0 4px ${hexToRgba(channelGlow, 0.25)}`,
-                      `0 0 10px ${hexToRgba(channelGlow, 0.45)}`,
-                      `0 0 4px ${hexToRgba(channelGlow, 0.25)}`,
-                    ],
-                  }}
-                  transition={{ duration: 2, repeat: Infinity, ease: "easeInOut" }}
+                <div
+                  style={composeStyles(
+                    effects.border.radius.full,
+                    {
+                      height: '100%',
+                      background: `linear-gradient(90deg, ${hexToRgba(
+                        channelColor,
+                        0.8
+                      )}, ${hexToRgba(channelGlow, 0.4)})`,
+                      width: `${Math.abs(settings.pan) * 100}%`,
+                      left:
+                        settings.pan >= 0
+                          ? "50%"
+                          : `${50 - Math.abs(settings.pan) * 50}%`,
+                      opacity: 0.45 + intensity * 0.35,
+                    }
+                  )}
                 />
                 <input
                   type="range"
@@ -583,108 +863,309 @@ const FlowChannelStrip: React.FC<FlowChannelStripProps> = memo(
                   onChange={(event) =>
                     onMixerChange(track.id, "pan", parseFloat(event.target.value))
                   }
-                  className="absolute inset-0 w-full h-full opacity-0 cursor-pointer"
+                  style={composeStyles(
+                    layout.position.absolute,
+                    { inset: 0 },
+                    layout.width.full,
+                    layout.height.full,
+                    {
+                      opacity: 0,
+                      cursor: 'pointer',
+                    }
+                  )}
                   onClick={(event) => event.stopPropagation()}
                   aria-label="Pan balance"
                 />
               </div>
-              <div className="text-[0.45rem] text-ink/55 text-center mt-2 uppercase tracking-[0.4em]">
+              <div style={composeStyles(
+                typography.size('xs'),
+                typography.color.ink.muted,
+                typography.align('center'),
+                spacing.mt(2),
+                typography.transform('uppercase'),
+                typography.tracking.widest,
+                {
+                  fontSize: '0.6875rem', // 11px minimum
+                }
+              )}>
                 Pan Balance
               </div>
             </div>
           </div>
 
-          <div className="flex w-32 flex-col gap-2">
-            <div className="rounded-xl border border-glass-border bg-[rgba(8,18,34,0.78)] px-3 py-2 text-ink">
-              <div className="text-[0.48rem] uppercase tracking-[0.35em] text-ink/65">
+          <div style={composeStyles(
+            layout.flex.container('col'),
+            spacing.gap(2),
+            { width: '128px' }
+          )}>
+            <div style={composeStyles(
+              spacing.px(3),
+              spacing.py(2),
+              effects.border.radius.xl,
+              {
+                border: '1px solid rgba(102, 140, 198, 0.45)',
+                background: 'rgba(8,18,34,0.78)',
+                color: '#e6f0ff',
+              }
+            )}>
+              <div style={composeStyles(
+                typography.transform('uppercase'),
+                typography.tracking.widest,
+                {
+                  fontSize: '0.48rem',
+                  color: 'rgba(230, 240, 255, 0.65)',
+                }
+              )}>
                 ALS Core
               </div>
-              <div className="mt-1 text-[0.85rem] font-semibold tracking-[0.2em] text-cyan-100">
+              <div style={composeStyles(
+                spacing.mt(1),
+                typography.weight('semibold'),
+                {
+                  fontSize: '0.85rem',
+                  letterSpacing: '0.2em',
+                  color: 'rgba(207, 250, 254, 1)',
+                }
+              )}>
                 {temperature.toUpperCase()}
               </div>
-              <div className="text-[0.42rem] uppercase tracking-[0.3em] text-ink/60">
+              <div style={composeStyles(
+                typography.transform('uppercase'),
+                typography.tracking.widest,
+                {
+                  fontSize: '0.42rem',
+                  color: 'rgba(230, 240, 255, 0.6)',
+                }
+              )}>
                 Flow {(flow * 100).toFixed(0)}%
               </div>
-              <div className="text-[0.42rem] uppercase tracking-[0.3em] text-ink/60">
+              <div style={composeStyles(
+                typography.transform('uppercase'),
+                typography.tracking.widest,
+                {
+                  fontSize: '0.42rem',
+                  color: 'rgba(230, 240, 255, 0.6)',
+                }
+              )}>
                 Pulse {(pulse * 100).toFixed(0)}%
               </div>
             </div>
 
-            <div className="rounded-xl border border-glass-border bg-[rgba(8,18,34,0.78)] px-3 py-2 text-ink">
-              <div className="text-[0.48rem] uppercase tracking-[0.35em] text-ink/65">
+            <div style={composeStyles(
+              spacing.px(3),
+              spacing.py(2),
+              effects.border.radius.xl,
+              {
+                border: '1px solid rgba(102, 140, 198, 0.45)',
+                background: 'rgba(8,18,34,0.78)',
+                color: '#e6f0ff',
+              }
+            )}>
+              <div style={composeStyles(
+                typography.transform('uppercase'),
+                typography.tracking.widest,
+                {
+                  fontSize: '0.48rem',
+                  color: 'rgba(230, 240, 255, 0.65)',
+                }
+              )}>
                 Dynamics & Tone
               </div>
-              <div className="mt-1 flex items-center justify-between text-[0.6rem] uppercase tracking-[0.3em]">
+              <div style={composeStyles(
+                spacing.mt(1),
+                layout.flex.container('row'),
+                layout.flex.align.center,
+                layout.flex.justify.between,
+                typography.transform('uppercase'),
+                typography.tracking.widest,
+                {
+                  fontSize: '0.6rem',
+                }
+              )}>
                 <span>Crest</span>
                 <span>{crestFactor.toFixed(2)}</span>
               </div>
-              <div className="flex items-center justify-between text-[0.6rem] uppercase tracking-[0.3em] text-ink/70">
+              <div style={composeStyles(
+                layout.flex.container('row'),
+                layout.flex.align.center,
+                layout.flex.justify.between,
+                typography.transform('uppercase'),
+                typography.tracking.widest,
+                typography.color.ink.muted,
+                {
+                  fontSize: '0.6rem',
+                }
+              )}>
                 <span>Tilt</span>
                 <span>
                   {spectralTilt > 0 ? "Air +" : spectralTilt < 0 ? "Body +" : "Flat"}
                 </span>
               </div>
-              <div className="flex items-center justify-between text-[0.6rem] uppercase tracking-[0.3em] text-ink/70">
+              <div style={composeStyles(
+                layout.flex.container('row'),
+                layout.flex.align.center,
+                layout.flex.justify.between,
+                typography.transform('uppercase'),
+                typography.tracking.widest,
+                typography.color.ink.muted,
+                {
+                  fontSize: '0.6rem',
+                }
+              )}>
                 <span>Sends</span>
                 <span>{Math.round(sendEnergy * 100)}%</span>
               </div>
             </div>
 
-            <div className="rounded-xl border border-glass-border bg-[rgba(8,18,34,0.78)] px-3 py-2 text-ink">
-              <div className="flex items-center justify-between">
-                <span className="text-[0.48rem] uppercase tracking-[0.35em] text-ink/65">
+            <div style={composeStyles(
+              spacing.px(3),
+              spacing.py(2),
+              effects.border.radius.xl,
+              {
+                border: '1px solid rgba(102, 140, 198, 0.45)',
+                background: 'rgba(8,18,34,0.78)',
+                color: '#e6f0ff',
+              }
+            )}>
+              <div style={composeStyles(
+                layout.flex.container('row'),
+                layout.flex.align.center,
+                layout.flex.justify.between
+              )}>
+                <span style={composeStyles(
+                  typography.transform('uppercase'),
+                  typography.tracking.widest,
+                  {
+                    fontSize: '0.48rem',
+                    color: 'rgba(230, 240, 255, 0.65)',
+                  }
+                )}>
                   Modules
                 </span>
-                <span className="text-[0.45rem] uppercase tracking-[0.3em] text-ink/50">
+                <span style={composeStyles(
+                  typography.transform('uppercase'),
+                  typography.tracking.widest,
+                  {
+                    fontSize: '0.6875rem', // 11px minimum
+                    color: 'rgba(230, 240, 255, 0.5)',
+                  }
+                )}>
                   {displayedPlugins.length}
                 </span>
               </div>
-              <div className="mt-1 flex flex-col gap-1">
+              <div style={composeStyles(
+                spacing.mt(1),
+                layout.flex.container('col'),
+                spacing.gap(1)
+              )}>
                 {topPlugins.length ? (
                   topPlugins.map((plugin) => (
                     <span
                       key={`preview-${plugin.id}`}
-                      className="rounded-md border border-glass-border bg-[rgba(6,14,28,0.78)] px-2 py-1 text-[0.45rem] uppercase tracking-[0.3em] text-ink/75"
-                      style={{
-                        boxShadow: `0 0 8px ${hexToRgba(plugin.glow ?? plugin.color, 0.22)}`,
-                      }}
+                      style={composeStyles(
+                        spacing.px(2),
+                        spacing.py(1),
+                        effects.border.radius.md,
+                        typography.transform('uppercase'),
+                        typography.tracking.widest,
+                        {
+                          border: '1px solid rgba(102, 140, 198, 0.45)',
+                          background: 'rgba(6,14,28,0.78)',
+                          fontSize: '0.6875rem', // 11px minimum
+                          color: 'rgba(230, 240, 255, 0.75)',
+                          boxShadow: `0 0 8px ${hexToRgba(plugin.glow ?? plugin.color, 0.22)}`,
+                        }
+                      )}
                     >
                       {plugin.name}
                     </span>
                   ))
                 ) : (
-                  <span className="text-[0.45rem] uppercase tracking-[0.3em] text-ink/45">
+                  <span style={composeStyles(
+                    typography.transform('uppercase'),
+                    typography.tracking.widest,
+                    {
+                      fontSize: '0.6875rem', // 11px minimum
+                      color: 'rgba(230, 240, 255, 0.45)',
+                    }
+                  )}>
                     No inserts
                   </span>
                 )}
               </div>
             </div>
 
-            <div className="rounded-xl border border-glass-border bg-[rgba(8,18,34,0.78)] px-3 py-2 text-ink">
-              <div className="flex items-center justify-between">
-                <span className="text-[0.48rem] uppercase tracking-[0.35em] text-ink/65">
+            <div style={composeStyles(
+              spacing.px(3),
+              spacing.py(2),
+              effects.border.radius.xl,
+              {
+                border: '1px solid rgba(102, 140, 198, 0.45)',
+                background: 'rgba(8,18,34,0.78)',
+                color: '#e6f0ff',
+              }
+            )}>
+              <div style={composeStyles(
+                layout.flex.container('row'),
+                layout.flex.align.center,
+                layout.flex.justify.between
+              )}>
+                <span style={composeStyles(
+                  typography.transform('uppercase'),
+                  typography.tracking.widest,
+                  {
+                    fontSize: '0.48rem',
+                    color: 'rgba(230, 240, 255, 0.65)',
+                  }
+                )}>
                   Automation
                 </span>
-                <span
-                  className={`text-[0.48rem] uppercase tracking-[0.3em] ${
-                    automationActive ? "text-emerald-300" : "text-ink/45"
-                  }`}
-                >
+                <span style={composeStyles(
+                  typography.transform('uppercase'),
+                  typography.tracking.widest,
+                  {
+                    fontSize: '0.48rem',
+                    color: automationActive ? 'rgba(110, 231, 183, 1)' : 'rgba(230, 240, 255, 0.45)',
+                  }
+                )}>
                   {automationActive ? "Active" : "Idle"}
                 </span>
               </div>
-              <div className="mt-1 flex flex-col gap-1">
+              <div style={composeStyles(
+                spacing.mt(1),
+                layout.flex.container('col'),
+                spacing.gap(1)
+              )}>
                 {automationTargets.length ? (
                   automationTargets.slice(0, 3).map((target) => (
                     <span
                       key={target}
-                      className="rounded-md border border-glass-border bg-[rgba(6,14,28,0.78)] px-2 py-1 text-[0.45rem] uppercase tracking-[0.3em] text-ink/65"
+                      style={composeStyles(
+                        spacing.px(2),
+                        spacing.py(1),
+                        effects.border.radius.md,
+                        typography.transform('uppercase'),
+                        typography.tracking.widest,
+                        {
+                          border: '1px solid rgba(102, 140, 198, 0.45)',
+                          background: 'rgba(6,14,28,0.78)',
+                          fontSize: '0.6875rem', // 11px minimum
+                          color: 'rgba(230, 240, 255, 0.65)',
+                        }
+                      )}
                     >
                       {target}
                     </span>
                   ))
                 ) : (
-                  <span className="text-[0.45rem] uppercase tracking-[0.3em] text-ink/45">
+                  <span style={composeStyles(
+                    typography.transform('uppercase'),
+                    typography.tracking.widest,
+                    {
+                      fontSize: '0.6875rem', // 11px minimum
+                      color: 'rgba(230, 240, 255, 0.45)',
+                    }
+                  )}>
                     No lanes armed
                   </span>
                 )}
@@ -696,46 +1177,87 @@ const FlowChannelStrip: React.FC<FlowChannelStripProps> = memo(
     };
 
     const renderModulesSurface = () => (
-      <div className="flex flex-1 flex-col gap-2 overflow-y-auto pr-1 text-ink">
-        <motion.div
-          className="flex flex-col gap-1 rounded-xl border border-glass-border bg-[rgba(9,18,36,0.75)] px-2 py-2"
-          animate={
-            isPickerOpen
-              ? {
-                  boxShadow: [
-                    `0 0 8px ${hexToRgba(trackGlowColor, 0.25)}`,
-                    `0 0 18px ${hexToRgba(trackGlowColor, 0.4)}`,
-                    `0 0 8px ${hexToRgba(trackGlowColor, 0.25)}`,
-                  ],
-                }
-              : {}
-          }
-          transition={{
-            duration: 1.2,
-            ease: "easeInOut",
-            repeat: isPickerOpen ? Infinity : 0,
-          }}
-        >
+      <div style={composeStyles(
+        layout.flex.container('col'),
+        { flex: 1 },
+        spacing.gap(2),
+        layout.overflow.y.auto,
+        spacing.pr(1),
+        { color: '#e6f0ff' }
+      )}>
+        <PickerOpenContainer isPickerOpen={isPickerOpen} trackGlowColor={trackGlowColor}>
           <button
             onClick={(event) => {
               event.stopPropagation();
               setIsPickerOpen((prev) => !prev);
             }}
-            className="w-full text-[0.48rem] uppercase tracking-[0.35em] text-ink bg-glass-surface-soft hover:bg-glass-surface border border-glass-border rounded-lg py-1.5 transition-all flex items-center justify-between"
+            style={composeStyles(
+              layout.width.full,
+              layout.flex.container('row'),
+              layout.flex.align.center,
+              layout.flex.justify.between,
+              spacing.py(1.5),
+              effects.border.radius.lg,
+              transitions.transition.standard('all', 200, 'ease-out'),
+              typography.transform('uppercase'),
+              typography.tracking.widest,
+              {
+                fontSize: '0.48rem',
+                color: '#e6f0ff',
+                background: 'rgba(12,24,46,0.68)',
+                border: '1px solid rgba(102, 140, 198, 0.45)',
+                cursor: 'pointer',
+              }
+            )}
+            onMouseEnter={(e) => {
+              e.currentTarget.style.background = 'rgba(9,18,36,0.82)';
+            }}
+            onMouseLeave={(e) => {
+              e.currentTarget.style.background = 'rgba(12,24,46,0.68)';
+            }}
           >
             <span>Insert picker</span>
-            <span className="text-ink/60">{isPickerOpen ? "Close" : "Open"}</span>
+            <span style={{ color: 'rgba(230, 240, 255, 0.6)' }}>{isPickerOpen ? "Close" : "Open"}</span>
           </button>
           {isPickerOpen && (
-            <div className="flex flex-col gap-1">
+            <div style={composeStyles(
+              layout.flex.container('col'),
+              spacing.gap(1)
+            )}>
               <input
                 value={insertSearch}
                 onChange={(event) => setInsertSearch(event.target.value)}
-                className="w-full rounded-lg border border-glass-border bg-[rgba(6,14,28,0.78)] px-2 py-1 text-[0.48rem] uppercase tracking-[0.3em] text-ink placeholder:text-ink/40 focus:border-cyan-300/60 focus:outline-none"
+                style={composeStyles(
+                  layout.width.full,
+                  spacing.px(2),
+                  spacing.py(1),
+                  effects.border.radius.lg,
+                  typography.transform('uppercase'),
+                  typography.tracking.widest,
+                  transitions.transition.standard(['border-color', 'outline'], 200, 'ease-out'),
+                  {
+                    border: '1px solid rgba(102, 140, 198, 0.45)',
+                    background: 'rgba(6,14,28,0.78)',
+                    fontSize: '0.48rem',
+                    color: '#e6f0ff',
+                    outline: 'none',
+                  }
+                )}
                 placeholder="Search modules"
+                onFocus={(e) => {
+                  e.currentTarget.style.borderColor = 'rgba(103, 232, 249, 0.6)';
+                }}
+                onBlur={(e) => {
+                  e.currentTarget.style.borderColor = 'rgba(102, 140, 198, 0.45)';
+                }}
                 onClick={(event) => event.stopPropagation()}
               />
-              <div className="flex flex-col gap-1 max-h-36 overflow-y-auto">
+              <div style={composeStyles(
+                layout.flex.container('col'),
+                spacing.gap(1),
+                { maxHeight: '144px' },
+                layout.overflow.y.auto
+              )}>
                 {quickAddPlugins.length ? (
                   quickAddPlugins.map((plugin) => (
                     <button
@@ -744,18 +1266,45 @@ const FlowChannelStrip: React.FC<FlowChannelStripProps> = memo(
                         event.stopPropagation();
                         handleQuickAdd(plugin.id);
                       }}
-                      className="group flex items-center justify-between gap-1 rounded-lg border border-glass-border bg-[rgba(8,18,34,0.65)] px-2 py-1 text-[0.48rem] uppercase tracking-[0.3em] text-ink hover:bg-[rgba(12,26,48,0.8)] transition-all"
-                      style={{
-                        boxShadow: pluginFavorites[plugin.id]
-                          ? `0 0 14px ${hexToRgba(plugin.glow, 0.38)}`
-                          : `0 0 8px ${hexToRgba(plugin.glow, 0.2)}`,
+                      style={composeStyles(
+                        layout.flex.container('row'),
+                        layout.flex.align.center,
+                        layout.flex.justify.between,
+                        spacing.gap(1),
+                        spacing.px(2),
+                        spacing.py(1),
+                        effects.border.radius.lg,
+                        transitions.transition.standard('all', 200, 'ease-out'),
+                        typography.transform('uppercase'),
+                        typography.tracking.widest,
+                        {
+                          border: '1px solid rgba(102, 140, 198, 0.45)',
+                          background: 'rgba(8,18,34,0.65)',
+                          fontSize: '0.48rem',
+                          color: '#e6f0ff',
+                          cursor: 'pointer',
+                          boxShadow: pluginFavorites[plugin.id]
+                            ? `0 0 14px ${hexToRgba(plugin.glow, 0.38)}`
+                            : `0 0 8px ${hexToRgba(plugin.glow, 0.2)}`,
+                        }
+                      )}
+                      onMouseEnter={(e) => {
+                        e.currentTarget.style.background = 'rgba(12,26,48,0.8)';
+                      }}
+                      onMouseLeave={(e) => {
+                        e.currentTarget.style.background = 'rgba(8,18,34,0.65)';
                       }}
                     >
-                      <span className="truncate">{plugin.name}</span>
+                      <span style={{ overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{plugin.name}</span>
                       <span
-                        className={`ml-1 text-[0.55rem] ${
-                          pluginFavorites[plugin.id] ? "text-amber-300" : "text-ink/40"
-                        }`}
+                        style={composeStyles(
+                          spacing.ml(1),
+                          {
+                            fontSize: '0.55rem',
+                            color: pluginFavorites[plugin.id] ? 'rgba(252, 211, 77, 1)' : 'rgba(230, 240, 255, 0.4)',
+                            cursor: 'pointer',
+                          }
+                        )}
                         onClick={(event) => {
                           event.stopPropagation();
                           handleToggleFavorite(plugin.id);
@@ -771,39 +1320,23 @@ const FlowChannelStrip: React.FC<FlowChannelStripProps> = memo(
                     </button>
                   ))
                 ) : (
-                  <div className="text-[0.42rem] uppercase tracking-[0.3em] text-ink/50">
+                  <div style={composeStyles(
+                    typography.transform('uppercase'),
+                    typography.tracking.widest,
+                    {
+                      fontSize: '0.42rem',
+                      color: 'rgba(230, 240, 255, 0.5)',
+                    }
+                  )}>
                     No matches yet
                   </div>
                 )}
               </div>
             </div>
           )}
-        </motion.div>
+        </PickerOpenContainer>
 
-        <motion.div
-          className="flex flex-col gap-2 rounded-xl border border-glass-border bg-[rgba(9,18,36,0.72)] px-2 py-2"
-          animate={
-            actionPulse
-              ? {
-                  boxShadow: [
-                    `0 0 10px ${hexToRgba(actionPulse.glow, 0.25)}`,
-                    `0 0 22px ${hexToRgba(actionPulse.halo, 0.4)}`,
-                    `0 0 10px ${hexToRgba(actionPulse.glow, 0.25)}`,
-                  ],
-                }
-              : {}
-          }
-          transition={{
-            duration: 1.4,
-            ease: "easeInOut",
-            repeat: actionPulse ? Infinity : 0,
-          }}
-          style={{
-            borderColor: actionPulse
-              ? hexToRgba(actionPulse.accent, 0.58)
-              : "rgba(255,255,255,0.12)",
-          }}
-        >
+        <ActionPulseContainer actionPulse={actionPulse}>
           {displayedPlugins.length ? (
             displayedPlugins.map((plugin, index) => {
               const isFirst = index === 0;
@@ -811,66 +1344,194 @@ const FlowChannelStrip: React.FC<FlowChannelStripProps> = memo(
               return (
                 <div
                   key={`${plugin.id}-${plugin.index}`}
-                  className="flex flex-col gap-1 rounded-lg border border-glass-border/80 bg-[rgba(6,14,28,0.82)] px-2 py-2"
-                  style={{
-                    boxShadow: `0 0 12px ${hexToRgba(plugin.glow ?? plugin.color, 0.2)}`,
-                  }}
+                  style={composeStyles(
+                    layout.flex.container('col'),
+                    spacing.gap(1),
+                    spacing.px(2),
+                    spacing.py(2),
+                    effects.border.radius.lg,
+                    {
+                      border: '1px solid rgba(102, 140, 198, 0.8)',
+                      background: 'rgba(6,14,28,0.82)',
+                      boxShadow: `0 0 12px ${hexToRgba(plugin.glow ?? plugin.color, 0.2)}`,
+                    }
+                  )}
                   onClick={(event) => event.stopPropagation()}
                 >
-                  <div className="flex items-center justify-between gap-2">
+                  <div style={composeStyles(
+                    layout.flex.container('row'),
+                    layout.flex.align.center,
+                    layout.flex.justify.between,
+                    spacing.gap(2)
+                  )}>
                     <span
-                      className="flex-1 truncate text-[0.55rem] uppercase tracking-[0.35em] text-ink/85"
-                      style={{
-                        textShadow: `0 0 8px ${hexToRgba(
-                          plugin.glow ?? plugin.color,
-                          0.35
-                        )}`,
-                      }}
+                      style={composeStyles(
+                        { flex: 1 },
+                        typography.transform('uppercase'),
+                        typography.tracking.widest,
+                        {
+                          fontSize: '0.55rem',
+                          color: 'rgba(230, 240, 255, 0.85)',
+                          overflow: 'hidden',
+                          textOverflow: 'ellipsis',
+                          whiteSpace: 'nowrap',
+                          textShadow: `0 0 8px ${hexToRgba(
+                            plugin.glow ?? plugin.color,
+                            0.35
+                          )}`,
+                        }
+                      )}
                     >
                       {plugin.name}
                     </span>
-                    <div className="flex items-center gap-1">
+                    <div style={composeStyles(
+                      layout.flex.container('row'),
+                      layout.flex.align.center,
+                      spacing.gap(1)
+                    )}>
                       <button
-                        className={`px-2 py-0.5 rounded-full text-[0.45rem] uppercase tracking-[0.3em] border border-glass-border/80 transition-colors ${
-                          plugin.isBypassed
-                            ? "bg-red-500/70 text-white"
-                            : "bg-glass-surface text-ink hover:bg-glass-surface-soft"
-                        }`}
+                        style={composeStyles(
+                          spacing.px(2),
+                          spacing.py(0.5),
+                          effects.border.radius.full,
+                          typography.transform('uppercase'),
+                          typography.tracking.widest,
+                          transitions.transition.standard('all', 200, 'ease-out'),
+                          {
+                            fontSize: '0.6875rem', // 11px minimum
+                            border: '1px solid rgba(102, 140, 198, 0.8)',
+                            background: plugin.isBypassed
+                              ? 'rgba(239, 68, 68, 0.7)'
+                              : 'rgba(9,18,36,0.82)',
+                            color: plugin.isBypassed ? '#ffffff' : '#e6f0ff',
+                            cursor: 'pointer',
+                          }
+                        )}
                         onClick={() => onTogglePluginBypass?.(track.id, plugin.id)}
+                        onMouseEnter={(e) => {
+                          if (!plugin.isBypassed) {
+                            e.currentTarget.style.background = 'rgba(12,24,46,0.68)';
+                          }
+                        }}
+                        onMouseLeave={(e) => {
+                          if (!plugin.isBypassed) {
+                            e.currentTarget.style.background = 'rgba(9,18,36,0.82)';
+                          }
+                        }}
                       >
                         Byp
                       </button>
                       <button
-                        className="px-2 py-0.5 rounded-full text-[0.45rem] uppercase tracking-[0.3em] text-ink/80 border border-glass-border/80 hover:bg-glass-surface transition-colors"
+                        style={composeStyles(
+                          spacing.px(2),
+                          spacing.py(0.5),
+                          effects.border.radius.full,
+                          typography.transform('uppercase'),
+                          typography.tracking.widest,
+                          transitions.transition.standard('all', 200, 'ease-out'),
+                          {
+                            fontSize: '0.6875rem', // 11px minimum
+                            color: 'rgba(230, 240, 255, 0.8)',
+                            border: '1px solid rgba(102, 140, 198, 0.8)',
+                            background: 'transparent',
+                            cursor: 'pointer',
+                          }
+                        )}
                         onClick={() => onOpenPluginSettings?.(plugin.id)}
+                        onMouseEnter={(e) => {
+                          e.currentTarget.style.background = 'rgba(9,18,36,0.82)';
+                        }}
+                        onMouseLeave={(e) => {
+                          e.currentTarget.style.background = 'transparent';
+                        }}
                       >
                         ⚙
                       </button>
                       <button
-                        className={`px-1.5 py-0.5 rounded-full text-[0.45rem] text-ink/70 border border-glass-border/80 hover:bg-glass-surface transition-colors ${
-                          isFirst ? "opacity-30 cursor-default" : ""
-                        }`}
+                        style={composeStyles(
+                          spacing.px(1.5),
+                          spacing.py(0.5),
+                          effects.border.radius.full,
+                          transitions.transition.standard('all', 200, 'ease-out'),
+                          {
+                            fontSize: '0.6875rem', // 11px minimum
+                            color: 'rgba(230, 240, 255, 0.7)',
+                            border: '1px solid rgba(102, 140, 198, 0.8)',
+                            background: 'transparent',
+                            cursor: isFirst ? 'default' : 'pointer',
+                            opacity: isFirst ? 0.3 : 1,
+                          }
+                        )}
                         onClick={() =>
                           !isFirst && onMovePlugin?.(track.id, plugin.index, plugin.index - 1)
                         }
                         disabled={isFirst}
+                        onMouseEnter={(e) => {
+                          if (!isFirst) {
+                            e.currentTarget.style.background = 'rgba(9,18,36,0.82)';
+                          }
+                        }}
+                        onMouseLeave={(e) => {
+                          if (!isFirst) {
+                            e.currentTarget.style.background = 'transparent';
+                          }
+                        }}
                       >
                         ↑
                       </button>
                       <button
-                        className={`px-1.5 py-0.5 rounded-full text-[0.45rem] text-ink/70 border border-glass-border/80 hover:bg-glass-surface transition-colors ${
-                          isLast ? "opacity-30 cursor-default" : ""
-                        }`}
+                        style={composeStyles(
+                          spacing.px(1.5),
+                          spacing.py(0.5),
+                          effects.border.radius.full,
+                          transitions.transition.standard('all', 200, 'ease-out'),
+                          {
+                            fontSize: '0.6875rem', // 11px minimum
+                            color: 'rgba(230, 240, 255, 0.7)',
+                            border: '1px solid rgba(102, 140, 198, 0.8)',
+                            background: 'transparent',
+                            cursor: isLast ? 'default' : 'pointer',
+                            opacity: isLast ? 0.3 : 1,
+                          }
+                        )}
                         onClick={() =>
                           !isLast && onMovePlugin?.(track.id, plugin.index, plugin.index + 1)
                         }
                         disabled={isLast}
+                        onMouseEnter={(e) => {
+                          if (!isLast) {
+                            e.currentTarget.style.background = 'rgba(9,18,36,0.82)';
+                          }
+                        }}
+                        onMouseLeave={(e) => {
+                          if (!isLast) {
+                            e.currentTarget.style.background = 'transparent';
+                          }
+                        }}
                       >
                         ↓
                       </button>
                       <button
-                        className="px-1.5 py-0.5 rounded-full text-[0.45rem] text-red-300 border border-red-400/40 hover:bg-red-500/30 transition-colors"
+                        style={composeStyles(
+                          spacing.px(1.5),
+                          spacing.py(0.5),
+                          effects.border.radius.full,
+                          transitions.transition.standard('all', 200, 'ease-out'),
+                          {
+                            fontSize: '0.6875rem', // 11px minimum
+                            color: 'rgba(252, 165, 165, 1)',
+                            border: '1px solid rgba(248, 113, 113, 0.4)',
+                            background: 'transparent',
+                            cursor: 'pointer',
+                          }
+                        )}
                         onClick={() => onRemovePlugin?.(track.id, plugin.index)}
+                        onMouseEnter={(e) => {
+                          e.currentTarget.style.background = 'rgba(239, 68, 68, 0.3)';
+                        }}
+                        onMouseLeave={(e) => {
+                          e.currentTarget.style.background = 'transparent';
+                        }}
                       >
                         ✕
                       </button>
@@ -878,17 +1539,54 @@ const FlowChannelStrip: React.FC<FlowChannelStripProps> = memo(
                   </div>
 
                   {pluginPresets?.[plugin.id]?.length ? (
-                    <div className="flex flex-col gap-1 rounded-lg border border-glass-border/60 bg-[rgba(5,12,24,0.9)] px-2 py-2">
-                      <div className="flex items-center justify-between text-[0.45rem] uppercase tracking-[0.3em] text-ink/55">
+                    <div style={composeStyles(
+                      layout.flex.container('col'),
+                      spacing.gap(1),
+                      spacing.px(2),
+                      spacing.py(2),
+                      effects.border.radius.lg,
+                      {
+                        border: '1px solid rgba(102, 140, 198, 0.6)',
+                        background: 'rgba(5,12,24,0.9)',
+                      }
+                    )}>
+                      <div style={composeStyles(
+                        layout.flex.container('row'),
+                        layout.flex.align.center,
+                        layout.flex.justify.between,
+                        typography.transform('uppercase'),
+                        typography.tracking.widest,
+                        {
+                          fontSize: '0.6875rem', // 11px minimum
+                          color: 'rgba(230, 240, 255, 0.55)',
+                        }
+                      )}>
                         <span>Captures</span>
                         <button
-                          className="text-ink/45 hover:text-cyan-200 transition-colors"
+                          style={composeStyles(
+                            transitions.transition.standard('color', 200, 'ease-out'),
+                            {
+                              color: 'rgba(230, 240, 255, 0.45)',
+                              background: 'transparent',
+                              border: 'none',
+                              cursor: 'pointer',
+                            }
+                          )}
                           onClick={() => setPresetEditor(plugin.id)}
+                          onMouseEnter={(e) => {
+                            e.currentTarget.style.color = 'rgba(165, 243, 252, 1)';
+                          }}
+                          onMouseLeave={(e) => {
+                            e.currentTarget.style.color = 'rgba(230, 240, 255, 0.45)';
+                          }}
                         >
                           + Capture
                         </button>
                       </div>
-                      <div className="flex flex-col gap-1">
+                      <div style={composeStyles(
+                        layout.flex.container('col'),
+                        spacing.gap(1)
+                      )}>
                         {pluginPresets[plugin.id]!.map((preset) => {
                           const label = preset.label || "Preset";
                           const displayLabel =
@@ -896,22 +1594,67 @@ const FlowChannelStrip: React.FC<FlowChannelStripProps> = memo(
                           return (
                             <div
                               key={`${plugin.id}-${preset.id}`}
-                              className="flex items-center justify-between gap-1"
+                              style={composeStyles(
+                                layout.flex.container('row'),
+                                layout.flex.align.center,
+                                layout.flex.justify.between,
+                                spacing.gap(1)
+                              )}
                             >
                               <button
-                                className="flex-1 rounded-md border border-glass-border/80 bg-[rgba(4,10,20,0.85)] px-2 py-1 text-[0.45rem] uppercase tracking-[0.3em] text-ink/70 hover:bg-glass-surface-soft transition-colors text-left"
+                                style={composeStyles(
+                                  { flex: 1 },
+                                  spacing.px(2),
+                                  spacing.py(1),
+                                  effects.border.radius.md,
+                                  typography.transform('uppercase'),
+                                  typography.tracking.widest,
+                                  transitions.transition.standard('all', 200, 'ease-out'),
+                                  {
+                                    border: '1px solid rgba(102, 140, 198, 0.8)',
+                                    background: 'rgba(4,10,20,0.85)',
+                                    fontSize: '0.6875rem', // 11px minimum
+                                    color: 'rgba(230, 240, 255, 0.7)',
+                                    textAlign: 'left',
+                                    cursor: 'pointer',
+                                  }
+                                )}
                                 onClick={(event) => {
                                   event.stopPropagation();
                                   handlePresetRecall(plugin.id, preset.id);
+                                }}
+                                onMouseEnter={(e) => {
+                                  e.currentTarget.style.background = 'rgba(12,24,46,0.68)';
+                                }}
+                                onMouseLeave={(e) => {
+                                  e.currentTarget.style.background = 'rgba(4,10,20,0.85)';
                                 }}
                               >
                                 {displayLabel}
                               </button>
                               <button
-                                className="px-1.5 py-0.5 rounded-md text-[0.45rem] text-ink/50 hover:text-red-300 transition-colors"
+                                style={composeStyles(
+                                  spacing.px(1.5),
+                                  spacing.py(0.5),
+                                  effects.border.radius.md,
+                                  transitions.transition.standard('color', 200, 'ease-out'),
+                                  {
+                                    fontSize: '0.6875rem', // 11px minimum
+                                    color: 'rgba(230, 240, 255, 0.5)',
+                                    background: 'transparent',
+                                    border: 'none',
+                                    cursor: 'pointer',
+                                  }
+                                )}
                                 onClick={(event) => {
                                   event.stopPropagation();
                                   handlePresetDelete(plugin.id, preset.id);
+                                }}
+                                onMouseEnter={(e) => {
+                                  e.currentTarget.style.color = 'rgba(252, 165, 165, 1)';
+                                }}
+                                onMouseLeave={(e) => {
+                                  e.currentTarget.style.color = 'rgba(230, 240, 255, 0.5)';
                                 }}
                                 aria-label="Delete preset"
                               >
@@ -927,42 +1670,130 @@ const FlowChannelStrip: React.FC<FlowChannelStripProps> = memo(
               );
             })
           ) : (
-            <div className="text-[0.48rem] uppercase tracking-[0.35em] text-ink/50 text-center py-2">
+            <div style={composeStyles(
+              typography.transform('uppercase'),
+              typography.tracking.widest,
+              typography.align('center'),
+              spacing.py(2),
+              {
+                fontSize: '0.48rem',
+                color: 'rgba(230, 240, 255, 0.5)',
+              }
+            )}>
               No modules loaded
             </div>
           )}
-        </motion.div>
+        </ActionPulseContainer>
 
         {presetFeedback && (
-          <div className="rounded-xl border border-glass-border/60 bg-[rgba(6,14,28,0.74)] px-3 py-2 text-center text-[0.42rem] uppercase tracking-[0.3em] text-emerald-300/80">
+          <div style={composeStyles(
+            spacing.px(3),
+            spacing.py(2),
+            effects.border.radius.xl,
+            typography.align('center'),
+            typography.transform('uppercase'),
+            typography.tracking.widest,
+            {
+              border: '1px solid rgba(102, 140, 198, 0.6)',
+              background: 'rgba(6,14,28,0.74)',
+              fontSize: '0.42rem',
+              color: 'rgba(110, 231, 183, 0.8)',
+            }
+          )}>
             {presetFeedback}
           </div>
         )}
 
         {presetEditor && (
-          <div className="flex items-center gap-2 rounded-xl border border-emerald-400/60 bg-[rgba(6,20,32,0.9)] px-3 py-2">
+          <div style={composeStyles(
+            layout.flex.container('row'),
+            layout.flex.align.center,
+            spacing.gap(2),
+            spacing.px(3),
+            spacing.py(2),
+            effects.border.radius.xl,
+            {
+              border: '1px solid rgba(16, 185, 129, 0.6)',
+              background: 'rgba(6,20,32,0.9)',
+            }
+          )}>
             <input
               value={presetLabel}
               onChange={(event) => setPresetLabel(event.target.value)}
-              className="flex-1 rounded-lg border border-emerald-400/60 bg-transparent px-2 py-1 text-[0.48rem] uppercase tracking-[0.3em] text-emerald-200 placeholder:text-emerald-200/40 focus:outline-none"
+              style={composeStyles(
+                { flex: 1 },
+                spacing.px(2),
+                spacing.py(1),
+                effects.border.radius.lg,
+                typography.transform('uppercase'),
+                typography.tracking.widest,
+                transitions.transition.standard('outline', 200, 'ease-out'),
+                {
+                  border: '1px solid rgba(16, 185, 129, 0.6)',
+                  background: 'transparent',
+                  fontSize: '0.48rem',
+                  color: 'rgba(167, 243, 208, 1)',
+                  outline: 'none',
+                }
+              )}
               placeholder="Label capture"
               onClick={(event) => event.stopPropagation()}
             />
             <button
-              className="rounded-full border border-emerald-300/70 px-3 py-1 text-[0.45rem] uppercase tracking-[0.3em] text-emerald-200 hover:bg-emerald-500/20 transition-all"
+              style={composeStyles(
+                spacing.px(3),
+                spacing.py(1),
+                effects.border.radius.full,
+                typography.transform('uppercase'),
+                typography.tracking.widest,
+                transitions.transition.standard('all', 200, 'ease-out'),
+                {
+                  border: '1px solid rgba(110, 231, 183, 0.7)',
+                  background: 'transparent',
+                  fontSize: '0.6875rem', // 11px minimum
+                  color: 'rgba(167, 243, 208, 1)',
+                  cursor: 'pointer',
+                }
+              )}
               onClick={(event) => {
                 event.stopPropagation();
                 handlePresetCapture(presetEditor);
+              }}
+              onMouseEnter={(e) => {
+                e.currentTarget.style.background = 'rgba(16, 185, 129, 0.2)';
+              }}
+              onMouseLeave={(e) => {
+                e.currentTarget.style.background = 'transparent';
               }}
             >
               Save
             </button>
             <button
-              className="rounded-full border border-emerald-300/40 px-3 py-1 text-[0.45rem] uppercase tracking-[0.3em] text-emerald-100/60 hover:bg-emerald-500/10 transition-all"
+              style={composeStyles(
+                spacing.px(3),
+                spacing.py(1),
+                effects.border.radius.full,
+                typography.transform('uppercase'),
+                typography.tracking.widest,
+                transitions.transition.standard('all', 200, 'ease-out'),
+                {
+                  border: '1px solid rgba(110, 231, 183, 0.4)',
+                  background: 'transparent',
+                  fontSize: '0.6875rem', // 11px minimum
+                  color: 'rgba(167, 243, 208, 0.6)',
+                  cursor: 'pointer',
+                }
+              )}
               onClick={(event) => {
                 event.stopPropagation();
                 setPresetEditor(null);
                 setPresetLabel("");
+              }}
+              onMouseEnter={(e) => {
+                e.currentTarget.style.background = 'rgba(16, 185, 129, 0.1)';
+              }}
+              onMouseLeave={(e) => {
+                e.currentTarget.style.background = 'transparent';
               }}
             >
               Cancel
@@ -976,7 +1807,27 @@ const FlowChannelStrip: React.FC<FlowChannelStripProps> = memo(
               event.stopPropagation();
               onOpenPluginBrowser?.(track.id);
             }}
-            className="rounded-xl border border-glass-border bg-glass-surface-soft px-3 py-2 text-[0.48rem] uppercase tracking-[0.35em] text-ink hover:bg-glass-surface transition-all"
+            style={composeStyles(
+              spacing.px(3),
+              spacing.py(2),
+              effects.border.radius.xl,
+              typography.transform('uppercase'),
+              typography.tracking.widest,
+              transitions.transition.standard('all', 200, 'ease-out'),
+              {
+                border: '1px solid rgba(102, 140, 198, 0.45)',
+                background: 'rgba(12,24,46,0.68)',
+                fontSize: '0.48rem',
+                color: '#e6f0ff',
+                cursor: 'pointer',
+              }
+            )}
+            onMouseEnter={(e) => {
+              e.currentTarget.style.background = 'rgba(9,18,36,0.82)';
+            }}
+            onMouseLeave={(e) => {
+              e.currentTarget.style.background = 'rgba(12,24,46,0.68)';
+            }}
           >
             Open module browser
           </button>
@@ -985,17 +1836,52 @@ const FlowChannelStrip: React.FC<FlowChannelStripProps> = memo(
     );
 
     const renderRoutingSurface = () => (
-      <div className="flex flex-1 flex-col gap-2 text-ink">
-        <div className="rounded-xl border border-glass-border bg-[rgba(9,18,36,0.75)] px-3 py-2">
-          <div className="mb-2 flex items-center justify-between">
-            <span className="text-[0.48rem] uppercase tracking-[0.35em] text-ink/65">
+      <div style={composeStyles(
+        layout.flex.container('col'),
+        { flex: 1 },
+        spacing.gap(2),
+        { color: '#e6f0ff' }
+      )}>
+        <div style={composeStyles(
+          spacing.px(3),
+          spacing.py(2),
+          effects.border.radius.xl,
+          {
+            border: '1px solid rgba(102, 140, 198, 0.45)',
+            background: 'rgba(9,18,36,0.75)',
+          }
+        )}>
+          <div style={composeStyles(
+            spacing.mb(2),
+            layout.flex.container('row'),
+            layout.flex.align.center,
+            layout.flex.justify.between
+          )}>
+            <span style={composeStyles(
+              typography.transform('uppercase'),
+              typography.tracking.widest,
+              {
+                fontSize: '0.48rem',
+                color: 'rgba(230, 240, 255, 0.65)',
+              }
+            )}>
               Send matrix
             </span>
-            <span className="text-[0.45rem] uppercase tracking-[0.3em] text-ink/45">
+            <span style={composeStyles(
+              typography.transform('uppercase'),
+              typography.tracking.widest,
+              {
+                fontSize: '0.45rem',
+                color: 'rgba(230, 240, 255, 0.45)',
+              }
+            )}>
               Live
             </span>
           </div>
-          <div className="flex flex-col gap-1">
+          <div style={composeStyles(
+            layout.flex.container('col'),
+            spacing.gap(1)
+          )}>
             {orderedSends.length ? (
               orderedSends.map((send) => (
                 <SendIndicator
@@ -1015,58 +1901,156 @@ const FlowChannelStrip: React.FC<FlowChannelStripProps> = memo(
                 />
               ))
             ) : (
-              <div className="rounded-lg border border-glass-border/60 bg-[rgba(6,14,28,0.78)] px-2 py-2 text-[0.45rem] uppercase tracking-[0.3em] text-ink/50">
+              <div style={composeStyles(
+                spacing.px(2),
+                spacing.py(2),
+                effects.border.radius.lg,
+                typography.transform('uppercase'),
+                typography.tracking.widest,
+                {
+                  border: '1px solid rgba(102, 140, 198, 0.6)',
+                  background: 'rgba(6,14,28,0.78)',
+                  fontSize: '0.6875rem', // 11px minimum
+                  color: 'rgba(230, 240, 255, 0.5)',
+                }
+              )}>
                 No sends configured
               </div>
             )}
           </div>
         </div>
 
-        <div className="rounded-xl border border-glass-border bg-[rgba(9,18,36,0.75)] px-3 py-2">
-          <div className="text-[0.48rem] uppercase tracking-[0.35em] text-ink/65">
+        <div style={composeStyles(
+          spacing.px(3),
+          spacing.py(2),
+          effects.border.radius.xl,
+          {
+            border: '1px solid rgba(102, 140, 198, 0.45)',
+            background: 'rgba(9,18,36,0.75)',
+          }
+        )}>
+          <div style={composeStyles(
+            typography.transform('uppercase'),
+            typography.tracking.widest,
+            {
+              fontSize: '0.48rem',
+              color: 'rgba(230, 240, 255, 0.65)',
+            }
+          )}>
             Bus palette
           </div>
-          <div className="mt-2 flex flex-wrap gap-1.5">
+          <div style={composeStyles(
+            spacing.mt(2),
+            layout.flex.container('row'),
+            layout.flex.wrap.wrap,
+            spacing.gap(1.5)
+          )}>
             {(availableSends ?? []).map((send) => (
               <span
                 key={`preview-${send.id}`}
-                className="rounded-full border border-glass-border/70 bg-[rgba(6,14,28,0.82)] px-2 py-0.5 text-[0.45rem] uppercase tracking-[0.3em] text-ink/70"
-                style={{
-                  boxShadow: `0 0 8px ${hexToRgba(send.glow, 0.25)}`,
-                }}
+                style={composeStyles(
+                  spacing.px(2),
+                  spacing.py(0.5),
+                  effects.border.radius.full,
+                  typography.transform('uppercase'),
+                  typography.tracking.widest,
+                  {
+                    border: '1px solid rgba(102, 140, 198, 0.7)',
+                    background: 'rgba(6,14,28,0.82)',
+                    fontSize: '0.6875rem', // 11px minimum
+                    color: 'rgba(230, 240, 255, 0.7)',
+                    boxShadow: `0 0 8px ${hexToRgba(send.glow, 0.25)}`,
+                  }
+                )}
               >
                 {send.name}
               </span>
             ))}
             {!availableSends?.length && (
-              <span className="text-[0.45rem] uppercase tracking-[0.3em] text-ink/45">
+              <span style={composeStyles(
+                typography.transform('uppercase'),
+                typography.tracking.widest,
+                {
+                  fontSize: '0.6875rem', // 11px minimum
+                  color: 'rgba(230, 240, 255, 0.45)',
+                }
+              )}>
                 No buses exposed
               </span>
             )}
           </div>
         </div>
 
-        <div className="rounded-xl border border-glass-border bg-[rgba(9,18,36,0.75)] px-3 py-2">
-          <div className="flex items-center justify-between">
-            <span className="text-[0.48rem] uppercase tracking-[0.35em] text-ink/65">
+        <div style={composeStyles(
+          spacing.px(3),
+          spacing.py(2),
+          effects.border.radius.xl,
+          {
+            border: '1px solid rgba(102, 140, 198, 0.45)',
+            background: 'rgba(9,18,36,0.75)',
+          }
+        )}>
+          <div style={composeStyles(
+            layout.flex.container('row'),
+            layout.flex.align.center,
+            layout.flex.justify.between
+          )}>
+            <span style={composeStyles(
+              typography.transform('uppercase'),
+              typography.tracking.widest,
+              {
+                fontSize: '0.48rem',
+                color: 'rgba(230, 240, 255, 0.65)',
+              }
+            )}>
               Sidechain sources
             </span>
-            <span className="text-[0.45rem] uppercase tracking-[0.3em] text-ink/45">
+            <span style={composeStyles(
+              typography.transform('uppercase'),
+              typography.tracking.widest,
+              {
+                fontSize: '0.45rem',
+                color: 'rgba(230, 240, 255, 0.45)',
+              }
+            )}>
               {sidechainSources.length}
             </span>
           </div>
-          <div className="mt-2 flex flex-col gap-1">
+          <div style={composeStyles(
+            spacing.mt(2),
+            layout.flex.container('col'),
+            spacing.gap(1)
+          )}>
             {sidechainSources.length ? (
               sidechainSources.map((name) => (
                 <span
                   key={`sidechain-${name}`}
-                  className="rounded-lg border border-glass-border/70 bg-[rgba(6,14,28,0.85)] px-2 py-1 text-[0.45rem] uppercase tracking-[0.3em] text-ink/70"
+                  style={composeStyles(
+                    spacing.px(2),
+                    spacing.py(1),
+                    effects.border.radius.lg,
+                    typography.transform('uppercase'),
+                    typography.tracking.widest,
+                    {
+                      border: '1px solid rgba(102, 140, 198, 0.7)',
+                      background: 'rgba(6,14,28,0.85)',
+                      fontSize: '0.6875rem', // 11px minimum
+                      color: 'rgba(230, 240, 255, 0.7)',
+                    }
+                  )}
                 >
                   {name}
                 </span>
               ))
             ) : (
-              <span className="text-[0.45rem] uppercase tracking-[0.3em] text-ink/45">
+              <span style={composeStyles(
+                typography.transform('uppercase'),
+                typography.tracking.widest,
+                {
+                  fontSize: '0.6875rem', // 11px minimum
+                  color: 'rgba(230, 240, 255, 0.45)',
+                }
+              )}>
                 No sidechain sources detected
               </span>
             )}
@@ -1075,74 +2059,192 @@ const FlowChannelStrip: React.FC<FlowChannelStripProps> = memo(
       </div>
     );
 
-    const renderAutomationSurface = () => (
-      <div className="flex flex-1 flex-col gap-2 text-ink">
-        <div className="rounded-xl border border-glass-border bg-[rgba(9,18,36,0.75)] px-3 py-3">
-          <div className="flex items-center justify-between">
-            <span className="text-[0.48rem] uppercase tracking-[0.35em] text-ink/65">
-              ALS automation
-            </span>
-            <span
-              className={`text-[0.48rem] uppercase tracking-[0.3em] ${
-                automationActive ? "text-emerald-300" : "text-ink/50"
-              }`}
-            >
-              {automationActive ? "Active" : "Idle"}
-            </span>
-          </div>
-          <div className="mt-2 flex flex-wrap gap-1.5">
-            {automationTargets.length ? (
-              automationTargets.map((target) => (
-                <span
-                  key={`automation-${target}`}
-                  className="rounded-full border border-glass-border/70 bg-[rgba(6,14,28,0.82)] px-2 py-0.5 text-[0.45rem] uppercase tracking-[0.3em] text-ink/70"
-                >
-                  {target}
-                </span>
-              ))
-            ) : (
-              <span className="text-[0.45rem] uppercase tracking-[0.3em] text-ink/45">
-                No automation passes yet
+    const renderAutomationSurface = () => {
+      return (
+        <div style={composeStyles(
+          layout.flex.container('col'),
+          { flex: 1 },
+          spacing.gap(2),
+          { color: '#e6f0ff' }
+        )}>
+          <div style={composeStyles(
+            spacing.px(3),
+            spacing.py(3),
+            effects.border.radius.xl,
+            {
+              border: '1px solid rgba(102, 140, 198, 0.45)',
+              background: 'rgba(9,18,36,0.75)',
+            }
+          )}>
+            <div style={composeStyles(
+              layout.flex.container('row'),
+              layout.flex.align.center,
+              layout.flex.justify.between
+            )}>
+              <span style={composeStyles(
+                typography.transform('uppercase'),
+                typography.tracking.widest,
+                {
+                  fontSize: '0.48rem',
+                  color: 'rgba(230, 240, 255, 0.65)',
+                }
+              )}>
+                ALS automation
               </span>
-            )}
+              <span style={composeStyles(
+                typography.transform('uppercase'),
+                typography.tracking.widest,
+                {
+                  fontSize: '0.48rem',
+                  color: automationActive ? 'rgba(110, 231, 183, 1)' : 'rgba(230, 240, 255, 0.5)',
+                }
+              )}>
+                {automationActive ? "Active" : "Idle"}
+              </span>
+            </div>
+            <div style={composeStyles(
+              spacing.mt(2),
+              layout.flex.container('row'),
+              layout.flex.wrap.wrap,
+              spacing.gap(1.5)
+            )}>
+              {automationTargets.length ? (
+                automationTargets.map((target) => (
+                  <span
+                    key={`automation-${target}`}
+                    style={composeStyles(
+                      spacing.px(2),
+                      spacing.py(0.5),
+                      effects.border.radius.full,
+                      typography.transform('uppercase'),
+                      typography.tracking.widest,
+                      {
+                        border: '1px solid rgba(102, 140, 198, 0.7)',
+                        background: 'rgba(6,14,28,0.82)',
+                        fontSize: '0.6875rem', // 11px minimum
+                        color: 'rgba(230, 240, 255, 0.7)',
+                      }
+                    )}
+                  >
+                    {target}
+                  </span>
+                ))
+              ) : (
+                <span style={composeStyles(
+                  typography.transform('uppercase'),
+                  typography.tracking.widest,
+                  {
+                    fontSize: '0.6875rem', // 11px minimum
+                    color: 'rgba(230, 240, 255, 0.45)',
+                  }
+                )}>
+                  No automation passes yet
+                </span>
+              )}
+            </div>
           </div>
-        </div>
 
-        <div className="rounded-xl border border-glass-border bg-[rgba(9,18,36,0.75)] px-3 py-2">
-          <div className="flex items-center justify-between">
-            <span className="text-[0.48rem] uppercase tracking-[0.35em] text-ink/65">
-              Quick lanes
-            </span>
-            <span className="text-[0.45rem] uppercase tracking-[0.3em] text-ink/45">
-              Sub {Math.round(Math.min(1, Math.max(0, analysis?.rms ?? 0)) * 100)}%
-            </span>
-          </div>
-          <div className="mt-2 flex flex-wrap gap-1.5">
-            {automationQuickTargets.map(({ fxId, paramName, label }) => {
-              const key = `${fxId}:${paramName}`;
-              const isActive = automationTargets.includes(key);
-              return (
-                <motion.button
-                  key={`automation-toggle-${key}`}
-                  whileTap={{ scale: 0.94 }}
-                  onClick={(event) => {
-                    event.stopPropagation();
-                    onToggleAutomationLaneWithParam?.(track.id, fxId, paramName);
-                  }}
-                  className={`rounded-full border px-3 py-1 text-[0.45rem] uppercase tracking-[0.3em] transition ${
-                    isActive
-                      ? "border-emerald-300/70 bg-[rgba(12,48,52,0.7)] text-emerald-200 shadow-[0_0_14px_rgba(74,222,128,0.35)]"
-                      : "border-glass-border text-ink/65 hover:text-emerald-100"
-                  }`}
-                >
-                  {label}
-                </motion.button>
-              );
-            })}
+          <div style={composeStyles(
+            spacing.px(3),
+            spacing.py(2),
+            effects.border.radius.xl,
+            {
+              border: '1px solid rgba(102, 140, 198, 0.45)',
+              background: 'rgba(9,18,36,0.75)',
+            }
+          )}>
+            <div style={composeStyles(
+              layout.flex.container('row'),
+              layout.flex.align.center,
+              layout.flex.justify.between
+            )}>
+              <span style={composeStyles(
+                typography.transform('uppercase'),
+                typography.tracking.widest,
+                {
+                  fontSize: '0.48rem',
+                  color: 'rgba(230, 240, 255, 0.65)',
+                }
+              )}>
+                Quick lanes
+              </span>
+              <span style={composeStyles(
+                typography.transform('uppercase'),
+                typography.tracking.widest,
+                {
+                  fontSize: '0.6875rem', // 11px minimum
+                  color: 'rgba(230, 240, 255, 0.45)',
+                }
+              )}>
+                Sub {Math.round(Math.min(1, Math.max(0, analysis?.rms ?? 0)) * 100)}%
+              </span>
+            </div>
+            <div style={composeStyles(
+              spacing.mt(2),
+              layout.flex.container('row'),
+              layout.flex.wrap.wrap,
+              spacing.gap(1.5)
+            )}>
+              {automationQuickTargets.map(({ fxId, paramName, label }) => {
+                const key = `${fxId}:${paramName}`;
+                const isActive = automationTargets.includes(key);
+                return (
+                  <button
+                    key={`automation-toggle-${key}`}
+                    style={composeStyles(
+                      spacing.px(3),
+                      spacing.py(1),
+                      effects.border.radius.full,
+                      typography.transform('uppercase'),
+                      typography.tracking.widest,
+                      transitions.transition.standard('all', 200, 'ease-out'),
+                      {
+                        fontSize: '0.6875rem', // 11px minimum
+                        border: isActive
+                          ? '1px solid rgba(110, 231, 183, 0.7)'
+                          : '1px solid rgba(102, 140, 198, 0.45)',
+                        background: isActive
+                          ? 'rgba(12,48,52,0.7)'
+                          : 'transparent',
+                        color: isActive
+                          ? 'rgba(167, 243, 208, 1)'
+                          : 'rgba(230, 240, 255, 0.65)',
+                        boxShadow: isActive
+                          ? '0 0 14px rgba(74,222,128,0.35)'
+                          : 'none',
+                        cursor: 'pointer',
+                      }
+                    )}
+                    onClick={(event) => {
+                      event.stopPropagation();
+                      onToggleAutomationLaneWithParam?.(track.id, fxId, paramName);
+                    }}
+                    onMouseEnter={(e) => {
+                      if (!isActive) {
+                        e.currentTarget.style.color = 'rgba(167, 243, 208, 1)';
+                      }
+                    }}
+                    onMouseLeave={(e) => {
+                      if (!isActive) {
+                        e.currentTarget.style.color = 'rgba(230, 240, 255, 0.65)';
+                      }
+                    }}
+                    onMouseDown={(e) => {
+                      e.currentTarget.style.transform = 'scale(0.95)';
+                    }}
+                    onMouseUp={(e) => {
+                      e.currentTarget.style.transform = 'scale(1)';
+                    }}
+                  >
+                    {label}
+                  </button>
+                );
+              })}
+            </div>
           </div>
         </div>
-      </div>
-    );
+      );
+    };
 
     const renderModeSurface = () => {
       switch (mode) {
@@ -1158,42 +2260,68 @@ const FlowChannelStrip: React.FC<FlowChannelStripProps> = memo(
       }
     };
 
+    // Animated entrance and selection
+    const entranceStyle = useFlowMotion(
+      { opacity: 1, scale: isSelected ? 1.02 : 1 },
+      { duration: 300, easing: 'ease-out' }
+    );
+
     return (
-      <motion.div
-        className={`relative flex flex-col rounded-xl border backdrop-blur-2xl overflow-hidden transition-all bg-glass-surface text-ink ${
-          isSelected
-            ? "border-cyan-300/70 shadow-[0_0_48px_rgba(56,189,248,0.45)]"
-            : "border-glass-border shadow-[0_22px_70px_rgba(4,12,26,0.55)]"
-        } ${
-          isArmed
-            ? "border-red-500/70 shadow-[0_0_32px_rgba(248,113,113,0.5)]"
-            : ""
-        }`}
-        style={{
-          height: `${stageHeight}px`,
-          width: `${MIXER_STRIP_WIDTH}px`,
-          minWidth: `${MIXER_STRIP_MIN_WIDTH}px`,
-          maxWidth: `${MIXER_STRIP_MAX_WIDTH}px`,
-        }}
-        initial={{ opacity: 0, scale: 0.95 }}
-        animate={{ opacity: 1, scale: isSelected ? 1.02 : 1 }}
-        transition={{ duration: 0.3, ease: "easeOut" }}
+      <div
+        style={composeStyles(
+          layout.position.relative,
+          layout.flex.container('col'),
+          effects.border.radius.xl,
+          effects.backdrop.blur('strong'),
+          layout.overflow.hidden,
+          transitions.transition.standard('all', 200, 'ease-out'),
+          {
+            background: 'rgba(9, 18, 36, 0.82)',
+            border: isArmed
+              ? '1px solid rgba(248, 113, 113, 0.7)'
+              : isSelected
+              ? '1px solid rgba(103, 232, 249, 0.7)'
+              : '1px solid rgba(102, 140, 198, 0.45)',
+            boxShadow: isArmed
+              ? '0 0 32px rgba(248,113,113,0.5)'
+              : isSelected
+              ? '0 0 48px rgba(56,189,248,0.45)'
+              : '0 22px 70px rgba(4,12,26,0.55)',
+            color: '#e6f0ff',
+            height: `${stageHeight}px`,
+            width: `${MIXER_STRIP_WIDTH}px`,
+            minWidth: `${MIXER_STRIP_MIN_WIDTH}px`,
+            maxWidth: `${MIXER_STRIP_MAX_WIDTH}px`,
+            opacity: entranceStyle.opacity,
+            transform: `scale(${entranceStyle.scale})`,
+            cursor: 'pointer',
+          }
+        )}
         onClick={() => onSelectTrack(track.id)}
       >
-        <div className="relative flex-shrink-0 h-18 border-b border-glass-border/70">
-          <motion.div
-            className="absolute inset-0"
-            style={{
-              background: `linear-gradient(135deg, ${hexToRgba(
-                channelColor,
-                0.35 + intensity * 0.3
-              )} 0%, transparent 70%)`,
-            }}
-            animate={{ opacity: [0.7, 1, 0.7] }}
-            transition={{ duration: 2.4, repeat: Infinity, ease: "easeInOut" }}
+        <div style={composeStyles(
+          layout.position.relative,
+          { flexShrink: 0, height: '72px' },
+          effects.border.bottom(),
+          {
+            borderBottom: '1px solid rgba(102, 140, 198, 0.7)',
+          }
+        )}>
+          <PulsingChannelBackground
+            channelColor={channelColor}
+            channelGlow={channelGlow}
+            intensity={intensity}
           />
 
-          <div className="relative z-10 px-2 pt-2 flex flex-col gap-1 text-ink">
+          <div style={composeStyles(
+            layout.position.relative,
+            { zIndex: 10 },
+            spacing.px(2),
+            spacing.pt(2),
+            layout.flex.container('col'),
+            spacing.gap(1),
+            { color: '#e6f0ff' }
+          )}>
             {isRenaming ? (
               <input
                 type="text"
@@ -1201,116 +2329,284 @@ const FlowChannelStrip: React.FC<FlowChannelStripProps> = memo(
                 onChange={(event) => setEditedName(event.target.value)}
                 onBlur={handleRename}
                 onKeyDown={(event) => event.key === "Enter" && handleRename()}
-                className="w-full text-[0.55rem] uppercase tracking-[0.35em] bg-transparent border-b border-cyan-300/40 text-ink focus:border-cyan-300/70 outline-none"
+                style={composeStyles(
+                  layout.width.full,
+                  typography.transform('uppercase'),
+                  typography.tracking.widest,
+                  transitions.transition.standard('border-color', 200, 'ease-out'),
+                  {
+                    fontSize: '0.55rem',
+                    background: 'transparent',
+                    borderBottom: '1px solid rgba(103, 232, 249, 0.4)',
+                    color: '#e6f0ff',
+                    outline: 'none',
+                  }
+                )}
+                onFocus={(e) => {
+                  e.currentTarget.style.borderBottomColor = 'rgba(103, 232, 249, 0.7)';
+                }}
+                onBlur={(e) => {
+                  e.currentTarget.style.borderBottomColor = 'rgba(103, 232, 249, 0.4)';
+                }}
                 autoFocus
                 onClick={(event) => event.stopPropagation()}
                 aria-label="Track name"
               />
             ) : (
               <div
-                className="text-[0.55rem] uppercase tracking-[0.35em] text-ink truncate cursor-pointer"
-                style={{ textShadow: `0 0 10px ${hexToRgba(channelGlow, 0.6)}` }}
+                style={composeStyles(
+                  typography.transform('uppercase'),
+                  typography.tracking.widest,
+                  {
+                    fontSize: '0.55rem',
+                    color: '#e6f0ff',
+                    overflow: 'hidden',
+                    textOverflow: 'ellipsis',
+                    whiteSpace: 'nowrap',
+                    cursor: 'pointer',
+                    textShadow: `0 0 10px ${hexToRgba(channelGlow, 0.6)}`,
+                  }
+                )}
                 onDoubleClick={() => setIsRenaming(true)}
                 onClick={(event) => event.stopPropagation()}
               >
                 {track.trackName}
               </div>
             )}
-            <div className="flex items-center justify-between">
-              <div className="text-[0.45rem] uppercase tracking-[0.45em] text-ink/60 truncate">
+            <div style={composeStyles(
+              layout.flex.container('row'),
+              layout.flex.align.center,
+              layout.flex.justify.between
+            )}>
+              <div style={composeStyles(
+                typography.transform('uppercase'),
+                typography.tracking.widest,
+                {
+                  fontSize: '0.6875rem', // 11px minimum
+                  color: 'rgba(230, 240, 255, 0.6)',
+                  overflow: 'hidden',
+                  textOverflow: 'ellipsis',
+                  whiteSpace: 'nowrap',
+                }
+              )}>
                 {track.group}
               </div>
-              <div className="flex items-center gap-1">
+              <div style={composeStyles(
+                layout.flex.container('row'),
+                layout.flex.align.center,
+                spacing.gap(1)
+              )}>
                 <button
                   onClick={(event) => {
                     event.stopPropagation();
                     onMixerChange(track.id, "isMuted", !settings.isMuted);
                   }}
-                  className={`w-6 h-6 rounded-full flex items-center justify-center transition-all ${
-                    settings.isMuted
-                      ? "bg-red-500/80 text-white"
-                      : "bg-[rgba(16,50,95,0.55)] text-ink hover:bg-[rgba(22,64,122,0.7)]"
-                  }`}
+                  style={composeStyles(
+                    layout.flex.container('row'),
+                    layout.flex.align.center,
+                    layout.flex.justify.center,
+                    effects.border.radius.full,
+                    transitions.transition.standard('all', 200, 'ease-out'),
+                    {
+                      width: '24px',
+                      height: '24px',
+                      background: settings.isMuted
+                        ? 'rgba(239, 68, 68, 0.8)'
+                        : 'rgba(16,50,95,0.55)',
+                      color: settings.isMuted ? '#ffffff' : '#e6f0ff',
+                      cursor: 'pointer',
+                    }
+                  )}
+                  onMouseEnter={(e) => {
+                    if (!settings.isMuted) {
+                      e.currentTarget.style.background = 'rgba(22,64,122,0.7)';
+                    }
+                  }}
+                  onMouseLeave={(e) => {
+                    if (!settings.isMuted) {
+                      e.currentTarget.style.background = 'rgba(16,50,95,0.55)';
+                    }
+                  }}
                   aria-label={settings.isMuted ? "Unmute channel" : "Mute channel"}
                   title={settings.isMuted ? "Unmute channel" : "Mute channel"}
                 >
-                  <MuteIcon className="w-3.5 h-3.5" />
+                  <MuteIcon style={{ width: '14px', height: '14px' }} />
                 </button>
                 <button
                   onClick={(event) => {
                     event.stopPropagation();
                     onToggleSolo(track.id);
                   }}
-                  className={`w-6 h-6 rounded-full flex items-center justify-center transition-all ${
-                    isSoloed
-                      ? "bg-amber-300/80 text-ink"
-                      : "bg-[rgba(16,50,95,0.55)] text-ink/80 hover:bg-[rgba(22,64,122,0.7)]"
-                  }`}
+                  style={composeStyles(
+                    layout.flex.container('row'),
+                    layout.flex.align.center,
+                    layout.flex.justify.center,
+                    effects.border.radius.full,
+                    transitions.transition.standard('all', 200, 'ease-out'),
+                    {
+                      width: '24px',
+                      height: '24px',
+                      background: isSoloed
+                        ? 'rgba(252, 211, 77, 0.8)'
+                        : 'rgba(16,50,95,0.55)',
+                      color: '#e6f0ff',
+                      cursor: 'pointer',
+                    }
+                  )}
+                  onMouseEnter={(e) => {
+                    if (!isSoloed) {
+                      e.currentTarget.style.background = 'rgba(22,64,122,0.7)';
+                    }
+                  }}
+                  onMouseLeave={(e) => {
+                    if (!isSoloed) {
+                      e.currentTarget.style.background = 'rgba(16,50,95,0.55)';
+                    }
+                  }}
                   aria-label={isSoloed ? "Unsolo channel" : "Solo channel"}
                   title={isSoloed ? "Unsolo channel" : "Solo channel"}
                 >
-                  <SoloIcon className="w-3.5 h-3.5" />
+                  <SoloIcon style={{ width: '14px', height: '14px' }} />
                 </button>
                 <button
                   onClick={(event) => {
                     event.stopPropagation();
                     onToggleArm(track.id);
                   }}
-                  className={`w-6 h-6 rounded-full flex items-center justify-center transition-all ${
-                    isArmed
-                      ? "bg-red-500 text-white"
-                      : "bg-[rgba(16,50,95,0.55)] text-ink/80 hover:bg-[rgba(22,64,122,0.7)]"
-                  }`}
+                  style={composeStyles(
+                    layout.flex.container('row'),
+                    layout.flex.align.center,
+                    layout.flex.justify.center,
+                    effects.border.radius.full,
+                    transitions.transition.standard('all', 200, 'ease-out'),
+                    {
+                      width: '24px',
+                      height: '24px',
+                      background: isArmed
+                        ? 'rgba(239, 68, 68, 1)'
+                        : 'rgba(16,50,95,0.55)',
+                      color: isArmed ? '#ffffff' : 'rgba(230, 240, 255, 0.8)',
+                      cursor: 'pointer',
+                    }
+                  )}
+                  onMouseEnter={(e) => {
+                    if (!isArmed) {
+                      e.currentTarget.style.background = 'rgba(22,64,122,0.7)';
+                    }
+                  }}
+                  onMouseLeave={(e) => {
+                    if (!isArmed) {
+                      e.currentTarget.style.background = 'rgba(16,50,95,0.55)';
+                    }
+                  }}
                   aria-label={isArmed ? "Disarm recording" : "Arm for recording"}
                   title={isArmed ? "Disarm recording" : "Arm for recording"}
                 >
-                  <ArmIcon className="w-3.5 h-3.5" />
+                  <ArmIcon style={{ width: '14px', height: '14px' }} />
                 </button>
               </div>
             </div>
           </div>
         </div>
 
-        <div className="flex flex-col flex-1 gap-3 px-2 py-3">
-          <div className="flex items-center justify-between gap-2">
-            <div className="flex flex-wrap gap-1.5">
+        <div style={composeStyles(
+          layout.flex.container('col'),
+          { flex: 1 },
+          spacing.gap(3),
+          spacing.px(2),
+          spacing.py(3)
+        )}>
+          <div style={composeStyles(
+            layout.flex.container('row'),
+            layout.flex.align.center,
+            layout.flex.justify.between,
+            spacing.gap(2)
+          )}>
+            <div style={composeStyles(
+              layout.flex.container('row'),
+              layout.flex.wrap.wrap,
+              spacing.gap(1.5)
+            )}>
               {CHANNEL_MODE_DEFINITIONS.map(({ id, label }) => {
                 const isActive = mode === id;
                 return (
-                  <motion.button
+                  <button
                     key={id}
-                    whileTap={{ scale: 0.96 }}
                     onClick={(event) => {
                       event.stopPropagation();
                       setMode(id);
                     }}
-                    className={`rounded-full border px-3 py-1 text-[0.48rem] uppercase tracking-[0.35em] transition ${
-                      isActive
-                        ? "border-cyan-300/80 bg-[rgba(16,50,95,0.7)] text-cyan-100 shadow-[0_0_16px_rgba(56,189,248,0.35)]"
-                        : "border-glass-border text-ink/65 hover:text-cyan-100"
-                    }`}
+                    style={composeStyles(
+                      spacing.px(3),
+                      spacing.py(1),
+                      effects.border.radius.full,
+                      typography.transform('uppercase'),
+                      typography.tracking.widest,
+                      transitions.transition.standard('all', 200, 'ease-out'),
+                      {
+                        fontSize: '0.48rem',
+                        border: isActive
+                          ? '1px solid rgba(103, 232, 249, 0.8)'
+                          : '1px solid rgba(102, 140, 198, 0.45)',
+                        background: isActive
+                          ? 'rgba(16,50,95,0.7)'
+                          : 'transparent',
+                        color: isActive
+                          ? 'rgba(207, 250, 254, 1)'
+                          : 'rgba(230, 240, 255, 0.65)',
+                        boxShadow: isActive
+                          ? '0 0 16px rgba(56,189,248,0.35)'
+                          : 'none',
+                        cursor: 'pointer',
+                      }
+                    )}
+                    onMouseEnter={(e) => {
+                      if (!isActive) {
+                        e.currentTarget.style.color = 'rgba(207, 250, 254, 1)';
+                      }
+                    }}
+                    onMouseLeave={(e) => {
+                      if (!isActive) {
+                        e.currentTarget.style.color = 'rgba(230, 240, 255, 0.65)';
+                      }
+                    }}
+                    onMouseDown={(e) => {
+                      e.currentTarget.style.transform = 'scale(0.96)';
+                    }}
+                    onMouseUp={(e) => {
+                      e.currentTarget.style.transform = 'scale(1)';
+                    }}
                   >
                     {label}
-                  </motion.button>
+                  </button>
                 );
               })}
             </div>
             {actionMessage && (
-              <motion.span
-                className="rounded-full border border-cyan-300/60 bg-[rgba(6,18,34,0.85)] px-3 py-1 text-[0.45rem] uppercase tracking-[0.3em] text-cyan-100"
-                initial={{ opacity: 0, y: -6 }}
-                animate={{ opacity: 1, y: 0 }}
-                exit={{ opacity: 0, y: -6 }}
+              <span
+                style={composeStyles(
+                  spacing.px(3),
+                  spacing.py(1),
+                  effects.border.radius.full,
+                  typography.transform('uppercase'),
+                  typography.tracking.widest,
+                  {
+                    border: '1px solid rgba(103, 232, 249, 0.6)',
+                    background: 'rgba(6,18,34,0.85)',
+                    fontSize: '0.6875rem', // 11px minimum
+                    color: 'rgba(207, 250, 254, 1)',
+                  }
+                )}
               >
                 {actionMessage}
-              </motion.span>
+              </span>
             )}
           </div>
-          <div className="flex flex-1">
+          <div style={{ flex: 1 }}>
             {renderModeSurface()}
           </div>
         </div>
-      </motion.div>
+      </div>
     );
   }
 );

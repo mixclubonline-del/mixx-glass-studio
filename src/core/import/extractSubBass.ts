@@ -46,7 +46,7 @@ export async function extractSubBass(
   try {
     return await ctx.startRendering();
   } catch (error) {
-    console.warn('[FLOW IMPORT] Sub-bass extraction failed, returning original buffer:', error);
+    // Sub-bass extraction failed - graceful fallback (no ALS needed for expected failures)
     return audioBuffer;
   }
 }
@@ -82,7 +82,7 @@ export async function extractBass(
   try {
     return await ctx.startRendering();
   } catch (error) {
-    console.warn('[FLOW IMPORT] Bass extraction failed, returning original buffer:', error);
+    // Bass extraction failed - graceful fallback (no ALS needed for expected failures)
     return audioBuffer;
   }
 }

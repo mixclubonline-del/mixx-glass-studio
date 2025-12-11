@@ -115,10 +115,8 @@ export async function compareBackends(
  * Log benchmark results
  */
 export function logBenchmarkResult(result: BenchmarkResult): void {
-  console.log(`[Benchmark] ${result.operation} (${result.backend}):`);
-  console.log(`  Duration: ${result.duration.toFixed(2)}ms`);
-  console.log(`  Throughput: ${result.throughput.toFixed(2)} ops/sec`);
-  console.log(`  Memory: ${(result.memoryUsed / 1024).toFixed(2)} KB`);
+  // Benchmark results available via return value
+  // Logging removed - use return value for feedback
 }
 
 /**
@@ -135,8 +133,6 @@ export function logComparisonResults(comparison: {
   if (comparison.cpu) {
     logBenchmarkResult(comparison.cpu);
   }
-  if (comparison.speedup) {
-    console.log(`[Benchmark] Speedup: ${comparison.speedup.toFixed(2)}x faster with WebGPU`);
-  }
+  // Speedup available via return value
 }
 
