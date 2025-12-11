@@ -35,6 +35,14 @@ export function useFlowMotion<T extends Record<string, number | string>>(
   }, [current]);
 
   useEffect(() => {
+    // If duration is 0, return target immediately (instant, no animation)
+    if (duration === 0) {
+      setCurrent(target);
+      startValuesRef.current = { ...target };
+      currentRef.current = { ...target };
+      return;
+    }
+
     // Cancel any existing animation
     if (animationRef.current !== null) {
       cancelAnimationFrame(animationRef.current);

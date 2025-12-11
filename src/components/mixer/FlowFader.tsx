@@ -30,14 +30,38 @@ const FlowFader: React.FC<FlowFaderProps> = ({
   const containerRef = useRef<HTMLDivElement>(null);
   const [isDragging, setIsDragging] = useState(false);
   const [showDBBubble, setShowDBBubble] = useState(false);
+  const dragStartRef = useRef<{ y: number; value: number } | null>(null);
+  
+  // Calculate position directly - NO animation during drag for instant response
+  const sliderRatio = clamp(value / 1.2, 0, 1);
 
+  // Professional fader interaction: click-to-jump (direct), drag with fine/coarse control
   const handlePointerValue = useCallback(
-    (clientY: number) => {
+    (clientY: number, isInitialClick: boolean = false, isFineTuning: boolean = false, isCoarseTuning: boolean = false) => {
       if (!containerRef.current) return;
       const rect = containerRef.current.getBoundingClientRect();
       const relative = 1 - (clientY - rect.top) / rect.height;
-      const scaled = clamp(relative * 1.2, 0, 1.2);
-      onChange(Number(scaled.toFixed(3)));
+      const targetValue = clamp(relative * 1.2, 0, 1.2);
+      
+      if (isInitialClick) {
+        // Click anywhere: jump directly to position (1:1, professional standard)
+        onChange(Number(targetValue.toFixed(3)));
+        dragStartRef.current = { y: clientY, value: targetValue };
+      } else if (dragStartRef.current) {
+        // Drag: move relative to start position with fine/coarse control
+        const deltaY = dragStartRef.current.y - clientY;
+        const pixelsPerUnit = rect.height / 1.2; // Full range in pixels
+        
+        // Professional sensitivity: 1:1 pixel mapping by default
+        // Fine: 0.25x (Shift), Coarse: 4x (Cmd/Ctrl)
+        let sensitivity = 1.0;
+        if (isFineTuning) sensitivity = 0.25;
+        if (isCoarseTuning) sensitivity = 4.0;
+        
+        const deltaValue = (deltaY / pixelsPerUnit) * sensitivity;
+        const newValue = clamp(dragStartRef.current.value + deltaValue, 0, 1.2);
+        onChange(Number(newValue.toFixed(3)));
+      }
     },
     [onChange]
   );
@@ -51,7 +75,8 @@ const FlowFader: React.FC<FlowFaderProps> = ({
       containerRef.current?.setPointerCapture(event.pointerId);
       setIsDragging(true);
       if (showDB) setShowDBBubble(true);
-      handlePointerValue(event.clientY);
+      // Initial click: jump directly to position (professional standard)
+      handlePointerValue(event.clientY, true, false, false);
     },
     [handlePointerValue, showDB]
   );
@@ -60,11 +85,15 @@ const FlowFader: React.FC<FlowFaderProps> = ({
     if (!isDragging) return;
 
     const handlePointerMove = (event: PointerEvent) => {
-      handlePointerValue(event.clientY);
+      const isFineTuning = event.shiftKey;
+      const isCoarseTuning = event.metaKey || event.ctrlKey;
+      // Drag: move relative to start with fine/coarse control
+      handlePointerValue(event.clientY, false, isFineTuning, isCoarseTuning);
     };
 
     const handlePointerUp = () => {
       setIsDragging(false);
+      dragStartRef.current = null;
       if (showDB) {
         setTimeout(() => setShowDBBubble(false), 400);
       }
@@ -79,6 +108,7 @@ const FlowFader: React.FC<FlowFaderProps> = ({
     };
   }, [handlePointerValue, isDragging]);
 
+  // Calculate position directly - NO animation during drag for instant response
   const sliderRatio = clamp(value / 1.2, 0, 1);
   const intensity = alsFeedback?.intensity ?? 0;
   const pulse = alsFeedback?.pulse ?? 0;
@@ -124,6 +154,7 @@ const FlowFader: React.FC<FlowFaderProps> = ({
           background: 'linear-gradient(to bottom, rgba(0,0,0,0.7), rgba(0,0,0,0.6), rgba(0,0,0,0.8))',
           border: '1px solid rgba(255,255,255,0.05)',
           boxShadow: 'inset 0 2px 4px rgba(0,0,0,0.3)',
+          width: '24px', // Wider track for immersive 40px cap
         }
       )}>
         <PulsingFaderBackground glowColor={glowColor} intensity={intensity} />
@@ -139,6 +170,21 @@ const FlowFader: React.FC<FlowFaderProps> = ({
           }
         )} />
       </div>
+      
+      {/* Fader fill - instant during drag, fast snap after */}
+      <div style={composeStyles(
+        layout.position.absolute,
+        { bottom: 0, left: 0, right: 0 },
+        {
+          height: `${sliderRatio * 100}%`,
+          background: `linear-gradient(180deg, ${hexToRgba(trackColor, 0.6)}, ${hexToRgba(glowColor, 0.3)})`,
+          boxShadow: `0 0 ${4 + intensity * 6}px ${hexToRgba(glowColor, 0.3)}`,
+          borderRadius: '12px',
+          // Instant during drag, fast snap after
+          transition: isDragging ? 'none' : 'height 60ms ease-out, box-shadow 80ms ease-out',
+          willChange: isDragging ? 'height' : 'auto',
+        }
+      )} />
 
       <PulsingFaderThumb
         trackColor={trackColor}
@@ -286,25 +332,38 @@ const PulsingFaderThumb: React.FC<{
     maxScale: 1 + pulse * 0.05,
     easing: 'ease-in-out',
   });
+  // Professional fader cap: instant position, fast visual transitions
   return (
     <div
       style={composeStyles(
         layout.position.absolute,
         { left: '50%' },
-        transitions.transform.combine(`translateX(-50%) scale(${pulseScale.scale})`),
-        effects.border.radius.full,
         {
-          width: '40px',
-          height: '12px',
+          width: '40px',  // Wider immersive cap (Logic/Pro Tools/Ableton standard)
+          height: '12px', // Taller professional cap
           top: `${(1 - sliderRatio) * 100}%`,
-          background: `linear-gradient(135deg, ${hexToRgba(
-            trackColor,
-            0.85
-          )}, ${hexToRgba(glowColor, 0.75)})`,
-          border: '1px solid rgba(255,255,255,0.1)',
-          boxShadow: `0 0 18px ${hexToRgba(glowColor, 0.4 + intensity * 0.4)}`,
+          borderRadius: '6px', // Subtle rounding
+          // ALS-driven gradient: intensity affects color saturation
+          background: `linear-gradient(180deg, 
+            ${hexToRgba(trackColor, 0.8 + intensity * 0.15)}, 
+            ${hexToRgba(glowColor, 0.6 + intensity * 0.15)}
+          )`,
+          // Temperature-driven border with ALS intensity
+          border: `1px solid ${hexToRgba(glowColor, 0.25 + intensity * 0.3)}`,
+          // ALS pulse-driven glow + professional depth
+          boxShadow: `
+            0 0 ${8 + pulse * 16}px ${hexToRgba(glowColor, 0.3 + pulse * 0.4)},
+            0 2px 4px rgba(0, 0, 0, 0.4),
+            inset 0 1px 0 rgba(255, 255, 255, 0.15),
+            inset 0 -1px 0 rgba(0, 0, 0, 0.2)
+          `,
           opacity: pulseOpacity.opacity,
-          backdropFilter: 'blur(4px)',
+          // Instant position - NO transition on top/transform
+          // Fast transitions for visual properties only
+          transition: 'box-shadow 80ms ease-out, border-color 80ms ease-out, background 80ms ease-out, opacity 80ms ease-out',
+          transform: 'translateX(-50%)',
+          // Performance optimization
+          willChange: 'top, box-shadow',
         }
       )}
     >

@@ -20,11 +20,14 @@ import { hexToRgba } from "../utils/ALS";
 import type { WaveformHeaderSettings } from "../types/waveformHeaderSettings";
 import { DEFAULT_WAVEFORM_HEADER_SETTINGS } from "../types/waveformHeaderSettings";
 import { spacing, typography, layout, effects, transitions, composeStyles } from "../design-system";
+import { ALSSpine } from "./transport/ALSSpine";
 
 interface AdaptiveWaveformHeaderProps {
   primeBrainStatus: PrimeBrainStatus;
   hushFeedback: { color: string; intensity: number; isEngaged: boolean; noiseCount?: number };
   isPlaying: boolean;
+  masterAnalysis?: { level: number; peak?: number; transient?: boolean };
+  loudnessMetrics?: { momentaryLUFS?: number; shortTermLUFS?: number; integratedLUFS?: number };
   onHeightChange?: (height: number) => void;
   className?: string;
   settings?: WaveformHeaderSettings;
@@ -94,6 +97,8 @@ const AdaptiveWaveformHeader: React.FC<AdaptiveWaveformHeaderProps> = ({
   primeBrainStatus,
   hushFeedback,
   isPlaying,
+  masterAnalysis,
+  loudnessMetrics,
   onHeightChange,
   className,
   settings = DEFAULT_WAVEFORM_HEADER_SETTINGS,
@@ -448,6 +453,23 @@ const AdaptiveWaveformHeader: React.FC<AdaptiveWaveformHeaderProps> = ({
         }
       )}
     >
+      {/* ALS Spine - Professional top-edge meter */}
+      {masterAnalysis && (
+        <div style={composeStyles(
+          layout.position.absolute,
+          { top: 0, left: 0, right: 0, zIndex: 50 },
+          spacing.px(6),
+          spacing.pt(2)
+        )}>
+          <ALSSpine
+            level={masterAnalysis.level}
+            peak={masterAnalysis.peak}
+            lufs={loudnessMetrics?.momentaryLUFS}
+            isClipping={masterAnalysis.level >= 0.95}
+          />
+        </div>
+      )}
+
       {/* Waveform Canvas */}
       <canvas
         ref={canvasRef}
@@ -461,6 +483,7 @@ const AdaptiveWaveformHeader: React.FC<AdaptiveWaveformHeaderProps> = ({
             height: `${waveformHeight}px`,
             left: 0,
             right: 0,
+            marginTop: masterAnalysis ? '12px' : '0',
           }
         )}
       />

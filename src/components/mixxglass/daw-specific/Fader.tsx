@@ -17,6 +17,7 @@ import { useFlowMotion } from '../hooks/useFlowMotion';
 import { getGlassSurface } from '../utils/glassStyles';
 import { useALSFeedback, type ALSChannel } from '../hooks/useALSFeedback';
 import { valueToTemperature } from '../utils/alsHelpers';
+import { hexToRgba } from '../../../utils/ALS';
 import { layout, effects, transitions, spacing, typography, composeStyles } from '../../../design-system';
 
 export interface MixxGlassFaderProps {
@@ -24,6 +25,7 @@ export interface MixxGlassFaderProps {
   onChange: (value: number) => void;
   alsChannel?: ALSChannel;
   alsIntensity?: number;
+  alsPulse?: number; // ALS pulse value for immersive feedback
   trackColor?: string;
   glowColor?: string;
   name?: string;
@@ -49,6 +51,7 @@ export const MixxGlassFader: React.FC<MixxGlassFaderProps> = ({
   onChange,
   alsChannel = 'momentum',
   alsIntensity,
+  alsPulse,
   trackColor,
   glowColor,
   name = 'fader',
@@ -60,6 +63,8 @@ export const MixxGlassFader: React.FC<MixxGlassFaderProps> = ({
   const containerRef = useRef<HTMLDivElement>(null);
   const [isDragging, setIsDragging] = useState(false);
   const [showValueBubble, setShowValueBubble] = useState(false);
+  const [isHovering, setIsHovering] = useState(false);
+  const dragStartRef = useRef<{ y: number; value: number } | null>(null);
 
   // ALS feedback
   const normalizedValue = clamp(value / 1.2, 0, 1);
@@ -72,20 +77,47 @@ export const MixxGlassFader: React.FC<MixxGlassFaderProps> = ({
   // Temperature representation (no raw numbers)
   const temperature = valueToTemperature(normalizedValue);
 
-  // Animated position using useFlowMotion
+  // Professional fader position: instant during drag, fast snap after
+  // NO animation during drag - instant response is critical for professional DAWs
   const sliderRatio = clamp(value / 1.2, 0, 1);
+  // During drag: instant (duration 0). After drag: fast snap (60ms)
   const animatedPosition = useFlowMotion(
     { position: sliderRatio },
-    { duration: 150, easing: 'ease-out' }
+    { 
+      duration: isDragging ? 0 : 60, // Instant during drag, 60ms snap after (professional standard)
+      easing: 'ease-out' 
+    }
   );
+  // Use animated position (which is instant when duration=0 during drag)
+  const displayPosition = animatedPosition.position;
 
+  // Professional fader interaction: click-to-jump (direct), drag with fine/coarse control
   const handlePointerValue = useCallback(
-    (clientY: number) => {
+    (clientY: number, isInitialClick: boolean = false, isFineTuning: boolean = false, isCoarseTuning: boolean = false) => {
       if (!containerRef.current || disabled) return;
       const rect = containerRef.current.getBoundingClientRect();
       const relative = 1 - (clientY - rect.top) / rect.height;
-      const scaled = clamp(relative * 1.2, 0, 1.2);
-      onChange(Number(scaled.toFixed(3)));
+      const targetValue = clamp(relative * 1.2, 0, 1.2);
+      
+      if (isInitialClick) {
+        // Click anywhere: jump directly to position (1:1, professional standard)
+        onChange(Number(targetValue.toFixed(3)));
+        dragStartRef.current = { y: clientY, value: targetValue };
+      } else if (dragStartRef.current) {
+        // Drag: move relative to start position with fine/coarse control
+        const deltaY = dragStartRef.current.y - clientY;
+        const pixelsPerUnit = rect.height / 1.2; // Full range in pixels
+        
+        // Professional sensitivity: 1:1 pixel mapping by default
+        // Fine: 0.25x (Shift), Coarse: 4x (Cmd/Ctrl)
+        let sensitivity = 1.0;
+        if (isFineTuning) sensitivity = 0.25;
+        if (isCoarseTuning) sensitivity = 4.0;
+        
+        const deltaValue = (deltaY / pixelsPerUnit) * sensitivity;
+        const newValue = clamp(dragStartRef.current.value + deltaValue, 0, 1.2);
+        onChange(Number(newValue.toFixed(3)));
+      }
     },
     [onChange, disabled]
   );
@@ -102,7 +134,8 @@ export const MixxGlassFader: React.FC<MixxGlassFaderProps> = ({
       if (showDB || showTemperature) {
         setShowValueBubble(true);
       }
-      handlePointerValue(event.clientY);
+      // Initial click: jump directly to position (professional standard)
+      handlePointerValue(event.clientY, true, false, false);
     },
     [handlePointerValue, showDB, showTemperature, disabled]
   );
@@ -111,11 +144,15 @@ export const MixxGlassFader: React.FC<MixxGlassFaderProps> = ({
     if (!isDragging) return;
 
     const handlePointerMove = (event: PointerEvent) => {
-      handlePointerValue(event.clientY);
+      const isFineTuning = event.shiftKey;
+      const isCoarseTuning = event.metaKey || event.ctrlKey;
+      // Drag: move relative to start with fine/coarse control
+      handlePointerValue(event.clientY, false, isFineTuning, isCoarseTuning);
     };
 
     const handlePointerUp = () => {
       setIsDragging(false);
+      dragStartRef.current = null;
       if (showDB || showTemperature) {
         setTimeout(() => setShowValueBubble(false), 400);
       }
@@ -159,22 +196,24 @@ export const MixxGlassFader: React.FC<MixxGlassFaderProps> = ({
     glowColor: alsFeedback?.glowColor || glowColor || trackColor,
   });
 
-  // Fader track style
+  // Professional fader track style
   const trackStyle: React.CSSProperties = composeStyles(
-    glassSurface,
     layout.position.relative,
     layout.overflow.hidden,
     {
       height: `${height}px`,
-      width: '24px',
-      borderRadius: '12px',
+      width: '24px', // Wider track for immersive 40px cap (Logic/Pro Tools/Ableton standard)
+      borderRadius: '11px',
+      background: 'linear-gradient(180deg, rgba(0, 0, 0, 0.6), rgba(0, 0, 0, 0.8), rgba(0, 0, 0, 0.6))',
+      border: '1px solid rgba(255, 255, 255, 0.08)',
+      boxShadow: 'inset 0 2px 4px rgba(0, 0, 0, 0.4)',
       cursor: disabled ? 'not-allowed' : 'pointer',
       opacity: disabled ? 0.5 : 1,
     }
   );
 
-  // Fader fill (shows level)
-  const fillHeight = animatedPosition.position * 100;
+  // Professional fader fill: instant during drag, fast snap after
+  const fillHeight = displayPosition * 100;
   const fillStyle: React.CSSProperties = composeStyles(
     layout.position.absolute,
     {
@@ -183,31 +222,73 @@ export const MixxGlassFader: React.FC<MixxGlassFaderProps> = ({
       right: 0,
       height: `${fillHeight}%`,
       background: trackColor
-        ? `linear-gradient(180deg, ${trackColor}80, ${glowColor || trackColor}40)`
-        : `linear-gradient(180deg, ${alsFeedback?.color || temperature.color}80, ${alsFeedback?.glowColor || temperature.color}40)`,
-      boxShadow: `0 0 ${10 + (alsFeedback?.intensity || 0) * 15}px ${alsFeedback?.glowColor || temperature.color}50`,
-      borderRadius: '12px',
-    },
-    transitions.transition.standard('height', 150, 'ease-out')
+        ? `linear-gradient(180deg, ${trackColor}60, ${glowColor || trackColor}30)`
+        : `linear-gradient(180deg, ${alsFeedback?.color || temperature.color}60, ${alsFeedback?.glowColor || temperature.color}30)`,
+      boxShadow: `0 0 ${4 + (alsFeedback?.intensity || 0) * 6}px ${alsFeedback?.glowColor || temperature.color}30`,
+      borderRadius: '11px',
+      // Instant during drag, fast snap after
+      transition: isDragging 
+        ? 'none' // NO transition during drag - instant response
+        : 'height 60ms ease-out, box-shadow 80ms ease-out',
+      // Performance optimization
+      willChange: isDragging ? 'height' : 'auto',
+    }
   );
 
-  // Fader cap (thumb)
+  // Immersive ALS-integrated fader cap - wider, more interactive, professional
+  const capIntensity = alsIntensity ?? alsFeedback?.intensity ?? normalizedValue;
+  const capPulse = alsPulse ?? (alsFeedback?.pulse ? 0.8 : 0.3);
+  const capColor = trackColor || alsFeedback?.color || temperature.color;
+  const capGlow = glowColor || alsFeedback?.glowColor || temperature.color;
+  
+  // ALS-driven cap color intensity (using rgba for proper alpha)
+  const capColorAlpha = 0.78 + capIntensity * 0.22; // 0.78-1.0 based on intensity
+  const capGlowAlpha = 0.59 + capIntensity * 0.21; // 0.59-0.8 based on intensity
+  
+  // ALS pulse-driven glow intensity
+  const pulseGlowIntensity = 8 + capPulse * 16; // 8-24px glow based on pulse
+  const pulseGlowAlpha = 0.12 + capPulse * 0.20; // 0.12-0.32 alpha based on pulse
+  
+  // Temperature-driven border
+  const temperatureAlpha = 0.10 + capIntensity * 0.20; // 0.10-0.30 based on intensity
+  
+  // Interactive state multipliers
+  const hoverMultiplier = isHovering ? 1.3 : 1.0;
+  const dragMultiplier = isDragging ? 1.5 : 1.0;
+  const interactiveMultiplier = Math.max(hoverMultiplier, dragMultiplier);
+  
+  // Professional fader cap: instant position during drag, fast transitions for visual properties only
   const capStyle: React.CSSProperties = composeStyles(
     layout.position.absolute,
-    effects.border.radius.full,
-    transitions.transition.standard('all', 150, 'ease-out'),
     {
       left: '50%',
       bottom: `${fillHeight}%`,
-      transform: 'translate(-50%, 50%)',
-      width: '20px',
-      height: '20px',
-      background: trackColor
-        ? `radial-gradient(circle, ${trackColor}, ${glowColor || trackColor}80)`
-        : `radial-gradient(circle, ${alsFeedback?.color || temperature.color}, ${alsFeedback?.glowColor || temperature.color}80)`,
-      border: '2px solid rgba(255, 255, 255, 0.4)',
-      boxShadow: `0 0 ${8 + (alsFeedback?.intensity || 0) * 12}px ${alsFeedback?.glowColor || temperature.color}60, inset 0 0 0.5px rgba(255, 255, 255, 0.3)`,
-      cursor: disabled ? 'not-allowed' : 'grab',
+      // Instant position - NO transition on bottom/transform during drag
+      transform: `translate(-50%, 50%) scale(${isHovering && !isDragging ? 1.05 : 1})`,
+      width: '40px',  // Wider professional cap (Logic/Pro Tools/Ableton standard)
+      height: '12px', // Taller professional cap
+      borderRadius: '6px', // Subtle rounding
+      // ALS-driven gradient: intensity affects color saturation
+      background: `linear-gradient(180deg, 
+        ${hexToRgba(capColor, capColorAlpha)}, 
+        ${hexToRgba(capGlow, capGlowAlpha)}
+      )`,
+      // Temperature-driven border with ALS intensity
+      border: `1px solid ${hexToRgba(capGlow, temperatureAlpha)}`,
+      // ALS pulse-driven glow + professional depth
+      boxShadow: `
+        0 0 ${pulseGlowIntensity * interactiveMultiplier}px ${hexToRgba(capGlow, pulseGlowAlpha * interactiveMultiplier)},
+        0 2px 4px rgba(0, 0, 0, 0.4),
+        inset 0 1px 0 rgba(255, 255, 255, 0.15),
+        inset 0 -1px 0 rgba(0, 0, 0, 0.2)
+      `,
+      cursor: disabled ? 'not-allowed' : isDragging ? 'grabbing' : 'grab',
+      // Fast transitions for visual properties only (not position)
+      transition: isDragging 
+        ? 'none' // NO transitions during drag - instant response
+        : 'box-shadow 80ms ease-out, border-color 80ms ease-out, background 80ms ease-out, transform 80ms ease-out',
+      // Performance optimization
+      willChange: isDragging ? 'transform' : 'auto',
     }
   );
 
@@ -241,12 +322,14 @@ export const MixxGlassFader: React.FC<MixxGlassFaderProps> = ({
       style={trackStyle}
       onPointerDown={handlePointerDown}
       onKeyDown={handleKeyDown}
+      onMouseEnter={() => setIsHovering(true)}
+      onMouseLeave={() => setIsHovering(false)}
       tabIndex={disabled ? -1 : 0}
       role="slider"
       aria-label={name}
-      aria-valuemin={0}
-      aria-valuemax={1.2}
-      aria-valuenow={value}
+      aria-valuemin="0"
+      aria-valuemax="1.2"
+      aria-valuenow={String(Math.round(value * 100) / 100)}
     >
       {/* Fill (level indicator) */}
       <div className="mixxglass-fader-fill" style={fillStyle} />
@@ -267,18 +350,28 @@ export const MixxGlassFader: React.FC<MixxGlassFaderProps> = ({
         </div>
       )}
 
-      {/* ALS pulse overlay */}
-      {alsFeedback?.pulse && (
+      {/* Immersive ALS energy flow visualization - shows energy around cap */}
+      {alsFeedback && (
         <div
           style={composeStyles(
             layout.position.absolute,
-            { inset: 0 },
-            effects.border.radius.full,
             {
+              left: '50%',
+              bottom: `${fillHeight}%`,
+              transform: 'translate(-50%, 50%)',
+              width: '44px', // Slightly wider than cap for energy halo
+              height: '16px',
+              borderRadius: '8px',
               pointerEvents: 'none',
-              background: `radial-gradient(circle at 50% ${100 - fillHeight}%, ${alsFeedback.glowColor} 0%, transparent 50%)`,
-              opacity: 0.2,
-              animation: 'pulse 2s ease-in-out infinite',
+              // ALS pulse-driven energy visualization
+              background: `radial-gradient(ellipse, ${hexToRgba(alsFeedback.glowColor, 0.08 + capPulse * 0.12)} 0%, transparent 70%)`,
+              opacity: 0.4 + capPulse * 0.3,
+              filter: `blur(${2 + capPulse * 2}px)`,
+              // Instant position, smooth visual properties
+              transition: isDragging 
+                ? 'none' 
+                : 'bottom 60ms ease-out, opacity 120ms ease-out, filter 120ms ease-out',
+              willChange: isDragging ? 'bottom' : 'opacity, filter',
             }
           )}
         />

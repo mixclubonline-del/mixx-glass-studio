@@ -7547,6 +7547,8 @@ const FlowRuntime: React.FC<FlowRuntimeProps> = ({ arrangeFocusToken }) => {
           primeBrainStatus={primeBrainStatus}
           hushFeedback={hushFeedback}
           isPlaying={isPlaying}
+          masterAnalysis={masterAnalysis}
+          loudnessMetrics={loudnessMetrics}
           onHeightChange={setHeaderHeight}
           settings={waveformHeaderSettings}
         />

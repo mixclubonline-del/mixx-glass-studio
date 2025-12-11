@@ -16,6 +16,21 @@
   --btn-radius: 12px;
 }
 
+/* Debug: Verify CSS is loaded */
+body::after {
+  content: 'Button CSS loaded';
+  position: fixed;
+  bottom: 0;
+  right: 0;
+  background: rgba(139, 123, 255, 0.9);
+  color: white;
+  padding: 4px 8px;
+  font-size: 10px;
+  z-index: 99999;
+  pointer-events: none;
+  opacity: 0.7;
+}
+
 /* Universal Mixx button - Enhancement layer */
 button.button-mixx,
 .button-mixx {

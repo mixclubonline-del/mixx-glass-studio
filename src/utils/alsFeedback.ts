@@ -5,7 +5,7 @@
  * Follows Flow Doctrine: No raw numbers, only color/temperature/energy
  */
 
-import { alsHelpers } from '../components/mixxglass/utils/alsHelpers';
+import { generateALSFeedback } from '../components/mixxglass/utils/alsHelpers';
 
 export type ALSMessageLevel = 'info' | 'success' | 'warning' | 'error' | 'system';
 
@@ -81,7 +81,7 @@ export function alsLog(level: ALSMessageLevel, message: string, ...args: any[]):
     }
     
     // Create ALS feedback for visual display
-    const feedback = alsHelpers.generateALSFeedback(channel, intensity, 0.5);
+    const feedback = generateALSFeedback(channel, intensity, 0.5);
     
     // Trigger ALS pulse for important messages
     if (level === 'error' || level === 'warning') {

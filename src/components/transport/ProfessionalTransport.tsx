@@ -13,7 +13,11 @@ interface ProfessionalTransportProps {
   isLooping: boolean;
   currentTime: number;
   onPlayPause: () => void;
-  onSeek: (direction: 'back' | 'forward') => void;
+  onSeek?: (direction: 'back' | 'forward') => void;
+  onSeekPointerDown?: (direction: 'back' | 'forward') => (event: React.PointerEvent<HTMLButtonElement>) => void;
+  onSeekPointerUp?: (direction: 'back' | 'forward') => (event: React.PointerEvent<HTMLButtonElement>) => void;
+  onPlayPointerDown?: (event: React.PointerEvent<HTMLButtonElement>) => void;
+  onPlayPointerUp?: () => void;
   onToggleLoop: () => void;
   className?: string;
 }
@@ -31,6 +35,10 @@ export const ProfessionalTransport: React.FC<ProfessionalTransportProps> = ({
   currentTime,
   onPlayPause,
   onSeek,
+  onSeekPointerDown,
+  onSeekPointerUp,
+  onPlayPointerDown,
+  onPlayPointerUp,
   onToggleLoop,
   className = '',
 }) => {
@@ -55,8 +63,12 @@ export const ProfessionalTransport: React.FC<ProfessionalTransportProps> = ({
       <button
         type="button"
         aria-label="Cue backward"
-        onClick={() => onSeek('back')}
-        className="btn-transport-secondary"
+        onClick={() => onSeek?.('back')}
+        onPointerDown={onSeekPointerDown?.('back')}
+        onPointerUp={onSeekPointerUp?.('back')}
+        onPointerLeave={onSeekPointerUp?.('back')}
+        onPointerCancel={onSeekPointerUp?.('back')}
+        className="btn-transport-secondary button-mixx secondary"
         style={{
           width: '40px',
           height: '40px',
@@ -93,7 +105,9 @@ export const ProfessionalTransport: React.FC<ProfessionalTransportProps> = ({
         type="button"
         aria-label={isPlaying ? 'Pause' : 'Play'}
         onClick={onPlayPause}
-        className="btn-play"
+        onPointerDown={onPlayPointerDown}
+        onPointerUp={onPlayPointerUp}
+        className="btn-play button-mixx primary"
         style={{
           width: '48px',
           height: '48px',
@@ -137,8 +151,12 @@ export const ProfessionalTransport: React.FC<ProfessionalTransportProps> = ({
       <button
         type="button"
         aria-label="Cue forward"
-        onClick={() => onSeek('forward')}
-        className="btn-transport-secondary"
+        onClick={() => onSeek?.('forward')}
+        onPointerDown={onSeekPointerDown?.('forward')}
+        onPointerUp={onSeekPointerUp?.('forward')}
+        onPointerLeave={onSeekPointerUp?.('forward')}
+        onPointerCancel={onSeekPointerUp?.('forward')}
+        className="btn-transport-secondary button-mixx secondary"
         style={{
           width: '40px',
           height: '40px',
@@ -195,6 +213,7 @@ export const ProfessionalTransport: React.FC<ProfessionalTransportProps> = ({
         aria-pressed={isLooping}
         aria-label="Toggle loop"
         onClick={onToggleLoop}
+        className="button-mixx icon"
         style={{
           width: '40px',
           height: '40px',

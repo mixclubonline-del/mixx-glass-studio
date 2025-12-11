@@ -21,8 +21,7 @@
 @tailwind components;
 @tailwind utilities;
 
-/* Import Mixx button styles for immediate global application */
-@import './styles/mixx-button.css';
+/* Mixx button styles are imported in index.tsx */
 
 :root {
   color-scheme: dark;

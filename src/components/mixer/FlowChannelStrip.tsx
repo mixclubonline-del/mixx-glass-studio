@@ -744,6 +744,7 @@ const FlowChannelStrip: React.FC<FlowChannelStripProps> = memo(
                 onChange={(value) => onMixerChange(track.id, "volume", value)}
                 alsChannel="momentum"
                 alsIntensity={alsFeedback?.intensity}
+                alsPulse={alsFeedback?.pulse}
                 trackColor={channelColor}
                 glowColor={channelGlow}
                 name={track.trackName}

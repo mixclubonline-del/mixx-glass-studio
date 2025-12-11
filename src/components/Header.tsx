@@ -3,11 +3,14 @@ import clsx from "clsx";
 import type { PrimeBrainStatus } from "../types/primeBrainStatus";
 import { PrimeBrainIcon } from "./flowdock/glyphs/PrimeBrainIcon";
 import { FlowPulseBar } from "./visualizers/FlowPulseBar";
+import { ALSSpine } from "./transport/ALSSpine";
 
 interface HeaderProps {
   primeBrainStatus: PrimeBrainStatus;
   hushFeedback: { color: string; intensity: number; isEngaged: boolean; noiseCount?: number };
   isPlaying: boolean;
+  masterAnalysis?: { level: number; peak?: number; transient?: boolean };
+  loudnessMetrics?: { momentaryLUFS?: number; shortTermLUFS?: number; integratedLUFS?: number };
   onHeightChange?: (height: number) => void;
   className?: string;
 }
@@ -18,6 +21,8 @@ const Header: React.FC<HeaderProps> = ({
   primeBrainStatus,
   hushFeedback,
   isPlaying,
+  masterAnalysis,
+  loudnessMetrics,
   onHeightChange,
   className,
 }) => {
@@ -127,10 +132,24 @@ const Header: React.FC<HeaderProps> = ({
         </div>
       </div>
 
-      {/* Flow ALS Bar with Adapting Waveform */}
-      <div className="mt-3 -mx-6 px-6">
-        <FlowPulseBar />
-      </div>
+      {/* ALS Spine - Professional top-edge meter */}
+      {masterAnalysis && (
+        <div className="mt-3 -mx-6 px-6">
+          <ALSSpine
+            level={masterAnalysis.level}
+            peak={masterAnalysis.peak}
+            lufs={loudnessMetrics?.momentaryLUFS}
+            isClipping={masterAnalysis.level >= 0.95}
+          />
+        </div>
+      )}
+      
+      {/* Flow ALS Bar with Adapting Waveform (fallback if no masterAnalysis) */}
+      {!masterAnalysis && (
+        <div className="mt-3 -mx-6 px-6">
+          <FlowPulseBar />
+        </div>
+      )}
 
       <div className="mt-3 grid gap-2 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-6">
         {alsChannelBlocks.map((channel) => (

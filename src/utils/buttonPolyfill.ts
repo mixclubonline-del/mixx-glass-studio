@@ -61,10 +61,27 @@ export function applyButtonPolyfill() {
 
   // Process all existing buttons
   // Use setTimeout to ensure DOM is ready
-  setTimeout(() => {
-    document.querySelectorAll('button').forEach(processButton);
-    console.log('[ButtonPolyfill] Applied to', document.querySelectorAll('button.button-mixx').length, 'buttons');
-  }, 100);
+  const processAll = () => {
+    const buttons = document.querySelectorAll('button');
+    buttons.forEach(processButton);
+    const styled = document.querySelectorAll('button.button-mixx');
+    console.log('[ButtonPolyfill] Applied to', styled.length, 'of', buttons.length, 'buttons');
+    
+    // Visual debug: Log first few buttons
+    if (styled.length > 0) {
+      console.log('[ButtonPolyfill] Sample styled buttons:', 
+        Array.from(styled).slice(0, 3).map(btn => ({
+          text: btn.textContent?.trim() || 'icon',
+          classes: Array.from(btn.classList).join(' ')
+        }))
+      );
+    }
+  };
+  
+  // Try immediately, then retry after delay
+  processAll();
+  setTimeout(processAll, 100);
+  setTimeout(processAll, 500);
 
   // Watch for dynamically added buttons
   const observer = new MutationObserver((mutations) => {

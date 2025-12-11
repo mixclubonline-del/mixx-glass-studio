@@ -18,6 +18,7 @@ import { FlowDockDebug } from '../dock/debug/FlowDockDebug';
 import { FlowPulseGraph } from '../dock/debug/FlowPulseGraph';
 import { ALSEventLog } from '../dock/debug/ALSEventLog';
 import { ALSSyncMonitor } from '../dock/debug/ALSSyncMonitor';
+import { ProfessionalTransport } from '../transport/ProfessionalTransport';
 import './ArrangeBloomStrip.css';
 
 type ImportProgressLike = {
@@ -775,94 +776,17 @@ export const BloomDock: React.FC<BloomDockProps> = (props) => {
             : undefined;
 
     const transportModule = (
-        <div className="flex items-center gap-4 px-4 py-2 rounded-full border border-white/10 bg-[rgba(6,12,28,0.68)] backdrop-blur-xl shadow-[0_24px_68px_rgba(4,12,26,0.45)]">
-            <button
-                type="button"
-                aria-label="Cue backward"
-                title="Cue backward"
-                onPointerDown={handleSeekPointerDown('back')}
-                onPointerUp={handleSeekPointerUp('back')}
-                onPointerLeave={() => clearSeekTimers()}
-                onPointerCancel={() => clearSeekTimers()}
-                className="relative flex items-center justify-center w-11 h-11 rounded-full border border-white/14 bg-[rgba(12,26,48,0.65)] text-cyan-100 hover:text-white transition-all"
-                style={pulseGlowStyle('rewind')}
-            >
-                <RewindIcon className="w-5 h-5" />
-            </button>
-            <div className="relative">
-                <button
-                    type="button"
-                    aria-label={isPlaying ? 'Pause transport' : 'Play transport'}
-                    title={isPlaying ? 'Pause' : 'Play'}
-                    onPointerDown={handlePlayPointerDown}
-                    onPointerUp={() => clearSeekTimers()}
-                    className={`button-mixx primary relative flex items-center justify-center w-14 h-14 rounded-full border transition-all text-white`}
-                    style={
-                        transportPulse === 'play' || transportPulse === 'pause'
-                            ? {
-                                  boxShadow: `0 0 36px ${hexToRgba(pulseAccent, 0.5)}, inset 0 0 22px ${hexToRgba(pulseAccent, 0.32)}`,
-                                  borderColor: hexToRgba(pulseAccent, 0.62),
-                              }
-                            : undefined
-                    }
-                >
-                    {isPlaying ? (
-                        <PauseIcon className="w-6 h-6 text-cyan-100" />
-                    ) : (
-                        <PlayIcon className="w-6 h-6 text-cyan-100" />
-                    )}
-                    <span
-                        aria-hidden
-                        className="pointer-events-none absolute inset-0 rounded-full"
-                        style={{
-                            boxShadow: `0 0 ${isPlaying ? 46 : 32}px ${hexToRgba(pulseGlow, isPlaying ? 0.48 : 0.35)}`,
-                            opacity: 0.85,
-                        }}
-                    />
-                </button>
-            </div>
-            <button
-                type="button"
-                aria-label="Cue forward"
-                title="Cue forward"
-                onPointerDown={handleSeekPointerDown('forward')}
-                onPointerUp={handleSeekPointerUp('forward')}
-                onPointerLeave={() => clearSeekTimers()}
-                onPointerCancel={() => clearSeekTimers()}
-                className="relative flex items-center justify-center w-11 h-11 rounded-full border border-white/14 bg-[rgba(12,26,48,0.65)] text-cyan-100 hover:text-white transition-all"
-                style={pulseGlowStyle('forward')}
-            >
-                <FastForwardIcon className="w-5 h-5" />
-            </button>
-            <div className="relative w-40 h-12 rounded-full overflow-hidden border border-white/12 bg-[rgba(4,10,22,0.86)]">
-                <div
-                    className="absolute inset-0"
-                    style={{
-                        opacity: 0.38 + transportEnergy * 0.44,
-                        background: `linear-gradient(135deg, ${hexToRgba(pulseGlow, 0.28)} 0%, ${secondaryAccent} 100%)`,
-                    }}
-                />
-                <div className="absolute inset-0 mix-blend-screen opacity-80">
-                    <MasterWaveform waveform={masterAnalysis.waveform} color={waveformAccent} />
-                </div>
-                {masterAnalysis.transient && (
-                    <div
-                        aria-hidden
-                        className="absolute inset-0 rounded-full pointer-events-none"
-                        style={{
-                            boxShadow: `0 0 42px ${hexToRgba(pulseAccent, 0.55)}`,
-                            opacity: 0.7,
-                        }}
-                    />
-                )}
-                {followPlayhead && (
-                    <div
-                        className="absolute top-1/2 right-3 -translate-y-1/2 w-2.5 h-2.5 rounded-full bg-cyan-200 shadow-[0_0_16px_rgba(45,212,191,0.65)]"
-                        aria-hidden
-                    />
-                )}
-            </div>
-        </div>
+        <ProfessionalTransport
+            isPlaying={isPlaying}
+            isLooping={isLooping}
+            currentTime={currentTime}
+            onPlayPause={onPlayPause}
+            onSeekPointerDown={handleSeekPointerDown}
+            onSeekPointerUp={handleSeekPointerUp}
+            onPlayPointerDown={handlePlayPointerDown}
+            onPlayPointerUp={() => clearSeekTimers()}
+            onToggleLoop={onToggleLoop}
+        />
     );
 
     const loopActive = isLooping || transportPulse === 'loop';

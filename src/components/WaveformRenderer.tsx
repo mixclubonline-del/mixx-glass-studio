@@ -8,7 +8,7 @@
  */
 
 import React, { useEffect, useRef } from "react";
-import { als } from "../../utils/alsFeedback";
+import { als } from "../utils/alsFeedback";
 
 type WaveformDisplayMode = "peak" | "rms";
 
