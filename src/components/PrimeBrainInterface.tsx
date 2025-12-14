@@ -1,6 +1,8 @@
 import React, { useCallback, useEffect, useRef, useState } from 'react';
 import { ArrangeClip, ClipId } from '../hooks/useArrange';
 import { XIcon } from './icons';
+import { AuraColors, AuraEffects } from '../theme/aura-tokens';
+import { hexToRgba } from '../utils/ALS';
 
 interface PrimeBrainInterfaceProps {
   clip: ArrangeClip;
@@ -27,12 +29,12 @@ const WaveformPath: React.FC<{ color: string, stretchFactor: number }> = ({ colo
                     </feMerge>
                 </filter>
                  <linearGradient id="waveform-gradient" x1="0%" y1="0%" x2="0%" y2="100%">
-                    <stop offset="0%" stopColor={color} stopOpacity="0.5"/>
-                    <stop offset="50%" stopColor={color} stopOpacity="0.1"/>
+                    <stop offset="0%" stopColor={color} stopOpacity="0.6"/>
+                    <stop offset="50%" stopColor={color} stopOpacity="0.2"/>
                     <stop offset="100%" stopColor={color} stopOpacity="0"/>
                 </linearGradient>
             </defs>
-            <path d={d} stroke={color} strokeWidth="2" fill="url(#waveform-gradient)" style={{ filter: 'url(#waveform-glow)'}} />
+            <path d={d} stroke={color} strokeWidth="2.5" fill="url(#waveform-gradient)" style={{ filter: 'url(#waveform-glow)'}} />
         </svg>
     );
 };
@@ -85,83 +87,151 @@ const PrimeBrainInterface: React.FC<PrimeBrainInterfaceProps> = ({ clip, onClose
 
 
   const timeStretchRate = clip.timeStretchRate ?? 1.0;
+  
+  const brainAccent = AuraColors.thermal.warm;
+  const secondaryAccent = AuraColors.violet;
 
   return (
-    <div className="fixed inset-0 bg-black/80 flex items-center justify-center z-[100] backdrop-filter backdrop-blur-lg" onClick={onClose}>
+    <div className="fixed inset-0 bg-black/90 flex items-center justify-center z-[100]" 
+        style={{ backdropFilter: 'blur(16px)' }}
+        onClick={onClose}>
         <div 
-            className="relative w-[80vw] h-[70vh] max-w-6xl rounded-3xl bg-black/30 border border-amber-400/20 flex flex-col p-8 shadow-2xl shadow-amber-500/20 overflow-hidden" 
+            className="relative w-[85vw] h-[75vh] max-w-6xl rounded-[32px] flex flex-col p-8 overflow-hidden" 
+            style={{
+                background: `linear-gradient(145deg, ${hexToRgba(AuraColors.space, 0.95)}, ${hexToRgba(AuraColors.twilight, 0.9)})`,
+                border: `1px solid ${hexToRgba(brainAccent, 0.2)}`,
+                boxShadow: `0 0 80px ${hexToRgba(brainAccent, 0.15)}, inset 0 0 20px ${hexToRgba(AuraColors.violet, 0.1)}`
+            }}
             onClick={(e) => e.stopPropagation()}
         >
             {/* Background Vortex Effect */}
             <div 
-                className={`absolute inset-0 transition-opacity duration-500 ${isWarping ? 'opacity-100' : 'opacity-0'}`} 
+                className={`absolute inset-0 transition-opacity duration-700 ease-out ${isWarping ? 'opacity-100' : 'opacity-30'}`} 
                 style={{
-                    background: `radial-gradient(ellipse at center, transparent 30%, ${clip.color}44 150%)`,
-                    animation: isWarping ? 'time-warp-vortex 20s linear infinite' : 'none',
+                    background: `radial-gradient(ellipse at center, transparent 30%, ${hexToRgba(clip.color, isWarping ? 0.2 : 0.05)} 100%)`,
+                    animation: isWarping ? 'time-warp-vortex 12s linear infinite' : 'none', // Faster when warping
+                    pointerEvents: 'none'
                 }}
             />
 
-            <header className="flex justify-between items-center text-gray-400 mb-6 z-10">
+            <header className="flex justify-between items-start mb-6 z-10">
                 <div className="flex flex-col">
-                    <h2 className="text-2xl font-bold tracking-widest text-gray-200">PRIME BRAIN</h2>
-                    <p className="text-amber-400">{clip.name}</p>
+                    <h2 className="text-[10px] font-bold tracking-[0.4em] uppercase text-slate-400 mb-1">Intelligence Layer</h2>
+                    <h1 className="text-3xl font-bold tracking-widest text-white drop-shadow-[0_0_10px_rgba(255,255,255,0.3)]">PRIME BRAIN</h1>
+                    <p className="text-sm mt-1 font-mono tracking-wider" style={{ color: brainAccent }}>
+                        Analyzing: <span className="text-white ml-2">{clip.name}</span>
+                    </p>
                 </div>
-                <button onClick={onClose} className="p-2 rounded-full hover:bg-white/10 text-gray-400 hover:text-white transition-colors">
-                    <XIcon className="w-6 h-6" />
+                <button 
+                    onClick={onClose} 
+                    className="w-10 h-10 rounded-full flex items-center justify-center border border-white/10 hover:border-white/30 text-slate-400 hover:text-white transition-all bg-white/5 hover:bg-white/10"
+                >
+                    <XIcon className="w-5 h-5" />
                 </button>
             </header>
 
             <div className="relative flex-grow flex items-center justify-center z-10">
                 {/* Central Brain & Waveform */}
-                <div className="absolute w-full h-48">
+                <div className="absolute w-full h-64 pointer-events-none opacity-80">
                     <WaveformPath color={clip.color} stretchFactor={timeStretchRate} />
                 </div>
                 
-                <div className="absolute w-40 h-40 rounded-full flex items-center justify-center" style={{ animation: 'brain-pulse 5s ease-in-out infinite' }}>
-                    <div className="absolute inset-0 rounded-full bg-amber-500/10 blur-2xl"></div>
-                    <div className="w-32 h-32 rounded-full border-2 border-amber-400/80 bg-black/50 flex items-center justify-center text-amber-300 font-bold tracking-widest">
-                        BRAIN
+                <div 
+                    className="absolute w-44 h-44 rounded-full flex items-center justify-center" 
+                    style={{ animation: 'brain-pulse 6s ease-in-out infinite' }}
+                >
+                    <div className="absolute inset-0 rounded-full blur-3xl" style={{ background: hexToRgba(brainAccent, 0.15) }}></div>
+                    <div 
+                        className="w-32 h-32 rounded-full border-2 flex items-center justify-center backdrop-blur-md"
+                        style={{
+                            borderColor: hexToRgba(brainAccent, 0.6),
+                            background: `radial-gradient(circle at 30% 30%, ${hexToRgba(brainAccent, 0.2)}, ${hexToRgba(AuraColors.space, 0.8)})`,
+                            boxShadow: `0 0 30px ${hexToRgba(brainAccent, 0.2)}`
+                        }}
+                    >
+                        <span className="text-[10px] font-bold tracking-[0.25em] text-white/90">BRAIN</span>
                     </div>
                 </div>
 
                 {/* Interactive Lattice Points */}
-                <div className="absolute w-full h-full">
-                    <div className="absolute top-1/2 left-[calc(50%-200px)] -translate-y-1/2 flex flex-col items-center text-center cursor-pointer group">
-                        <div className="w-16 h-16 rounded-full border-2 border-cyan-400/50 flex items-center justify-center bg-black/50 group-hover:bg-cyan-400/20 transition-colors" style={{ animation: 'lattice-glow 4s ease-in-out infinite' }}>PITCH</div>
-                        <span className="text-xs text-gray-500 mt-2">Drag to shift tonal center</span>
+                <div className="absolute w-full h-full pointer-events-none">
+                     {/* Pitch Node */}
+                    <div className="absolute top-1/2 left-[calc(50%-240px)] -translate-y-1/2 flex flex-col items-center text-center pointer-events-auto cursor-pointer group">
+                        <div 
+                            className="w-18 h-18 rounded-full border flex items-center justify-center bg-black/40 transition-all duration-300 group-hover:scale-110" 
+                            style={{ 
+                                borderColor: hexToRgba(AuraColors.thermal.cold, 0.4),
+                                animation: 'lattice-glow 5s ease-in-out infinite' 
+                            }}
+                        >
+                             <div className="w-2 h-2 rounded-full bg-cyan-400 shadow-[0_0_10px_cyan]"></div>
+                        </div>
+                        <span className="text-[10px] font-bold uppercase tracking-widest text-slate-400 mt-4 group-hover:text-cyan-300 transition-colors">Pitch</span>
                     </div>
+
+                     {/* Time Node (Center-Top) - Draggable */}
                      <div 
-                        className="absolute top-[calc(50%-100px)] left-1/2 -translate-x-1/2 flex flex-col items-center text-center cursor-ew-resize group"
+                        className="absolute top-[calc(50%-140px)] left-1/2 -translate-x-1/2 flex flex-col items-center text-center pointer-events-auto cursor-ew-resize group"
                         onMouseDown={handleTimeNodeMouseDown}
                      >
-                        <div className={`w-20 h-20 rounded-full border-2 flex items-center justify-center bg-black/50 transition-colors ${isWarping ? 'border-fuchsia-300 bg-fuchsia-400/30' : 'border-fuchsia-400/50 group-hover:bg-fuchsia-400/20'}`} style={{ animation: 'lattice-glow 4s 1s ease-in-out infinite' }}>
-                            <div className="flex flex-col items-center">
-                               <span className="font-bold">TIME</span>
-                               <span className="text-lg font-mono">{timeStretchRate.toFixed(2)}x</span>
-                            </div>
+                        <div 
+                            className={`w-24 h-24 rounded-full border flex flex-col items-center justify-center backdrop-blur-md transition-all duration-200 ${isWarping ? 'scale-110' : 'group-hover:scale-105'}`} 
+                            style={{ 
+                                borderColor: isWarping ? AuraColors.violet : hexToRgba(AuraColors.violet, 0.4),
+                                background: isWarping ? hexToRgba(AuraColors.violet, 0.15) : 'rgba(0,0,0,0.4)',
+                                boxShadow: isWarping ? `0 0 40px ${hexToRgba(AuraColors.violet, 0.4)}` : 'none',
+                                animation: 'lattice-glow 5s 1.5s ease-in-out infinite' 
+                            }}
+                        >
+                            <span className="text-[9px] font-bold uppercase tracking-widest text-slate-300 mb-1">Time</span>
+                            <span className="text-xl font-mono text-white tracking-widest">{timeStretchRate.toFixed(2)}x</span>
                         </div>
-                        <span className="text-xs text-gray-500 mt-2">Drag to warp rhythm</span>
+                        <span className="text-[9px] uppercase tracking-widest text-slate-500 mt-4 opacity-0 group-hover:opacity-100 transition-opacity">
+                            {isWarping ? 'Warping...' : 'Drag to Warp'}
+                        </span>
                     </div>
-                     <div className="absolute top-1/2 right-[calc(50%-200px)] -translate-y-1/2 flex flex-col items-center text-center cursor-pointer group">
-                        <div className="w-16 h-16 rounded-full border-2 border-violet-400/50 flex items-center justify-center bg-black/50 group-hover:bg-violet-400/20 transition-colors" style={{ animation: 'lattice-glow 4s 2s ease-in-out infinite' }}>TIMBRE</div>
-                        <span className="text-xs text-gray-500 mt-2">Drag to sculpt texture</span>
+
+                     {/* Timbre Node */}
+                     <div className="absolute top-1/2 right-[calc(50%-240px)] -translate-y-1/2 flex flex-col items-center text-center pointer-events-auto cursor-pointer group">
+                        <div 
+                            className="w-18 h-18 rounded-full border flex items-center justify-center bg-black/40 transition-all duration-300 group-hover:scale-110" 
+                            style={{ 
+                                borderColor: hexToRgba(secondaryAccent, 0.4),
+                                animation: 'lattice-glow 5s 3s ease-in-out infinite' 
+                            }}
+                        >
+                             <div className="w-2 h-2 rounded-full bg-indigo-400 shadow-[0_0_10px_indigo]"></div>
+                        </div>
+                        <span className="text-[10px] font-bold uppercase tracking-widest text-slate-400 mt-4 group-hover:text-indigo-300 transition-colors">Timbre</span>
                     </div>
                 </div>
             </div>
 
             {/* Satellite Controls */}
-            <footer className="grid grid-cols-3 gap-8 pt-6 mt-6 border-t border-white/10 text-xs z-10">
-                <div className="flex flex-col items-center">
-                    <label htmlFor="focus-range" className="font-bold text-gray-400 mb-2">FOCUS</label>
-                    <input id="focus-range" type="range" min="0" max="1" step="0.01" defaultValue="0.5" className="w-full h-1 accent-amber-400" />
+            <footer className="grid grid-cols-3 gap-12 pt-8 border-t border-white/5 text-xs z-10 px-12">
+                <div className="flex flex-col items-center gap-3">
+                    <label htmlFor="focus-range" className="text-[10px] uppercase tracking-[0.2em] font-bold text-slate-500">Focus</label>
+                    <input 
+                        id="focus-range" type="range" min="0" max="1" step="0.01" defaultValue="0.5" 
+                        className="w-full h-1 appearance-none bg-slate-800 rounded-full cursor-pointer hover:bg-slate-700" 
+                        style={{ accentColor: AuraColors.thermal.cold }}
+                    />
                 </div>
-                <div className="flex flex-col items-center">
-                    <label htmlFor="aggression-range" className="font-bold text-gray-400 mb-2">AGGRESSION</label>
-                    <input id="aggression-range" type="range" min="0" max="1" step="0.01" defaultValue="0.3" className="w-full h-1 accent-amber-400" />
+                <div className="flex flex-col items-center gap-3">
+                    <label htmlFor="aggression-range" className="text-[10px] uppercase tracking-[0.2em] font-bold text-slate-500">Aggression</label>
+                    <input 
+                        id="aggression-range" type="range" min="0" max="1" step="0.01" defaultValue="0.3" 
+                        className="w-full h-1 appearance-none bg-slate-800 rounded-full cursor-pointer hover:bg-slate-700" 
+                        style={{ accentColor: AuraColors.thermal.hot }}
+                    />
                 </div>
-                <div className="flex flex-col items-center">
-                    <label htmlFor="flow-range" className="font-bold text-gray-400 mb-2">FLOW</label>
-                    <input id="flow-range" type="range" min="0" max="1" step="0.01" defaultValue="0.8" className="w-full h-1 accent-amber-400" />
+                <div className="flex flex-col items-center gap-3">
+                    <label htmlFor="flow-range" className="text-[10px] uppercase tracking-[0.2em] font-bold text-slate-500">Flow</label>
+                    <input 
+                        id="flow-range" type="range" min="0" max="1" step="0.01" defaultValue="0.8" 
+                        className="w-full h-1 appearance-none bg-slate-800 rounded-full cursor-pointer hover:bg-slate-700" 
+                        style={{ accentColor: AuraColors.violet }}
+                    />
                 </div>
             </footer>
         </div>

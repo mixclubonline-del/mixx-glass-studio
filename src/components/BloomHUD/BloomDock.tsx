@@ -5,6 +5,7 @@ import PluginBrowser from '../PluginBrowser';
 import { FxWindowConfig, FxWindowId } from '../../App';
 import type { PluginInventoryItem } from '../../audio/pluginTypes';
 import { hexToRgba, ALSActionPulse } from '../../utils/ALS';
+import { AuraColors, AuraEffects } from '../../theme/aura-tokens';
 import type { PulsePalette } from '../../utils/ALS';
 import type { BloomActionMeta } from '../../types/bloom';
 import type { PrimeBrainStatus } from '../../types/primeBrainStatus';
@@ -205,7 +206,7 @@ export const BloomDock: React.FC<BloomDockProps> = (props) => {
         viewMode, onViewModeChange, onOpenAIHub,
         currentTime, canRecallLastImport, followPlayhead,
         contextLabel = 'FLOW',
-        contextAccent = '#86efac',
+        contextAccent = AuraColors.violet,
         recordingOptions,
         onToggleRecordingOption,
         onDropTakeMarker,
@@ -321,10 +322,10 @@ export const BloomDock: React.FC<BloomDockProps> = (props) => {
         }
     }, [clampPosition, onPositionChange, position.x, position.y]);
 
-    const pulseGlow = alsPulseAgent?.glow ?? '#22d3ee';
-    const pulseHalo = alsPulseAgent?.halo ?? '#38bdf8';
+    const pulseGlow = alsPulseAgent?.glow ?? AuraColors.violet;
+    const pulseHalo = alsPulseAgent?.halo ?? AuraColors.blue;
     const pulseStrength = alsPulseAgent?.pulseStrength ?? (isPlaying ? 0.6 : 0.35);
-    const pulseAccent = alsPulseAgent?.accent ?? '#06b6d4';
+    const pulseAccent = alsPulseAgent?.accent ?? AuraColors.blue;
     
     // Enhanced halo with Flow Dock ALS glow
     const enhancedGlowIntensity = Math.max(pulseStrength, alsGlow.glowIntensity);
@@ -339,7 +340,7 @@ export const BloomDock: React.FC<BloomDockProps> = (props) => {
         `,
         borderColor: hexToRgba(contextAccent, 0.55),
         background: `linear-gradient(135deg, ${hexToRgba(contextAccent, 0.22)} 0%, rgba(8,14,28,0.92) 60%, rgba(4,7,16,0.9) 100%)`,
-    }), [contextAccent, isDragging, pulseGlow, pulseHalo, enhancedGlowIntensity, enhancedGlowColor, alsGlow]);
+    }), [contextAccent, isDragging, enhancedGlowColor, pulseHalo, enhancedGlowIntensity, alsGlow]);
 
     // Developer-mode ALS debug payload (reads from global ALS + current dock state)
     const alsDebugState = useMemo(() => {

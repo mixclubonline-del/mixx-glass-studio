@@ -7,6 +7,8 @@
 
 import React, { useState, useEffect, useRef } from 'react';
 import { SaveIcon, LoadIcon, XIcon } from '../icons';
+import { AuraColors, AuraEffects } from '../../theme/aura-tokens';
+import { hexToRgba } from '../../utils/ALS';
 
 export interface BloomAction {
   id: string;
@@ -99,8 +101,8 @@ const ProfessionalBloomHUD: React.FC<ProfessionalBloomHUDProps> = ({
         display: 'flex',
         alignItems: 'center',
         justifyContent: 'center',
-        background: 'rgba(0,0,0,0.4)',
-        backdropFilter: 'blur(4px)',
+        background: 'rgba(0,0,0,0.6)',
+        backdropFilter: 'blur(8px)',
       }}
       onClick={(e) => {
         if (e.target === e.currentTarget) {
@@ -116,14 +118,14 @@ const ProfessionalBloomHUD: React.FC<ProfessionalBloomHUDProps> = ({
           left: `${defaultPosition.x}px`,
           top: `${defaultPosition.y}px`,
           transform: 'translate(-50%, -50%)',
-          width: 'min(480px, 90vw)',
-          maxHeight: 'min(600px, 80vh)',
-          borderRadius: '16px',
-          background: 'linear-gradient(135deg, rgba(255,255,255,0.7), var(--glass-tint))',
-          border: '1px solid var(--glass-border)',
-          backdropFilter: 'blur(10px) saturate(120%)',
-          WebkitBackdropFilter: 'blur(10px) saturate(120%)',
-          boxShadow: 'var(--elevation-shadow)',
+          width: 'min(520px, 90vw)',
+          maxHeight: 'min(640px, 80vh)',
+          borderRadius: '24px',
+          background: `linear-gradient(135deg, ${hexToRgba(AuraColors.space, 0.95)}, ${hexToRgba(AuraColors.twilight, 0.9)})`,
+          border: '1px solid rgba(255, 255, 255, 0.08)',
+          backdropFilter: 'blur(24px) saturate(180%)',
+          WebkitBackdropFilter: 'blur(24px) saturate(180%)',
+          boxShadow: `${AuraEffects.glow.lg}, 0 20px 50px rgba(0,0,0,0.5)`,
           display: 'flex',
           flexDirection: 'column',
           overflow: 'hidden',
@@ -136,20 +138,24 @@ const ProfessionalBloomHUD: React.FC<ProfessionalBloomHUDProps> = ({
             display: 'flex',
             alignItems: 'center',
             justifyContent: 'space-between',
-            padding: '16px 20px',
-            borderBottom: '1px solid var(--glass-border)',
+            padding: '20px 24px',
+            borderBottom: '1px solid rgba(255, 255, 255, 0.06)',
           }}
         >
-          <h2
-            style={{
-              fontSize: '18px',
-              fontWeight: 700,
-              color: 'var(--ink-foreground)',
-              margin: 0,
-            }}
-          >
-            Bloom Menu
-          </h2>
+          <div className="flex items-center gap-2">
+              <div className="w-2 h-8 bg-gradient-to-b from-violet-500 to-blue-500 rounded-full" />
+              <h2
+                style={{
+                  fontSize: '18px',
+                  fontWeight: 600,
+                  color: '#fff',
+                  margin: 0,
+                  letterSpacing: '0.05em',
+                }}
+              >
+                AURA Command
+              </h2>
+          </div>
           <button
             type="button"
             aria-label="Close"
@@ -161,17 +167,19 @@ const ProfessionalBloomHUD: React.FC<ProfessionalBloomHUDProps> = ({
               display: 'flex',
               alignItems: 'center',
               justifyContent: 'center',
-              background: 'rgba(255,255,255,0.3)',
-              border: '1px solid var(--glass-border)',
-              color: 'var(--muted)',
+              background: 'rgba(255,255,255,0.05)',
+              border: '1px solid rgba(255,255,255,0.1)',
+              color: 'rgba(255,255,255,0.6)',
               cursor: 'pointer',
               transition: 'all 0.15s ease',
             }}
             onMouseEnter={(e) => {
-              e.currentTarget.style.background = 'rgba(255,255,255,0.5)';
+              e.currentTarget.style.background = 'rgba(255,255,255,0.1)';
+              e.currentTarget.style.color = '#fff';
             }}
             onMouseLeave={(e) => {
-              e.currentTarget.style.background = 'rgba(255,255,255,0.3)';
+              e.currentTarget.style.background = 'rgba(255,255,255,0.05)';
+              e.currentTarget.style.color = 'rgba(255,255,255,0.6)';
             }}
           >
             <XIcon className="w-[18px] h-[18px]" />
@@ -181,8 +189,8 @@ const ProfessionalBloomHUD: React.FC<ProfessionalBloomHUDProps> = ({
         {/* Search */}
         <div
           style={{
-            padding: '12px 20px',
-            borderBottom: '1px solid var(--glass-border)',
+            padding: '16px 24px',
+            borderBottom: '1px solid rgba(255, 255, 255, 0.06)',
           }}
         >
           <div
@@ -198,11 +206,11 @@ const ProfessionalBloomHUD: React.FC<ProfessionalBloomHUDProps> = ({
               fill="none"
               stroke="currentColor"
               strokeWidth={1.5}
-              className="w-4 h-4"
+              className="w-5 h-5"
               style={{
                 position: 'absolute',
                 left: '12px',
-                color: 'var(--muted)',
+                color: 'rgba(255,255,255,0.4)',
               }}
             >
               <circle cx="11" cy="11" r="8" />
@@ -216,13 +224,22 @@ const ProfessionalBloomHUD: React.FC<ProfessionalBloomHUDProps> = ({
               onChange={(e) => setSearchQuery(e.target.value)}
               style={{
                 width: '100%',
-                padding: '8px 12px 8px 36px',
-                borderRadius: '8px',
-                background: 'rgba(255,255,255,0.4)',
-                border: '1px solid var(--glass-border)',
-                fontSize: '14px',
-                color: 'var(--ink-foreground)',
+                padding: '12px 16px 12px 42px',
+                borderRadius: '12px',
+                background: 'rgba(0,0,0,0.2)',
+                border: '1px solid rgba(255, 255, 255, 0.1)',
+                fontSize: '15px',
+                color: '#fff',
                 outline: 'none',
+                transition: 'border-color 0.2s, box-shadow 0.2s',
+              }}
+              onFocus={(e) => {
+                  e.target.style.borderColor = AuraColors.violet;
+                  e.target.style.boxShadow = `0 0 0 1px ${AuraColors.violet}`;
+              }}
+              onBlur={(e) => {
+                  e.target.style.borderColor = 'rgba(255, 255, 255, 0.1)';
+                  e.target.style.boxShadow = 'none';
               }}
               onKeyDown={(e) => {
                 if (e.key === 'ArrowDown') {
@@ -236,10 +253,11 @@ const ProfessionalBloomHUD: React.FC<ProfessionalBloomHUDProps> = ({
 
         {/* Actions list */}
         <div
+          className="custom-scrollbar"
           style={{
             flex: 1,
             overflowY: 'auto',
-            padding: '8px',
+            padding: '12px',
           }}
         >
           {filteredActions.length === 0 ? (
@@ -247,7 +265,7 @@ const ProfessionalBloomHUD: React.FC<ProfessionalBloomHUDProps> = ({
               style={{
                 padding: '40px 20px',
                 textAlign: 'center',
-                color: 'var(--muted)',
+                color: 'rgba(255,255,255,0.3)',
                 fontSize: '14px',
               }}
             >
@@ -266,16 +284,16 @@ const ProfessionalBloomHUD: React.FC<ProfessionalBloomHUDProps> = ({
                   width: '100%',
                   display: 'flex',
                   alignItems: 'center',
-                  gap: '12px',
+                  gap: '14px',
                   padding: '12px 16px',
-                  borderRadius: '10px',
+                  borderRadius: '12px',
                   background:
                     selectedIndex === index
-                      ? 'rgba(139,123,255,0.15)'
+                      ? `linear-gradient(90deg, ${hexToRgba(AuraColors.violet, 0.15)}, rgba(0,0,0,0))`
                       : 'transparent',
-                  border: 'none',
+                  border: selectedIndex === index ? `1px solid ${hexToRgba(AuraColors.violet, 0.3)}` : '1px solid transparent',
                   cursor: 'pointer',
-                  transition: 'all 0.15s ease',
+                  transition: 'all 0.1s ease',
                   textAlign: 'left',
                 }}
                 onMouseEnter={() => setSelectedIndex(index)}
@@ -285,15 +303,16 @@ const ProfessionalBloomHUD: React.FC<ProfessionalBloomHUDProps> = ({
                   style={{
                     width: '36px',
                     height: '36px',
-                    borderRadius: '8px',
+                    borderRadius: '10px',
                     display: 'flex',
                     alignItems: 'center',
                     justifyContent: 'center',
                     background: action.accentColor
                       ? `${action.accentColor}20`
-                      : 'rgba(139,123,255,0.1)',
-                    color: action.accentColor || 'var(--accent)',
+                      : 'rgba(255,255,255,0.1)',
+                    color: action.accentColor || AuraColors.violet,
                     flexShrink: 0,
+                    boxShadow: selectedIndex === index ? `0 0 12px ${hexToRgba(action.accentColor || AuraColors.violet, 0.3)}` : 'none',
                   }}
                 >
                   {action.icon}
@@ -303,7 +322,7 @@ const ProfessionalBloomHUD: React.FC<ProfessionalBloomHUDProps> = ({
                     style={{
                       fontSize: '14px',
                       fontWeight: 500,
-                      color: 'var(--ink-foreground)',
+                      color: selectedIndex === index ? '#fff' : 'rgba(255,255,255,0.9)',
                       marginBottom: '2px',
                     }}
                   >
@@ -313,7 +332,7 @@ const ProfessionalBloomHUD: React.FC<ProfessionalBloomHUDProps> = ({
                     <div
                       style={{
                         fontSize: '12px',
-                        color: 'var(--muted)',
+                        color: 'rgba(255,255,255,0.5)',
                       }}
                     >
                       {action.description}
@@ -324,11 +343,12 @@ const ProfessionalBloomHUD: React.FC<ProfessionalBloomHUDProps> = ({
                   <div
                     style={{
                       fontSize: '11px',
-                      color: 'var(--muted)',
+                      color: 'rgba(255,255,255,0.4)',
                       fontFamily: 'monospace',
                       padding: '2px 6px',
                       borderRadius: '4px',
-                      background: 'rgba(0,0,0,0.1)',
+                      background: 'rgba(255,255,255,0.05)',
+                      border: '1px solid rgba(255,255,255,0.1)',
                     }}
                   >
                     {action.shortcut}
@@ -342,14 +362,17 @@ const ProfessionalBloomHUD: React.FC<ProfessionalBloomHUDProps> = ({
         {/* Footer hint */}
         <div
           style={{
-            padding: '12px 20px',
-            borderTop: '1px solid var(--glass-border)',
+            padding: '12px 24px',
+            borderTop: '1px solid rgba(255, 255, 255, 0.06)',
             fontSize: '11px',
-            color: 'var(--muted)',
-            textAlign: 'center',
+            color: 'rgba(255,255,255,0.3)',
+            display: 'flex',
+            justifyContent: 'space-between',
+            alignItems: 'center',
           }}
         >
-          Use ↑↓ to navigate, Enter to select, Esc to close
+            <span>AURA v1.0</span>
+            <span>Use ↑↓ to navigate, Enter to select, Esc to close</span>
         </div>
       </div>
     </div>

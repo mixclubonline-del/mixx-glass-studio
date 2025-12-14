@@ -20,7 +20,7 @@ import { hexToRgba } from "../utils/ALS";
 import type { WaveformHeaderSettings } from "../types/waveformHeaderSettings";
 import { DEFAULT_WAVEFORM_HEADER_SETTINGS } from "../types/waveformHeaderSettings";
 import { spacing, typography, layout, effects, transitions, composeStyles } from "../design-system";
-import { ALSSpine } from "./transport/ALSSpine";
+import ALSSpine from "./transport/ALSSpine";
 
 interface AdaptiveWaveformHeaderProps {
   primeBrainStatus: PrimeBrainStatus;

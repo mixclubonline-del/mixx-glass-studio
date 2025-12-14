@@ -148,9 +148,7 @@ const FlowProbeOverlay: React.FC = () => {
         
         // Engine status available via status object
         if (status && (status.engine_running || status.is_playing)) {
-            has_stats: !!status.engine,
-            total_callbacks: status.engine?.total_callbacks ?? 0,
-          });
+           // Status updated above
         }
       } catch (error) {
         if (!mounted) {

@@ -2,6 +2,7 @@ import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { hexToRgba } from '../../utils/ALS';
 import { useFlowContext } from '../../state/flowContextService';
 import type { PulsePalette } from '../../utils/ALS';
+import { AuraColors, AuraEffects } from '../../theme/aura-tokens';
 import {
   bloomChargeFromFlow,
   getBloomScale,
@@ -36,14 +37,7 @@ interface BloomFloatingHubProps {
   menuRequest?: { menu: string; open?: boolean; timestamp: number } | null;
 }
 
-const PETAL_RADIUS = 128;
-const FLOW_ACCENT = '#8aa7ff';
-const FLOW_SOFT_ACCENT = hexToRgba(FLOW_ACCENT, 0.45);
-const FLOW_BASE = 'rgba(10, 20, 40, 0.85)';
-const FLOW_BASE_ALT = 'rgba(8, 18, 34, 0.78)';
-const FLOW_EDGE_LIGHT = 'rgba(124, 164, 228, 0.4)';
-const FLOW_TOOLTIP_BG = 'rgba(9, 18, 34, 0.92)';
-const FLOW_TOOLTIP_BORDER = 'rgba(110, 150, 210, 0.45)';
+const PETAL_RADIUS = 130;
 const VIEWPORT_PADDING = 32;
 const DEFAULT_DOCK_SIZE = { width: 420, height: 132 };
 const DEFAULT_HUB_SIZE = { width: 220, height: 220 };
@@ -99,7 +93,7 @@ const buildProgressIcon = (accent: string, percent?: number) => {
           boxShadow: `0 0 18px ${hexToRgba(accent, 0.3)}`,
         }}
       />
-      <div className="absolute inset-[18%] rounded-full bg-glass-surface backdrop-blur-sm border border-glass-border" />
+      <div className="absolute inset-[18%] rounded-full bg-black/40 backdrop-blur-sm border border-white/10" />
     </div>
   );
 };
@@ -108,7 +102,7 @@ export const BloomFloatingHub: React.FC<BloomFloatingHubProps> = ({
   menuConfig,
   alsPulseAgent,
   initialMenu = 'main',
-  label = 'Bloom HUD',
+  label = 'AURA',
   position,
   onPositionChange,
   menuRequest,
@@ -133,8 +127,8 @@ export const BloomFloatingHub: React.FC<BloomFloatingHubProps> = ({
   const currentMenu = menuConfig[activeMenu];
   const items = currentMenu?.items ?? [];
 
-  const glowColor = alsPulseAgent?.glow ?? '#22d3ee';
-  const haloColor = alsPulseAgent?.halo ?? '#38bdf8';
+  const glowColor = alsPulseAgent?.glow ?? AuraColors.violet;
+  const haloColor = alsPulseAgent?.halo ?? AuraColors.blue;
   const basePulseStrength = alsPulseAgent?.pulseStrength ?? (isOpen ? 0.65 : 0.4);
   const intensityBoost =
     flowContext.intensity === 'immersed'
@@ -180,7 +174,7 @@ export const BloomFloatingHub: React.FC<BloomFloatingHubProps> = ({
     () => ({
       boxShadow: `0 0 ${bloomGlowRadius}px ${bloomChargeColor}, inset 0 0 ${
         24 + pulseStrength * 26
-      }px ${hexToRgba(FLOW_ACCENT, 0.28)}, 0 0 ${110 + pulseStrength * 70}px ${flowHaloColor}`,
+      }px ${hexToRgba(AuraColors.violet, 0.28)}, 0 0 ${110 + pulseStrength * 70}px ${flowHaloColor}`,
       transform: `scale(${bloomScale})`,
       transition: 'transform 0.3s ease-out, box-shadow 0.3s ease-out',
     }),
@@ -380,26 +374,32 @@ useEffect(() => {
     const energy = progress !== undefined ? Math.max(0.35, progress / 100) : isOpen ? 1 : 0.6;
     const isHovered = hoveredItem?.name === item.name;
 
+    // AURA Petal Style: Soft curved organic shapes with glass effect
     return (
       <button
         key={`${item.name}-${index}`}
-        className={`absolute flex h-24 w-24 flex-col items-center justify-center rounded-[28px] border text-xs text-slate-100 transition-[transform,box-shadow,background,opacity] duration-400 ease-[cubic-bezier(0.25,0.8,0.25,1)] backdrop-blur-2xl ${
+        className={`absolute flex h-24 w-24 flex-col items-center justify-center border text-xs text-slate-100 transition-[transform,box-shadow,background,opacity] duration-400 ease-[cubic-bezier(0.25,0.8,0.25,1)] backdrop-blur-3xl ${
           item.disabled
             ? 'cursor-not-allowed opacity-40'
-            : 'hover:scale-[1.06] focus-visible:scale-[1.06]'
+            : 'hover:scale-[1.1] focus-visible:scale-[1.1]'
         }`}
         style={{
           transform: `translate(${x}px, ${y}px) scale(${isOpen ? 1 : 0.4 + energy * 0.2})`,
           opacity: isOpen ? 1 : 0,
           pointerEvents: isOpen ? 'auto' : 'none',
           transitionDelay: `${index * 40}ms`,
-          background: `linear-gradient(150deg, ${hexToRgba(FLOW_ACCENT, 0.32)} 0%, ${FLOW_BASE} 55%, ${FLOW_BASE_ALT} 100%)`,
-          borderColor: isHovered ? hexToRgba(accent, 0.5) : FLOW_EDGE_LIGHT,
+          // Petal Shape from AURA Visualization (Leaf/Petal)
+          borderRadius: '50% 0 50% 50%',
+          transformOrigin: '50% 50%',
+          rotate: `${(360 / items.length) * index}deg`,
+          
+          background: `linear-gradient(135deg, ${hexToRgba(AuraColors.violet, 0.15)} 0%, ${hexToRgba(AuraColors.space, 0.9)} 100%)`,
+          borderColor: isHovered ? hexToRgba(accent, 0.5) : 'rgba(255,255,255,0.1)',
           boxShadow: `${
             isHovered
-              ? `0 0 ${24 + energy * 32}px ${hexToRgba(FLOW_ACCENT, 0.46)}`
-              : `0 0 ${14 + energy * 22}px ${hexToRgba(FLOW_ACCENT, 0.36)}`
-          }, inset 0 0 ${6 + energy * 18}px ${hexToRgba(accent, 0.35)}`,
+              ? `0 0 ${24 + energy * 32}px ${hexToRgba(AuraColors.violet, 0.46)}`
+              : `0 0 ${14 + energy * 22}px ${hexToRgba(AuraColors.violet, 0.2)}`
+          }, inset 0 0 ${6 + energy * 18}px ${hexToRgba(accent, 0.2)}`,
         }}
         onClick={() => handlePetalClick(item)}
         onMouseEnter={() => setHoveredItem(item)}
@@ -407,14 +407,16 @@ useEffect(() => {
         onMouseLeave={() => setHoveredItem(null)}
         onBlur={() => setHoveredItem(null)}
       >
-        <div className="mb-1 flex items-center justify-center text-[18px] text-ink">
-          {item.progressPercent !== undefined
-            ? buildProgressIcon(accent, item.progressPercent)
-            : item.icon ?? <span className="text-lg">•</span>}
+        <div className="flex flex-col items-center justify-center -rotate-[var(--rotation)]" style={{ '--rotation': `${(360 / items.length) * index}deg` } as React.CSSProperties}>
+          <div className="mb-1 text-[18px] text-white/90">
+            {item.progressPercent !== undefined
+              ? buildProgressIcon(accent, item.progressPercent)
+              : item.icon ?? <span className="text-lg">•</span>}
+          </div>
+          <span className="text-[10px] font-semibold uppercase tracking-[0.15em] text-white/70">
+            {item.name}
+          </span>
         </div>
-        <span className="text-center text-[11px] font-semibold uppercase tracking-[0.28em] text-ink/70">
-          {item.name}
-        </span>
       </button>
     );
   });
@@ -430,53 +432,42 @@ useEffect(() => {
     >
       <div className="relative flex flex-col items-end space-y-3 pointer-events-auto">
         {hoveredItem && (
-          <div className="max-w-xs rounded-2xl border px-5 py-4 text-xs text-ink/70 shadow-[0_24px_65px_rgba(148,163,209,0.35)] backdrop-blur-2xl"
+          <div className="absolute top-[-80px] left-1/2 transform -translate-x-1/2 max-w-xs rounded-2xl border px-5 py-4 text-xs text-white/80 shadow-2xl backdrop-blur-2xl z-50 text-center pointer-events-none"
             style={{
-              borderColor: FLOW_TOOLTIP_BORDER,
-              background: FLOW_TOOLTIP_BG,
-              boxShadow: `0 18px 55px ${hexToRgba(FLOW_ACCENT, 0.32)}, inset 0 0 22px ${hexToRgba(
-                FLOW_ACCENT,
-                0.1
-              )}`,
+              borderColor: 'rgba(255,255,255,0.1)',
+              background: 'rgba(5,5,10,0.9)',
+              boxShadow: `0 0 40px ${hexToRgba(AuraColors.violet, 0.3)}`,
+              minWidth: '200px'
             }}
           >
-            <div className="flex items-center justify-between">
-              <span className="uppercase tracking-[0.22em] text-[11px] text-ink/80">
+            <div className="flex flex-col items-center gap-1">
+              <span className="uppercase tracking-[0.2em] text-[12px] font-bold text-white">
                 {hoveredItem.name}
               </span>
-              {currentMenu?.parent && (
-                <button
-                  className="rounded-full px-2 py-1 text-[10px] uppercase tracking-[0.18em] text-slate-500 transition-colors duration-200 hover:text-slate-200 focus-visible:text-slate-200"
-                  onClick={handleBack}
-                  type="button"
-                >
-                  Back
-                </button>
+              {hoveredItem.description && (
+                <p className="text-[11px] leading-relaxed text-slate-400">
+                  {hoveredItem.description}
+                </p>
               )}
             </div>
-            {hoveredItem.description && (
-              <p className="mt-2 text-[12px] leading-relaxed text-slate-300">
-                {hoveredItem.description}
-              </p>
-            )}
           </div>
         )}
 
         <div className="relative">
           <div className="pointer-events-none absolute inset-0 -z-10 rounded-full"
             style={{
-              background: `radial-gradient(circle at 30% 30%, ${hexToRgba(
-                FLOW_ACCENT,
-                0.18
+              background: `radial-gradient(circle at 50% 50%, ${hexToRgba(
+                AuraColors.violet,
+                0.2
               )}, transparent 70%)`,
-              filter: 'blur(36px)',
+              filter: 'blur(48px)',
             }}
           />
           {petals}
           <button
             type="button"
-            className={`relative flex h-28 w-28 items-center justify-center rounded-full border border-white/70 text-ink shadow-[0_28px_80px_rgba(148,163,209,0.38)] transition-transform duration-500 ease-[cubic-bezier(0.23,1,0.32,1)] backdrop-blur-2xl ${
-              isOpen ? 'scale-[1.08]' : 'scale-100'
+            className={`relative flex h-32 w-32 items-center justify-center rounded-full border border-white/20 text-white shadow-2xl transition-transform duration-500 ease-[cubic-bezier(0.23,1,0.32,1)] backdrop-blur-3xl ${
+              isOpen ? 'scale-[1.05]' : 'scale-100'
             }`}
             style={containerGlow}
             onClick={() => {
@@ -493,36 +484,38 @@ useEffect(() => {
             onPointerDown={handleDragPointerDown}
           >
             <div
-              className="flex flex-col items-center text-center"
+              className="flex flex-col items-center text-center z-10"
               style={{
-                background: `radial-gradient(circle at 50% 38%, ${hexToRgba(
-                  FLOW_ACCENT,
-                  0.12
-                )}, transparent 65%)`,
-                padding: '12px 16px',
+                background: `radial-gradient(circle at 50% 50%, ${hexToRgba(
+                  AuraColors.violet,
+                  0.3
+                )}, transparent 80%)`,
+                padding: '20px',
                 borderRadius: '9999px',
               }}
             >
-              <span className="text-[10px] font-semibold uppercase tracking-[0.32em] text-ink/80">
+              <span className="text-[14px] font-bold uppercase tracking-[0.2em] text-white drop-shadow-[0_0_8px_rgba(139,92,246,0.8)]">
                 {label}
               </span>
-              <span className="mt-1 text-[12px] uppercase tracking-[0.24em] text-ink/60">
-                {isOpen ? 'Collapse' : 'Bloom'}
+              <span className="mt-1 text-[10px] uppercase tracking-[0.2em] text-white/50">
+                {isOpen ? 'Close' : 'Menu'}
               </span>
-              {activeMenu !== 'main' && (
-                <span className="mt-2 rounded-full bg-glass-surface-soft px-3 py-1 text-[10px] uppercase tracking-[0.2em] text-ink/70 border border-glass-border backdrop-blur-sm">
-                  {activeMenu}
-                </span>
+              {activeMenu !== 'main' && targetPositionRef.current && (
+                 <span className="absolute -bottom-8 rounded-full bg-black/60 px-3 py-1 text-[9px] uppercase tracking-[0.15em] text-white/80 border border-white/10 backdrop-blur-md">
+                   {activeMenu}
+                 </span>
               )}
             </div>
+            {/* Inner ring */}
+            <div className="absolute inset-2 rounded-full border border-white/10" />
             <div
               className="absolute inset-0 -z-10 rounded-full"
               style={{
-                boxShadow: `0 0 48px ${hexToRgba(FLOW_ACCENT, 0.48)}, inset 0 0 32px ${hexToRgba(
+                boxShadow: `0 0 60px ${hexToRgba(AuraColors.violet, 0.4)}, inset 0 0 40px ${hexToRgba(
                   glowColor,
-                  0.32
+                  0.2
                 )}`,
-                opacity: isOpen || isDragging ? 1 : 0.72,
+                opacity: isOpen || isDragging ? 1 : 0.8,
                 transition: 'opacity 0.35s ease, box-shadow 0.45s ease',
               }}
             />
