@@ -84,12 +84,24 @@ const config: Config = {
           700: "#A21CAF",
           800: "#86198F",
           900: "#701A75",
-        }
+        },
+        // Professional glass UI tokens
+        'mixx-bg': '#F6F6FA',
+        'mixx-glass-tint': 'rgba(238,232,255,0.56)',
+        'mixx-accent': '#8B7BFF',
+        'mixx-accent-strong': '#6E56FF',
+        'mixx-muted': '#4B4B57',
+      },
+      boxShadow: {
+        'mixx-elev': '0 8px 30px rgba(26,21,44,0.08)',
+        'mixx-focus': '0 0 0 4px rgba(110,86,255,0.12)',
       },
       borderRadius: {
         lg: "var(--radius)",
         md: "calc(var(--radius) - 2px)",
         sm: "calc(var(--radius) - 4px)",
+        'mixx-lg': '12px',
+        'mixx-xl': '14px',
       },
       keyframes: {
         "accordion-down": {

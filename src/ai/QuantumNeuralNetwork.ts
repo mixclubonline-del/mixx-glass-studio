@@ -62,7 +62,7 @@ function quantumActivation(x: tf.Tensor): tf.Tensor {
   return superposition;
 }
 
-class QuantumActivationLayer extends tf.layers.Layer {
+export class QuantumActivationLayer extends tf.layers.Layer {
   constructor() {
     super({ name: "quantum_activation" });
   }
@@ -183,7 +183,7 @@ export class QuantumNeuralNetwork {
   private cache = getInferenceCache();
 
   constructor() {
-    console.log("🧠 QUANTUM NEURAL NETWORK: Initializing...");
+    // Quantum Neural Network initializing
   }
   
   /**
@@ -192,8 +192,6 @@ export class QuantumNeuralNetwork {
   async prefetch(): Promise<void> {
     if (this.prefetched) return;
     
-    console.log("🔮 QUANTUM NEURAL NETWORK: Prefetching models...");
-    
     try {
       // Ensure initialized
       await this.ensureInitialized();
@@ -201,14 +199,23 @@ export class QuantumNeuralNetwork {
       // Warm up models with dummy data
       const dummyFeatures = new Array(MAX_AUDIO_FEATURES).fill(0.5);
       
-      // Warm up all models
+      // Warm up all models (predict returns tensors synchronously, so we dispose immediately)
       await Promise.all([
-        this.audioAnalyzer!.predict(tf.tensor2d([dummyFeatures.slice(0, MAX_AUDIO_FEATURES)])).then(t => t.dispose()),
-        this.genreClassifier!.predict(tf.tensor2d([dummyFeatures.slice(0, MAX_GENRE_FEATURES)])).then(t => t.dispose()),
+        Promise.resolve().then(() => {
+          const input1 = tf.tensor2d([dummyFeatures.slice(0, MAX_AUDIO_FEATURES)]);
+          const result1 = this.audioAnalyzer!.predict(input1);
+          result1.dispose();
+          input1.dispose();
+        }),
+        Promise.resolve().then(() => {
+          const input2 = tf.tensor2d([dummyFeatures.slice(0, MAX_GENRE_FEATURES)]);
+          const result2 = this.genreClassifier!.predict(input2);
+          result2.dispose();
+          input2.dispose();
+        }),
       ]);
       
       this.prefetched = true;
-      console.log("✅ QUANTUM NEURAL NETWORK: Models prefetched and warmed up");
     } catch (error) {
       console.warn("[Quantum Neural Network] Prefetch failed:", error);
       // Continue anyway - models will initialize on first use
@@ -223,12 +230,6 @@ export class QuantumNeuralNetwork {
       try {
         const backendStatus = await initializeWebGPUBackend();
         this.backendInitialized = true;
-        
-        if (backendStatus.type === 'webgpu') {
-          console.log("🔮 QUANTUM NEURAL NETWORK: WebGPU acceleration active - 10-100x speedup");
-        } else {
-          console.log("🔮 QUANTUM NEURAL NETWORK: CPU backend active (WebGPU unavailable)");
-        }
       } catch (error) {
         console.warn("[Quantum Neural Network] Backend initialization failed, continuing with default:", error);
         this.backendInitialized = true; // Mark as attempted to avoid retry loops
@@ -261,8 +262,7 @@ export class QuantumNeuralNetwork {
       ? "WebGPU accelerated" 
       : `CPU backend (${backendStatus.performanceHint || 'fallback'})`;
     
-    const quantizedInfo = this.quantized ? " (quantized)" : "";
-    console.log(`✅ QUANTUM NEURAL NETWORK: Online - All layers active (${backendInfo}${quantizedInfo})`);
+    // Quantum Neural Network initialized
   }
   
   /**
@@ -272,8 +272,6 @@ export class QuantumNeuralNetwork {
     if (this.quantized) return;
     
     try {
-      console.log("🔮 QUANTUM NEURAL NETWORK: Evaluating quantization...");
-      
       // For now, we'll mark as quantized-ready
       // Actual quantization would require test data and model export/import
       // This architecture is ready for quantization when models are trained
@@ -285,7 +283,6 @@ export class QuantumNeuralNetwork {
       // 4. Replace if beneficial
       
       this.quantized = true;
-      console.log("✅ QUANTUM NEURAL NETWORK: Quantization-ready (models will be quantized when trained)");
     } catch (error) {
       console.warn("[Quantum Neural Network] Quantization evaluation failed:", error);
       // Continue without quantization
@@ -335,7 +332,7 @@ export class QuantumNeuralNetwork {
               
               const duration = performance.now() - startTime;
               if (duration > 50) {
-                console.log(`[QNN] Genre classification took ${duration.toFixed(2)}ms`);
+                // Genre classification complete
               }
               
               resolve(result);
@@ -394,7 +391,7 @@ export class QuantumNeuralNetwork {
               
               const duration = performance.now() - startTime;
               if (duration > 50) {
-                console.log(`[QNN] Audio analysis took ${duration.toFixed(2)}ms`);
+                // Audio analysis complete
               }
               
               resolve(result);
@@ -513,7 +510,7 @@ export class QuantumNeuralNetwork {
 
       if (network) {
         await network.train(inputTensor, targetTensor, 1);
-        console.log(`🧠 QUANTUM NN: Learned from ${networkType} example`);
+        // Learned from example
       }
     } catch (error) {
       console.error("QUANTUM NN Training Error:", error);
@@ -529,7 +526,7 @@ export class QuantumNeuralNetwork {
     this.patternRecognizer?.dispose();
     this.mixerOptimizer?.dispose();
     this.isInitialized = false;
-    console.log("🛑 QUANTUM NEURAL NETWORK: Disposed");
+    // Quantum Neural Network disposed
   }
 
   private async ensureInitialized(): Promise<void> {

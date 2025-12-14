@@ -6,6 +6,7 @@ import { DownloadIcon, SlidersIcon } from '../icons'; // Using SlidersIcon for v
 import { VelvetProcessor, VelvetProcessorOptions } from '../../audio/VelvetProcessor';
 import { MASTERING_PROFILES, MasteringProfile } from '../../types/sonic-architecture';
 import { ensureMasterCompliance } from '../../audio/VelvetValidator';
+import { als } from '../../utils/alsFeedback';
 
 interface AIMasteringAssistantProps {
   audioContext: AudioContext | null;
@@ -38,7 +39,7 @@ const AIMasteringAssistant: React.FC<AIMasteringAssistantProps> = ({ audioContex
         const decodedBuffer = await audioContext.decodeAudioData(arrayBuffer);
         setAudioBuffer(decodedBuffer);
       } catch (err: any) {
-        console.error("Error decoding audio file:", err);
+        als.error("Error decoding audio file", err);
         setError(`Failed to decode audio: ${err.message || 'Unknown error'}`);
         setAudioBuffer(null);
       } finally {
@@ -95,7 +96,7 @@ const AIMasteringAssistant: React.FC<AIMasteringAssistantProps> = ({ audioContex
       const blob = velvetProcessor.exportWAV(processedBuffer);
       setMasteredBlob(blob);
     } catch (err: any) {
-      console.error("Error during AI mastering:", err);
+      als.error("Error during AI mastering", err);
       if (Array.isArray(err?.issues) && err.issues.length) {
         setError(`Mastering failed: ${err.issues.join(' • ')}`);
       } else {

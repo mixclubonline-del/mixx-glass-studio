@@ -19,6 +19,11 @@ pub fn git_status() -> Result<serde_json::Value, String> {
         .output()
         .map_err(|e| format!("Failed to get branch: {}", e))?;
     
+    if !branch_output.status.success() {
+        let error_msg = String::from_utf8_lossy(&branch_output.stderr);
+        return Err(format!("Failed to get branch: {}", error_msg));
+    }
+    
     let branch = String::from_utf8_lossy(&branch_output.stdout).trim().to_string();
     
     // Check for uncommitted changes
@@ -26,6 +31,11 @@ pub fn git_status() -> Result<serde_json::Value, String> {
         .args(["-C", &repo_path, "status", "--porcelain"])
         .output()
         .map_err(|e| format!("Failed to get status: {}", e))?;
+    
+    if !status_output.status.success() {
+        let error_msg = String::from_utf8_lossy(&status_output.stderr);
+        return Err(format!("Failed to get status: {}", error_msg));
+    }
     
     let has_changes = !status_output.stdout.is_empty();
     
@@ -36,28 +46,38 @@ pub fn git_status() -> Result<serde_json::Value, String> {
     
     let (ahead, behind) = match ahead_behind_output {
         Ok(output) => {
-            let counts = String::from_utf8_lossy(&output.stdout);
-            let parts: Vec<&str> = counts.trim().split('\t').collect();
-            if parts.len() == 2 {
-                (
-                    parts[0].parse::<i32>().unwrap_or(0),
-                    parts[1].parse::<i32>().unwrap_or(0),
-                )
-            } else {
+            if !output.status.success() {
+                // If rev-list fails (e.g., no remote tracking branch), default to (0, 0)
                 (0, 0)
+            } else {
+                let counts = String::from_utf8_lossy(&output.stdout);
+                let parts: Vec<&str> = counts.trim().split('\t').collect();
+                if parts.len() == 2 {
+                    // git rev-list --left-right --count returns: behind<tab>ahead
+                    // parts[0] = commits in origin not in HEAD (behind)
+                    // parts[1] = commits in HEAD not in origin (ahead)
+                    (
+                        parts[1].parse::<i32>().unwrap_or(0), // ahead
+                        parts[0].parse::<i32>().unwrap_or(0), // behind
+                    )
+                } else {
+                    (0, 0)
+                }
             }
         }
         Err(_) => (0, 0),
     };
     
     // Check for merge conflicts
+    // git diff --check returns success (0) when NO conflicts, failure (1) when conflicts exist
     let conflict_output = Command::new("git")
         .args(["-C", &repo_path, "diff", "--check"])
         .output();
     
-    let has_conflicts = conflict_output
-        .map(|o| !o.stdout.is_empty())
-        .unwrap_or(false);
+    let has_conflicts = match conflict_output {
+        Ok(output) => !output.status.success(), // Conflicts exist when command fails
+        Err(_) => false,
+    };
     
     Ok(serde_json::json!({
         "branch": branch,

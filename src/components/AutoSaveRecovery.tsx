@@ -8,6 +8,7 @@
 import React, { useState, useEffect } from 'react';
 import { useAutoSave } from '../hooks/useAutoSave';
 import type { PersistedProjectState } from '../App';
+import { als } from '../utils/alsFeedback';
 
 interface AutoSaveRecoveryProps {
   isOpen: boolean;
@@ -29,12 +30,18 @@ export const AutoSaveRecovery: React.FC<AutoSaveRecoveryProps> = ({
   useEffect(() => {
     if (isOpen) {
       setLoading(true);
-      autoSave.getAllSaves().then((allSaves) => {
-        setSaves(allSaves);
-        setLoading(false);
-      });
+      autoSave.getAllSaves()
+        .then((allSaves) => {
+          setSaves(allSaves);
+          setLoading(false);
+        })
+        .catch((error) => {
+          als.error('[AutoSaveRecovery] Failed to load saves', error);
+          setSaves([]);
+          setLoading(false);
+        });
     }
-  }, [isOpen, autoSave]);
+  }, [isOpen]); // Only depend on isOpen - autoSave methods are stable
 
   const formatDate = (timestamp: number): string => {
     const date = new Date(timestamp);

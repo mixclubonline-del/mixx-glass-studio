@@ -1,8 +1,9 @@
 import React, { useState, useMemo, useRef, useCallback, useEffect } from 'react';
-import { PlayIcon, PauseIcon, RewindIcon, FastForwardIcon, LoopIcon, HushIcon, SaveIcon, LoadIcon, SlidersIcon, MixerIcon, SparklesIcon, ArrangeViewIcon, PianoIcon, EditSurfaceIcon, SamplerIcon, SquaresPlusIcon, PlusCircleIcon, SplitIcon, MergeIcon, RefreshIcon, BulbIcon, StarIcon } from '../icons';
+import { PlayIcon, PauseIcon, RewindIcon, FastForwardIcon, LoopIcon, HushIcon, SaveIcon, LoadIcon, SlidersIcon, BloomModuleIcon, MixerIcon, SparklesIcon, ArrangeViewIcon, PianoIcon, EditSurfaceIcon, SamplerIcon, SquaresPlusIcon, PlusCircleIcon, SplitIcon, MergeIcon, RefreshIcon, BulbIcon, StarIcon } from '../icons';
 import { ArrangeClip, ClipId } from '../../hooks/useArrange';
-import FXMenu from '../FXMenu';
+import PluginBrowser from '../PluginBrowser';
 import { FxWindowConfig, FxWindowId } from '../../App';
+import type { PluginInventoryItem } from '../../audio/pluginTypes';
 import { hexToRgba, ALSActionPulse } from '../../utils/ALS';
 import type { PulsePalette } from '../../utils/ALS';
 import type { BloomActionMeta } from '../../types/bloom';
@@ -17,6 +18,7 @@ import { FlowDockDebug } from '../dock/debug/FlowDockDebug';
 import { FlowPulseGraph } from '../dock/debug/FlowPulseGraph';
 import { ALSEventLog } from '../dock/debug/ALSEventLog';
 import { ALSSyncMonitor } from '../dock/debug/ALSSyncMonitor';
+import { ProfessionalTransport } from '../transport/ProfessionalTransport';
 import './ArrangeBloomStrip.css';
 
 type ImportProgressLike = {
@@ -185,6 +187,11 @@ interface BloomDockProps {
     mixerActionPulse?: { trackId: string; pulse: ALSActionPulse; message: string } | null;
     onBloomAction?: (action: string, payload?: any, meta?: BloomActionMeta) => void;
     onSetTranslationProfile?: (action: string, payload?: any, meta?: BloomActionMeta) => void;
+    pluginInventory?: PluginInventoryItem[];
+    pluginFavorites?: Record<FxWindowId, boolean>;
+    onAddPlugin?: (trackId: string, pluginId: FxWindowId) => void;
+    onTogglePluginFavorite?: (pluginId: FxWindowId) => void;
+    tracks?: Array<{ id: string; trackName?: string }>;
 }
 
 export const BloomDock: React.FC<BloomDockProps> = (props) => {
@@ -202,6 +209,11 @@ export const BloomDock: React.FC<BloomDockProps> = (props) => {
         recordingOptions,
         onToggleRecordingOption,
         onDropTakeMarker,
+        pluginInventory = [],
+        pluginFavorites = {},
+        onAddPlugin,
+        onTogglePluginFavorite,
+        tracks = [],
     } = props;
     
     const containerRef = useRef<HTMLDivElement>(null);
@@ -210,7 +222,7 @@ export const BloomDock: React.FC<BloomDockProps> = (props) => {
     const hasDraggedRef = useRef(false);
     const cleanupDragListenersRef = useRef<(() => void) | null>(null);
     const [isDragging, setIsDragging] = useState(false);
-    const [isFxMenuOpen, setIsFxMenuOpen] = useState(false);
+    const [isPluginBrowserOpen, setIsPluginBrowserOpen] = useState(false);
     const [transportPulse, setTransportPulse] = useState<TransportPulseType | null>(null);
     const transportPulseTimeoutRef = useRef<number | null>(null);
     const holdTimeoutRef = useRef<number | null>(null);
@@ -492,12 +504,12 @@ export const BloomDock: React.FC<BloomDockProps> = (props) => {
     const canReingest = Boolean(singleSelectedClip?.sourceJobId);
     const canOpenClipEditor = Boolean(singleSelectedClip?.bufferId);
     
-    const actionButton = (icon: React.ReactNode, action: string, payload?: any, tooltip?: string, disabled?: boolean) => (
+    const actionButton = (icon: React.ReactNode, action: string, payload?: any, tooltip?: string, disabled?: boolean, variant: 'primary' | 'secondary' = 'secondary') => (
         <button
             onClick={() => onAction(action, payload, { source: "bloom-dock" })}
             title={tooltip}
             disabled={disabled}
-            className="w-11 h-11 rounded-full bg-glass-surface-soft flex items-center justify-center text-ink/70 hover:bg-glass-surface hover:text-ink disabled:text-ink/40 disabled:bg-glass-surface disabled:cursor-not-allowed transition-colors shadow-[inset_0_0_18px_rgba(4,12,26,0.4)]"
+            className={`button-mixx ${variant} w-11 h-11 rounded-full bg-glass-surface-soft flex items-center justify-center text-ink/70 hover:bg-glass-surface hover:text-ink disabled:text-ink/40 disabled:bg-glass-surface disabled:cursor-not-allowed transition-colors shadow-[inset_0_0_18px_rgba(4,12,26,0.4)]`}
         >
             {icon}
         </button>
@@ -534,7 +546,8 @@ export const BloomDock: React.FC<BloomDockProps> = (props) => {
                 'recallLastImport',
                 undefined,
                 'Recall last import',
-                !canRecallLastImport
+                !canRecallLastImport,
+                'primary'
             )}
         </div>
     );
@@ -606,7 +619,7 @@ export const BloomDock: React.FC<BloomDockProps> = (props) => {
 
     const mixCluster = (
         <div className="flex items-center gap-2.5">
-            {actionButton(<SaveIcon className="w-5 h-5" />, 'saveProject', undefined, 'Save project')}
+            {actionButton(<SaveIcon className="w-5 h-5" />, 'saveProject', undefined, 'Save project', false, 'primary')}
             {actionButton(<LoadIcon className="w-5 h-5" />, 'loadProject', undefined, 'Load project file')}
             {actionButton(
                 <PlusCircleIcon className="w-5 h-5 text-emerald-200" />,
@@ -763,96 +776,17 @@ export const BloomDock: React.FC<BloomDockProps> = (props) => {
             : undefined;
 
     const transportModule = (
-        <div className="flex items-center gap-4 px-4 py-2 rounded-full border border-white/10 bg-[rgba(6,12,28,0.68)] backdrop-blur-xl shadow-[0_24px_68px_rgba(4,12,26,0.45)]">
-            <button
-                type="button"
-                aria-label="Cue backward"
-                title="Cue backward"
-                onPointerDown={handleSeekPointerDown('back')}
-                onPointerUp={handleSeekPointerUp('back')}
-                onPointerLeave={() => clearSeekTimers()}
-                onPointerCancel={() => clearSeekTimers()}
-                className="relative flex items-center justify-center w-11 h-11 rounded-full border border-white/14 bg-[rgba(12,26,48,0.65)] text-cyan-100 hover:text-white transition-all"
-                style={pulseGlowStyle('rewind')}
-            >
-                <RewindIcon className="w-5 h-5" />
-            </button>
-            <div className="relative">
-                <button
-                    type="button"
-                    aria-label={isPlaying ? 'Pause transport' : 'Play transport'}
-                    title={isPlaying ? 'Pause' : 'Play'}
-                    onPointerDown={handlePlayPointerDown}
-                    onPointerUp={() => clearSeekTimers()}
-                    className={`relative flex items-center justify-center w-14 h-14 rounded-full border transition-all text-white ${
-                        isPlaying ? 'bg-[rgba(24,32,76,0.78)] border-white/18' : 'bg-[rgba(18,48,84,0.82)] border-white/14'
-                    }`}
-                    style={
-                        transportPulse === 'play' || transportPulse === 'pause'
-                            ? {
-                                  boxShadow: `0 0 36px ${hexToRgba(pulseAccent, 0.5)}, inset 0 0 22px ${hexToRgba(pulseAccent, 0.32)}`,
-                                  borderColor: hexToRgba(pulseAccent, 0.62),
-                              }
-                            : undefined
-                    }
-                >
-                    {isPlaying ? (
-                        <PauseIcon className="w-6 h-6 text-cyan-100" />
-                    ) : (
-                        <PlayIcon className="w-6 h-6 text-cyan-100" />
-                    )}
-                    <span
-                        aria-hidden
-                        className="pointer-events-none absolute inset-0 rounded-full"
-                        style={{
-                            boxShadow: `0 0 ${isPlaying ? 46 : 32}px ${hexToRgba(pulseGlow, isPlaying ? 0.48 : 0.35)}`,
-                            opacity: 0.85,
-                        }}
-                    />
-                </button>
-            </div>
-            <button
-                type="button"
-                aria-label="Cue forward"
-                title="Cue forward"
-                onPointerDown={handleSeekPointerDown('forward')}
-                onPointerUp={handleSeekPointerUp('forward')}
-                onPointerLeave={() => clearSeekTimers()}
-                onPointerCancel={() => clearSeekTimers()}
-                className="relative flex items-center justify-center w-11 h-11 rounded-full border border-white/14 bg-[rgba(12,26,48,0.65)] text-cyan-100 hover:text-white transition-all"
-                style={pulseGlowStyle('forward')}
-            >
-                <FastForwardIcon className="w-5 h-5" />
-            </button>
-            <div className="relative w-40 h-12 rounded-full overflow-hidden border border-white/12 bg-[rgba(4,10,22,0.86)]">
-                <div
-                    className="absolute inset-0"
-                    style={{
-                        opacity: 0.38 + transportEnergy * 0.44,
-                        background: `linear-gradient(135deg, ${hexToRgba(pulseGlow, 0.28)} 0%, ${secondaryAccent} 100%)`,
-                    }}
-                />
-                <div className="absolute inset-0 mix-blend-screen opacity-80">
-                    <MasterWaveform waveform={masterAnalysis.waveform} color={waveformAccent} />
-                </div>
-                {masterAnalysis.transient && (
-                    <div
-                        aria-hidden
-                        className="absolute inset-0 rounded-full pointer-events-none"
-                        style={{
-                            boxShadow: `0 0 42px ${hexToRgba(pulseAccent, 0.55)}`,
-                            opacity: 0.7,
-                        }}
-                    />
-                )}
-                {followPlayhead && (
-                    <div
-                        className="absolute top-1/2 right-3 -translate-y-1/2 w-2.5 h-2.5 rounded-full bg-cyan-200 shadow-[0_0_16px_rgba(45,212,191,0.65)]"
-                        aria-hidden
-                    />
-                )}
-            </div>
-        </div>
+        <ProfessionalTransport
+            isPlaying={isPlaying}
+            isLooping={isLooping}
+            currentTime={currentTime}
+            onPlayPause={onPlayPause}
+            onSeekPointerDown={handleSeekPointerDown}
+            onSeekPointerUp={handleSeekPointerUp}
+            onPlayPointerDown={handlePlayPointerDown}
+            onPlayPointerUp={() => clearSeekTimers()}
+            onToggleLoop={onToggleLoop}
+        />
     );
 
     const loopActive = isLooping || transportPulse === 'loop';
@@ -977,19 +911,29 @@ export const BloomDock: React.FC<BloomDockProps> = (props) => {
                                 availableModes={availableViewModes}
                             />
                             <button
-                                onClick={() => setIsFxMenuOpen((prev) => !prev)}
+                                onClick={() => setIsPluginBrowserOpen((prev) => !prev)}
                                 className="w-11 h-11 rounded-full bg-glass-surface-soft flex items-center justify-center text-ink/70 hover:bg-glass-surface hover:text-ink transition-colors shadow-[inset_0_0_15px_rgba(4,12,26,0.4)]"
-                                aria-label="Toggle FX menu"
-                                title="Toggle FX menu"
+                                aria-label="Open plugin browser"
+                                title="Open plugin browser"
                             >
-                                <SlidersIcon className="w-5 h-5" />
+                                <BloomModuleIcon className="w-5 h-5" />
                             </button>
-                            {isFxMenuOpen && (
-                                <FXMenu
-                                    fxWindows={fxWindows.map((fw) => ({ id: fw.id, title: fw.name }))}
-                                    fxVisibility={fxVisibility}
-                                    onToggleFxVisibility={onToggleFxVisibility}
-                                    onClose={() => setIsFxMenuOpen(false)}
+                            {isPluginBrowserOpen && onAddPlugin && (
+                                <PluginBrowser
+                                    trackId={selectedTrackId || tracks[0]?.id || 'default'}
+                                    trackName={selectedTrackId ? tracks.find(t => t.id === selectedTrackId)?.trackName : 'Master Chain'}
+                                    activeInserts={fxWindows.filter(fw => fxVisibility[fw.id]).map(fw => fw.id)}
+                                    inventory={pluginInventory}
+                                    favorites={pluginFavorites}
+                                    onAddPlugin={(trackId, pluginId) => {
+                                        if (selectedTrackId) {
+                                            onAddPlugin(selectedTrackId, pluginId);
+                                        } else if (tracks.length > 0) {
+                                            onAddPlugin(tracks[0].id, pluginId);
+                                        }
+                                    }}
+                                    onToggleFavorite={onTogglePluginFavorite || (() => {})}
+                                    onClose={() => setIsPluginBrowserOpen(false)}
                                 />
                             )}
                             <button

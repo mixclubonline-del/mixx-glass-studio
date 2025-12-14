@@ -6,6 +6,7 @@
  */
 
 import type { PersistedProjectState } from '../../App';
+import { als } from '../../utils/alsFeedback';
 
 const DB_NAME = 'mixx-studio-autosave';
 const DB_VERSION = 1;
@@ -37,15 +38,20 @@ class AutoSaveService {
 
   /**
    * Initialize the auto-save service
+   * Safe to call multiple times - will only initialize once
    */
   async initialize(): Promise<void> {
+    // Prevent multiple initializations
+    if (this.db !== null) {
+      return;
+    }
+
     try {
       this.db = await this.openDatabase();
       this.loadSettings();
       this.startInterval();
-      console.log('[AutoSave] Service initialized');
     } catch (error) {
-      console.error('[AutoSave] Failed to initialize:', error);
+      als.error('[AutoSave] Failed to initialize', error);
     }
   }
 
@@ -80,7 +86,10 @@ class AutoSaveService {
         this.state.isEnabled = settings.isEnabled !== false;
       }
     } catch (error) {
-      console.warn('[AutoSave] Failed to load settings:', error);
+      // Settings load failure is non-critical - continue with defaults
+      if (import.meta.env.DEV) {
+        als.warning('[AutoSave] Failed to load settings, using defaults');
+      }
     }
   }
 
@@ -94,7 +103,10 @@ class AutoSaveService {
         JSON.stringify({ isEnabled: this.state.isEnabled })
       );
     } catch (error) {
-      console.warn('[AutoSave] Failed to save settings:', error);
+      // Settings save failure is non-critical
+      if (import.meta.env.DEV) {
+        als.warning('[AutoSave] Failed to save settings');
+      }
     }
   }
 
@@ -209,10 +221,8 @@ class AutoSaveService {
       this.state.pendingChanges = false;
       this.state.saveInProgress = false;
       this.notifyStatusChange();
-
-      console.log('[AutoSave] Project state saved at', new Date(timestamp).toLocaleTimeString());
     } catch (error) {
-      console.error('[AutoSave] Failed to save:', error);
+      als.error('[AutoSave] Failed to save project state', error);
       this.state.saveInProgress = false;
       this.notifyStatusChange();
     }

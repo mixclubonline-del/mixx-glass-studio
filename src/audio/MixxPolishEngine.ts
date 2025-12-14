@@ -72,7 +72,6 @@ export class MixxPolishEngine implements IAudioEngine {
 
     this.updateParameters();
     this.isInitialized = true;
-    console.log("✨ MixxPolishEngine active");
   }
 
   isActive(): boolean {
@@ -155,6 +154,18 @@ export class MixxPolishEngine implements IAudioEngine {
 let instance: MixxPolishEngine | null = null;
 
 export function getMixxPolishEngine(context: BaseAudioContext | null = null): MixxPolishEngine {
+  // If instance exists but context is closed or different, dispose and recreate
+  if (instance) {
+    const existingContext = instance.audioContext;
+    const contextClosed = existingContext && 'state' in existingContext && existingContext.state === 'closed';
+    const contextChanged = context && existingContext && existingContext !== context;
+    
+    if (contextClosed || contextChanged) {
+      instance.dispose();
+      instance = null;
+    }
+  }
+  
   if (!instance) {
     instance = new MixxPolishEngine(context);
   }

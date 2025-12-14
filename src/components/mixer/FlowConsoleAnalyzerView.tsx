@@ -6,11 +6,12 @@
  */
 
 import React, { useRef, useEffect, useState, useMemo } from 'react';
-import { motion } from 'framer-motion';
+import { usePulseAnimation } from '../mixxglass';
 import type { TrackData } from '../../App';
 import type { TrackALSFeedback } from '../../utils/ALS';
 import { hexToRgba } from '../../utils/ALS';
 import { TRACK_COLOR_SWATCH } from '../../utils/ALS';
+import { spacing, typography, layout, effects, transitions, composeStyles } from '../../design-system';
 
 export type AnalyzerType = 'spectrum' | 'correlation' | 'lufs';
 
@@ -135,40 +136,103 @@ export const FlowConsoleAnalyzerView: React.FC<FlowConsoleAnalyzerViewProps> = (
   }, [analyzerType, spectrumData]);
 
   const renderSpectrum = () => (
-    <div className="flex h-full flex-col gap-4">
+    <div style={composeStyles(
+      layout.flex.container('col'),
+      { height: '100%' },
+      spacing.gap(4)
+    )}>
       <canvas
         ref={canvasRef}
         width={1200}
         height={400}
-        className="h-full w-full rounded-xl border border-glass-border/60"
+        style={composeStyles(
+          layout.width.full,
+          { height: '100%' },
+          effects.border.radius.xl,
+          {
+            border: '1px solid rgba(102, 140, 198, 0.6)',
+          }
+        )}
       />
-      <div className="flex items-center justify-between rounded-xl border border-glass-border/60 bg-[rgba(6,14,28,0.7)] px-4 py-3">
-        <div className="flex items-center gap-6 text-[0.42rem] uppercase tracking-[0.3em] text-ink/60">
+      <div style={composeStyles(
+        layout.flex.container('row'),
+        layout.flex.align.center,
+        layout.flex.justify.between,
+        spacing.px(4),
+        spacing.py(3),
+        effects.border.radius.xl,
+        {
+          border: '1px solid rgba(102, 140, 198, 0.6)',
+          background: 'rgba(6,14,28,0.7)',
+        }
+      )}>
+        <div style={composeStyles(
+          layout.flex.container('row'),
+          layout.flex.align.center,
+          spacing.gap(6),
+          typography.transform('uppercase'),
+          typography.tracking.widest,
+          {
+            fontSize: '0.42rem',
+            color: 'rgba(230, 240, 255, 0.6)',
+          }
+        )}>
           <div>
-            <span className="block">Frequency Range</span>
-            <span className="text-[0.55rem] font-semibold text-ink">20 Hz - 20 kHz</span>
+            <span style={{ display: 'block' }}>Frequency Range</span>
+            <span style={composeStyles(
+              typography.weight('semibold'),
+              {
+                fontSize: '0.55rem',
+                color: '#e6f0ff',
+              }
+            )}>20 Hz - 20 kHz</span>
           </div>
           <div>
-            <span className="block">Resolution</span>
-            <span className="text-[0.55rem] font-semibold text-ink">512 Bins</span>
+            <span style={{ display: 'block' }}>Resolution</span>
+            <span style={composeStyles(
+              typography.weight('semibold'),
+              {
+                fontSize: '0.55rem',
+                color: '#e6f0ff',
+              }
+            )}>512 Bins</span>
           </div>
         </div>
-        <div className="flex items-center gap-4">
+        <div style={composeStyles(
+          layout.flex.container('row'),
+          layout.flex.align.center,
+          spacing.gap(4)
+        )}>
           {['Low', 'Mid', 'High'].map((band, idx) => {
             const startIdx = Math.floor((idx / 3) * spectrumData.length);
             const endIdx = Math.floor(((idx + 1) / 3) * spectrumData.length);
             const avg = Array.from(spectrumData.slice(startIdx, endIdx)).reduce((a, b) => a + b, 0) / (endIdx - startIdx);
             const hue = 210 + idx * 30;
             return (
-              <div key={band} className="flex flex-col items-center gap-1">
-                <span className="text-[0.42rem] uppercase tracking-[0.3em] text-ink/55">{band}</span>
+              <div key={band} style={composeStyles(
+                layout.flex.container('col'),
+                layout.flex.align.center,
+                spacing.gap(1)
+              )}>
+                <span style={composeStyles(
+                  typography.transform('uppercase'),
+                  typography.tracking.widest,
+                  {
+                    fontSize: '0.42rem',
+                    color: 'rgba(230, 240, 255, 0.55)',
+                  }
+                )}>{band}</span>
                 <div
-                  className="h-2 w-16 rounded-full"
-                  style={{
-                    background: `linear-gradient(90deg, hsl(${hue}, 70%, 50%), hsl(${hue}, 90%, 70%))`,
-                    width: `${avg * 100}%`,
-                    boxShadow: `0 0 8px hsl(${hue}, 90%, 60%)`,
-                  }}
+                  style={composeStyles(
+                    effects.border.radius.full,
+                    {
+                      height: '8px',
+                      width: `${avg * 100}%`,
+                      maxWidth: '64px',
+                      background: `linear-gradient(90deg, hsl(${hue}, 70%, 50%), hsl(${hue}, 90%, 70%))`,
+                      boxShadow: `0 0 8px hsl(${hue}, 90%, 60%)`,
+                    }
+                  )}
                 />
               </div>
             );
@@ -182,13 +246,38 @@ export const FlowConsoleAnalyzerView: React.FC<FlowConsoleAnalyzerViewProps> = (
     const normalizedCorr = (correlation + 1) / 2; // -1 to +1 → 0 to 1
 
     return (
-      <div className="flex h-full flex-col items-center justify-center gap-8">
-        <div className="relative">
+      <div style={composeStyles(
+        layout.flex.container('col'),
+        layout.flex.align.center,
+        layout.flex.justify.center,
+        { height: '100%' },
+        spacing.gap(8)
+      )}>
+        <div style={composeStyles(
+          layout.position.relative
+        )}>
           {/* Correlation Meter */}
-          <div className="h-64 w-64 rounded-full border-4 border-glass-border/60 bg-[rgba(6,14,28,0.7)] p-4">
-            <div className="relative h-full w-full">
+          <div style={composeStyles(
+            spacing.p(4),
+            effects.border.radius.full,
+            {
+              width: '256px',
+              height: '256px',
+              border: '4px solid rgba(102, 140, 198, 0.6)',
+              background: 'rgba(6,14,28,0.7)',
+            }
+          )}>
+            <div style={composeStyles(
+              layout.position.relative,
+              layout.width.full,
+              layout.height.full
+            )}>
               {/* Arc Background */}
-              <svg className="h-full w-full -rotate-90 transform">
+              <svg style={composeStyles(
+                layout.width.full,
+                layout.height.full,
+                transitions.transform.combine('rotate(-90deg)')
+              )}>
                 <path
                   d="M 128 128 m -100 0 a 100 100 0 1 1 200 0"
                   fill="none"
@@ -201,25 +290,49 @@ export const FlowConsoleAnalyzerView: React.FC<FlowConsoleAnalyzerViewProps> = (
                   stroke={`hsl(${correlation > 0 ? 120 : 0}, 70%, 60%)`}
                   strokeWidth="8"
                   strokeDasharray={`${normalizedCorr * 628} 628`}
-                  className="transition-all duration-300"
+                  style={transitions.transition.standard('all', 300, 'ease-out')}
                 />
               </svg>
 
               {/* Center Value */}
-              <div className="absolute inset-0 flex flex-col items-center justify-center">
-                <span className="text-[0.45rem] uppercase tracking-[0.3em] text-ink/60">
+              <div style={composeStyles(
+                layout.position.absolute,
+                { inset: 0 },
+                layout.flex.container('col'),
+                layout.flex.align.center,
+                layout.flex.justify.center
+              )}>
+                <span style={composeStyles(
+                  typography.transform('uppercase'),
+                  typography.tracking.widest,
+                  {
+                    fontSize: '0.45rem',
+                    color: 'rgba(230, 240, 255, 0.6)',
+                  }
+                )}>
                   Correlation
                 </span>
                 <span
-                  className="text-4xl font-bold"
-                  style={{
-                    color: `hsl(${correlation > 0 ? 120 : 0}, 70%, 65%)`,
-                    textShadow: `0 0 20px hsl(${correlation > 0 ? 120 : 0}, 70%, 50%)`,
-                  }}
+                  style={composeStyles(
+                    typography.weight('bold'),
+                    {
+                      fontSize: '2.25rem',
+                      color: `hsl(${correlation > 0 ? 120 : 0}, 70%, 65%)`,
+                      textShadow: `0 0 20px hsl(${correlation > 0 ? 120 : 0}, 70%, 50%)`,
+                    }
+                  )}
                 >
                   {correlation.toFixed(2)}
                 </span>
-                <span className="mt-1 text-[0.42rem] uppercase tracking-[0.3em] text-ink/50">
+                <span style={composeStyles(
+                  spacing.mt(1),
+                  typography.transform('uppercase'),
+                  typography.tracking.widest,
+                  {
+                    fontSize: '0.42rem',
+                    color: 'rgba(230, 240, 255, 0.5)',
+                  }
+                )}>
                   {correlation > 0.9 ? 'Mono' : correlation > 0.7 ? 'Wide' : correlation > 0 ? 'Stereo' : 'Out of Phase'}
                 </span>
               </div>
@@ -227,19 +340,29 @@ export const FlowConsoleAnalyzerView: React.FC<FlowConsoleAnalyzerViewProps> = (
           </div>
 
           {/* Track Correlation Indicators */}
-          <div className="absolute -bottom-12 left-1/2 -translate-x-1/2 flex gap-2">
+          <div style={composeStyles(
+            layout.position.absolute,
+            { bottom: '-48px', left: '50%' },
+            transitions.transform.combine('translateX(-50%)'),
+            layout.flex.container('row'),
+            spacing.gap(2)
+          )}>
             {tracks.slice(0, 4).map((track) => {
               const feedback = trackFeedbackMap[track.id];
               const { glow } = TRACK_COLOR_SWATCH[track.trackColor];
               return (
                 <div
                   key={track.id}
-                  className="h-2 w-2 rounded-full"
-                  style={{
-                    background: hexToRgba(glow, 0.8),
-                    boxShadow: `0 0 8px ${hexToRgba(glow, 0.6)}`,
-                    opacity: 0.6 + (feedback?.intensity ?? 0) * 0.4,
-                  }}
+                  style={composeStyles(
+                    effects.border.radius.full,
+                    {
+                      width: '8px',
+                      height: '8px',
+                      background: hexToRgba(glow, 0.8),
+                      boxShadow: `0 0 8px ${hexToRgba(glow, 0.6)}`,
+                      opacity: 0.6 + (feedback?.intensity ?? 0) * 0.4,
+                    }
+                  )}
                 />
               );
             })}
@@ -250,50 +373,73 @@ export const FlowConsoleAnalyzerView: React.FC<FlowConsoleAnalyzerViewProps> = (
   };
 
   const renderLUFS = () => (
-    <div className="flex h-full flex-col gap-6">
-      <div className="grid grid-cols-3 gap-4">
+    <div style={composeStyles(
+      layout.flex.container('col'),
+      { height: '100%' },
+      spacing.gap(6)
+    )}>
+      <div style={composeStyles(
+        layout.grid.container(3),
+        spacing.gap(4)
+      )}>
         {(['i', 's', 'm'] as const).map((key) => {
           const value = lufs[key];
           const label = key === 'i' ? 'Integrated' : key === 's' ? 'Short Term' : 'Momentary';
           const color = value > -16 ? 'red' : value > -18 ? 'yellow' : 'green';
 
           return (
-            <motion.div
+            <PulsingLUFSIndicator
               key={key}
-              className="flex flex-col items-center gap-3 rounded-xl border border-glass-border/60 bg-[rgba(6,14,28,0.7)] p-6"
-              animate={{
-                boxShadow: value > -16 ? [`0 0 8px rgba(239,68,68,0.3)`, `0 0 16px rgba(239,68,68,0.5)`, `0 0 8px rgba(239,68,68,0.3)`] : [],
-              }}
-              transition={{ duration: 2, repeat: Infinity }}
-            >
-              <span className="text-[0.45rem] uppercase tracking-[0.3em] text-ink/60">
-                {label}
-              </span>
-              <span
-                className="text-3xl font-bold"
-                style={{
-                  color: color === 'red' ? '#ef4444' : color === 'yellow' ? '#eab308' : '#10b981',
-                }}
-              >
-                {value.toFixed(1)}
-              </span>
-              <span className="text-[0.42rem] uppercase tracking-[0.3em] text-ink/50">
-                LUFS
-              </span>
-            </motion.div>
+              value={value}
+              label={label}
+            />
           );
         })}
       </div>
 
       {/* LUFS History Graph */}
-      <div className="flex-1 rounded-xl border border-glass-border/60 bg-[rgba(6,14,28,0.7)] p-4">
-        <div className="mb-2 text-[0.45rem] uppercase tracking-[0.3em] text-ink/60">
+      <div style={composeStyles(
+        { flex: 1 },
+        spacing.p(4),
+        effects.border.radius.xl,
+        {
+          border: '1px solid rgba(102, 140, 198, 0.6)',
+          background: 'rgba(6,14,28,0.7)',
+        }
+      )}>
+        <div style={composeStyles(
+          spacing.mb(2),
+          typography.transform('uppercase'),
+          typography.tracking.widest,
+          {
+            fontSize: '0.45rem',
+            color: 'rgba(230, 240, 255, 0.6)',
+          }
+        )}>
           Loudness Trend
         </div>
-        <div className="h-32 w-full rounded-lg bg-[rgba(4,8,18,0.8)] p-2">
+        <div style={composeStyles(
+          layout.width.full,
+          spacing.p(2),
+          effects.border.radius.lg,
+          {
+            height: '128px',
+            background: 'rgba(4,8,18,0.8)',
+          }
+        )}>
           {/* Simplified trend visualization */}
-          <div className="relative h-full w-full">
-            <div className="absolute inset-0 flex items-end justify-around">
+          <div style={composeStyles(
+            layout.position.relative,
+            layout.width.full,
+            layout.height.full
+          )}>
+            <div style={composeStyles(
+              layout.position.absolute,
+              { inset: 0 },
+              layout.flex.container('row'),
+              layout.flex.align.end,
+              layout.flex.justify.around
+            )}>
               {Array.from({ length: 20 }).map((_, i) => {
                 const height = 0.4 + Math.random() * 0.6;
                 const target = -18;
@@ -302,13 +448,16 @@ export const FlowConsoleAnalyzerView: React.FC<FlowConsoleAnalyzerViewProps> = (
                 return (
                   <div
                     key={i}
-                    className="flex-1 rounded-t"
-                    style={{
-                      height: `${height * 100}%`,
-                      background: `linear-gradient(180deg, hsl(${hue}, 70%, 55%), hsl(${hue}, 90%, 70%))`,
-                      opacity: 0.6 + height * 0.4,
-                      margin: '0 1px',
-                    }}
+                    style={composeStyles(
+                      { flex: 1 },
+                      effects.border.radius.top(),
+                      {
+                        height: `${height * 100}%`,
+                        background: `linear-gradient(180deg, hsl(${hue}, 70%, 55%), hsl(${hue}, 90%, 70%))`,
+                        opacity: 0.6 + height * 0.4,
+                        margin: '0 1px',
+                      }
+                    )}
                   />
                 );
               })}
@@ -320,7 +469,14 @@ export const FlowConsoleAnalyzerView: React.FC<FlowConsoleAnalyzerViewProps> = (
   );
 
   return (
-    <div className={`flex h-full flex-col gap-4 px-6 py-4 ${className}`}>
+    <div style={composeStyles(
+      layout.flex.container('col'),
+      { height: '100%' },
+      spacing.gap(4),
+      spacing.px(6),
+      spacing.py(4),
+      ...(className ? { className } : {}),
+    )}>
       {analyzerType === 'spectrum' && renderSpectrum()}
       {analyzerType === 'correlation' && renderCorrelation()}
       {analyzerType === 'lufs' && renderLUFS()}
@@ -328,7 +484,82 @@ export const FlowConsoleAnalyzerView: React.FC<FlowConsoleAnalyzerViewProps> = (
   );
 };
 
+// Component for pulsing LUFS indicator
+const PulsingLUFSIndicator: React.FC<{
+  value: number;
+  label: string;
+}> = ({ value, label }) => {
+  const pulseGlow = usePulseAnimation({
+    duration: 2000,
+    minOpacity: 0.3,
+    maxOpacity: 0.5,
+    easing: 'ease-in-out',
+  });
+  const color = value > -16 ? 'red' : value > -18 ? 'yellow' : 'green';
+  const colorValue = color === 'red' ? '#ef4444' : color === 'yellow' ? '#eab308' : '#10b981';
+  
+  const boxShadow = value > -16
+    ? `0 0 ${8 + pulseGlow.opacity * 8}px rgba(239,68,68, ${0.3 + pulseGlow.opacity * 0.2})`
+    : undefined;
+
+  return (
+    <div
+      style={composeStyles(
+        layout.flex.container('col'),
+        layout.flex.align.center,
+        spacing.gap(3),
+        spacing.p(6),
+        effects.border.radius.xl,
+        {
+          border: '1px solid rgba(102, 140, 198, 0.6)',
+          background: 'rgba(6,14,28,0.7)',
+          boxShadow,
+        }
+      )}
+    >
+      <span style={composeStyles(
+        typography.transform('uppercase'),
+        typography.tracking.widest,
+        {
+          fontSize: '0.45rem',
+          color: 'rgba(230, 240, 255, 0.6)',
+        }
+      )}>
+        {label}
+      </span>
+      <span
+        style={composeStyles(
+          typography.weight('bold'),
+          {
+            fontSize: '1.875rem',
+            color: colorValue,
+          }
+        )}
+      >
+        {value.toFixed(1)}
+      </span>
+      <span style={composeStyles(
+        typography.transform('uppercase'),
+        typography.tracking.widest,
+        {
+          fontSize: '0.42rem',
+          color: 'rgba(230, 240, 255, 0.5)',
+        }
+      )}>
+        LUFS
+      </span>
+    </div>
+  );
+};
+
 export default FlowConsoleAnalyzerView;
+
+
+
+
+
+
+
 
 
 

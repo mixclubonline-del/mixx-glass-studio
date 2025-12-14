@@ -24,13 +24,16 @@ export function useAutoSave(getProjectState: () => PersistedProjectState) {
     saveInProgress: false,
   });
   const initializedRef = useRef(false);
+  const consumerAddedRef = useRef(false); // Track if we've added ourselves as a consumer
+  const isPrimaryConsumerRef = useRef(false); // Track if we're the primary consumer (first to register getter)
   const getProjectStateRef = useRef(getProjectState);
 
   // Keep getProjectState ref up to date without re-initializing
   useEffect(() => {
     getProjectStateRef.current = getProjectState;
-    // Update the service's state getter if already initialized
-    if (initializedRef.current) {
+    // Only update the service's state getter if we're the primary consumer
+    // This prevents multiple components from overwriting each other's getters
+    if (initializedRef.current && isPrimaryConsumerRef.current) {
       autoSaveService.registerStateGetter(getProjectState);
     }
   }, [getProjectState]);
@@ -38,18 +41,40 @@ export function useAutoSave(getProjectState: () => PersistedProjectState) {
   // Initialize service only once (empty deps like useAutoPull)
   useEffect(() => {
     if (!initializedRef.current) {
-      autoSaveService.initialize().then(() => {
-        autoSaveService.registerStateGetter(() => getProjectStateRef.current());
-        autoSaveService.onStatusChange(setStatus);
-        autoSaveService.addConsumer();
-        initializedRef.current = true;
-      });
+      // Service tracks its own initialization state, safe to call multiple times
+      autoSaveService
+        .initialize()
+        .then(() => {
+          // Only register state getter if we're the first consumer (primary)
+          // This prevents multiple components from overwriting each other's getters
+          const isFirstConsumer = !autoSaveService.hasConsumers();
+          if (isFirstConsumer) {
+            autoSaveService.registerStateGetter(() => getProjectStateRef.current());
+            isPrimaryConsumerRef.current = true;
+          }
+          autoSaveService.onStatusChange(setStatus);
+          autoSaveService.addConsumer();
+          consumerAddedRef.current = true;
+          initializedRef.current = true;
+        })
+        .catch((error) => {
+          console.error('[useAutoSave] Failed to initialize auto-save service:', error);
+          // Mark as initialized to prevent infinite retry loops
+          // Service will remain non-functional, but won't spam console
+          initializedRef.current = true;
+        });
     }
 
     return () => {
-      if (initializedRef.current) {
+      // Always remove consumer if we added one, even if initialization didn't complete
+      // This prevents consumer count leaks when components unmount before init completes
+      if (consumerAddedRef.current) {
         autoSaveService.removeConsumer();
+        consumerAddedRef.current = false;
+      }
+      if (initializedRef.current) {
         initializedRef.current = false;
+        isPrimaryConsumerRef.current = false;
       }
     };
   }, []); // Empty deps - only initialize once

@@ -1,3 +1,5 @@
+import { als } from '../utils/alsFeedback';
+
 export interface VelvetLoudnessMetrics {
   momentaryLUFS: number;
   shortTermLUFS: number;
@@ -69,10 +71,16 @@ export class VelvetLoudnessMeter extends EventTarget {
         return;
       }
     } catch (error) {
-      console.warn('[VELVET LOUDNESS] Falling back to analyser meter', error);
+      // AudioWorklet failed - analyser fallback will be used (expected)
     }
 
     // Fallback to analyser-based estimation
+    // Check if context is closed before creating analyser
+    if (context.state === 'closed') {
+      // Context closed - cannot initialize (expected in some scenarios)
+      return;
+    }
+    
     const analyser = context.createAnalyser();
     analyser.fftSize = 2048;
     const buffer = new Float32Array(analyser.fftSize);

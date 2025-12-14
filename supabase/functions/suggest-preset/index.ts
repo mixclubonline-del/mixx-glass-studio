@@ -1,9 +1,10 @@
 /**
  * AI Preset Suggestion - Generate professional plugin presets
- * Uses Lovable AI (Gemini 2.5 Flash) to suggest optimal plugin settings
+ * Uses direct Gemini API to suggest optimal plugin settings
  */
 
 import { createClient } from 'https://esm.sh/@supabase/supabase-js@2';
+import { callGeminiAPI, extractGeminiText } from "../_shared/gemini-api.ts";
 
 const corsHeaders = {
   'Access-Control-Allow-Origin': '*',
@@ -65,35 +66,28 @@ Example format:
   "explanation": "Fast attack to catch transients, medium ratio for control, auto-release for musicality"
 }`;
 
-    // Call Lovable AI
-    const aiResponse = await fetch('https://ai.gateway.lovable.dev/v1/chat/completions', {
-      method: 'POST',
-      headers: {
-        'Authorization': `Bearer ${Deno.env.get('LOVABLE_API_KEY')}`,
-        'Content-Type': 'application/json',
-      },
-      body: JSON.stringify({
-        model: 'google/gemini-2.5-flash',
-        messages: [
-          {
-            role: 'system',
-            content: 'You are a professional audio engineer. Always respond with valid JSON containing preset_name, parameters, and explanation fields.',
-          },
-          {
-            role: 'user',
-            content: prompt,
-          },
-        ],
-        temperature: 0.7,
-      }),
-    });
-
-    if (!aiResponse.ok) {
-      throw new Error(`AI API error: ${aiResponse.status}`);
+    const GEMINI_API_KEY = Deno.env.get('GEMINI_API_KEY');
+    if (!GEMINI_API_KEY) {
+      throw new Error('GEMINI_API_KEY not configured');
     }
 
-    const aiData = await aiResponse.json();
-    const aiContent = aiData.choices[0].message.content;
+    // Call Gemini API directly
+    const geminiResponse = await callGeminiAPI({
+      model: 'gemini-2.5-flash',
+      messages: [
+        {
+          role: 'system',
+          content: 'You are a professional audio engineer. Always respond with valid JSON containing preset_name, parameters, and explanation fields.',
+        },
+        {
+          role: 'user',
+          content: prompt,
+        },
+      ],
+      temperature: 0.7,
+    }, GEMINI_API_KEY);
+
+    const aiContent = extractGeminiText(geminiResponse);
 
     // Parse AI response (handle markdown code blocks)
     let presetData;

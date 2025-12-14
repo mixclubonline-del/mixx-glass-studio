@@ -17,6 +17,7 @@ import { AutomationIcon } from './flowdock/glyphs/AutomationIcon';
 import { SendsIcon } from './flowdock/glyphs/SendsIcon';
 import { InsertsIcon } from './flowdock/glyphs/InsertsIcon';
 import type { TrackType, TrackHeaderSettings } from '../types/trackHeader';
+import { spacing, typography, layout, effects, transitions, composeStyles } from '../design-system';
 
 // Additional icons for track headers
 const PhaseInvertIcon: React.FC<{ className?: string }> = ({ className }) => (
@@ -259,51 +260,139 @@ const ProfessionalTrackHeader: React.FC<ProfessionalTrackHeaderProps> = ({
     <div
       role="button"
       tabIndex={0}
-      className={`group relative flex w-full flex-col overflow-hidden border-b border-white/10 px-3 py-3.5 text-left transition-all duration-200 focus:outline-none focus-visible:ring-2 focus-visible:ring-cyan-400/70 cursor-pointer ${
-        isDragOver ? 'ring-2 ring-cyan-400/60 bg-cyan-400/10' : ''
-      }`}
-      style={{ ...rootStyle, height: '100%' }}
+      style={composeStyles(
+        layout.position.relative,
+        layout.flex.container('col'),
+        layout.width.full,
+        layout.overflow.hidden,
+        spacing.px(3),
+        spacing.py(5),
+        effects.border.bottom(),
+        transitions.transition.standard('all', 200, 'ease-out'),
+        {
+          height: '100%',
+          minHeight: '72px',
+          textAlign: 'left',
+          cursor: 'pointer',
+          borderBottom: '1px solid rgba(255,255,255,0.1)',
+          outline: 'none',
+          ...rootStyle,
+          ...(isDragOver ? {
+            border: '2px solid rgba(6, 182, 212, 0.6)',
+            background: 'rgba(6, 182, 212, 0.1)',
+          } : {}),
+        }
+      )}
       onClick={handleSelectTrack}
       onKeyDown={(e) => {
         if (e.key === 'Enter' || e.key === ' ') {
           e.preventDefault();
           handleSelectTrack();
         }
+        if (e.key === 'Tab' && !e.shiftKey) {
+          e.currentTarget.style.boxShadow = '0 0 0 2px rgba(6, 182, 212, 0.7)';
+        }
+      }}
+      onKeyUp={(e) => {
+        if (e.key === 'Tab') {
+          e.currentTarget.style.boxShadow = rootStyle.boxShadow || 'none';
+        }
       }}
       onDragOver={handleDragOver}
       onDragLeave={handleDragLeave}
       onDrop={handleDrop}
+      onMouseEnter={(e) => {
+        const glowEl = e.currentTarget.querySelector('[data-hover-glow]') as HTMLElement;
+        if (glowEl) glowEl.style.opacity = '1';
+      }}
+      onMouseLeave={(e) => {
+        const glowEl = e.currentTarget.querySelector('[data-hover-glow]') as HTMLElement;
+        if (glowEl) glowEl.style.opacity = '0';
+      }}
     >
       {/* Hover glow effect */}
-      <div className="absolute inset-0 z-[-1] opacity-0 transition-opacity duration-300 group-hover:opacity-100">
+      <div 
+        data-hover-glow
+        style={composeStyles(
+          layout.position.absolute,
+          { inset: 0, zIndex: -1 },
+          transitions.transition.standard('opacity', 300, 'ease-out'),
+          {
+            opacity: 0,
+          }
+        )}
+      >
         <div
-          className="absolute inset-0"
-          style={{
-            background: `radial-gradient(circle at 12% 18%, ${hexToRgba(
-              glowColor,
-              0.22
-            )}, transparent 65%)`,
-            filter: 'blur(28px)',
-          }}
+          style={composeStyles(
+            layout.position.absolute,
+            { inset: 0 },
+            {
+              background: `radial-gradient(circle at 12% 18%, ${hexToRgba(
+                glowColor,
+                0.22
+              )}, transparent 65%)`,
+              filter: 'blur(28px)',
+            }
+          )}
         />
       </div>
 
       {/* Main content - Two-row layout with explicit spacing */}
-      <div className="flex flex-col gap-2.5 h-full justify-between">
+      <div style={composeStyles(
+        layout.flex.container('col'),
+        spacing.gap(2.5),
+        { height: '100%' },
+        layout.flex.justify.between
+      )}>
         {/* Row 1: Track info on left, primary controls on right */}
-        <div className="flex items-start justify-between gap-3 w-full">
+        <div style={composeStyles(
+          layout.flex.container('row'),
+          layout.flex.align.start,
+          layout.flex.justify.between,
+          spacing.gap(3),
+          layout.width.full
+        )}>
           {/* Left: Track info - Fixed max width to prevent squishing */}
-          <div className="flex flex-col flex-1 min-w-[120px] max-w-[65%]">
+          <div style={composeStyles(
+            layout.flex.container('col'),
+            { flex: 1, minWidth: '120px', maxWidth: '65%' }
+          )}>
             {/* Group label */}
-            <div className="flex items-center gap-2 mb-0.5">
-              <span className="text-xs uppercase tracking-[0.32em] text-ink/60 whitespace-nowrap">
+            <div style={composeStyles(
+              layout.flex.container('row'),
+              layout.flex.align.center,
+              spacing.gap(2),
+              spacing.mb(0.5)
+            )}>
+              <span style={composeStyles(
+                typography.transform('uppercase'),
+                typography.tracking.widest,
+                {
+                  fontSize: '0.75rem',
+                  color: 'rgba(230, 240, 255, 0.6)',
+                  whiteSpace: 'nowrap',
+                }
+              )}>
                 {track.group?.toUpperCase() ?? 'FLOW LANES'}
               </span>
               {settings.locked && (
-                <LockIcon className="w-3 h-3 text-ink/40 flex-shrink-0" />
+                <LockIcon style={{ width: '12px', height: '12px', color: 'rgba(230, 240, 255, 0.4)', flexShrink: 0 }} />
               )}
               {resolvedTrackType !== 'audio' && (
-                <span className="text-[10px] uppercase tracking-[0.2em] px-2 py-0.5 rounded-full bg-white/5 text-ink/50 border border-white/10 whitespace-nowrap">
+                <span style={composeStyles(
+                  typography.transform('uppercase'),
+                  typography.tracking.widest,
+                  spacing.px(2),
+                  spacing.py(0.5),
+                  effects.border.radius.full,
+                  {
+                    fontSize: '10px',
+                    background: 'rgba(255,255,255,0.05)',
+                    color: 'rgba(230, 240, 255, 0.5)',
+                    border: '1px solid rgba(255,255,255,0.1)',
+                    whiteSpace: 'nowrap',
+                  }
+                )}>
                   {resolvedTrackType.toUpperCase()}
                 </span>
               )}
@@ -323,13 +412,41 @@ const ProfessionalTrackHeader: React.FC<ProfessionalTrackHeaderProps> = ({
                     setIsRenaming(false);
                   }
                 }}
-                className="mt-0.5 text-lg font-semibold text-slate-100 bg-transparent border-b border-cyan-400/50 focus:outline-none focus:border-cyan-400 w-full"
+                style={composeStyles(
+                  typography.weight('semibold'),
+                  spacing.mt(0.5),
+                  layout.width.full,
+                  {
+                    fontSize: '1.125rem',
+                    color: 'rgb(241, 245, 249)',
+                    background: 'transparent',
+                    border: 'none',
+                    borderBottom: '1px solid rgba(6, 182, 212, 0.5)',
+                    outline: 'none',
+                  }
+                )}
+                onFocus={(e) => {
+                  e.currentTarget.style.borderBottomColor = 'rgba(6, 182, 212, 1)';
+                }}
                 autoFocus
                 onClick={(e) => e.stopPropagation()}
               />
             ) : (
               <span 
-                className="mt-0.5 line-clamp-1 text-lg font-semibold text-slate-100 cursor-text break-words"
+                style={composeStyles(
+                  typography.weight('semibold'),
+                  spacing.mt(0.5),
+                  {
+                    fontSize: '1.125rem',
+                    color: 'rgb(241, 245, 249)',
+                    cursor: 'text',
+                    wordBreak: 'break-word',
+                    display: '-webkit-box',
+                    WebkitLineClamp: 1,
+                    WebkitBoxOrient: 'vertical',
+                    overflow: 'hidden',
+                  }
+                )}
                 onDoubleClick={(e) => {
                   e.stopPropagation();
                   setIsRenaming(true);
@@ -340,54 +457,144 @@ const ProfessionalTrackHeader: React.FC<ProfessionalTrackHeaderProps> = ({
             )}
 
             {/* Context mode */}
-            <span className="text-[11px] uppercase tracking-[0.28em] text-ink/50 mt-0.5 whitespace-nowrap">
+            <span style={composeStyles(
+              typography.transform('uppercase'),
+              typography.tracking.widest,
+              spacing.mt(0.5),
+              {
+                fontSize: '11px',
+                color: 'rgba(230, 240, 255, 0.5)',
+                whiteSpace: 'nowrap',
+              }
+            )}>
               {uiState.context?.toUpperCase() ?? 'PLAYBACK'}
             </span>
           </div>
 
           {/* Right: Primary controls - Mute, Solo, Arm, Collapse */}
-          <div className="flex items-center gap-1.5 flex-shrink-0">
+          <div style={composeStyles(
+            layout.flex.container('row'),
+            layout.flex.align.center,
+            spacing.gap(1.5),
+            { flexShrink: 0 }
+          )}>
             <button
               onClick={(e) => {
                 e.stopPropagation();
                 onToggleMute?.(track.id);
               }}
-              className={`w-7 h-7 rounded-lg border transition-all flex items-center justify-center flex-shrink-0 ${
-                isMuted
-                  ? 'bg-red-500/30 border-red-400/60 text-red-200 shadow-[0_0_12px_rgba(248,113,113,0.3)]'
-                  : 'bg-white/5 border-white/10 text-ink/60 hover:bg-white/10 hover:text-ink hover:border-white/20'
-              }`}
+              style={composeStyles(
+                layout.flex.container('row'),
+                layout.flex.align.center,
+                layout.flex.justify.center,
+                effects.border.radius.lg,
+                transitions.transition.standard('all', 200, 'ease-out'),
+                {
+                  width: '28px',
+                  height: '28px',
+                  border: isMuted ? '1px solid rgba(248, 113, 113, 0.6)' : '1px solid rgba(255,255,255,0.1)',
+                  background: isMuted ? 'rgba(239, 68, 68, 0.3)' : 'rgba(255,255,255,0.05)',
+                  color: isMuted ? 'rgb(254, 202, 202)' : 'rgba(230, 240, 255, 0.6)',
+                  boxShadow: isMuted ? '0 0 12px rgba(248,113,113,0.3)' : 'none',
+                  flexShrink: 0,
+                }
+              )}
+              onMouseEnter={(e) => {
+                if (!isMuted) {
+                  e.currentTarget.style.background = 'rgba(255,255,255,0.1)';
+                  e.currentTarget.style.color = 'rgba(230, 240, 255, 1)';
+                  e.currentTarget.style.borderColor = 'rgba(255,255,255,0.2)';
+                }
+              }}
+              onMouseLeave={(e) => {
+                if (!isMuted) {
+                  e.currentTarget.style.background = 'rgba(255,255,255,0.05)';
+                  e.currentTarget.style.color = 'rgba(230, 240, 255, 0.6)';
+                  e.currentTarget.style.borderColor = 'rgba(255,255,255,0.1)';
+                }
+              }}
               title={isMuted ? 'Unmute track' : 'Mute track'}
             >
-              <MuteIcon className="w-3.5 h-3.5" />
+              <MuteIcon style={{ width: '14px', height: '14px' }} />
             </button>
             <button
               onClick={(e) => {
                 e.stopPropagation();
                 onToggleSolo?.(track.id);
               }}
-              className={`w-7 h-7 rounded-lg border transition-all flex items-center justify-center flex-shrink-0 ${
-                isSoloed
-                  ? 'bg-yellow-500/30 border-yellow-400/60 text-yellow-200 shadow-[0_0_12px_rgba(250,204,21,0.3)]'
-                  : 'bg-white/5 border-white/10 text-ink/60 hover:bg-white/10 hover:text-ink hover:border-white/20'
-              }`}
+              style={composeStyles(
+                layout.flex.container('row'),
+                layout.flex.align.center,
+                layout.flex.justify.center,
+                effects.border.radius.lg,
+                transitions.transition.standard('all', 200, 'ease-out'),
+                {
+                  width: '28px',
+                  height: '28px',
+                  border: isSoloed ? '1px solid rgba(250, 204, 21, 0.6)' : '1px solid rgba(255,255,255,0.1)',
+                  background: isSoloed ? 'rgba(234, 179, 8, 0.3)' : 'rgba(255,255,255,0.05)',
+                  color: isSoloed ? 'rgb(254, 240, 138)' : 'rgba(230, 240, 255, 0.6)',
+                  boxShadow: isSoloed ? '0 0 12px rgba(250,204,21,0.3)' : 'none',
+                  flexShrink: 0,
+                }
+              )}
+              onMouseEnter={(e) => {
+                if (!isSoloed) {
+                  e.currentTarget.style.background = 'rgba(255,255,255,0.1)';
+                  e.currentTarget.style.color = 'rgba(230, 240, 255, 1)';
+                  e.currentTarget.style.borderColor = 'rgba(255,255,255,0.2)';
+                }
+              }}
+              onMouseLeave={(e) => {
+                if (!isSoloed) {
+                  e.currentTarget.style.background = 'rgba(255,255,255,0.05)';
+                  e.currentTarget.style.color = 'rgba(230, 240, 255, 0.6)';
+                  e.currentTarget.style.borderColor = 'rgba(255,255,255,0.1)';
+                }
+              }}
               title={isSoloed ? 'Unsolo track' : 'Solo track'}
             >
-              <SoloIcon className="w-3.5 h-3.5" />
+              <SoloIcon style={{ width: '14px', height: '14px' }} />
             </button>
             <button
               onClick={(e) => {
                 e.stopPropagation();
                 onToggleArm?.(track.id);
               }}
-              className={`w-7 h-7 rounded-lg border transition-all flex items-center justify-center flex-shrink-0 ${
-                isArmed
-                  ? 'bg-pink-500/30 border-pink-400/60 text-pink-200 shadow-[0_0_12px_rgba(236,72,153,0.3)]'
-                  : 'bg-white/5 border-white/10 text-ink/60 hover:bg-white/10 hover:text-ink hover:border-white/20'
-              }`}
+              className={`button-mixx ${isArmed ? 'primary' : 'icon'}`}
+              style={composeStyles(
+                layout.flex.container('row'),
+                layout.flex.align.center,
+                layout.flex.justify.center,
+                effects.border.radius.lg,
+                transitions.transition.standard('all', 200, 'ease-out'),
+                {
+                  width: '28px',
+                  height: '28px',
+                  border: isArmed ? '1px solid rgba(236, 72, 153, 0.6)' : '1px solid rgba(255,255,255,0.1)',
+                  background: isArmed ? 'rgba(236, 72, 153, 0.3)' : 'rgba(255,255,255,0.05)',
+                  color: isArmed ? 'rgb(251, 207, 232)' : 'rgba(230, 240, 255, 0.6)',
+                  boxShadow: isArmed ? '0 0 12px rgba(236,72,153,0.3)' : 'none',
+                  flexShrink: 0,
+                }
+              )}
+              onMouseEnter={(e) => {
+                if (!isArmed) {
+                  e.currentTarget.style.background = 'rgba(255,255,255,0.1)';
+                  e.currentTarget.style.color = 'rgba(230, 240, 255, 1)';
+                  e.currentTarget.style.borderColor = 'rgba(255,255,255,0.2)';
+                }
+              }}
+              onMouseLeave={(e) => {
+                if (!isArmed) {
+                  e.currentTarget.style.background = 'rgba(255,255,255,0.05)';
+                  e.currentTarget.style.color = 'rgba(230, 240, 255, 0.6)';
+                  e.currentTarget.style.borderColor = 'rgba(255,255,255,0.1)';
+                }
+              }}
               title={isArmed ? 'Disarm track' : 'Arm track for recording'}
             >
-              <ArmIcon className="w-3.5 h-3.5" />
+              <ArmIcon style={{ width: '14px', height: '14px' }} />
             </button>
             {onToggleCollapse && (
               <button
@@ -395,33 +602,89 @@ const ProfessionalTrackHeader: React.FC<ProfessionalTrackHeaderProps> = ({
                   e.stopPropagation();
                   onToggleCollapse?.(track.id);
                 }}
-                className="w-7 h-7 rounded-lg border border-white/8 bg-white/3 text-ink/50 hover:bg-white/8 hover:text-ink/70 flex items-center justify-center transition-all flex-shrink-0"
+                style={composeStyles(
+                  layout.flex.container('row'),
+                  layout.flex.align.center,
+                  layout.flex.justify.center,
+                  effects.border.radius.lg,
+                  transitions.transition.standard('all', 200, 'ease-out'),
+                  {
+                    width: '28px',
+                    height: '28px',
+                    border: '1px solid rgba(255,255,255,0.08)',
+                    background: 'rgba(255,255,255,0.03)',
+                    color: 'rgba(230, 240, 255, 0.5)',
+                    flexShrink: 0,
+                  }
+                )}
+                onMouseEnter={(e) => {
+                  e.currentTarget.style.background = 'rgba(255,255,255,0.08)';
+                  e.currentTarget.style.color = 'rgba(230, 240, 255, 0.7)';
+                }}
+                onMouseLeave={(e) => {
+                  e.currentTarget.style.background = 'rgba(255,255,255,0.03)';
+                  e.currentTarget.style.color = 'rgba(230, 240, 255, 0.5)';
+                }}
                 title={collapsed ? 'Expand track' : 'Collapse track'}
               >
-                <CollapseIcon className="w-3 h-3" collapsed={collapsed} />
+                <CollapseIcon style={{ width: '12px', height: '12px' }} collapsed={collapsed} />
               </button>
             )}
           </div>
         </div>
 
         {/* Row 2: Secondary controls on left, Volume/Pan on right */}
-        <div className="flex items-center justify-between gap-3 w-full mt-0.5">
+        <div style={composeStyles(
+          layout.flex.container('row'),
+          layout.flex.align.center,
+          layout.flex.justify.between,
+          spacing.gap(3),
+          spacing.mt(0.5),
+          layout.width.full
+        )}>
           {/* Left: Secondary controls */}
-          <div className="flex items-center gap-1.5 flex-shrink-0">
+          <div style={composeStyles(
+            layout.flex.container('row'),
+            layout.flex.align.center,
+            spacing.gap(1.5),
+            { flexShrink: 0 }
+          )}>
             {showInputMonitoring && (
               <button
                 onClick={(e) => {
                   e.stopPropagation();
                   onToggleInputMonitor?.(track.id);
                 }}
-                className={`w-6 h-6 rounded-md border transition-all flex items-center justify-center flex-shrink-0 ${
-                  settings.inputMonitoring
-                    ? 'bg-blue-500/25 border-blue-400/50 text-blue-200'
-                    : 'bg-white/3 border-white/8 text-ink/50 hover:bg-white/8 hover:text-ink/70'
-                }`}
+                style={composeStyles(
+                  layout.flex.container('row'),
+                  layout.flex.align.center,
+                  layout.flex.justify.center,
+                  effects.border.radius.md,
+                  transitions.transition.standard('all', 200, 'ease-out'),
+                  {
+                    width: '24px',
+                    height: '24px',
+                    border: settings.inputMonitoring ? '1px solid rgba(96, 165, 250, 0.5)' : '1px solid rgba(255,255,255,0.08)',
+                    background: settings.inputMonitoring ? 'rgba(59, 130, 246, 0.25)' : 'rgba(255,255,255,0.03)',
+                    color: settings.inputMonitoring ? 'rgb(191, 219, 254)' : 'rgba(230, 240, 255, 0.5)',
+                    flexShrink: 0,
+                  }
+                )}
+                onMouseEnter={(e) => {
+                  if (!settings.inputMonitoring) {
+                    e.currentTarget.style.background = 'rgba(255,255,255,0.08)';
+                    e.currentTarget.style.color = 'rgba(230, 240, 255, 0.7)';
+                  }
+                }}
+                onMouseLeave={(e) => {
+                  if (!settings.inputMonitoring) {
+                    e.currentTarget.style.background = 'rgba(255,255,255,0.03)';
+                    e.currentTarget.style.color = 'rgba(230, 240, 255, 0.5)';
+                  }
+                }}
                 title={settings.inputMonitoring ? 'Disable input monitoring' : 'Enable input monitoring'}
               >
-                <InputMonitorIcon className="w-3 h-3" />
+                <InputMonitorIcon style={{ width: '12px', height: '12px' }} />
               </button>
             )}
             {showPhaseInvert && (
@@ -430,14 +693,36 @@ const ProfessionalTrackHeader: React.FC<ProfessionalTrackHeaderProps> = ({
                   e.stopPropagation();
                   onTogglePhaseInvert?.(track.id);
                 }}
-                className={`w-6 h-6 rounded-md border transition-all flex items-center justify-center flex-shrink-0 ${
-                  settings.phaseInvert
-                    ? 'bg-orange-500/25 border-orange-400/50 text-orange-200'
-                    : 'bg-white/3 border-white/8 text-ink/50 hover:bg-white/8 hover:text-ink/70'
-                }`}
+                style={composeStyles(
+                  layout.flex.container('row'),
+                  layout.flex.align.center,
+                  layout.flex.justify.center,
+                  effects.border.radius.md,
+                  transitions.transition.standard('all', 200, 'ease-out'),
+                  {
+                    width: '24px',
+                    height: '24px',
+                    border: settings.phaseInvert ? '1px solid rgba(251, 146, 60, 0.5)' : '1px solid rgba(255,255,255,0.08)',
+                    background: settings.phaseInvert ? 'rgba(249, 115, 22, 0.25)' : 'rgba(255,255,255,0.03)',
+                    color: settings.phaseInvert ? 'rgb(254, 215, 170)' : 'rgba(230, 240, 255, 0.5)',
+                    flexShrink: 0,
+                  }
+                )}
+                onMouseEnter={(e) => {
+                  if (!settings.phaseInvert) {
+                    e.currentTarget.style.background = 'rgba(255,255,255,0.08)';
+                    e.currentTarget.style.color = 'rgba(230, 240, 255, 0.7)';
+                  }
+                }}
+                onMouseLeave={(e) => {
+                  if (!settings.phaseInvert) {
+                    e.currentTarget.style.background = 'rgba(255,255,255,0.03)';
+                    e.currentTarget.style.color = 'rgba(230, 240, 255, 0.5)';
+                  }
+                }}
                 title={settings.phaseInvert ? 'Phase normal' : 'Phase invert (180°)'}
               >
-                <PhaseInvertIcon className="w-3 h-3" />
+                <PhaseInvertIcon style={{ width: '12px', height: '12px' }} />
               </button>
             )}
             {insertCount > 0 && (
@@ -446,7 +731,29 @@ const ProfessionalTrackHeader: React.FC<ProfessionalTrackHeaderProps> = ({
                   e.stopPropagation();
                   // Could open insert browser
                 }}
-                className="w-6 h-6 rounded-md border border-purple-400/35 bg-purple-500/15 text-purple-200 flex items-center justify-center text-[9px] font-semibold hover:bg-purple-500/25 transition-all flex-shrink-0"
+                style={composeStyles(
+                  layout.flex.container('row'),
+                  layout.flex.align.center,
+                  layout.flex.justify.center,
+                  effects.border.radius.md,
+                  transitions.transition.standard('all', 200, 'ease-out'),
+                  typography.weight('semibold'),
+                  {
+                    width: '24px',
+                    height: '24px',
+                    border: '1px solid rgba(139, 92, 246, 0.35)',
+                    background: 'rgba(139, 92, 246, 0.15)',
+                    color: 'rgb(196, 181, 253)',
+                    fontSize: '9px',
+                    flexShrink: 0,
+                  }
+                )}
+                onMouseEnter={(e) => {
+                  e.currentTarget.style.background = 'rgba(139, 92, 246, 0.25)';
+                }}
+                onMouseLeave={(e) => {
+                  e.currentTarget.style.background = 'rgba(139, 92, 246, 0.15)';
+                }}
                 title={`${insertCount} insert${insertCount > 1 ? 's' : ''} active`}
               >
                 {insertCount}
@@ -458,7 +765,29 @@ const ProfessionalTrackHeader: React.FC<ProfessionalTrackHeaderProps> = ({
                   e.stopPropagation();
                   // Could open sends panel
                 }}
-                className="w-6 h-6 rounded-md border border-cyan-400/35 bg-cyan-500/15 text-cyan-200 flex items-center justify-center text-[9px] font-semibold hover:bg-cyan-500/25 transition-all flex-shrink-0"
+                style={composeStyles(
+                  layout.flex.container('row'),
+                  layout.flex.align.center,
+                  layout.flex.justify.center,
+                  effects.border.radius.md,
+                  transitions.transition.standard('all', 200, 'ease-out'),
+                  typography.weight('semibold'),
+                  {
+                    width: '24px',
+                    height: '24px',
+                    border: '1px solid rgba(6, 182, 212, 0.35)',
+                    background: 'rgba(6, 182, 212, 0.15)',
+                    color: 'rgb(103, 232, 249)',
+                    fontSize: '9px',
+                    flexShrink: 0,
+                  }
+                )}
+                onMouseEnter={(e) => {
+                  e.currentTarget.style.background = 'rgba(6, 182, 212, 0.25)';
+                }}
+                onMouseLeave={(e) => {
+                  e.currentTarget.style.background = 'rgba(6, 182, 212, 0.15)';
+                }}
                 title={`${sendCount} send${sendCount > 1 ? 's' : ''} active`}
               >
                 {sendCount}
@@ -467,19 +796,60 @@ const ProfessionalTrackHeader: React.FC<ProfessionalTrackHeaderProps> = ({
           </div>
 
           {/* Right: Volume & Pan display */}
-          <div className="flex items-center gap-2 flex-shrink-0">
-            <div className="flex flex-col items-end gap-1">
+          <div style={composeStyles(
+            layout.flex.container('row'),
+            layout.flex.align.center,
+            spacing.gap(2),
+            { flexShrink: 0 }
+          )}>
+            <div style={composeStyles(
+              layout.flex.container('col'),
+              layout.flex.align.end,
+              spacing.gap(1)
+            )}>
               <div
-                className="h-1.5 w-20 overflow-hidden rounded-full bg-white/8 shadow-inner border border-white/5"
+                style={composeStyles(
+                  layout.overflow.hidden,
+                  effects.border.radius.full,
+                  {
+                    height: '6px',
+                    width: '80px',
+                    background: 'rgba(255,255,255,0.08)',
+                    border: '1px solid rgba(255,255,255,0.05)',
+                    boxShadow: 'inset 0 2px 4px rgba(0,0,0,0.2)',
+                  }
+                )}
                 title={`Volume ${Math.round(volume * 100)}%`}
               >
                 <div
-                  className="h-full rounded-full bg-gradient-to-r from-cyan-400 via-blue-400 to-violet-400 transition-all duration-200"
-                  style={{ width: `${Math.round(volume * 100)}%` }}
+                  style={composeStyles(
+                    layout.height.full,
+                    effects.border.radius.full,
+                    transitions.transition.standard('all', 200, 'ease-out'),
+                    {
+                      background: 'linear-gradient(to right, rgba(6, 182, 212, 1), rgba(59, 130, 246, 1), rgba(139, 92, 246, 1))',
+                      width: `${Math.round(volume * 100)}%`,
+                    }
+                  )}
                 />
               </div>
               <div
-                className="flex h-5 w-20 items-center justify-center rounded-md border border-white/10 bg-white/5 text-[10px] uppercase tracking-[0.2em] text-ink/60"
+                style={composeStyles(
+                  layout.flex.container('row'),
+                  layout.flex.align.center,
+                  layout.flex.justify.center,
+                  effects.border.radius.md,
+                  {
+                    height: '20px',
+                    width: '80px',
+                    border: '1px solid rgba(255,255,255,0.1)',
+                    background: 'rgba(255,255,255,0.05)',
+                    fontSize: '10px',
+                    color: 'rgba(230, 240, 255, 0.6)',
+                    textTransform: 'uppercase',
+                    letterSpacing: '0.2em',
+                  }
+                )}
                 title={`Pan ${pan >= 0 ? 'R' : 'L'}${Math.abs(pan * 100).toFixed(0)}%`}
               >
                 {pan === 0 ? 'CENTER' : `${pan > 0 ? 'R' : 'L'} ${Math.abs(pan * 100).toFixed(0)}%`}
@@ -491,16 +861,31 @@ const ProfessionalTrackHeader: React.FC<ProfessionalTrackHeaderProps> = ({
 
       {/* Status chips */}
       {statusChips.length > 0 && (
-        <div className="mt-3 flex flex-wrap gap-2">
+        <div style={composeStyles(
+          spacing.mt(3),
+          layout.flex.container('row'),
+          layout.flex.wrap.wrap,
+          spacing.gap(2)
+        )}>
           {statusChips.map((chip) => (
             <span
               key={chip.label}
-              className="rounded-full px-3 py-1 text-[10px] uppercase tracking-[0.22em] text-ink/70 backdrop-blur-sm transition-all duration-200"
-              style={{
-                background: hexToRgba(chip.accent, 0.18),
-                border: `1px solid ${hexToRgba(chip.accent, 0.45)}`,
-                boxShadow: `0 0 14px ${hexToRgba(chip.accent, 0.35)}`,
-              }}
+              style={composeStyles(
+                effects.border.radius.full,
+                spacing.px(3),
+                spacing.py(1),
+                typography.transform('uppercase'),
+                typography.tracking.widest,
+                transitions.transition.standard('all', 200, 'ease-out'),
+                {
+                  fontSize: '10px',
+                  color: 'rgba(230, 240, 255, 0.7)',
+                  backdropFilter: 'blur(4px)',
+                  background: hexToRgba(chip.accent, 0.18),
+                  border: `1px solid ${hexToRgba(chip.accent, 0.45)}`,
+                  boxShadow: `0 0 14px ${hexToRgba(chip.accent, 0.35)}`,
+                }
+              )}
               title={chip.description}
             >
               {chip.label}
@@ -511,15 +896,39 @@ const ProfessionalTrackHeader: React.FC<ProfessionalTrackHeaderProps> = ({
 
       {/* Divider if no chips */}
       {statusChips.length === 0 && (
-        <div className="mt-4 h-[1px] w-full rounded-full bg-gradient-to-r from-transparent via-white/10 to-transparent" />
+        <div style={composeStyles(
+          spacing.mt(4),
+          effects.border.radius.full,
+          layout.width.full,
+          {
+            height: '1px',
+            background: 'linear-gradient(to right, transparent, rgba(255,255,255,0.1), transparent)',
+          }
+        )} />
       )}
 
       {/* Record input level meter (for recording tracks) */}
       {recordInputLevel !== undefined && recordInputLevel > 0 && (
-        <div className="mt-2 h-1 w-full overflow-hidden rounded-full bg-white/5">
+        <div style={composeStyles(
+          spacing.mt(2),
+          layout.overflow.hidden,
+          effects.border.radius.full,
+          layout.width.full,
+          {
+            height: '4px',
+            background: 'rgba(255,255,255,0.05)',
+          }
+        )}>
           <div
-            className="h-full rounded-full bg-gradient-to-r from-green-400 to-red-400 transition-all duration-100"
-            style={{ width: `${Math.min(100, recordInputLevel * 100)}%` }}
+            style={composeStyles(
+              layout.height.full,
+              effects.border.radius.full,
+              transitions.transition.standard('all', 100, 'ease-out'),
+              {
+                background: 'linear-gradient(to right, rgba(34, 197, 94, 1), rgba(239, 68, 68, 1))',
+                width: `${Math.min(100, recordInputLevel * 100)}%`,
+              }
+            )}
           />
         </div>
       )}

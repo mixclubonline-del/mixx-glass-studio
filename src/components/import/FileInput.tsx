@@ -24,6 +24,7 @@ import { syncALSToPulseResult, syncALSToPulse, updateGlobalALS } from '../../cor
 import { hasAudioPlaying } from '../../core/loop/audioLevelDetector';
 import { ImportInspector, type ImportStep } from './ImportInspector';
 import type { FlowPulseResult } from '../../core/pulse/flowPulseEngine';
+import { als } from '../../utils/alsFeedback';
 
 declare global {
   interface Window {
@@ -182,15 +183,6 @@ export const FileInput = forwardRef<FileInputHandle, FileInputProps>(({
         window.__primeBrain.guidance = 'Scanning waveform structure.';
       }
       
-      // Log file prep start
-      if ((import.meta as any).env?.DEV) {
-        console.log('[FLOW IMPORT] Starting file prep:', {
-          name: file.name,
-          size: `${(file.size / 1024 / 1024).toFixed(2)}MB`,
-          type: file.type,
-        });
-      }
-      
       // Create AudioContext for import (can be optimized later to reuse App's context)
       const audioContext = new AudioContext();
       
@@ -202,19 +194,6 @@ export const FileInput = forwardRef<FileInputHandle, FileInputProps>(({
       }
       
       const result = await runFlowStemPipeline(file, audioContext, snapshotCallback);
-      
-      if ((import.meta as any).env?.DEV) {
-        console.log('[FLOW IMPORT] Pipeline complete:', {
-          classification: result.classification.type,
-          timing: { bpm: result.timing.bpm, key: result.timing.key },
-          stems: Object.keys(result.stems).filter(k => result.stems[k] !== null),
-          metadata: {
-            bpm: result.metadata.bpm,
-            key: result.metadata.key,
-            punchZones: result.metadata.punchZones.length,
-          },
-        });
-      }
       
       markStepDone(1);
       await new Promise(resolve => setTimeout(resolve, 150)); // Breathing delay
@@ -396,19 +375,6 @@ export const FileInput = forwardRef<FileInputHandle, FileInputProps>(({
       
       setInspectorVisible(false);
       
-      // Log completion (dev mode)
-      if ((import.meta as any).env?.DEV) {
-        console.log('[FLOW IMPORT] Complete', {
-          stems: Object.keys(result.stems).filter(k => result.stems[k] !== null),
-          metadata: {
-            type: result.metadata.type,
-            bpm: result.metadata.bpm,
-            key: result.metadata.key,
-            stemCount: result.metadata.stems.length,
-          },
-        });
-      }
-      
       // Call completion callback with full result including stems
       if (onImportComplete) {
         // Get tracks and buffers from Zustand for callback
@@ -445,7 +411,7 @@ export const FileInput = forwardRef<FileInputHandle, FileInputProps>(({
         inputRef.current.value = '';
       }
     } catch (error) {
-      console.error('[FLOW IMPORT] Error:', error);
+      als.error('[FLOW IMPORT] Import error', error);
       
       // Stop pulse animation on error
       if (pulseIntervalRef.current) {

@@ -1,7 +1,7 @@
 
 import React from 'react';
 import { PluginContainer } from '../shared/PluginContainer';
-import { Knob } from '../shared/Knob';
+import { MixxGlassKnob } from '../../../../components/mixxglass';
 import { MixxBalanceSettings, PluginComponentProps, AudioSignal, GlobalSettings } from '../../types';
 import { PrimeBrainStub } from '../../lib/PrimeBrainStub';
 import { mapRange } from '../../lib/utils';
@@ -175,11 +175,11 @@ export const MixxBalance: React.FC<PluginComponentProps<MixxBalanceSettings>> = 
           <Vectorscope visualizerData={visualizerData as BalanceVisualizerData | null} />
         </div>
         <div className="flex flex-col gap-4">
-            <Knob label="Width" value={width} setValue={(v) => handleValueChange('width', v)} paramName="width" isLearning={isLearning('width')} onMidiLearn={onMidiLearn} />
-            <Knob label="Phase" value={phase} setValue={(v) => handleValueChange('phase', v)} paramName="phase" isLearning={isLearning('phase')} onMidiLearn={onMidiLearn} />
-            <Knob label="Tilt" value={tilt} setValue={(v) => handleValueChange('tilt', v)} paramName="tilt" isLearning={isLearning('tilt')} onMidiLearn={onMidiLearn} />
-            <Knob label="Mix" value={mix} setValue={(v) => handleValueChange('mix', v)} paramName="mix" isLearning={isLearning('mix')} onMidiLearn={onMidiLearn} />
-            <Knob label="Output" value={output} setValue={(v) => handleValueChange('output', v)} paramName="output" isLearning={isLearning('output')} onMidiLearn={onMidiLearn} />
+            <MixxGlassKnob label="Width" value={width} setValue={(v) => handleValueChange('width', v)} paramName="width" isLearning={isLearning('width')} onMidiLearn={onMidiLearn} />
+            <MixxGlassKnob label="Phase" value={phase} setValue={(v) => handleValueChange('phase', v)} paramName="phase" isLearning={isLearning('phase')} onMidiLearn={onMidiLearn} />
+            <MixxGlassKnob label="Tilt" value={tilt} setValue={(v) => handleValueChange('tilt', v)} paramName="tilt" isLearning={isLearning('tilt')} onMidiLearn={onMidiLearn} />
+            <MixxGlassKnob label="Mix" value={mix} setValue={(v) => handleValueChange('mix', v)} paramName="mix" isLearning={isLearning('mix')} onMidiLearn={onMidiLearn} />
+            <MixxGlassKnob label="Output" value={output} setValue={(v) => handleValueChange('output', v)} paramName="output" isLearning={isLearning('output')} onMidiLearn={onMidiLearn} />
         </div>
       </div>
     </PluginContainer>

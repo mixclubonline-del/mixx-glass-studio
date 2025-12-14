@@ -1,11 +1,47 @@
 
 
 import React from 'react';
-import { motion, AnimatePresence, Variants } from 'framer-motion';
+import { useFlowMotion, useAnimatePresence, AnimatePresence } from '../../../../components/mixxglass';
 import { SidePanelProps, Preset } from '../types';
 import { XIcon } from './shared/Icons';
 import { mapRange } from '../lib/utils'; // Import mapRange
 import { PrimeBotConsole } from './plugins/PrimeBotConsole';
+
+// Preset Item Component - uses hook at component level
+const PresetItem: React.FC<{
+    preset: Preset;
+    onLoadPreset: (name: string) => void;
+    onDeletePreset: (name: string) => void;
+}> = ({ preset, onLoadPreset, onDeletePreset }) => {
+    // Hook is now called at component level
+    const presetAnimation = useAnimatePresence({
+        isVisible: true,
+        initial: { y: -10, opacity: 0 },
+        animate: { y: 0, opacity: 1 },
+        exit: { x: -20, opacity: 0 },
+        transition: { duration: 200 },
+    });
+
+    return (
+        <li 
+            className="my-1 group"
+            style={presetAnimation.style}
+        >
+            <div className="flex items-center justify-between bg-white/5 rounded-md p-2 hover:bg-white/10 transition-colors group-hover:shadow-[0_0_8px_rgba(255,255,255,0.1)]">
+                <button onClick={() => onLoadPreset(preset.name)} className="flex-1 text-left">
+                    <span className="text-sm text-gray-300 group-hover:text-white">{preset.name}</span>
+                </button>
+                <button 
+                    onClick={() => onDeletePreset(preset.name)}
+                    className="p-1 text-gray-400 hover:text-red-400 transition-colors opacity-50 group-hover:opacity-100"
+                    aria-label={`Delete preset ${preset.name}`}
+                >
+                    <XIcon className="w-4 h-4" />
+                </button>
+            </div>
+        </li>
+    );
+};
 
 export const SidePanel: React.FC<SidePanelProps> = (props) => {
     const { activePanel, setActivePanel, globalSettings, sessionContext } = props; // Destructure globalSettings and sessionContext
@@ -35,27 +71,12 @@ export const SidePanel: React.FC<SidePanelProps> = (props) => {
                 <ul>
                     <AnimatePresence>
                     {presets.map((preset) => (
-                        <motion.li 
-                            key={preset.name} 
-                            className="my-1 group" 
-                            initial={{ y: -10, opacity: 0 }}
-                            animate={{ y: 0, opacity: 1 }}
-                            exit={{ x: -20, opacity: 0 }}
-                            layout
-                        >
-                            <div className="flex items-center justify-between bg-white/5 rounded-md p-2 hover:bg-white/10 transition-colors group-hover:shadow-[0_0_8px_rgba(255,255,255,0.1)]">
-                            <button onClick={() => onLoadPreset(preset.name)} className="flex-1 text-left">
-                                <span className="text-sm text-gray-300 group-hover:text-white">{preset.name}</span>
-                            </button>
-                            <button 
-                                onClick={() => onDeletePreset(preset.name)}
-                                className="p-1 text-gray-400 hover:text-red-400 transition-colors opacity-50 group-hover:opacity-100"
-                                aria-label={`Delete preset ${preset.name}`}
-                            >
-                                <XIcon className="w-4 h-4" />
-                            </button>
-                            </div>
-                        </motion.li>
+                        <PresetItem
+                            key={preset.name}
+                            preset={preset}
+                            onLoadPreset={onLoadPreset}
+                            onDeletePreset={onDeletePreset}
+                        />
                     ))}
                     </AnimatePresence>
                 </ul>
@@ -90,16 +111,27 @@ export const SidePanel: React.FC<SidePanelProps> = (props) => {
       : 'border-white/20';
 
 
+    const panelAnimation = useAnimatePresence({
+        isVisible: activePanel !== null && activePanel !== 'routing' && activePanel !== 'settings',
+        initial: { x: '-100%', opacity: 0 },
+        animate: { x: '0%', opacity: 1 },
+        exit: { x: '-100%', opacity: 0 },
+        transition: {
+            duration: mapRange(globalSettings.animationIntensity, 0, 100, 300, 200),
+            easing: 'ease-out',
+        },
+    });
+
     return (
         <AnimatePresence>
             {activePanel && activePanel !== 'routing' && activePanel !== 'settings' && (
-                <motion.div
+                <div
                     key="side-panel"
                     className="fixed top-0 left-0 h-full w-64 z-[60] pt-4 pb-4 pl-4"
-                    variants={panelVariants}
-                    initial="hidden"
-                    animate="visible"
-                    exit="exit"
+                    style={{
+                        transform: panelAnimation.style.transform || 'translateX(0%)',
+                        opacity: panelAnimation.style.opacity,
+                    }}
                 >
                     <div className={`relative h-full bg-gradient-to-br from-black/50 to-transparent backdrop-blur-2xl border-r ${panelBorderColor} rounded-2xl transition-all duration-300`}>
                         <button 
@@ -113,7 +145,7 @@ export const SidePanel: React.FC<SidePanelProps> = (props) => {
                          {activePanel === 'midi' && <MidiPanel {...props} />}
                          {activePanel === 'console' && <PrimeBotConsole sessionContext={sessionContext} />}
                     </div>
-                </motion.div>
+                </div>
             )}
         </AnimatePresence>
     );

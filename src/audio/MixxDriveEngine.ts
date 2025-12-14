@@ -71,7 +71,6 @@ export class MixxDriveEngine implements IAudioEngine {
 
     this.updateParameters();
     this.isInitialized = true;
-    console.log("🎚️ MixxDriveEngine initialized");
   }
 
   isActive(): boolean {
@@ -162,6 +161,18 @@ export class MixxDriveEngine implements IAudioEngine {
 let instance: MixxDriveEngine | null = null;
 
 export function getMixxDriveEngine(context: BaseAudioContext | null = null): MixxDriveEngine {
+  // If instance exists but context is closed or different, dispose and recreate
+  if (instance) {
+    const existingContext = instance.audioContext;
+    const contextClosed = existingContext && 'state' in existingContext && existingContext.state === 'closed';
+    const contextChanged = context && existingContext && existingContext !== context;
+    
+    if (contextClosed || contextChanged) {
+      instance.dispose();
+      instance = null;
+    }
+  }
+  
   if (!instance) {
     instance = new MixxDriveEngine(context);
   }

@@ -30,46 +30,109 @@ export interface PluginConfig extends PluginCatalogEntry {
   engineInstance: (ctx: BaseAudioContext) => IAudioEngine;
 }
 
-// A placeholder for generic plugins or those not yet implemented
+/**
+ * PlaceholderAudioEngine - Fallback engine for plugins without audio processing
+ * 
+ * This is a graceful fallback for plugins that:
+ * - Don't have audio engines implemented yet
+ * - Are visual-only plugins
+ * - Are in development
+ * 
+ * Provides basic gain control so plugins can at least affect volume.
+ * For production, plugins should implement their own IAudioEngine.
+ * 
+ * Flow Doctrine: Graceful degradation - plugins work even without full engines.
+ */
 export class PlaceholderAudioEngine implements IAudioEngine {
   input: GainNode;
   output: GainNode;
   makeup: GainNode;
   audioContext: BaseAudioContext | null = null;
   private isInitialized = false;
-  private params: Record<string, number> = {};
+  private params: Record<string, number> = {
+    gain: 1.0,      // Basic gain control (0-2.0)
+    mix: 1.0        // Mix control (0-1.0)
+  };
 
   constructor(ctx: BaseAudioContext) {
     this.audioContext = ctx;
     this.input = ctx.createGain();
     this.output = ctx.createGain();
     this.makeup = ctx.createGain();
-    // Directly connect input to output for placeholder
+    
+    // Connect with gain control: input -> makeup (gain) -> output
     this.input.connect(this.makeup);
     this.makeup.connect(this.output);
+    
+    // Initialize gain to 1.0 (unity)
+    this.makeup.gain.value = 1.0;
   }
   
   async initialize(ctx: BaseAudioContext): Promise<void> {
     if(!this.audioContext) this.audioContext = ctx;
     this.isInitialized = true;
+    this.updateProcessing();
   }
 
   getIsInitialized(): boolean {
-      return this.isInitialized;
+    return this.isInitialized;
   }
 
-  setClock(getBeatPhase: () => number): void {}
-  dispose(): void {
-      this.input.disconnect();
-      this.output.disconnect();
-      this.makeup.disconnect();
+  setClock(getBeatPhase: () => number): void {
+    // Could use beat phase for tempo-synced effects in the future
   }
-  isActive(): boolean { return this.isInitialized; }
-  setParameter(name: string, value: number): void { this.params[name] = value; }
-  getParameter(name: string): number { return this.params[name] || 0; }
-  getParameterNames(): string[] { return Object.keys(this.params); }
-  getParameterMin(name: string): number { return 0; }
-  getParameterMax(name: string): number { return 1; }
+  
+  dispose(): void {
+    this.input.disconnect();
+    this.output.disconnect();
+    this.makeup.disconnect();
+  }
+  
+  isActive(): boolean { 
+    return this.isInitialized; 
+  }
+  
+  setParameter(name: string, value: number): void { 
+    this.params[name] = value;
+    this.updateProcessing();
+  }
+  
+  getParameter(name: string): number { 
+    return this.params[name] ?? 0; 
+  }
+  
+  getParameterNames(): string[] { 
+    return ['gain', 'mix']; 
+  }
+  
+  getParameterMin(name: string): number {
+    if (name === 'gain') return 0;
+    if (name === 'mix') return 0;
+    return 0;
+  }
+  
+  getParameterMax(name: string): number {
+    if (name === 'gain') return 2.0;
+    if (name === 'mix') return 1.0;
+    return 1;
+  }
+  
+  /**
+   * Update audio processing based on parameters
+   */
+  private updateProcessing(): void {
+    if (!this.audioContext || !this.makeup) return;
+    
+    const gain = this.params.gain ?? 1.0;
+    const mix = this.params.mix ?? 1.0;
+    
+    // Apply gain and mix
+    // Mix of 1.0 = full effect, 0.0 = dry (but we're a placeholder, so just apply gain)
+    const effectiveGain = gain * mix;
+    
+    const now = this.audioContext.currentTime;
+    this.makeup.gain.setTargetAtTime(effectiveGain, now, 0.01);
+  }
 }
 
 /**

@@ -25,7 +25,7 @@ if (!GITHUB_TOKEN) {
 }
 
 const prData = JSON.stringify({
-  title: 'feat: Complete Studio Refactor with Adaptive Layout, Stem Separation, and Component Architecture',
+  title: 'feat: Complete Studio Refactor with Adaptive Layout, Stem Separation, and Auto-Save Fixes',
   body: `## Major Features
 - ✅ Adaptive layout system with platform detection and responsive breakpoints
 - ✅ Flow Console with Compact, Matrix, and Analyzer view modes
@@ -33,6 +33,14 @@ const prData = JSON.stringify({
 - ✅ Revolutionary stem separation engine with quantum processing
 - ✅ External plugin system integration
 - ✅ Rsbuild configuration for parallel build support
+
+## Auto-Save & Auto-Pull System Fixes
+- ✅ Fixed consumer count leaks in useAutoSave and useAutoPull hooks
+- ✅ Prevented multiple components from overwriting singleton state getter
+- ✅ Added proper error handling for initialization failures
+- ✅ Ensured cleanup always removes consumers even if init fails
+- ✅ Fixed keyboard shortcut promise rejection handling
+- ✅ Corrected Git command exit code checking in Rust backend
 
 ## Component Architecture
 - Removed unused placeholder components (Grid, Playhead, Timeline, Track, etc.)
@@ -62,7 +70,7 @@ const options = {
   method: 'POST',
   headers: {
     'Content-Type': 'application/json',
-    'Content-Length': prData.length,
+    'Content-Length': Buffer.byteLength(prData, 'utf-8'),
     'Authorization': `token ${GITHUB_TOKEN}`,
     'User-Agent': 'Node.js PR Creator'
   }

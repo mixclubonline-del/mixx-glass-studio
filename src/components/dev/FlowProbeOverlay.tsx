@@ -5,6 +5,7 @@ import {
   useSessionProbeStore,
 } from "../../hooks/useSessionProbe";
 import { clearSessionProbe, isSessionProbeExportAllowed } from "../../state/sessionProbe";
+import { als } from "../../utils/alsFeedback";
 
 const downloadJson = (payload: string) => {
   const blob = new Blob([payload], { type: "application/json" });
@@ -56,8 +57,7 @@ const FlowProbeOverlay: React.FC = () => {
   const handleExport = () => {
     const serialized = exportSessionProbeSnapshot();
     if (!serialized) {
-      console.warn('[Session Probe] Export not available. Set VITE_SESSION_PROBE_ALLOW_EXPORT=1 to enable.');
-      alert('Export is disabled. Set VITE_SESSION_PROBE_ALLOW_EXPORT=1 in your environment to enable JSON export.');
+      // Export not available - user-facing alert already shown (no ALS needed)
       return;
     }
     downloadJson(serialized);
@@ -141,22 +141,13 @@ const FlowProbeOverlay: React.FC = () => {
         }
         
         // Debug logging - check if Web Audio is playing but Tauri engine isn't
-        if (webAudioPlaying && !status?.is_playing && !status?.engine_running) {
-          console.warn('[FlowProbe] Web Audio is playing but Tauri FlowEngine not initialized:', {
-            webAudioPlaying,
-            tauriIsPlaying: status?.is_playing,
-            engine: status?.engine,
-            engine_running: status?.engine_running,
-            error: status?.error,
-            fullStatus: status,
-          });
+        if (webAudioPlaying && !status?.is_playing && !status?.engine_running && import.meta.env.DEV) {
+          // Web Audio playing but Tauri engine not initialized - DEV mode only
+          als.warning('[FlowProbe] Web Audio is playing but Tauri FlowEngine not initialized');
         }
         
-        // Debug: log status periodically to help diagnose
+        // Engine status available via status object
         if (status && (status.engine_running || status.is_playing)) {
-          console.log('[FlowProbe] Engine status:', {
-            is_playing: status.is_playing,
-            engine_running: status.engine_running,
             has_stats: !!status.engine,
             total_callbacks: status.engine?.total_callbacks ?? 0,
           });
@@ -165,7 +156,10 @@ const FlowProbeOverlay: React.FC = () => {
         if (!mounted) {
           return;
         }
-        console.warn('[FlowProbe] Failed to get engine status:', error);
+        // Failed to get engine status - DEV mode only
+        if (import.meta.env.DEV) {
+          als.warning('[FlowProbe] Failed to get engine status', error);
+        }
         setEngineStatusLabel("Unavailable");
       }
     };

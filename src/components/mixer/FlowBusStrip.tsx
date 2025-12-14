@@ -8,7 +8,8 @@
  */
 
 import React, { memo } from "react";
-import { motion } from "framer-motion";
+import { useFlowMotion, usePulseAnimation } from "../mixxglass";
+import { MixxGlassMeter } from "../mixxglass";
 import type { MixerBusId } from "../../App";
 import { hexToRgba } from "../../utils/ALS";
 import {
@@ -17,6 +18,7 @@ import {
   MIXER_STRIP_MAX_WIDTH,
   MIXER_STRIP_GAP_PX,
 } from "./mixerConstants";
+import { spacing, typography, layout, effects, transitions, composeStyles } from "../../design-system";
 
 export interface FlowBusStripProps {
   busId: MixerBusId;
@@ -28,6 +30,9 @@ export interface FlowBusStripProps {
   alsGlow: string;
   alsHaloColor?: string;
   alsGlowStrength?: number;
+  busLevel?: number; // Actual bus audio level (0-1) from analyser
+  busPeak?: number; // Peak level from analyser
+  busTransient?: boolean; // Transient detection
   onSelectBus?: (busId: MixerBusId) => void;
   isActive?: boolean;
 }
@@ -43,6 +48,9 @@ const FlowBusStrip: React.FC<FlowBusStripProps> = memo(
     alsGlow,
     alsHaloColor,
     alsGlowStrength,
+    busLevel,
+    busPeak,
+    busTransient,
     onSelectBus,
     isActive,
   }) => {
@@ -54,119 +62,309 @@ const FlowBusStrip: React.FC<FlowBusStripProps> = memo(
 
     const glowSource = alsHaloColor ?? alsGlow;
     const glowAlpha = Math.min(Math.max(alsGlowStrength ?? (0.25 + alsIntensity * 0.35), 0), 1);
+    
+    // Use actual bus level if available, otherwise fall back to send-based intensity
+    const displayLevel = busLevel !== undefined ? busLevel : alsIntensity;
+    const displayPeak = busPeak !== undefined ? busPeak : alsIntensity;
+    const displayTransient = busTransient ?? false;
+
+    // Animated entrance and selection
+    const entranceStyle = useFlowMotion(
+      { opacity: 1, scale: isActive ? 1.03 : 1 },
+      { duration: 250, easing: 'ease-out' }
+    );
+
+    // Pulsing BUS indicator
+    const busPulse = usePulseAnimation({
+      duration: 1800,
+      minOpacity: 0.6,
+      maxOpacity: 1,
+      minScale: 1,
+      maxScale: 1 + alsPulse * 0.04,
+    });
+
+    // Pulsing intensity bar
+    const intensityBarPulse = usePulseAnimation({
+      duration: 1800,
+      minOpacity: 0.6,
+      maxOpacity: 1,
+    });
+
+    // Member indicator component with pulse
+    const MemberIndicator: React.FC<{ memberId: string }> = ({ memberId }) => {
+      const memberPulse = usePulseAnimation({
+        duration: 2000 + Math.random() * 1000,
+        minOpacity: 0.5,
+        maxOpacity: 1,
+      });
+
+      return (
+        <span
+          style={composeStyles(
+            layout.width.full,
+            layout.height(5),
+            layout.flex.container('row'),
+            layout.flex.align.center,
+            layout.flex.justify.center,
+            spacing.px(2),
+            spacing.py(1),
+            effects.border.radius.md,
+            typography.transform('uppercase'),
+            typography.tracking.widest,
+            {
+              border: '1px solid rgba(102, 140, 198, 0.45)',
+              background: 'rgba(6,14,28,0.78)',
+              fontSize: '0.6875rem', // 11px minimum
+              color: '#e6f0ff',
+              opacity: memberPulse.opacity,
+            }
+          )}
+        >
+          {memberId.slice(0, 3)}
+        </span>
+      );
+    };
 
     return (
-      <motion.div
-        className={`flex flex-col items-center bg-glass-surface border border-glass-border rounded-xl backdrop-blur-2xl shadow-[0_18px_60px_rgba(4,12,26,0.48)] overflow-hidden cursor-pointer transition-all text-ink ${
-          isActive ? "border-cyan-300/70 shadow-[0_0_34px_rgba(56,189,248,0.45)]" : ""
-        }`}
-        style={stripWidth}
+      <div
+        style={composeStyles(
+          layout.flex.container('col'),
+          layout.flex.align.center,
+          effects.border.radius.xl,
+          effects.backdrop.blur('2xl'),
+          effects.overflow.hidden,
+          transitions.transition.standard('all', 200, 'ease-out'),
+          {
+            background: 'rgba(9, 18, 36, 0.82)',
+            border: isActive
+              ? '1px solid rgba(103, 232, 249, 0.7)'
+              : '1px solid rgba(102, 140, 198, 0.45)',
+            boxShadow: isActive
+              ? '0 0 34px rgba(56,189,248,0.45)'
+              : '0 18px 60px rgba(4,12,26,0.48)',
+            color: '#e6f0ff',
+            cursor: 'pointer',
+            opacity: entranceStyle.opacity,
+            transform: `scale(${entranceStyle.scale})`,
+            ...stripWidth,
+          }
+        )}
         onClick={() => onSelectBus?.(busId)}
-        initial={{ opacity: 0, scale: 0.95 }}
-        animate={{ opacity: 1, scale: isActive ? 1.03 : 1 }}
-        transition={{ duration: 0.25, ease: "easeOut" }}
       >
-        <div className="w-full px-2 pt-2 text-[0.55rem] uppercase tracking-[0.35em] text-ink flex items-center justify-between">
+        <div style={composeStyles(
+          layout.width.full,
+          spacing.px(3),
+          spacing.pt(3),
+          layout.flex.container('row'),
+          layout.flex.align.center,
+          layout.flex.justify.between,
+          typography.preset.label(),
+          {
+            // Professional label styling
+          }
+        )}>
           <span>{name}</span>
-          <span className="text-ink/50">{members.length}</span>
+          <span style={{ 
+            color: 'rgba(230, 240, 255, 0.65)',
+            fontWeight: '500',
+          }}>{members.length}</span>
         </div>
 
-        <motion.div
-          className="w-10 h-10 rounded-full border border-glass-border flex items-center justify-center text-[0.5rem] uppercase tracking-[0.3em] text-ink mt-2"
-          style={{
-            boxShadow: `0 0 20px ${hexToRgba(glowSource, glowAlpha)}`,
-            background: `radial-gradient(circle, ${hexToRgba(
-              glowSource,
-              glowAlpha * 0.9
-            )} 0%, transparent 70%)`,
-          }}
-          animate={{ opacity: [0.6, 1, 0.6], scale: [1, 1 + alsPulse * 0.04, 1] }}
-          transition={{ duration: 1.8, repeat: Infinity, ease: "easeInOut" }}
+        {/* Bus Meter - Shows actual bus audio level */}
+        <div style={composeStyles(
+          layout.width.full,
+          layout.flex.container('row'),
+          layout.flex.align.end,
+          layout.flex.justify.center,
+          spacing.px(2),
+          spacing.py(2),
+          effects.border.radius.xl,
+          {
+            border: '1px solid rgba(102, 140, 198, 0.45)',
+            background: 'rgba(8,18,34,0.72)',
+            height: '64px',
+          }
+        )}>
+          <MixxGlassMeter
+            level={Math.min(1, Math.max(0, displayLevel))}
+            peak={Math.min(1, Math.max(displayLevel, displayPeak))}
+            transient={displayTransient}
+            alsChannel="pressure"
+            color={alsColor}
+            glowColor={alsGlow}
+            height={48}
+            width={32}
+          />
+        </div>
+
+        <div
+          style={composeStyles(
+            layout.flex.container('row'),
+            layout.flex.align.center,
+            layout.flex.justify.center,
+            effects.border.radius.full,
+            spacing.mt(2),
+            typography.preset.label(),
+            {
+              width: '36px',
+              height: '36px',
+              border: '1px solid rgba(102, 140, 198, 0.35)',
+              fontSize: '0.6875rem', // 11px minimum
+              color: 'rgba(230, 240, 255, 0.85)',
+              boxShadow: `0 2px 8px ${hexToRgba(glowSource, glowAlpha * 0.4)}`,
+              background: `radial-gradient(circle, ${hexToRgba(
+                glowSource,
+                glowAlpha * 0.6
+              )} 0%, transparent 70%)`,
+              opacity: busPulse.opacity,
+              transform: `scale(${busPulse.scale})`,
+            }
+          )}
         >
           BUS
-        </motion.div>
+        </div>
 
-        <div className="flex-1 w-full px-2 pt-3 flex flex-col justify-between gap-2">
-          <div className="h-1 rounded-full bg-[rgba(9,18,36,0.6)] overflow-hidden relative">
-            <motion.div
-              className="absolute inset-y-0 left-0 rounded-full"
-              style={{
-                width: `${alsIntensity * 100}%`,
-                background: `linear-gradient(90deg, ${hexToRgba(
-                  alsColor,
-                  Math.min(0.6 + alsIntensity * 0.3, 1)
-                )}, ${hexToRgba(glowSource, glowAlpha)})`,
-                boxShadow: `0 0 12px ${hexToRgba(glowSource, glowAlpha)}`,
-              }}
-              animate={{ opacity: [0.6, 1, 0.6] }}
-              transition={{ duration: 1.8, repeat: Infinity, ease: "easeInOut" }}
+        <div style={composeStyles(
+          { flex: 1 },
+          layout.width.full,
+          spacing.px(2),
+          spacing.pt(3),
+          layout.flex.container('col'),
+          layout.flex.justify.between,
+          spacing.gap(2)
+        )}>
+          {/* Intensity bar - shows bus level or send intensity */}
+          <div style={composeStyles(
+            layout.position.relative,
+            layout.overflow.hidden,
+            effects.border.radius.full,
+            {
+              height: '4px',
+              background: 'rgba(9,18,36,0.6)',
+            }
+          )}>
+            <div
+              style={composeStyles(
+                layout.position.absolute,
+                { top: 0, bottom: 0, left: 0 },
+                effects.border.radius.full,
+                {
+                  width: `${displayLevel * 100}%`,
+                  background: `linear-gradient(90deg, ${hexToRgba(
+                    alsColor,
+                    Math.min(0.6 + displayLevel * 0.3, 1)
+                  )}, ${hexToRgba(glowSource, glowAlpha)})`,
+                  boxShadow: `0 0 12px ${hexToRgba(glowSource, glowAlpha)}`,
+                  opacity: intensityBarPulse.opacity,
+                }
+              )}
             />
           </div>
 
           <div
-            className="grid grid-cols-2 gap-1"
-            style={{ gap: `${MIXER_STRIP_GAP_PX}px` }}
+            style={composeStyles(
+              layout.grid.container(2),
+              {
+                gap: `${MIXER_STRIP_GAP_PX}px`,
+              }
+            )}
           >
             {members.slice(0, 4).map((memberId) => (
-              <motion.span
-                key={memberId}
-                className="w-full h-5 rounded-md border border-glass-border bg-[rgba(6,14,28,0.78)] text-[0.45rem] uppercase tracking-[0.25em] text-ink flex items-center justify-center"
-                animate={{
-                  opacity: [0.5, 1, 0.5],
-                }}
-                transition={{
-                  duration: 2 + Math.random(),
-                  repeat: Infinity,
-                  ease: "easeInOut",
-                }}
-              >
-                {memberId.slice(0, 3)}
-              </motion.span>
+              <MemberIndicator key={memberId} memberId={memberId} />
             ))}
             {members.length > 4 && (
-              <span className="w-full h-5 rounded-md border border-glass-border bg-[rgba(6,14,28,0.78)] text-[0.45rem] uppercase tracking-[0.25em] text-ink/70 flex items-center justify-center">
+              <span style={composeStyles(
+                layout.width.full,
+                layout.height(5),
+                layout.flex.container('row'),
+                layout.flex.align.center,
+                layout.flex.justify.center,
+                spacing.px(2),
+                spacing.py(1),
+                effects.border.radius.md,
+                typography.transform('uppercase'),
+                typography.tracking.widest,
+                {
+                  border: '1px solid rgba(102, 140, 198, 0.45)',
+                  background: 'rgba(6,14,28,0.78)',
+                  fontSize: '0.6875rem', // 11px minimum
+                  color: 'rgba(230, 240, 255, 0.7)',
+                }
+              )}>
                 +{members.length - 4}
               </span>
             )}
           </div>
         </div>
 
-        <div className="w-full px-2 pb-3">
-          <div className="h-1 rounded-full bg-[rgba(9,18,36,0.6)] overflow-hidden relative">
-            <motion.div
-              className="absolute inset-y-0 left-0 rounded-full"
-              style={{
-                width: `${Math.min(1, alsIntensity * 1.25) * 100}%`,
-                background: `linear-gradient(90deg, ${hexToRgba(
-                  alsColor,
-                  Math.min(0.45 + alsIntensity * 0.4, 1)
-                )}, ${hexToRgba(glowSource, glowAlpha)})`,
-                boxShadow: `0 0 12px ${hexToRgba(glowSource, glowAlpha)}`,
-              }}
-              animate={{ opacity: [0.6, 1, 0.6] }}
-              transition={{ duration: 2, repeat: Infinity, ease: "easeInOut" }}
+        <div style={composeStyles(
+          layout.width.full,
+          spacing.px(2),
+          spacing.pb(3)
+        )}>
+          <div style={composeStyles(
+            layout.position.relative,
+            layout.overflow.hidden,
+            effects.border.radius.full,
+            {
+              height: '4px',
+              background: 'rgba(9,18,36,0.6)',
+            }
+          )}>
+            <div
+              style={composeStyles(
+                layout.position.absolute,
+                { top: 0, bottom: 0, left: 0 },
+                effects.border.radius.full,
+                {
+                  width: `${Math.min(1, alsIntensity * 1.25) * 100}%`,
+                  background: `linear-gradient(90deg, ${hexToRgba(
+                    alsColor,
+                    Math.min(0.45 + alsIntensity * 0.4, 1)
+                  )}, ${hexToRgba(glowSource, glowAlpha)})`,
+                  boxShadow: `0 0 12px ${hexToRgba(glowSource, glowAlpha)}`,
+                  opacity: intensityBarPulse.opacity,
+                }
+              )}
             />
           </div>
-          <div className="mt-1 flex items-center justify-center gap-1.5">
+          <div style={composeStyles(
+            spacing.mt(1),
+            layout.flex.container('row'),
+            layout.flex.align.center,
+            layout.flex.justify.center,
+            spacing.gap(1.5)
+          )}>
             {members.slice(0, 4).map((memberId, index) => (
               <span
                 key={memberId}
-                className="w-1.5 h-1.5 rounded-full"
-                style={{
-                  background: hexToRgba(alsColor, 0.55 + index * 0.1),
-                  boxShadow: `0 0 6px ${hexToRgba(glowSource, glowAlpha * 0.8)}`,
-                  opacity: 0.5 + alsIntensity * 0.5,
-                }}
+                style={composeStyles(
+                  effects.border.radius.full,
+                  {
+                    width: '6px',
+                    height: '6px',
+                    background: hexToRgba(alsColor, 0.55 + index * 0.1),
+                    boxShadow: `0 0 6px ${hexToRgba(glowSource, glowAlpha * 0.8)}`,
+                    opacity: 0.5 + alsIntensity * 0.5,
+                  }
+                )}
               />
             ))}
             {members.length > 4 && (
-              <span className="text-[0.45rem] uppercase tracking-[0.3em] text-ink/55">
+              <span style={composeStyles(
+                typography.transform('uppercase'),
+                typography.tracking.widest,
+                {
+                  fontSize: '0.6875rem', // 11px minimum
+                  color: 'rgba(230, 240, 255, 0.55)',
+                }
+              )}>
                 +{members.length - 4}
               </span>
             )}
           </div>
         </div>
-      </motion.div>
+      </div>
     );
   }
 );
@@ -174,4 +372,3 @@ const FlowBusStrip: React.FC<FlowBusStripProps> = memo(
 FlowBusStrip.displayName = "FlowBusStrip";
 
 export default FlowBusStrip;
-

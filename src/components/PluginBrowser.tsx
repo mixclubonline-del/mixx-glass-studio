@@ -8,6 +8,7 @@ import type {
   PluginTier,
 } from "../audio/pluginTypes";
 import { TIER_ORDER } from "../audio/pluginCatalog";
+import { spacing, typography, layout, effects, transitions, composeStyles } from "../design-system";
 
 interface PluginBrowserProps {
   trackId: string;
@@ -173,45 +174,165 @@ const PluginBrowser: React.FC<PluginBrowserProps> = ({
 
   return (
     <div
-      className="fixed inset-0 z-[160] flex items-center justify-center bg-[rgba(2,4,12,0.76)] backdrop-blur-3xl"
+      style={composeStyles(
+        layout.position.fixed,
+        { inset: 0, zIndex: 160 },
+        layout.flex.container('row'),
+        layout.flex.align.center,
+        layout.flex.justify.center,
+        {
+          background: 'rgba(2,4,12,0.76)',
+          backdropFilter: 'blur(48px)',
+        }
+      )}
       onClick={onClose}
     >
       <div
-        className="relative flex h-[620px] w-[880px] flex-col overflow-hidden rounded-[32px] border border-white/10 bg-[rgba(6,14,32,0.85)] shadow-[0_45px_120px_rgba(4,10,26,0.65)]"
+        style={composeStyles(
+          layout.position.relative,
+          layout.flex.container('col'),
+          layout.overflow.hidden,
+          effects.border.radius.xl,
+          {
+            height: '620px',
+            width: '880px',
+            border: '1px solid rgba(255,255,255,0.1)',
+            background: 'rgba(6,14,32,0.85)',
+            boxShadow: '0 45px 120px rgba(4,10,26,0.65)',
+          }
+        )}
         onClick={(event) => event.stopPropagation()}
       >
-        <header className="flex items-center justify-between px-8 pt-7 pb-5">
+        <header style={composeStyles(
+          layout.flex.container('row'),
+          layout.flex.align.center,
+          layout.flex.justify.between,
+          spacing.px(8),
+          spacing.pt(7),
+          spacing.pb(5)
+        )}>
           <div>
-            <p className="text-[0.5rem] uppercase tracking-[0.45em] text-cyan-200/65">
+            <p style={composeStyles(
+              typography.transform('uppercase'),
+              typography.tracking.widest,
+              {
+                fontSize: '0.5rem',
+                color: 'rgba(165, 243, 252, 0.65)',
+              }
+            )}>
               {trackName ? `Routing into ${trackName}` : "Flow Insert Browser"}
             </p>
-            <h2 className="mt-2 text-2xl font-semibold tracking-[0.18em] text-white">
+            <h2 style={composeStyles(
+              typography.weight('semibold'),
+              spacing.mt(2),
+              typography.tracking.widest,
+              {
+                fontSize: '1.5rem',
+                color: 'white',
+              }
+            )}>
               Bloom Module Halo
             </h2>
           </div>
           <button
             onClick={onClose}
-            className="flex h-10 w-10 items-center justify-center rounded-full border border-white/15 bg-white/8 text-white/70 transition-colors hover:bg-white/16 hover:text-white"
+            style={composeStyles(
+              layout.flex.container('row'),
+              layout.flex.align.center,
+              layout.flex.justify.center,
+              effects.border.radius.full,
+              transitions.transition.standard('all', 200, 'ease-out'),
+              {
+                width: '40px',
+                height: '40px',
+                border: '1px solid rgba(255,255,255,0.15)',
+                background: 'rgba(255,255,255,0.08)',
+                color: 'rgba(255,255,255,0.7)',
+              }
+            )}
+            onMouseEnter={(e) => {
+              e.currentTarget.style.background = 'rgba(255,255,255,0.16)';
+              e.currentTarget.style.color = 'white';
+            }}
+            onMouseLeave={(e) => {
+              e.currentTarget.style.background = 'rgba(255,255,255,0.08)';
+              e.currentTarget.style.color = 'rgba(255,255,255,0.7)';
+            }}
             aria-label="Close plug-in browser"
           >
-            <XIcon className="h-5 w-5" />
+            <XIcon style={{ width: '20px', height: '20px' }} />
           </button>
         </header>
 
-        <div className="flex flex-col gap-4 px-8 pb-7">
-          <div className="flex items-center gap-4">
-            <div className="flex flex-1 items-center rounded-2xl border border-white/12 bg-[rgba(10,24,44,0.6)] px-4 py-3 backdrop-blur">
+        <div style={composeStyles(
+          layout.flex.container('col'),
+          spacing.gap(4),
+          spacing.px(8),
+          spacing.pb(7)
+        )}>
+          <div style={composeStyles(
+            layout.flex.container('row'),
+            layout.flex.align.center,
+            spacing.gap(4)
+          )}>
+            <div style={composeStyles(
+              layout.flex.container('row'),
+              layout.flex.align.center,
+              { flex: 1 },
+              effects.border.radius.xl,
+              spacing.px(4),
+              spacing.py(3),
+              {
+                border: '1px solid rgba(255,255,255,0.12)',
+                background: 'rgba(10,24,44,0.6)',
+                backdropFilter: 'blur(8px)',
+              }
+            )}>
               <input
                 value={searchTerm}
                 onChange={(event) => setSearchTerm(event.target.value)}
                 placeholder="Search by vibe, tier, or mood response"
-                className="flex-1 bg-transparent text-sm uppercase tracking-[0.35em] text-white/80 placeholder:text-white/35 focus:outline-none"
+                style={composeStyles(
+                  { flex: 1 },
+                  typography.transform('uppercase'),
+                  typography.tracking.widest,
+                  {
+                    background: 'transparent',
+                    fontSize: '0.875rem',
+                    color: 'rgba(255,255,255,0.8)',
+                    outline: 'none',
+                  }
+                )}
+                onFocus={(e) => {
+                  e.currentTarget.style.color = 'white';
+                }}
+                onBlur={(e) => {
+                  e.currentTarget.style.color = 'rgba(255,255,255,0.8)';
+                }}
               />
             </div>
             {favoriteList.length > 0 && (
-              <div className="flex items-center gap-3 rounded-2xl border border-amber-200/20 bg-amber-400/8 px-4 py-3">
-                <StarIcon filled className="h-4 w-4 text-amber-200" />
-                <span className="text-[0.55rem] uppercase tracking-[0.35em] text-amber-100/80">
+              <div style={composeStyles(
+                layout.flex.container('row'),
+                layout.flex.align.center,
+                spacing.gap(3),
+                effects.border.radius.xl,
+                spacing.px(4),
+                spacing.py(3),
+                {
+                  border: '1px solid rgba(251, 191, 36, 0.2)',
+                  background: 'rgba(251, 191, 36, 0.08)',
+                }
+              )}>
+                <StarIcon filled style={{ width: '16px', height: '16px', color: 'rgba(253, 224, 71, 1)' }} />
+                <span style={composeStyles(
+                  typography.transform('uppercase'),
+                  typography.tracking.widest,
+                  {
+                    fontSize: '0.55rem',
+                    color: 'rgba(254, 243, 199, 0.8)',
+                  }
+                )}>
                   Favorites pulsing
                 </span>
               </div>
@@ -219,16 +340,41 @@ const PluginBrowser: React.FC<PluginBrowserProps> = ({
           </div>
 
           {!searchTerm && curatedHighlights.length > 0 && (
-            <section className="flex flex-col gap-2">
-              <div className="flex items-center justify-between">
-                <span className="text-[0.48rem] uppercase tracking-[0.45em] text-white/55">
+            <section style={composeStyles(
+              layout.flex.container('col'),
+              spacing.gap(2)
+            )}>
+              <div style={composeStyles(
+                layout.flex.container('row'),
+                layout.flex.align.center,
+                layout.flex.justify.between
+              )}>
+                <span style={composeStyles(
+                  typography.transform('uppercase'),
+                  typography.tracking.widest,
+                  {
+                    fontSize: '0.48rem',
+                    color: 'rgba(255,255,255,0.55)',
+                  }
+                )}>
                   Curated Flow Chain
                 </span>
-                <span className="text-[0.45rem] uppercase tracking-[0.3em] text-white/30">
+                <span style={composeStyles(
+                  typography.transform('uppercase'),
+                  typography.tracking.widest,
+                  {
+                    fontSize: '0.45rem',
+                    color: 'rgba(255,255,255,0.3)',
+                  }
+                )}>
                   Tap to load
                 </span>
               </div>
-              <div className="flex flex-wrap gap-3">
+              <div style={composeStyles(
+                layout.flex.container('row'),
+                layout.flex.wrap.wrap,
+                spacing.gap(3)
+              )}>
                 {curatedHighlights.map((plugin) => (
                   <button
                     key={`curated-${plugin.id}`}
@@ -236,21 +382,74 @@ const PluginBrowser: React.FC<PluginBrowserProps> = ({
                     onDragStart={(e) => handleDragStart(e, plugin.id)}
                     onClick={() => handleAdd(plugin.id)}
                     onMouseEnter={() => handleHover(plugin.id)}
-                    className="rounded-2xl border border-white/12 bg-[rgba(12,24,48,0.78)] px-4 py-2 text-left transition-all hover:border-white/25 hover:bg-[rgba(16,36,68,0.85)] cursor-grab active:cursor-grabbing"
-                    style={{
-                      boxShadow: `0 0 28px ${hexToRgba(plugin.glow, 0.26)}`,
-                      backgroundImage: gradientFor(plugin),
+                    style={composeStyles(
+                      effects.border.radius.xl,
+                      spacing.px(4),
+                      spacing.py(2),
+                      transitions.transition.standard('all', 200, 'ease-out'),
+                      {
+                        border: '1px solid rgba(255,255,255,0.12)',
+                        background: 'rgba(12,24,48,0.78)',
+                        textAlign: 'left',
+                        cursor: 'grab',
+                        backgroundImage: gradientFor(plugin),
+                        boxShadow: `0 0 28px ${hexToRgba(plugin.glow, 0.26)}`,
+                      }
+                    )}
+                    onMouseEnter={(e) => {
+                      e.currentTarget.style.borderColor = 'rgba(255,255,255,0.25)';
+                      e.currentTarget.style.background = 'rgba(16,36,68,0.85)';
+                    }}
+                    onMouseLeave={(e) => {
+                      e.currentTarget.style.borderColor = 'rgba(255,255,255,0.12)';
+                      e.currentTarget.style.background = 'rgba(12,24,48,0.78)';
+                    }}
+                    onMouseDown={(e) => {
+                      e.currentTarget.style.cursor = 'grabbing';
+                    }}
+                    onMouseUp={(e) => {
+                      e.currentTarget.style.cursor = 'grab';
                     }}
                   >
-                    <div className="flex items-center gap-2">
-                      <span className="text-[0.58rem] uppercase tracking-[0.32em] text-white/85">
+                    <div style={composeStyles(
+                      layout.flex.container('row'),
+                      layout.flex.align.center,
+                      spacing.gap(2)
+                    )}>
+                      <span style={composeStyles(
+                        typography.transform('uppercase'),
+                        typography.tracking.widest,
+                        {
+                          fontSize: '0.58rem',
+                          color: 'rgba(255,255,255,0.85)',
+                        }
+                      )}>
                         {plugin.name}
                       </span>
-                      <span className="rounded-full bg-white/15 px-2 py-[2px] text-[0.42rem] uppercase tracking-[0.32em] text-white/70">
+                      <span style={composeStyles(
+                        effects.border.radius.full,
+                        spacing.px(2),
+                        spacing.py(0.5),
+                        typography.transform('uppercase'),
+                        typography.tracking.widest,
+                        {
+                          fontSize: '0.42rem',
+                          background: 'rgba(255,255,255,0.15)',
+                          color: 'rgba(255,255,255,0.7)',
+                        }
+                      )}>
                         {motionBadge[plugin.lightingProfile.motion]}
                       </span>
                     </div>
-                    <p className="mt-1 text-[0.48rem] uppercase tracking-[0.25em] text-white/55">
+                    <p style={composeStyles(
+                      spacing.mt(1),
+                      typography.transform('uppercase'),
+                      typography.tracking.widest,
+                      {
+                        fontSize: '0.48rem',
+                        color: 'rgba(255,255,255,0.55)',
+                      }
+                    )}>
                       {plugin.moodResponse}
                     </p>
                   </button>
@@ -260,24 +459,76 @@ const PluginBrowser: React.FC<PluginBrowserProps> = ({
           )}
         </div>
 
-        <div className="relative flex-1 overflow-hidden px-8 pb-8">
-          <div className="absolute left-0 top-0 h-12 w-full bg-gradient-to-b from-[rgba(6,14,32,0.95)] to-transparent" />
-          <div className="absolute bottom-0 left-0 h-12 w-full bg-gradient-to-t from-[rgba(6,14,32,0.95)] to-transparent" />
-          <div className="h-full w-full overflow-y-auto pr-2">
-            <div className="flex flex-col gap-6 pb-6">
+        <div style={composeStyles(
+          layout.position.relative,
+          { flex: 1 },
+          layout.overflow.hidden,
+          spacing.px(8),
+          spacing.pb(8)
+        )}>
+          <div style={composeStyles(
+            layout.position.absolute,
+            { left: 0, top: 0, width: '100%', height: '48px' },
+            {
+              background: 'linear-gradient(to bottom, rgba(6,14,32,0.95), transparent)',
+            }
+          )} />
+          <div style={composeStyles(
+            layout.position.absolute,
+            { left: 0, bottom: 0, width: '100%', height: '48px' },
+            {
+              background: 'linear-gradient(to top, rgba(6,14,32,0.95), transparent)',
+            }
+          )} />
+          <div style={composeStyles(
+            { height: '100%', width: '100%' },
+            layout.overflow.y.auto,
+            spacing.pr(2)
+          )}>
+            <div style={composeStyles(
+              layout.flex.container('col'),
+              spacing.gap(6),
+              spacing.pb(6)
+            )}>
               {groupedByTier.map(({ tier, headline, plugins }) => (
-                <section key={tier} className="flex flex-col gap-3">
-                  <div className="flex items-center justify-between">
+                <section key={tier} style={composeStyles(
+                  layout.flex.container('col'),
+                  spacing.gap(3)
+                )}>
+                  <div style={composeStyles(
+                    layout.flex.container('row'),
+                    layout.flex.align.center,
+                    layout.flex.justify.between
+                  )}>
                     <div>
-                      <span className="text-[0.42rem] uppercase tracking-[0.42em] text-white/35">
+                      <span style={composeStyles(
+                        typography.transform('uppercase'),
+                        typography.tracking.widest,
+                        {
+                          fontSize: '0.42rem',
+                          color: 'rgba(255,255,255,0.35)',
+                        }
+                      )}>
                         {headline}
                       </span>
-                      <p className="mt-1 text-[0.62rem] uppercase tracking-[0.42em] text-white/55">
+                      <p style={composeStyles(
+                        spacing.mt(1),
+                        typography.transform('uppercase'),
+                        typography.tracking.widest,
+                        {
+                          fontSize: '0.62rem',
+                          color: 'rgba(255,255,255,0.55)',
+                        }
+                      )}>
                         {tierSubtitle[tier]}
                       </p>
                     </div>
                   </div>
-                  <div className="grid grid-cols-1 gap-4 md:grid-cols-2">
+                  <div style={{
+                      display: 'grid',
+                      gridTemplateColumns: 'repeat(auto-fit, minmax(300px, 1fr))',
+                      gap: '16px',
+                    }}>
                     {plugins.map((plugin) => {
                       const isAdded = activeInserts.includes(plugin.id);
                       const isFavorite = favorites[plugin.id];
@@ -287,17 +538,61 @@ const PluginBrowser: React.FC<PluginBrowserProps> = ({
                           draggable
                           onDragStart={(e) => handleDragStart(e, plugin.id)}
                           onMouseEnter={() => handleHover(plugin.id)}
-                          className="group relative flex flex-col justify-between rounded-[24px] border border-white/10 bg-[rgba(8,16,36,0.78)] p-5 transition-all duration-200 hover:border-white/25 hover:shadow-[0_22px_48px_rgba(6,16,38,0.55)] cursor-grab active:cursor-grabbing"
-                          style={{
-                            backgroundImage: gradientFor(plugin),
+                          style={composeStyles(
+                            layout.position.relative,
+                            layout.flex.container('col'),
+                            layout.flex.justify.between,
+                            effects.border.radius.xl,
+                            spacing.p(5),
+                            transitions.transition.standard('all', 200, 'ease-out'),
+                            {
+                              border: '1px solid rgba(255,255,255,0.1)',
+                              background: 'rgba(8,16,36,0.78)',
+                              backgroundImage: gradientFor(plugin),
+                              cursor: 'grab',
+                            }
+                          )}
+                          onMouseEnter={(e) => {
+                            e.currentTarget.style.borderColor = 'rgba(255,255,255,0.25)';
+                            e.currentTarget.style.boxShadow = '0 22px 48px rgba(6,16,38,0.55)';
+                          }}
+                          onMouseLeave={(e) => {
+                            e.currentTarget.style.borderColor = 'rgba(255,255,255,0.1)';
+                            e.currentTarget.style.boxShadow = 'none';
+                          }}
+                          onMouseDown={(e) => {
+                            e.currentTarget.style.cursor = 'grabbing';
+                          }}
+                          onMouseUp={(e) => {
+                            e.currentTarget.style.cursor = 'grab';
                           }}
                         >
-                          <div className="flex items-start justify-between gap-4">
+                          <div style={composeStyles(
+                            layout.flex.container('row'),
+                            layout.flex.align.start,
+                            layout.flex.justify.between,
+                            spacing.gap(4)
+                          )}>
                             <div>
-                              <h3 className="text-sm uppercase tracking-[0.3em] text-white">
+                              <h3 style={composeStyles(
+                                typography.transform('uppercase'),
+                                typography.tracking.widest,
+                                {
+                                  fontSize: '0.875rem',
+                                  color: 'white',
+                                }
+                              )}>
                                 {plugin.name}
                               </h3>
-                              <p className="mt-2 text-[0.55rem] uppercase tracking-[0.28em] text-white/65">
+                              <p style={composeStyles(
+                                spacing.mt(2),
+                                typography.transform('uppercase'),
+                                typography.tracking.widest,
+                                {
+                                  fontSize: '0.55rem',
+                                  color: 'rgba(255,255,255,0.65)',
+                                }
+                              )}>
                                 {plugin.description}
                               </p>
                             </div>
@@ -306,34 +601,113 @@ const PluginBrowser: React.FC<PluginBrowserProps> = ({
                                 event.stopPropagation();
                                 onToggleFavorite(plugin.id);
                               }}
-                              className={`flex h-9 w-9 items-center justify-center rounded-full border transition-colors ${
-                                isFavorite
-                                  ? "border-amber-200/60 bg-amber-200/15 text-amber-100"
-                                  : "border-white/18 bg-white/8 text-white/60 hover:text-white"
-                              }`}
+                              style={composeStyles(
+                                layout.flex.container('row'),
+                                layout.flex.align.center,
+                                layout.flex.justify.center,
+                                effects.border.radius.full,
+                                transitions.transition.standard('all', 200, 'ease-out'),
+                                {
+                                  width: '36px',
+                                  height: '36px',
+                                  border: isFavorite 
+                                    ? '1px solid rgba(253, 224, 71, 0.6)' 
+                                    : '1px solid rgba(255,255,255,0.18)',
+                                  background: isFavorite 
+                                    ? 'rgba(253, 224, 71, 0.15)' 
+                                    : 'rgba(255,255,255,0.08)',
+                                  color: isFavorite 
+                                    ? 'rgba(254, 243, 199, 1)' 
+                                    : 'rgba(255,255,255,0.6)',
+                                }
+                              )}
+                              onMouseEnter={(e) => {
+                                if (!isFavorite) {
+                                  e.currentTarget.style.color = 'white';
+                                }
+                              }}
+                              onMouseLeave={(e) => {
+                                if (!isFavorite) {
+                                  e.currentTarget.style.color = 'rgba(255,255,255,0.6)';
+                                }
+                              }}
                               aria-label={isFavorite ? "Remove favorite" : "Add to favorites"}
                             >
-                              <StarIcon filled={isFavorite} className="h-4 w-4" />
+                              <StarIcon filled={isFavorite} style={{ width: '16px', height: '16px' }} />
                             </button>
                           </div>
-                          <p className="mt-3 text-[0.48rem] uppercase tracking-[0.28em] text-white/50">
+                          <p style={composeStyles(
+                            spacing.mt(3),
+                            typography.transform('uppercase'),
+                            typography.tracking.widest,
+                            {
+                              fontSize: '0.48rem',
+                              color: 'rgba(255,255,255,0.5)',
+                            }
+                          )}>
                             {plugin.moodResponse}
                           </p>
-                          <div className="mt-4 flex items-center justify-between">
-                            <span className="rounded-full border border-white/15 bg-white/10 px-3 py-1 text-[0.4rem] uppercase tracking-[0.35em] text-white/70">
+                          <div style={composeStyles(
+                            spacing.mt(4),
+                            layout.flex.container('row'),
+                            layout.flex.align.center,
+                            layout.flex.justify.between
+                          )}>
+                            <span style={composeStyles(
+                              effects.border.radius.full,
+                              spacing.px(3),
+                              spacing.py(1),
+                              typography.transform('uppercase'),
+                              typography.tracking.widest,
+                              {
+                                fontSize: '0.4rem',
+                                border: '1px solid rgba(255,255,255,0.15)',
+                                background: 'rgba(255,255,255,0.1)',
+                                color: 'rgba(255,255,255,0.7)',
+                              }
+                            )}>
                               {motionBadge[plugin.lightingProfile.motion]}
                             </span>
                             <button
                               onClick={() => handleAdd(plugin.id)}
                               disabled={isAdded}
-                              className={`flex items-center gap-2 rounded-full border px-4 py-2 text-[0.55rem] uppercase tracking-[0.32em] transition-all ${
-                                isAdded
-                                  ? "cursor-default border-white/15 bg-white/12 text-white/45"
-                                  : "border-white/25 bg-white/15 text-white/85 hover:bg-white/25"
-                              }`}
+                              style={composeStyles(
+                                layout.flex.container('row'),
+                                layout.flex.align.center,
+                                spacing.gap(2),
+                                effects.border.radius.full,
+                                spacing.px(4),
+                                spacing.py(2),
+                                typography.transform('uppercase'),
+                                typography.tracking.widest,
+                                transitions.transition.standard('all', 200, 'ease-out'),
+                                {
+                                  fontSize: '0.55rem',
+                                  border: isAdded 
+                                    ? '1px solid rgba(255,255,255,0.15)' 
+                                    : '1px solid rgba(255,255,255,0.25)',
+                                  background: isAdded 
+                                    ? 'rgba(255,255,255,0.12)' 
+                                    : 'rgba(255,255,255,0.15)',
+                                  color: isAdded 
+                                    ? 'rgba(255,255,255,0.45)' 
+                                    : 'rgba(255,255,255,0.85)',
+                                  cursor: isAdded ? 'default' : 'pointer',
+                                }
+                              )}
+                              onMouseEnter={(e) => {
+                                if (!isAdded) {
+                                  e.currentTarget.style.background = 'rgba(255,255,255,0.25)';
+                                }
+                              }}
+                              onMouseLeave={(e) => {
+                                if (!isAdded) {
+                                  e.currentTarget.style.background = 'rgba(255,255,255,0.15)';
+                                }
+                              }}
                             >
                               {isAdded ? "In Chain" : "Add Module"}
-                              {!isAdded && <PlusCircleIcon className="h-4 w-4" />}
+                              {!isAdded && <PlusCircleIcon style={{ width: '16px', height: '16px' }} />}
                             </button>
                           </div>
                         </article>
@@ -343,7 +717,16 @@ const PluginBrowser: React.FC<PluginBrowserProps> = ({
                 </section>
               ))}
               {!groupedByTier.length && (
-                <div className="py-16 text-center text-[0.55rem] uppercase tracking-[0.38em] text-white/35">
+                <div style={composeStyles(
+                  spacing.py(16),
+                  {
+                    textAlign: 'center',
+                    fontSize: '0.55rem',
+                    textTransform: 'uppercase',
+                    letterSpacing: '0.38em',
+                    color: 'rgba(255,255,255,0.35)',
+                  }
+                )}>
                   Nothing matches that vibe yet
                 </div>
               )}
@@ -351,13 +734,51 @@ const PluginBrowser: React.FC<PluginBrowserProps> = ({
           </div>
         </div>
 
-        <footer className="flex items-center justify-between border-t border-white/8 bg-[rgba(4,10,24,0.9)] px-8 py-4">
-          <div className="text-[0.42rem] uppercase tracking-[0.32em] text-white/40">
+        <footer style={composeStyles(
+          layout.flex.container('row'),
+          layout.flex.align.center,
+          layout.flex.justify.between,
+          effects.border.top(),
+          spacing.px(8),
+          spacing.py(4),
+          {
+            borderTop: '1px solid rgba(255,255,255,0.08)',
+            background: 'rgba(4,10,24,0.9)',
+          }
+        )}>
+          <div style={composeStyles(
+            typography.transform('uppercase'),
+            typography.tracking.widest,
+            {
+              fontSize: '0.42rem',
+              color: 'rgba(255,255,255,0.4)',
+            }
+          )}>
             Modules respond to ALS — no numbers, only flow.
           </div>
           <button
             onClick={onClose}
-            className="rounded-full border border-white/15 px-4 py-2 text-[0.55rem] uppercase tracking-[0.28em] text-white/70 transition-all hover:border-white/30 hover:text-white"
+            style={composeStyles(
+              effects.border.radius.full,
+              spacing.px(4),
+              spacing.py(2),
+              typography.transform('uppercase'),
+              typography.tracking.widest,
+              transitions.transition.standard('all', 200, 'ease-out'),
+              {
+                fontSize: '0.55rem',
+                border: '1px solid rgba(255,255,255,0.15)',
+                color: 'rgba(255,255,255,0.7)',
+              }
+            )}
+            onMouseEnter={(e) => {
+              e.currentTarget.style.borderColor = 'rgba(255,255,255,0.3)';
+              e.currentTarget.style.color = 'white';
+            }}
+            onMouseLeave={(e) => {
+              e.currentTarget.style.borderColor = 'rgba(255,255,255,0.15)';
+              e.currentTarget.style.color = 'rgba(255,255,255,0.7)';
+            }}
           >
             Close Browser
           </button>

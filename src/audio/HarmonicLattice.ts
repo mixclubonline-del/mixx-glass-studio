@@ -16,6 +16,7 @@
 
 import { IAudioEngine } from '../types/audio-graph';
 import { breathingPattern, warmthModulation } from '../core/beat-locked-lfo';
+import { als } from '../utils/alsFeedback';
 
 export interface HarmonicLatticeState {
   warmth: {
@@ -72,8 +73,6 @@ export class HarmonicLattice implements IAudioEngine {
       totalHarmonics: 0,
       emotionalBias: 0.5 // Default emotional bias
     };
-    
-    console.log('🌊 Harmonic Lattice initialized - Warmth that carries memory active');
   }
 
   async initialize(ctx: BaseAudioContext): Promise<void> {
@@ -105,7 +104,6 @@ export class HarmonicLattice implements IAudioEngine {
     
     this.isInitialized = true;
     this.startStateProcessing(); // Start interval AFTER initialization is complete
-    console.log('🎧 Harmonic Lattice audio nodes initialized');
   }
 
   isActive(): boolean {
@@ -135,7 +133,6 @@ export class HarmonicLattice implements IAudioEngine {
       this.intervalId = null;
     }
     this.isInitialized = false;
-    console.log('Harmonic Lattice disposed.');
   }
 
   private initializeAudioNodes(): void {
@@ -223,7 +220,11 @@ export class HarmonicLattice implements IAudioEngine {
     switch (name) {
       case 'emotionalBias': this.setEmotionalBias(value); break;
       // Add more specific parameter setters here if HarmonicLattice exposes them
-      default: console.warn(`HarmonicLattice: Unknown parameter ${name}`);
+      default: 
+        // Unknown parameter - log in DEV mode only
+        if (import.meta.env.DEV) {
+          als.warning(`HarmonicLattice: Unknown parameter ${name}`);
+        }
     }
   }
 
@@ -266,6 +267,18 @@ export class HarmonicLattice implements IAudioEngine {
 let harmonicLatticeInstance: HarmonicLattice | null = null;
 
 export function getHarmonicLattice(audioContext: BaseAudioContext | null = null): HarmonicLattice {
+  // If instance exists but context is closed or different, dispose and recreate
+  if (harmonicLatticeInstance) {
+    const existingContext = harmonicLatticeInstance.audioContext;
+    const contextClosed = existingContext && 'state' in existingContext && existingContext.state === 'closed';
+    const contextChanged = audioContext && existingContext && existingContext !== audioContext;
+    
+    if (contextClosed || contextChanged) {
+      harmonicLatticeInstance.dispose();
+      harmonicLatticeInstance = null;
+    }
+  }
+  
   if (!harmonicLatticeInstance) {
     harmonicLatticeInstance = new HarmonicLattice(audioContext);
   } else if (audioContext && !harmonicLatticeInstance.audioContext) {

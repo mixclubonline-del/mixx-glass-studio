@@ -1,0 +1,139 @@
+/**
+ * Universal Mixx Button Styles
+ * 
+ * Plain CSS + tiny JS polyfill to style existing raw <button> elements
+ * without refactoring. Apply this globally for immediate site-wide effect.
+ */
+
+:root {
+  --mixx-bg: #F6F6FA;
+  --mixx-glass-tint: rgba(238,232,255,0.56);
+  --mixx-accent: #8B7BFF;
+  --mixx-accent-strong: #6E56FF;
+  --mixx-muted: #4B4B57;
+  --mixx-elev: 0 8px 30px rgba(26,21,44,0.08);
+  --mixx-focus: 0 0 0 4px rgba(110,86,255,0.12);
+  --btn-radius: 12px;
+}
+
+/* Debug: Verify CSS is loaded */
+body::after {
+  content: 'Button CSS loaded';
+  position: fixed;
+  bottom: 0;
+  right: 0;
+  background: rgba(139, 123, 255, 0.9);
+  color: white;
+  padding: 4px 8px;
+  font-size: 10px;
+  z-index: 99999;
+  pointer-events: none;
+  opacity: 0.7;
+}
+
+/* Universal Mixx button - Enhancement layer */
+button.button-mixx,
+.button-mixx {
+  /* Add glass backdrop blur (works with existing backgrounds) */
+  backdrop-filter: blur(8px) saturate(120%) !important;
+  -webkit-backdrop-filter: blur(8px) saturate(120%) !important;
+  
+  /* Enhanced transitions for tactile feel */
+  transition: transform 120ms ease, box-shadow 120ms ease, opacity 120ms ease !important;
+  
+  /* User select none for better UX */
+  user-select: none;
+}
+
+/* Base styles for buttons without existing strong styling */
+button.button-mixx:not([style*="background"]):not(.primary):not(.icon):not([class*="bg-"]) {
+  padding: 10px 14px;
+  border-radius: var(--btn-radius);
+  border: 1px solid rgba(255,255,255,0.12);
+  background: linear-gradient(180deg, rgba(255,255,255,0.65), var(--mixx-glass-tint));
+  box-shadow: var(--mixx-elev);
+  color: var(--mixx-muted);
+  font-weight: 500;
+  font-size: 13px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+}
+
+/* Primary variant - override background with gradient */
+button.button-mixx.primary,
+.button-mixx.primary {
+  background: linear-gradient(180deg, var(--mixx-accent), var(--mixx-accent-strong)) !important;
+  color: white !important;
+  box-shadow: 0 10px 28px rgba(110,86,255,0.18) !important;
+}
+
+/* When primary has inline style, use pseudo-element overlay */
+button.button-mixx.primary[style*="background"]::before {
+  content: '';
+  position: absolute;
+  inset: 0;
+  background: linear-gradient(180deg, var(--mixx-accent), var(--mixx-accent-strong));
+  border-radius: inherit;
+  z-index: -1;
+  opacity: 0.8;
+}
+
+.button-mixx.secondary {
+  /* Default - already set above */
+}
+
+.button-mixx.ghost {
+  background: transparent;
+  border: none;
+  color: var(--mixx-muted);
+}
+
+/* Icon-only */
+.button-mixx.icon {
+  padding: 8px;
+  width: 40px;
+  height: 40px;
+  display: inline-grid;
+  place-items: center;
+}
+
+/* States - Higher specificity */
+button.button-mixx:hover:not(:disabled),
+.button-mixx:hover:not(:disabled) {
+  transform: translateY(-2px) !important;
+  box-shadow: 0 12px 36px rgba(26,21,44,0.10) !important;
+}
+
+button.button-mixx.primary:hover:not(:disabled),
+.button-mixx.primary:hover:not(:disabled) {
+  box-shadow: 0 12px 36px rgba(110,86,255,0.25) !important;
+}
+
+button.button-mixx:active:not(:disabled),
+.button-mixx:active:not(:disabled) {
+  transform: translateY(1px) scale(0.995) !important;
+}
+
+.button-mixx:disabled {
+  opacity: 0.52;
+  cursor: not-allowed;
+  transform: none !important;
+}
+
+/* Focus visible (keyboard) */
+.button-mixx:focus-visible {
+  outline: none;
+  box-shadow: var(--mixx-focus);
+}
+
+/* Respect reduced motion */
+@media (prefers-reduced-motion: reduce) {
+  .button-mixx,
+  .button-mixx:hover,
+  .button-mixx:active {
+    transition: none;
+    transform: none !important;
+  }
+}

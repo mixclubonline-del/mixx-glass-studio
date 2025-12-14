@@ -32,6 +32,7 @@ import { useAutoSave } from './hooks/useAutoSave';
 import { AutoSaveStatus } from './components/AutoSaveStatus';
 import { AutoSaveRecovery } from './components/AutoSaveRecovery';
 import { registerShortcut, unregisterShortcut } from './utils/keyboardShortcuts';
+import { applyButtonPolyfill } from './utils/buttonPolyfill';
 import { getMixxFXEngine, initializeMixxFXEngine } from './audio/MixxFXEngine';
 import { buildMasterChain } from './audio/masterChain';
 import type { VelvetMasterChain } from './audio/masterChain';
@@ -48,6 +49,7 @@ import TimeWarpVisualizer from './components/TimeWarpVisualizer';
 import PluginBrowser from './components/PluginBrowser';
 import { IAudioEngine } from './types/audio-graph';
 import { getHushSystem } from './audio/HushSystem';
+import { als } from './utils/alsFeedback';
 import AIHub from './components/AIHub/AIHub'; // Import AIHub
 import { useSessionProbe } from './hooks/useSessionProbe';
 import { getSessionProbeSnapshot } from './state/sessionProbe';
@@ -902,6 +904,9 @@ export interface MixerBusStripData {
   alsGlow: string;
   alsHaloColor?: string;
   alsGlowStrength?: number;
+  busLevel?: number; // Actual bus audio level (0-1) from analyser
+  busPeak?: number; // Peak level from analyser
+  busTransient?: boolean; // Transient detection
 }
 
 const MIXER_BUS_DEFINITIONS: MixerBusDefinition[] = [
@@ -1208,6 +1213,10 @@ const FlowRuntime: React.FC<FlowRuntimeProps> = ({ arrangeFocusToken }) => {
   const audioContextRef = useRef<AudioContext | null>(null);
   const trackNodesRef = useRef<{ [key: string]: AudioNodes }>({});
   
+  // Send Routing Nodes - Map<`${trackId}-${busId}`, GainNode>
+  // Stores send routing GainNodes for each track's sends to buses
+  const sendNodesRef = useRef<Map<string, GainNode>>(new Map());
+  
   // Master Ready Gate - prevents routing until master chain is fully initialized
   // MUST be declared before any useEffect that uses it
   const [masterReady, setMasterReady] = useState(false);
@@ -1219,6 +1228,21 @@ const FlowRuntime: React.FC<FlowRuntimeProps> = ({ arrangeFocusToken }) => {
     const cleanup = initThermalSync(100); // Update every 100ms
     return cleanup;
   }, []);
+
+  // Apply button polyfill for consistent button styling across the app
+  useEffect(() => {
+    // Delay slightly to ensure DOM is ready
+    let cleanup: (() => void) | undefined;
+    const timeoutId = setTimeout(() => {
+      cleanup = applyButtonPolyfill();
+      console.log('[App] Button polyfill applied');
+    }, 200);
+    
+    return () => {
+      clearTimeout(timeoutId);
+      if (cleanup) cleanup();
+    };
+  }, []);
   
   useEffect(() => {
     tracksRef.current = tracks;
@@ -1228,20 +1252,46 @@ const FlowRuntime: React.FC<FlowRuntimeProps> = ({ arrangeFocusToken }) => {
   useEffect(() => {
     if (masterReady && queuedRoutesRef.current.length > 0 && masterNodesRef.current) {
       const matrix = signalMatrixRef.current;
-      if (matrix) {
-        queuedRoutesRef.current.forEach(({ trackId, outputNode }) => {
+      const masterInput = masterNodesRef.current.input;
+      
+      queuedRoutesRef.current.forEach(({ trackId, outputNode }) => {
+        const track = tracksRef.current.find(t => t.id === trackId);
+        if (!matrix) {
+          als.error('[MIXER] Cannot flush route - signal matrix not available', trackId);
+          return;
+        }
+        const bus = matrix.routeTrack(trackId, track?.role as any);
+        if (bus) {
           try {
-            const bus = matrix.routeTrack(trackId, tracksRef.current.find(t => t.id === trackId)?.role as any);
             outputNode.connect(bus);
             // Route flushed successfully - ALS provides visual feedback
+            const busName = Object.entries(matrix.buses).find(([_, node]) => node === bus)?.[0] || 'unknown';
+            console.log(`[MIXER ROUTING] Queued track "${track?.trackName || trackId}" (${trackId}, role: ${track?.role}) → ${busName} bus`);
           } catch (err) {
-            console.error('[MIXER] Failed to flush route:', trackId, err);
+            als.error('[MIXER] Failed to flush route to bus', trackId, err);
+            // Fallback to direct master if bus routing fails
+            if (masterInput) {
+              try {
+                outputNode.connect(masterInput);
+                console.warn(`[MIXER ROUTING] Queued track "${track?.trackName || trackId}" fallback to direct master`);
+              } catch (fallbackErr) {
+                als.error('[MIXER] Fallback to master also failed', trackId, fallbackErr);
+              }
+            }
           }
-        });
-        queuedRoutesRef.current = [];
-      } else {
-        console.error('[MIXER] Cannot flush routes - signal matrix not available');
-      }
+        } else if (masterInput) {
+          // Fallback: direct to master if SignalMatrix unavailable
+          try {
+            outputNode.connect(masterInput);
+            console.warn(`[MIXER ROUTING] Queued track "${track?.trackName || trackId}" routed directly to master (SignalMatrix unavailable)`);
+          } catch (err) {
+            als.error('[MIXER] Failed to flush route to master', trackId, err);
+          }
+        } else {
+          als.error('[MIXER] Cannot flush route - no bus or master input available', trackId);
+        }
+      });
+      queuedRoutesRef.current = [];
     }
   }, [masterReady]);
 
@@ -1313,6 +1363,8 @@ const FlowRuntime: React.FC<FlowRuntimeProps> = ({ arrangeFocusToken }) => {
   const lastUpdateTimeRef = useRef<number>(0);
   const trackMeterBuffersRef = useRef<Record<string, TrackMeterBuffers>>({});
   const masterMeterBufferRef = useRef<MasterMeterBuffers | null>(null);
+  const busMeterBuffersRef = useRef<Record<string, TrackMeterBuffers>>({});
+  const [busLevels, setBusLevels] = useState<Record<string, { level: number; peak: number; transient: boolean }>>({});
   
   const [isAddTrackModalOpen, setIsAddTrackModalModalOpen] = useState(false);
   const [mixerSettings, setMixerSettings] = useState<{ [key: string]: MixerSettings }>(() => createInitialMixerSettings());
@@ -1692,7 +1744,8 @@ const FlowRuntime: React.FC<FlowRuntimeProps> = ({ arrangeFocusToken }) => {
           ? 'critical'
           : 'warn'
         : 'info';
-      const message = note.replace(/^[⚠️✅]\s*/, '');
+      // Remove emoji prefixes (⚠️ or ✅) from note messages
+      const message = note.replace(/^(⚠️|✅)\s*/u, '');
       return {
         category: 'capture',
         severity,
@@ -1919,7 +1972,7 @@ const FlowRuntime: React.FC<FlowRuntimeProps> = ({ arrangeFocusToken }) => {
     
     // Fallback to default if still empty
     if (!guidanceLine) {
-      guidanceLine = 'Flow is standing by.';
+      guidanceLine = 'Flow ready — transport armed.';
     }
     
     const bloomSummary = lastBloom
@@ -1959,7 +2012,7 @@ const FlowRuntime: React.FC<FlowRuntimeProps> = ({ arrangeFocusToken }) => {
         velvet: deriveVelvetLensState(analysisResult),
         aiFlags: [],
         userMemoryAnchors: [],
-        guidanceLine: 'Flow is standing by.',
+        guidanceLine: 'Flow ready — transport armed.',
       };
     }
   }, [analysisResult, primeBrainSnapshotInputs, flowContext.adaptiveSuggestions, flowContext.sessionContext]);
@@ -2072,6 +2125,14 @@ const FlowRuntime: React.FC<FlowRuntimeProps> = ({ arrangeFocusToken }) => {
       const swatch = TRACK_COLOR_SWATCH[bus.colorKey];
       const colors = deriveBusALSColors(swatch.base, swatch.glow, intensity);
 
+      // Map bus ID to SignalMatrix bus name for level lookup
+      // Note: MIXER_BUS_DEFINITIONS are send buses (Five Pillars), not SignalMatrix buses
+      // For now, we'll use send-based intensity, but we can add actual bus levels later
+      // when we map MIXER_BUS_DEFINITIONS to SignalMatrix buses
+      const busLevel = busLevels[bus.id]?.level ?? intensity; // Fallback to send intensity
+      const busPeak = busLevels[bus.id]?.peak ?? intensity;
+      const busTransient = busLevels[bus.id]?.transient ?? false;
+
       return {
         id: bus.id,
         name: bus.name,
@@ -2082,9 +2143,12 @@ const FlowRuntime: React.FC<FlowRuntimeProps> = ({ arrangeFocusToken }) => {
         alsGlow: colors.glow,
         alsHaloColor: colors.halo,
         alsGlowStrength: clamp01(intensity * 0.85 + pulse * 0.4),
+        busLevel: Math.max(busLevel, intensity), // Use actual bus level or send intensity (whichever is higher)
+        busPeak,
+        busTransient,
       };
     });
-  }, [tracks, trackSendLevels, trackAnalysis, mixerSettings]);
+  }, [tracks, trackSendLevels, trackAnalysis, mixerSettings, busLevels]);
   
   const upsertImportProgress = useCallback((entry: ImportProgressEntry) => {
     setImportProgress((prev) => {
@@ -2495,7 +2559,7 @@ const FlowRuntime: React.FC<FlowRuntimeProps> = ({ arrangeFocusToken }) => {
       .map(plugin => {
       const engineInstance = engineInstancesRef.current.get(plugin.id);
       if (!engineInstance) {
-          console.error(`Engine instance not found for plugin: ${plugin.id}`);
+          als.error('Engine instance not found for plugin', plugin.id);
           // This should still conform to the structure to avoid further errors down the line
           const { engineInstance: _factory, ...pluginWithoutFactory } = plugin;
           return { ...pluginWithoutFactory, params: {}, onChange: () => {}, engineInstance: null as any };
@@ -2780,7 +2844,6 @@ const FlowRuntime: React.FC<FlowRuntimeProps> = ({ arrangeFocusToken }) => {
 
         setClips((prev) => [...prev, ...separationResult.newClips]);
  
-         console.log(`[STEMS] Created ${separationResult.newTracks.length} stem tracks from ${request.fileName}.`);
          setTimeout(() => setImportMessage(null), 1200);
          if (jobId) {
            canonicalAllowed.forEach((stemKey) => {
@@ -2991,10 +3054,6 @@ const FlowRuntime: React.FC<FlowRuntimeProps> = ({ arrangeFocusToken }) => {
     let targetTrackMeta: TrackData | undefined;
 
     if (resetSession) {
-      console.log(
-        '%c[DAW CORE] New audio batch detected. Resetting project and starting ingestion.',
-        'color: orange; font-weight: bold;'
-      );
       const seededTracks = buildInitialTracks();
       const seededWithProcessing = seededTracks.map((track) =>
         track.id === TRACK_ROLE_TO_ID.twoTrack ? { ...track, isProcessing: true } : track
@@ -3246,7 +3305,6 @@ const FlowRuntime: React.FC<FlowRuntimeProps> = ({ arrangeFocusToken }) => {
       a.download = `flow-project-${new Date().toISOString()}.json`;
       a.click();
       URL.revokeObjectURL(url);
-      console.log("Project saved.");
   }, [
     audioBuffers,
     tracks,
@@ -3434,8 +3492,6 @@ const FlowRuntime: React.FC<FlowRuntimeProps> = ({ arrangeFocusToken }) => {
         zoomY: state.pianoRollZoom!.zoomY,
       }));
     }
-
-    console.log('[AutoSave] Project state restored from auto-save');
   }, [
     setTracks,
     setClips,
@@ -3678,8 +3734,6 @@ const FlowRuntime: React.FC<FlowRuntimeProps> = ({ arrangeFocusToken }) => {
         // Update refs
         tracksRef.current = zustandTracks;
         clipsRef.current = zustandClips;
-
-        console.log(`[INGEST] Imported ${zustandTracks.length} stem tracks from ${displayName}`);
       }
 
       controls.reportProgress({ percent: 100, message: `${displayName} • Complete` });
@@ -3848,8 +3902,6 @@ const FlowRuntime: React.FC<FlowRuntimeProps> = ({ arrangeFocusToken }) => {
           pendingQueueHydrationRef.current = projectState.ingestSnapshot;
         }
       }
-      
-      console.log("Project loaded.");
   };
 
   const handleFileLoad = async (event: React.ChangeEvent<HTMLInputElement>) => {
@@ -4009,11 +4061,10 @@ const FlowRuntime: React.FC<FlowRuntimeProps> = ({ arrangeFocusToken }) => {
           // Initialize engine if not already done, then start playback
           tauriInvoke('initialize_flow_engine')
             .then(() => {
-              console.log('✅ Flow Engine initialized');
               return tauriInvoke('flow_play');
             })
             .then(() => {
-              console.log('▶️ Flow Engine: PLAY');
+              // Flow Engine playing
             })
             .catch((error) => {
               console.warn('[FLOW] Failed to start engine:', error);
@@ -4022,7 +4073,7 @@ const FlowRuntime: React.FC<FlowRuntimeProps> = ({ arrangeFocusToken }) => {
           // Pause the engine
           tauriInvoke('flow_pause')
             .then(() => {
-              console.log('⏸️ Flow Engine: PAUSE');
+              // Flow Engine paused
             })
             .catch((error) => {
               console.warn('[FLOW] Failed to pause engine:', error);
@@ -4105,7 +4156,6 @@ const FlowRuntime: React.FC<FlowRuntimeProps> = ({ arrangeFocusToken }) => {
           clip.selected && splitTime > clip.start && splitTime < clip.start + clip.duration
       );
       if (!targets.length) {
-        console.log('[ARRANGE] No clips intersect playhead for split.');
         return;
       }
       targets.forEach((clip) => {
@@ -4304,7 +4354,6 @@ const FlowRuntime: React.FC<FlowRuntimeProps> = ({ arrangeFocusToken }) => {
               });
               setMasterVolume(0.8);
               setMasterBalance(0);
-              console.log("Mix settings reset.");
               break;
           case 'analyzeMaster':
               (async () => {
@@ -4316,12 +4365,10 @@ const FlowRuntime: React.FC<FlowRuntimeProps> = ({ arrangeFocusToken }) => {
                   }
                   const bufferToAnalyze = audioBuffers[firstClip.bufferId];
 
-                  console.log("%c[PRIME BRAIN] Analyzing sonic DNA...", "color: #f59e0b; font-weight: bold;");
                   setImportMessage("Prime Brain Analyzing...");
 
                   const analysis = await analyzeVelvetCurve(bufferToAnalyze);
                   
-                  console.log("[PRIME BRAIN] Analysis complete:", analysis);
                   setAnalysisResult(analysis);
                   
                   const velvetEngine = getVelvetCurveEngine();
@@ -5354,7 +5401,6 @@ const FlowRuntime: React.FC<FlowRuntimeProps> = ({ arrangeFocusToken }) => {
     let ctx: AudioContext | null = null;
 
     const setupAudio = async () => {
-        console.log("Setting up AudioContext and FX engines...");
         const AudioCtx = (window.AudioContext || (window as any).webkitAudioContext) as typeof AudioContext;
         const createdCtx = new AudioCtx();
 
@@ -5367,8 +5413,16 @@ const FlowRuntime: React.FC<FlowRuntimeProps> = ({ arrangeFocusToken }) => {
         trackNodesRef.current = {};
         fxNodesRef.current = {};
         engineInstancesRef.current.clear();
+        // Clean up send nodes
+        sendNodesRef.current.forEach(sendNode => {
+          try {
+            sendNode.disconnect();
+          } catch (e) {}
+        });
+        sendNodesRef.current.clear();
         masterNodesRef.current = null;
         trackMeterBuffersRef.current = {};
+        busMeterBuffersRef.current = {};
         masterMeterBufferRef.current = null;
         setMasterReady(false); // Reset master ready gate
         queuedRoutesRef.current = []; // Clear queued routes
@@ -5388,7 +5442,6 @@ const FlowRuntime: React.FC<FlowRuntimeProps> = ({ arrangeFocusToken }) => {
             return;
         }
         setAudioBuffers({ 'default': buffer });
-        console.log("Default audio buffer created.");
 
         masterNodesRef.current = await buildMasterChain(createdCtx);
         if (isCancelled || createdCtx.state === "closed") {
@@ -5397,6 +5450,67 @@ const FlowRuntime: React.FC<FlowRuntimeProps> = ({ arrangeFocusToken }) => {
         // Initialize Mixx Club Signal Matrix (buses -> master)
         try {
           signalMatrixRef.current = createSignalMatrix(createdCtx, masterNodesRef.current.input);
+          
+          // Expose routing verification utility (dev/testing)
+          if (typeof window !== 'undefined') {
+            (window as any).__mixx_verifyRouting = () => {
+              if (!signalMatrixRef.current) {
+                console.error('[ROUTING TEST] SignalMatrix not initialized');
+                return;
+              }
+              
+              console.group('[ROUTING VERIFICATION]');
+              
+              // Verify bus structure
+              const buses = signalMatrixRef.current.buses;
+              const busNames = Object.keys(buses);
+              console.log('✅ Available buses:', busNames.join(', '));
+              
+              // Test routing for known track patterns
+              const testCases = [
+                { id: 'track-two-track', role: undefined, expected: 'twoTrack' },
+                { id: 'track-stem-vocals', role: undefined, expected: 'vocals' },
+                { id: 'track-stem-drums', role: undefined, expected: 'drums' },
+                { id: 'track-stem-bass', role: undefined, expected: 'bass' },
+                { id: 'track-stem-harmonic', role: undefined, expected: 'music' },
+                { id: 'track-hush-record', role: undefined, expected: 'vocals' },
+                { id: 'track-unknown', role: 'standard', expected: 'stemMix' },
+              ];
+              
+              let passed = 0;
+              let failed = 0;
+              
+              testCases.forEach(({ id, role, expected }) => {
+                const bus = signalMatrixRef.current!.routeTrack(id, role);
+                const actualBus = Object.entries(buses).find(([_, node]) => node === bus)?.[0] || 'unknown';
+                const passedTest = actualBus === expected;
+                
+                if (passedTest) {
+                  passed++;
+                  console.log(`✅ ${id} (role: ${role || 'none'}) → ${actualBus}`);
+                } else {
+                  failed++;
+                  console.error(`❌ ${id} (role: ${role || 'none'}) → Expected ${expected}, got ${actualBus}`);
+                }
+              });
+              
+              console.log(`\n📊 Results: ${passed} passed, ${failed} failed`);
+              
+              // Verify gain staging
+              console.group('Bus Gain Staging:');
+              console.log(`  twoTrack: ${buses.twoTrack.gain.value} (expected: 0.65)`);
+              console.log(`  vocals: ${buses.vocals.gain.value} (expected: 1.15)`);
+              console.log(`  drums: ${buses.drums.gain.value} (expected: 1.0)`);
+              console.log(`  bass: ${buses.bass.gain.value} (expected: 0.85)`);
+              console.log(`  music: ${buses.music.gain.value} (expected: 0.9)`);
+              console.log(`  stemMix: ${buses.stemMix.gain.value} (expected: 1.0)`);
+              console.log(`  masterTap: ${buses.masterTap.gain.value} (expected: 1.0)`);
+              console.log(`  air: ${buses.air.gain.value} (expected: 0.5)`);
+              console.groupEnd();
+              
+              console.groupEnd();
+            };
+          }
         } catch (err) {
           console.warn('[AUDIO] Failed to initialize Mixx Signal Matrix', err);
         }
@@ -5489,7 +5603,6 @@ const FlowRuntime: React.FC<FlowRuntimeProps> = ({ arrangeFocusToken }) => {
           }
         }
 
-        console.log("[MIXER] Master Chain built and connected to destination.");
         setMasterReady(true);
         
         if (isCancelled || createdCtx.state === "closed") {
@@ -5508,25 +5621,40 @@ const FlowRuntime: React.FC<FlowRuntimeProps> = ({ arrangeFocusToken }) => {
             if (createdCtx.state === "closed") {
               break;
             }
-            const engine = plugin.engineInstance(createdCtx);
-            engineInstancesRef.current.set(plugin.id, engine);
-            if (typeof engine.initialize === 'function' && !engine.getIsInitialized()) {
-                if (isCancelled || createdCtx.state === "closed") {
-                  break;
+            
+            // Ensure context is in a valid state before creating engine
+            if (createdCtx.state === "closed" || createdCtx.state === "interrupted") {
+              console.warn(`[FX] Cannot create engine for '${plugin.id}' - context is ${createdCtx.state}`);
+              break;
+            }
+            
+            try {
+              const engine = plugin.engineInstance(createdCtx);
+              // Verify engine nodes belong to the correct context
+              if (engine.input && engine.output && 
+                  engine.input.context === createdCtx && engine.output.context === createdCtx) {
+                engineInstancesRef.current.set(plugin.id, engine);
+                if (typeof engine.initialize === 'function' && !engine.getIsInitialized()) {
+                    if (isCancelled || createdCtx.state === "closed") {
+                      break;
+                    }
+                    await engine.initialize(createdCtx);
                 }
-                await engine.initialize(createdCtx);
-                console.log(`Plugin engine for ${plugin.name} initialized.`);
+              } else {
+                console.warn(`[FX] Plugin '${plugin.id}' engine created with wrong context, skipping.`);
+              }
+            } catch (error) {
+              console.error(`[FX] Failed to create engine for '${plugin.id}':`, error);
+              // Continue with other plugins
             }
         }
         if (isCancelled) {
             return;
         }
-        console.log("All plugin engines initialized and stored.");
         
         // Set plugin registry AFTER engines are initialized
         // This ensures routing graph rebuild has engines available
         setPluginRegistry(initialPluginRegistry);
-        console.log("Plugin Registry loaded.");
 
         setFxBypassState(() => {
           const initialState: Record<FxWindowId, boolean> = {};
@@ -5583,7 +5711,6 @@ const FlowRuntime: React.FC<FlowRuntimeProps> = ({ arrangeFocusToken }) => {
 
     return () => {
         isCancelled = true;
-        console.log("Closing AudioContext.");
 
         // Disconnect track nodes
         Object.values(trackNodesRef.current).forEach(nodes => {
@@ -5725,7 +5852,6 @@ const FlowRuntime: React.FC<FlowRuntimeProps> = ({ arrangeFocusToken }) => {
             } catch (e) { console.warn(`Error disconnecting nodes for track ${id}:`, e); }
             delete trackNodesRef.current[id];
             delete trackMeterBuffersRef.current[id];
-            console.log(`%c[AUDIO] Disposed nodes for track: ${id}`, "color: grey");
         }
     });
   }, [tracks]);
@@ -5777,7 +5903,6 @@ const FlowRuntime: React.FC<FlowRuntimeProps> = ({ arrangeFocusToken }) => {
       // Check if we have engines for at least some plugins
       const hasEngines = engineInstancesRef.current.size > 0;
       if (!hasEngines) {
-        console.log('[FX] Waiting for engines to initialize before building routing graph...');
         return;
       }
       
@@ -5806,7 +5931,6 @@ const FlowRuntime: React.FC<FlowRuntimeProps> = ({ arrangeFocusToken }) => {
                 bypass.connect(engine.input); // Audio from input wrapper goes to engine's input
                 engine.output.connect(engine.makeup); // Engine's actual output to its makeup gain
                 engine.makeup.connect(output); // Engine's makeup gain to wrapper's output
-                console.log(`%c[FX] Initialized engine for plugin: ${id}`, "color: lightgreen");
               } else {
                 console.warn(`%c[FX] Plugin '${id}' engine nodes belong to different context, skipping connection.`, "color: orange");
                 bypass.connect(output);
@@ -5891,7 +6015,6 @@ const FlowRuntime: React.FC<FlowRuntimeProps> = ({ arrangeFocusToken }) => {
           return;
         }
 
-        console.log(">>> Rebuilding audio routing graph (Inserts-based)...");
         const masterInput = masterNodesRef.current.input;
         
         if (!masterInput) {
@@ -5914,6 +6037,13 @@ const FlowRuntime: React.FC<FlowRuntimeProps> = ({ arrangeFocusToken }) => {
             fxNode.output.disconnect();
           } catch (e) {} 
         });
+        // Disconnect all send nodes
+        sendNodesRef.current.forEach(sendNode => {
+          try {
+            sendNode.disconnect();
+          } catch (e) {}
+        });
+        sendNodesRef.current.clear();
         if (micSourceNodeRef.current) { 
             try { micSourceNodeRef.current.disconnect(); } catch(e) {} 
         }
@@ -5955,37 +6085,142 @@ const FlowRuntime: React.FC<FlowRuntimeProps> = ({ arrangeFocusToken }) => {
             }
         });
 
-        // Post-inserts: connect to analyser for monitoring and then to master
+        // Post-inserts: connect to analyser for monitoring and then route through bus system
         currentOutput.connect(trackNodes.analyser);
         
-        // Connect to master input (masterReady gate ensures this only happens when stable)
-        if (masterInput && masterReady) {
-          try {
-            currentOutput.connect(masterInput);
-            if ((import.meta as any).env?.DEV && track.id === tracks[0]?.id) {
-              console.log('[MIXER] Track connected to master:', {
-                trackId: track.id,
-                trackName: track.trackName,
-                masterInputExists: !!masterInput,
-                insertsCount: trackInserts.length,
+        // Route through SignalMatrix bus system (Two Track → Vocals → Drums → Bass → Music → Stem Mix → Master)
+        // masterReady gate ensures this only happens when stable
+        if (masterReady) {
+          const bus = signalMatrixRef.current?.routeTrack(track.id, track.role);
+          if (bus) {
+            try {
+              currentOutput.connect(bus);
+              // Routing verification log (can be removed in production)
+              const busName = signalMatrixRef.current 
+                ? Object.entries(signalMatrixRef.current.buses).find(([_, node]) => node === bus)?.[0] 
+                : 'unknown';
+              console.log(`[MIXER ROUTING] Track "${track.trackName}" (${track.id}, role: ${track.role}) → ${busName} bus`);
+            } catch (err) {
+              console.error('[MIXER] Failed to connect track to bus:', track.id, err);
+              // Fallback to direct master if bus routing fails
+              if (masterInput) {
+                try {
+                  currentOutput.connect(masterInput);
+                  console.warn(`[MIXER ROUTING] Track "${track.trackName}" fallback to direct master (bus routing failed)`);
+                } catch (fallbackErr) {
+                  console.error('[MIXER] Fallback to master also failed:', track.id, fallbackErr);
+                }
+              }
+            }
+          } else if (masterInput) {
+            // Fallback: direct to master if SignalMatrix unavailable
+            try {
+              currentOutput.connect(masterInput);
+              console.warn(`[MIXER ROUTING] Track "${track.trackName}" routed directly to master (SignalMatrix unavailable)`);
+            } catch (err) {
+              console.error('[MIXER] Failed to connect track to master:', track.id, err);
+            }
+          } else {
+            console.warn('[MIXER] No bus or master input available, track not connected:', track.id);
+          }
+          
+          // Route sends to AIR bus (FX returns)
+          // Sends allow tracks to send a portion of their signal to FX buses
+          if (signalMatrixRef.current && availableSendPalette.length > 0) {
+            const trackSends = trackSendLevels[track.id] || {};
+            const ctx = audioContextRef.current;
+            
+            if (ctx) {
+              availableSendPalette.forEach(sendBus => {
+                const sendLevel = trackSends[sendBus.id as MixerBusId] ?? 0;
+                
+                // Only create send routing if send level is above threshold
+                if (sendLevel > 0.001) {
+                  const sendKey = `${track.id}-${sendBus.id}`;
+                  let sendNode = sendNodesRef.current.get(sendKey);
+                  
+                  // Create send node if it doesn't exist
+                  if (!sendNode && signalMatrixRef.current) {
+                    sendNode = ctx.createGain();
+                    sendNodesRef.current.set(sendKey, sendNode);
+                    
+                    // Connect send node to AIR bus (FX returns)
+                    try {
+                      sendNode.connect(signalMatrixRef.current.buses.air);
+                      console.log(`[MIXER SEND] Created send routing: Track "${track.trackName}" → ${sendBus.name} → AIR bus`);
+                    } catch (err) {
+                      console.error(`[MIXER SEND] Failed to connect send to AIR bus:`, sendKey, err);
+                    }
+                  }
+                  
+                  // Update send level and connect if node exists
+                  if (sendNode) {
+                    sendNode.gain.value = sendLevel;
+                    
+                    // Connect track output to send node
+                    // Note: Web Audio API allows multiple connections from same source
+                    // This is intentional - we want sends to be parallel to main bus routing
+                    try {
+                      currentOutput.connect(sendNode);
+                    } catch (err) {
+                      // Connection might already exist from previous routing rebuild
+                      // This is fine - Web Audio API handles it gracefully
+                      console.debug(`[MIXER SEND] Send connection:`, sendKey);
+                    }
+                  }
+                } else {
+                  // Send level is zero or below threshold - disconnect if exists
+                  const sendKey = `${track.id}-${sendBus.id}`;
+                  const sendNode = sendNodesRef.current.get(sendKey);
+                  if (sendNode) {
+                    try {
+                      sendNode.disconnect();
+                      sendNodesRef.current.delete(sendKey);
+                    } catch (e) {
+                      // Node might already be disconnected
+                    }
+                  }
+                }
               });
             }
-          } catch (err) {
-            console.error('[MIXER] Failed to connect track to master:', track.id, err);
           }
-        } else if (!masterReady) {
+        } else {
           // Queue this track for routing when master becomes ready
           queuedRoutesRef.current.push({
             trackId: track.id,
             outputNode: currentOutput,
           });
           console.warn('[MIXER] Master not ready – queuing routing for track:', track.id);
-        } else {
-          console.warn('[MIXER] Master input not available, track not connected:', track.id);
         }
     });
 
-}, [tracks, armedTracks, pluginRegistry, masterReady]);
+}, [tracks, armedTracks, pluginRegistry, masterReady, trackSendLevels, availableSendPalette]);
+
+    // Update send levels dynamically (without rebuilding entire routing)
+    // This allows real-time send level changes without disconnecting/reconnecting everything
+    useEffect(() => {
+      if (!masterReady || !signalMatrixRef.current || !audioContextRef.current) return;
+      
+      const ctx = audioContextRef.current;
+      
+      // Update send node gain values for all existing sends
+      // Note: Send nodes are created in the main routing effect, this only updates levels
+      tracks.forEach(track => {
+        const trackSends = trackSendLevels[track.id] || {};
+        
+        availableSendPalette.forEach(sendBus => {
+          const sendLevel = trackSends[sendBus.id as MixerBusId] ?? 0;
+          const sendKey = `${track.id}-${sendBus.id}`;
+          const sendNode = sendNodesRef.current.get(sendKey);
+          
+          if (sendNode) {
+            // Update existing send level smoothly
+            sendNode.gain.setTargetAtTime(sendLevel, ctx.currentTime, 0.01);
+          }
+          // If send node doesn't exist, it will be created in the main routing effect
+        });
+      });
+    }, [trackSendLevels, tracks, availableSendPalette, masterReady]);
 
     // Manage Microphone Stream
     useEffect(() => {
@@ -6006,8 +6241,6 @@ const FlowRuntime: React.FC<FlowRuntimeProps> = ({ arrangeFocusToken }) => {
                         audioProcessingEvent.outputBuffer.getChannelData(0).set(outputData);
                     };
                     hushProcessorNodeRef.current = processor;
-
-                    console.log("Microphone stream acquired and Hush processor created.");
                 } catch (err) {
                     console.error("Error acquiring microphone stream:", err);
                     setArmedTracks(new Set()); // Disarm tracks if permission is denied
@@ -6017,7 +6250,6 @@ const FlowRuntime: React.FC<FlowRuntimeProps> = ({ arrangeFocusToken }) => {
                 microphoneStreamRef.current = null;
                 micSourceNodeRef.current = null;
                 hushProcessorNodeRef.current = null; // Will be disconnected by routing effect
-                console.log("Microphone stream released.");
             }
         };
         manageStream();
@@ -6241,8 +6473,6 @@ const FlowRuntime: React.FC<FlowRuntimeProps> = ({ arrangeFocusToken }) => {
                     const timeOver = newTime - projectDurationRef.current;
                     newTime = timeOver % projectDurationRef.current;
 
-                    console.log(`%c[DAW CORE] Project Loop Wrap. New Time: ${newTime.toFixed(2)}`, "color: cyan; font-weight: bold;");
-
                     lastUpdateTimeRef.current = now - timeOver;
                     scheduleClips(newTime); // Reschedule clips for gapless loop
                 } else {
@@ -6349,6 +6579,27 @@ const FlowRuntime: React.FC<FlowRuntimeProps> = ({ arrangeFocusToken }) => {
                     waveform: waveformData,
                 });
             }
+
+            // Read bus levels from SignalMatrix analysers
+            const nextBusLevels: Record<string, { level: number; peak: number; transient: boolean }> = {};
+            if (signalMatrixRef.current) {
+              const busAnalysers = signalMatrixRef.current.analysers;
+              const busNames: Array<keyof typeof busAnalysers> = ['twoTrack', 'vocals', 'drums', 'bass', 'music', 'stemMix', 'masterTap', 'air'];
+              
+              busNames.forEach(busName => {
+                const analyser = busAnalysers[busName];
+                if (analyser) {
+                  const buffers = ensureTrackMeterBuffers(busMeterBuffersRef.current, busName, analyser);
+                  const metrics = measureAnalyser(analyser, buffers);
+                  nextBusLevels[busName] = {
+                    level: metrics.level,
+                    peak: metrics.peak,
+                    transient: metrics.transient,
+                  };
+                }
+              });
+            }
+            setBusLevels(nextBusLevels);
 
             setTrackAnalysis(nextTrackAnalysis);
 
@@ -7282,18 +7533,7 @@ const FlowRuntime: React.FC<FlowRuntimeProps> = ({ arrangeFocusToken }) => {
         const compData = analyzeTakeForComp(takeMemory);
         
         if (import.meta.env.DEV) {
-          console.log('[TAKE MEMORY] Take recorded:', {
-            duration: `${(takeMemory.duration / 1000).toFixed(2)}s`,
-            barPosition: takeMemory.barPosition.toFixed(1),
-            flow: (takeMemory.flowDuringTake * 100).toFixed(0) + '%',
-            hushEvents: takeMemory.hushEvents,
-          });
-          console.log('[COMPING BRAIN] Take scored:', {
-            score: (compData.score * 100).toFixed(0) + '%',
-            timing: (compData.timingAccuracy * 100).toFixed(0) + '%',
-            noise: (compData.noiseScore * 100).toFixed(0) + '%',
-            energy: (compData.energySlope * 100).toFixed(0) + '%',
-          });
+          // Take recorded and scored
         }
       }
     }
@@ -7307,6 +7547,8 @@ const FlowRuntime: React.FC<FlowRuntimeProps> = ({ arrangeFocusToken }) => {
           primeBrainStatus={primeBrainStatus}
           hushFeedback={hushFeedback}
           isPlaying={isPlaying}
+          masterAnalysis={masterAnalysis}
+          loudnessMetrics={loudnessMetrics}
           onHeightChange={setHeaderHeight}
           settings={waveformHeaderSettings}
         />
@@ -7755,14 +7997,6 @@ const FlowRuntime: React.FC<FlowRuntimeProps> = ({ arrangeFocusToken }) => {
               
               // Sync Zustand tracks/clips to React state (MERGE, not replace)
               if (zustandTracks.length > 0 || zustandClips.length > 0) {
-                console.log('[FLOW IMPORT] Syncing Zustand to React state:', {
-                  tracks: zustandTracks.length,
-                  clips: zustandClips.length,
-                  buffers: Object.keys(zustandBuffers).length,
-                  existingTracks: tracks.length,
-                  existingClips: clips.length,
-                });
-                
                 // MERGE tracks: Keep existing tracks, add/update new ones from Zustand
                 setTracks(prev => {
                   const existingById = new Map(prev.map(t => [t.id, t]));
@@ -7780,12 +8014,6 @@ const FlowRuntime: React.FC<FlowRuntimeProps> = ({ arrangeFocusToken }) => {
                         merged[index] = { ...merged[index], ...zTrack };
                       }
                     }
-                  });
-                  
-                  console.log('[FLOW IMPORT] Merged tracks:', {
-                    before: prev.length,
-                    after: merged.length,
-                    added: merged.length - prev.length,
                   });
                   
                   return merged;
@@ -7808,12 +8036,6 @@ const FlowRuntime: React.FC<FlowRuntimeProps> = ({ arrangeFocusToken }) => {
                         merged[index] = { ...merged[index], ...zClip } as ArrangeClip;
                       }
                     }
-                  });
-                  
-                  console.log('[FLOW IMPORT] Merged clips:', {
-                    before: prev.length,
-                    after: merged.length,
-                    added: merged.length - prev.length,
                   });
                   
                   return merged;
@@ -7886,7 +8108,6 @@ const FlowRuntime: React.FC<FlowRuntimeProps> = ({ arrangeFocusToken }) => {
                 tracksRef.current = useTimelineStore.getState().getTracks();
                 clipsRef.current = useTimelineStore.getState().getClips();
                 
-                console.log('[FLOW IMPORT] React state synced from Zustand (merged)');
                 return; // Early return - Zustand is source of truth
               }
               
@@ -7994,17 +8215,6 @@ const FlowRuntime: React.FC<FlowRuntimeProps> = ({ arrangeFocusToken }) => {
               // CRITICAL: Batch all state updates together to ensure React sees the changes
               // This ensures ArrangeWindow re-renders with all new data at once
               
-              console.log('[FLOW IMPORT] Before state update:', {
-                currentTracksCount: tracks.length,
-                currentClipsCount: clips.length,
-                newTracksCount: newTracks.length,
-                newClipsCount: newClips.length,
-                newTrackIds: newTracks.map(t => t.id),
-                newClipTrackIds: newClips.map(c => c.trackId),
-                newClipIds: newClips.map(c => c.id),
-                bufferIds: Object.keys(newBuffers),
-              });
-              
               // CRITICAL: Initialize mixer settings FIRST before adding tracks
               // This prevents ArrangeTrackHeader from receiving undefined mixerSettings
               setMixerSettings(prev => {
@@ -8014,9 +8224,6 @@ const FlowRuntime: React.FC<FlowRuntimeProps> = ({ arrangeFocusToken }) => {
                     next[track.id] = { volume: 0.75, pan: 0, isMuted: false };
                   }
                 });
-                console.log('[FLOW IMPORT] Mixer settings initialized for tracks:', {
-                  trackIds: newTracks.map(t => t.id),
-                });
                 return next;
               });
               
@@ -8024,50 +8231,24 @@ const FlowRuntime: React.FC<FlowRuntimeProps> = ({ arrangeFocusToken }) => {
               // Add tracks to state (immutable update - new array reference)
               setTracks(prev => {
                 const updated = [...prev, ...newTracks];
-                console.log('[FLOW IMPORT] setTracks called:', {
-                  prevCount: prev.length,
-                  newCount: updated.length,
-                  allTrackIds: updated.map(t => t.id),
-                });
                 return updated;
               });
               
               // Add clips to state (immutable update - new array reference)
               setClips(prev => {
                 const updated = [...prev, ...newClips];
-                console.log('[FLOW IMPORT] setClips called:', {
-                  prevCount: prev.length,
-                  newCount: updated.length,
-                  allClipIds: updated.map(c => c.id),
-                  allClipTrackIds: updated.map(c => c.trackId),
-                });
                 return updated;
               });
               
               // Store audio buffers (immutable update - new object reference)
               setAudioBuffers(prev => {
                 const updated = { ...prev, ...newBuffers };
-                console.log('[FLOW IMPORT] setAudioBuffers called:', {
-                  prevCount: Object.keys(prev).length,
-                  newCount: Object.keys(updated).length,
-                  bufferIds: Object.keys(newBuffers),
-                });
                 return updated;
               });
-              
-              // Log for debugging - this confirms state updates are firing
-              console.log('[FLOW IMPORT] State hydration complete - all updates queued');
               
               // Force a microtask delay to ensure React has processed state updates
               // This guarantees ArrangeWindow receives the new props
               await new Promise(resolve => setTimeout(resolve, 100));
-              
-              // Verify state was actually updated
-              console.log('[FLOW IMPORT] After state update delay:', {
-                tracksState: tracks.length,
-                clipsState: clips.length,
-                note: 'These may still show old values due to closure - check ArrangeWindow props',
-              });
               
               // Initialize inserts for new tracks
               setInserts(prev => {
@@ -8131,15 +8312,7 @@ const FlowRuntime: React.FC<FlowRuntimeProps> = ({ arrangeFocusToken }) => {
                 window.__bloom_ready = true;
               }
               
-              // Log completion
-              if ((import.meta as any).env?.DEV) {
-                console.log('[FLOW IMPORT] Complete', {
-                  tracks: newTracks.length,
-                  clips: newClips.length,
-                  buffers: Object.keys(newBuffers).length,
-                  metadata: result.metadata,
-                });
-              }
+              // Import complete
             } catch (error) {
               console.error('[FLOW IMPORT] Error adding tracks to timeline:', error);
               if (typeof window !== 'undefined' && window.alert) {

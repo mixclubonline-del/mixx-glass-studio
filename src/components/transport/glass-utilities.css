@@ -1,0 +1,115 @@
+/**
+ * Glass Utilities CSS
+ * 
+ * Reusable glass aesthetic patterns for professional studio UI.
+ */
+
+/* Glass card base */
+.glass-card {
+  background: linear-gradient(135deg, rgba(255,255,255,0.7), var(--glass-tint));
+  border: 1px solid var(--glass-border);
+  backdrop-filter: blur(10px) saturate(120%);
+  -webkit-backdrop-filter: blur(10px) saturate(120%);
+  box-shadow: var(--elevation-shadow);
+  border-radius: 14px;
+  padding: 12px;
+}
+
+/* Transport slab */
+.transport-slab {
+  display: flex;
+  gap: 12px;
+  align-items: center;
+  justify-content: center;
+  padding: 10px 16px;
+  border-radius: 12px;
+  background: linear-gradient(180deg, rgba(255,255,255,0.82), rgba(240,238,255,0.6));
+  box-shadow: 0 6px 18px rgba(68,54,120,0.08), inset 0 1px 0 rgba(255,255,255,0.5);
+  border: 1px solid var(--glass-border);
+  backdrop-filter: blur(10px) saturate(120%);
+  -webkit-backdrop-filter: blur(10px) saturate(120%);
+}
+
+/* Play button */
+.btn-play {
+  width: 48px;
+  height: 48px;
+  border-radius: 12px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: linear-gradient(180deg, var(--accent), var(--accent-strong));
+  box-shadow: 0 6px 18px rgba(110,86,255,0.18);
+  transform-origin: center;
+  transition: all 0.15s ease;
+}
+
+.btn-play:active {
+  transform: translateY(2px) scale(0.995);
+  box-shadow: 0 3px 8px rgba(110,86,255,0.12);
+}
+
+/* ALS Spine */
+.als-spine {
+  height: 8px;
+  width: 100%;
+  border-radius: 999px;
+  background: linear-gradient(90deg, rgba(220,216,255,0.6), rgba(162,140,255,0.9));
+  box-shadow: 0 6px 30px rgba(139,123,255,0.12);
+  position: relative;
+  overflow: hidden;
+  transition: box-shadow 0.15s linear;
+}
+
+.als-spine.peak {
+  box-shadow: 0 8px 38px rgba(138,115,255,0.22);
+}
+
+.als-spine::after {
+  content: "";
+  position: absolute;
+  right: 0;
+  top: 0;
+  bottom: 0;
+  width: 0%;
+  background: linear-gradient(90deg, rgba(255,255,255,0.1), rgba(255,255,255,0.05));
+  transition: width 0.15s linear;
+}
+
+/* Elevation levels */
+.elevation-surface {
+  box-shadow: 0 2px 8px rgba(26,21,44,0.04);
+}
+
+.elevation-raised {
+  box-shadow: 0 8px 30px rgba(26,21,44,0.08);
+}
+
+.elevation-focus {
+  box-shadow: 0 12px 40px rgba(26,21,44,0.12);
+}
+
+/* Rim highlight (glossy surface effect) */
+.rim-highlight::before {
+  content: "";
+  position: absolute;
+  top: 0;
+  left: 0;
+  right: 0;
+  height: 1px;
+  background: linear-gradient(90deg, transparent, rgba(255,255,255,0.6), transparent);
+  pointer-events: none;
+}
+
+/* Tactile button states */
+.btn-tactile {
+  transition: all 0.15s ease;
+}
+
+.btn-tactile:hover {
+  transform: translateY(-1px);
+}
+
+.btn-tactile:active {
+  transform: translateY(2px);
+}

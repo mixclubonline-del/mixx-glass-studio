@@ -51,9 +51,6 @@ class PrimeBrain {
    * @param payload - An object containing data relevant to the event.
    */
   sendEvent(eventName: string, payload: any) {
-    // Log for debugging, preserving original functionality
-    console.log(`[PrimeBrainStub] Event: ${eventName}`, payload);
-
     if (this.subscribers[eventName]) {
       this.subscribers[eventName].forEach((callback) => {
         try {

@@ -1,12 +1,35 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { PluginContainer } from '../shared/PluginContainer';
 import { TelemetryCollectorSettings, PluginComponentProps } from '../../types';
-import { motion, AnimatePresence } from 'framer-motion';
+import { useFlowMotion, useAnimatePresence, AnimatePresence } from '../../../../components/mixxglass';
 import { PrimeBrainStub } from '../../lib/PrimeBrainStub';
 import { mapRange } from '../../lib/utils';
 
+// Event Item Component - uses hook at component level
+const EventItem: React.FC<{ event: { id: number; text: string } }> = ({ event }) => {
+    // Hook is now called at component level
+    const eventAnimation = useAnimatePresence({
+        isVisible: true,
+        initial: { opacity: 0, y: -10 },
+        animate: { opacity: 0.7, y: 0 },
+        exit: { opacity: 0 },
+        transition: { duration: 200 },
+    });
+
+    return (
+        <li style={eventAnimation.style}>
+            {event.text}
+        </li>
+    );
+};
+
 const Heartbeat: React.FC<{ isSpiking: boolean, globalSettings: PluginComponentProps['globalSettings'] }> = ({ isSpiking, globalSettings }) => {
     const animationSpeedMultiplier = mapRange(globalSettings.animationIntensity, 0, 100, 1.5, 0.5);
+    // Hook must be called at component level, not in JSX
+    const scaleAnimation = useFlowMotion(
+        { scale: isSpiking ? 1.2 : 1 },
+        { duration: 200, easing: 'ease-out' }
+    );
 
     return (
     <div className="relative w-full h-full flex items-center justify-center">
@@ -21,7 +44,7 @@ const Heartbeat: React.FC<{ isSpiking: boolean, globalSettings: PluginComponentP
         </div>
 
         <svg viewBox="0 0 100 100" className="w-1/2 h-1/2 overflow-visible relative">
-            <motion.path 
+            <path 
                 d="M 10 50 L 30 50 L 35 40 L 45 60 L 55 30 L 65 50 L 90 50"
                 stroke="rgba(255,255,255,0.8)"
                 strokeWidth="3"
@@ -29,16 +52,15 @@ const Heartbeat: React.FC<{ isSpiking: boolean, globalSettings: PluginComponentP
                 strokeLinecap="round"
                 strokeLinejoin="round"
                 className="animate-[energy-pulse]"
-                style={{
+                    style={{
                     animationDuration: `${1.5 * animationSpeedMultiplier}s`,
                     animationTimingFunction: 'ease-in-out',
                     animationIterationCount: 'infinite',
                     strokeDasharray: 1000,
                     strokeDashoffset: 1000,
-                    filter: 'drop-shadow(0 0 5px white)'
+                    filter: 'drop-shadow(0 0 5px white)',
+                    transform: `scale(${scaleAnimation.scale})`,
                 }}
-                animate={{ scale: isSpiking ? 1.2 : 1 }}
-                transition={{ type: 'spring', stiffness: 500, damping: 10 }}
             />
         </svg>
     </div>
@@ -82,15 +104,7 @@ export const TelemetryCollector: React.FC<PluginComponentProps<TelemetryCollecto
                         <ul>
                         <AnimatePresence initial={false}>
                             {events.map((event) => (
-                                <motion.li
-                                    key={event.id}
-                                    layout
-                                    initial={{ opacity: 0, y: -10 }}
-                                    animate={{ opacity: 0.7, y: 0 }}
-                                    exit={{ opacity: 0 }}
-                                >
-                                    {event.text}
-                                </motion.li>
+                                <EventItem key={event.id} event={event} />
                             ))}
                         </AnimatePresence>
                         </ul>

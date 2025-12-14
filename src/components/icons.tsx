@@ -390,6 +390,41 @@ export const SlidersIcon: React.FC<IconProps> = (props) => (
   </svg>
 );
 
+/**
+ * BloomModuleIcon - Represents the plugin/module browser
+ * 
+ * Design: Stacked modules with bloom energy - represents the "Bloom Module Halo"
+ * Flow Doctrine: Connected modules forming a cohesive chain, with energy flowing between them
+ */
+export const BloomModuleIcon: React.FC<IconProps> = (props) => (
+  <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" strokeWidth={1.5} stroke="currentColor" {...props}>
+    {/* Base module stack - three connected blocks */}
+    <rect x="4" y="8" width="5" height="3" rx="0.5" fill="currentColor" opacity="0.8" />
+    <rect x="4" y="12.5" width="5" height="3" rx="0.5" fill="currentColor" opacity="0.6" />
+    <rect x="4" y="17" width="5" height="3" rx="0.5" fill="currentColor" opacity="0.4" />
+    
+    {/* Connection flow lines */}
+    <path d="M9 9.5h2M9 14h2M9 18.5h2" stroke="currentColor" strokeWidth="1.2" strokeLinecap="round" opacity="0.5" />
+    
+    {/* Middle module stack */}
+    <rect x="11.5" y="8" width="5" height="3" rx="0.5" fill="currentColor" opacity="0.9" />
+    <rect x="11.5" y="12.5" width="5" height="3" rx="0.5" fill="currentColor" opacity="0.7" />
+    <rect x="11.5" y="17" width="5" height="3" rx="0.5" fill="currentColor" opacity="0.5" />
+    
+    {/* Connection flow lines */}
+    <path d="M16.5 9.5h2M16.5 14h2M16.5 18.5h2" stroke="currentColor" strokeWidth="1.2" strokeLinecap="round" opacity="0.5" />
+    
+    {/* Right module stack */}
+    <rect x="19" y="8" width="3" height="3" rx="0.5" fill="currentColor" opacity="0.8" />
+    <rect x="19" y="12.5" width="3" height="3" rx="0.5" fill="currentColor" opacity="0.6" />
+    
+    {/* Bloom energy accent - small sparkles */}
+    <circle cx="6.5" cy="9.5" r="0.8" fill="currentColor" opacity="0.9" />
+    <circle cx="14" cy="9.5" r="0.8" fill="currentColor" opacity="0.9" />
+    <circle cx="20.5" cy="9.5" r="0.8" fill="currentColor" opacity="0.9" />
+  </svg>
+);
+
 export const HushIcon: React.FC<IconProps> = (props) => (
   <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" {...props}>
     <path

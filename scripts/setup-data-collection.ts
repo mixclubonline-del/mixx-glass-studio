@@ -11,7 +11,7 @@
  * Run: npx ts-node scripts/setup-data-collection.ts
  */
 
-import { readFileSync, writeFileSync, existsSync } from 'fs';
+import { readFileSync, writeFileSync, existsSync, chmod } from 'fs';
 import { join } from 'path';
 
 interface DataCollectionConfig {
@@ -191,7 +191,6 @@ server.listen(PORT, () => {
   
   // Make executable on Unix systems
   try {
-    const { chmod } = require('fs');
     chmod(testEndpointPath, 0o755, () => {});
   } catch {
     // Ignore if chmod fails (Windows)
@@ -238,4 +237,5 @@ if (require.main === module) {
 }
 
 export { setupDataCollection };
+
 

@@ -1,6 +1,7 @@
 import React, { useEffect, useState } from "react";
-import { motion } from "framer-motion";
+import { usePulseAnimation } from "../mixxglass";
 import { hexToRgba } from "../../utils/ALS";
+import { spacing, typography, layout, effects, transitions, composeStyles } from "../../design-system";
 
 interface FlowMeterProps {
   level: number;
@@ -59,51 +60,74 @@ const FlowMeter: React.FC<FlowMeterProps> = ({
       )} 60%, ${hexToRgba(color, 0.15)} 100%)`;
 
   return (
-    <div className="relative w-44 h-full flex flex-col items-center" style={{ height: '100%' }}>
-      <div className="absolute inset-0 rounded-md bg-black/60 border border-white/8 shadow-inner overflow-hidden" style={{ height: '100%' }}>
-        <div className="absolute inset-1 rounded-md bg-gradient-to-b from-white/5 to-transparent" />
-        <motion.div
-          className="absolute inset-0 h-full"
-          style={{
-            background: `radial-gradient(circle at 50% 20%, ${hexToRgba(
-              glow,
-              0.25 + pulse * 0.3 + flowFollow * 0.2
-            )} 0%, transparent 100%)`,
-            boxShadow: `inset 0 0 ${20 + pulse * 15 + flowFollow * 10}px ${hexToRgba(glow, 0.15 + pulse * 0.25)}`,
-          }}
-          animate={{ opacity: [0.6, 1, 0.6] }}
-          transition={{ duration: 2.5, repeat: Infinity, ease: "easeInOut" }}
+    <div style={composeStyles(
+      layout.position.relative,
+      layout.flex.container('col'),
+      layout.flex.align.center,
+      { width: '176px', height: '100%' }
+    )}>
+      <div style={composeStyles(
+        layout.position.absolute,
+        { inset: 0 },
+        effects.border.radius.md,
+        layout.overflow.hidden,
+        {
+          height: '100%',
+          background: 'rgba(0,0,0,0.6)',
+          border: '1px solid rgba(255,255,255,0.08)',
+          boxShadow: 'inset 0 2px 4px rgba(0,0,0,0.3)',
+        }
+      )}>
+        <div style={composeStyles(
+          layout.position.absolute,
+          { inset: '4px' },
+          effects.border.radius.md,
+          {
+            background: 'linear-gradient(to bottom, rgba(255,255,255,0.05), transparent)',
+          }
+        )} />
+        <PulsingMeterBackground
+          glow={glow}
+          pulse={pulse}
+          flowFollow={flowFollow}
         />
-        <div className="absolute bottom-1 left-1 right-1 rounded-md bg-black/10 overflow-hidden">
-          <motion.div
-            className="w-full origin-bottom"
-            style={{
-              height: `${mainHeight * 100}%`,
-              background: gradient,
-              boxShadow: `0 0 ${12 + pulse * 8 + flowFollow * 6}px ${hexToRgba(glow, 0.45 + pulse * 0.3)}`,
-            }}
-            animate={{ opacity: [0.85, 1, 0.85] }}
-            transition={{ duration: 1.6, repeat: Infinity, ease: "easeInOut" }}
+        <div style={composeStyles(
+          layout.position.absolute,
+          { bottom: '4px', left: '4px', right: '4px' },
+          effects.border.radius.md,
+          layout.overflow.hidden,
+          {
+            background: 'rgba(0,0,0,0.1)',
+          }
+        )}>
+          <PulsingMeterBar
+            height={mainHeight * 100}
+            gradient={gradient}
+            glow={glow}
+            pulse={pulse}
+            flowFollow={flowFollow}
           />
         </div>
 
-        <motion.div
-          className="absolute left-1 right-1 h-1.5 rounded-full"
-          style={{
-            bottom: `${peakPosition * 100}%`,
-            background: hexToRgba(glow, transient ? 0.9 : 0.7),
-            boxShadow: `0 0 10px ${hexToRgba(glow, 0.6)}`,
-          }}
-          animate={{ scaleX: transient ? [1, 1.4, 1] : 1 }}
-          transition={{
-            duration: 0.35,
-            repeat: transient ? Infinity : 0,
-            ease: "easeInOut",
-          }}
+        <PulsingPeakIndicator
+          position={peakPosition * 100}
+          glow={glow}
+          transient={transient}
         />
       </div>
 
-      <div className="absolute -right-1.5 top-1 flex flex-col text-[7px] text-white/30 uppercase tracking-[0.3em] gap-4">
+      <div style={composeStyles(
+        layout.position.absolute,
+        { right: '-6px', top: '4px' },
+        layout.flex.container('col'),
+        typography.transform('uppercase'),
+        typography.tracking.widest,
+        spacing.gap(4),
+        {
+          fontSize: '7px',
+          color: 'rgba(255,255,255,0.3)',
+        }
+      )}>
         <span>+6</span>
         <span>0</span>
         <span>-6</span>
@@ -111,6 +135,97 @@ const FlowMeter: React.FC<FlowMeterProps> = ({
         <span>-24</span>
       </div>
     </div>
+  );
+};
+
+// Component for pulsing meter background
+const PulsingMeterBackground: React.FC<{
+  glow: string;
+  pulse: number;
+  flowFollow: number;
+}> = ({ glow, pulse, flowFollow }) => {
+  const pulseOpacity = usePulseAnimation({
+    duration: 2500,
+    minOpacity: 0.6,
+    maxOpacity: 1,
+    easing: 'ease-in-out',
+  });
+  return (
+    <div
+      style={composeStyles(
+        layout.position.absolute,
+        { inset: 0 },
+        { height: '100%' },
+        {
+          background: `radial-gradient(circle at 50% 20%, ${hexToRgba(
+            glow,
+            0.25 + pulse * 0.3 + flowFollow * 0.2
+          )} 0%, transparent 100%)`,
+          boxShadow: `inset 0 0 ${20 + pulse * 15 + flowFollow * 10}px ${hexToRgba(glow, 0.15 + pulse * 0.25)}`,
+          opacity: pulseOpacity.opacity,
+        }
+      )}
+    />
+  );
+};
+
+// Component for pulsing meter bar
+const PulsingMeterBar: React.FC<{
+  height: number;
+  gradient: string;
+  glow: string;
+  pulse: number;
+  flowFollow: number;
+}> = ({ height, gradient, glow, pulse, flowFollow }) => {
+  const pulseOpacity = usePulseAnimation({
+    duration: 1600,
+    minOpacity: 0.85,
+    maxOpacity: 1,
+    easing: 'ease-in-out',
+  });
+  return (
+    <div
+      style={composeStyles(
+        layout.width.full,
+        {
+          height: `${height}%`,
+          background: gradient,
+          boxShadow: `0 0 ${12 + pulse * 8 + flowFollow * 6}px ${hexToRgba(glow, 0.45 + pulse * 0.3)}`,
+          opacity: pulseOpacity.opacity,
+          transformOrigin: 'bottom',
+        }
+      )}
+    />
+  );
+};
+
+// Component for pulsing peak indicator
+const PulsingPeakIndicator: React.FC<{
+  position: number;
+  glow: string;
+  transient: boolean;
+}> = ({ position, glow, transient }) => {
+  const pulseScale = usePulseAnimation({
+    duration: 350,
+    minScale: 1,
+    maxScale: 1.4,
+    easing: 'ease-in-out',
+  });
+  return (
+    <div
+      style={composeStyles(
+        layout.position.absolute,
+        { left: '4px', right: '4px' },
+        effects.border.radius.full,
+        {
+          height: '6px',
+          bottom: `${position}%`,
+          background: hexToRgba(glow, transient ? 0.9 : 0.7),
+          boxShadow: `0 0 10px ${hexToRgba(glow, 0.6)}`,
+          transform: transient ? `scaleX(${pulseScale.scale})` : 'scaleX(1)',
+        }
+      )}
+    />
   );
 };
 
