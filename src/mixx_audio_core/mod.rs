@@ -12,13 +12,30 @@
  * - MixxSIMD: SIMD utilities (future)
  */
 
-pub mod resampler;
-pub mod dsp_math;
 pub mod audio_format;
 // pub mod audio_io;  // Future: will replace cpal
-// pub mod simd_utils;  // Future: will replace wide
+pub mod audio_io;
+pub mod clip_region;
+pub mod dsp_math;
+pub mod mixx_plugins;
+pub mod harmonic_lattice;
+pub mod history;
+pub mod midi_engine;
+pub mod neural_bridge;
+pub mod phase_weave;
+pub mod plugin_chain;
+pub mod processor;
+pub mod quantum_automation;
+pub mod quantum_transport;
+pub mod resampler;
+pub mod session;
+pub mod tempo_map;
+pub mod track_mixer;
+pub mod simd_utils;
+pub mod velvet_curve;
+pub mod master_chain;
+pub mod audio_export;
 
-pub use resampler::{MixxResampler, ResampleQuality, ResampleError};
-pub use dsp_math::*;
-pub use audio_format::{MixxAudioFormat, AudioFile, AudioMetadata, FormatError};
+pub use audio_format::{AudioFile, AudioMetadata, FormatError, MixxAudioFormat};
+pub use dsp_math::Complex;
 
