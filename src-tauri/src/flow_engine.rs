@@ -1,10 +1,15 @@
 use mixx_core::{
     current_stats as mixx_current_stats, init_engine as mixx_init_engine,
     start_engine as mixx_start_engine, stop_engine as mixx_stop_engine, EngineConfig as MixxEngineConfig,
+    update_velvet_curve_params, // Import from mixx_core
+    update_harmonic_lattice_params,
+    update_phase_weave_params,
 };
 use serde_json;
 use std::sync::atomic::{AtomicBool, AtomicU32, AtomicU64, Ordering};
-use std::sync::Arc;
+use std::sync::{Arc, Mutex};
+
+// use crate::dsp::velvet_curve::VelvetCurve; // Removed local import
 
 // Simplified F.L.O.W. Engine for testing
 pub struct FlowEngine {
@@ -21,6 +26,9 @@ pub struct FlowEngine {
     engine_initialized: Arc<AtomicBool>,
     engine_running: Arc<AtomicBool>,
     engine_config: MixxEngineConfig,
+    
+    // DSP Modules
+    // VelvetCurve is now managed by mixx_core
 }
 
 impl FlowEngine {
@@ -41,6 +49,21 @@ impl FlowEngine {
             engine_config: MixxEngineConfig::default(),
         })
     }
+    
+    // Added: Update Velvet Curve Parameters
+    // Added: Update Velvet Curve Parameters
+    pub fn update_velvet_curve(&mut self, warmth: f32, silk_edge: f32, emotion: f32, power: f32) {
+        update_velvet_curve_params(warmth, silk_edge, emotion, power);
+        // println!("Velvet Curve Updated: W={:.2} S={:.2} E={:.2} P={:.2}", warmth, silk_edge, emotion, power);
+    }
+
+    pub fn update_harmonic_lattice(&mut self, even_drive: f32, odd_drive: f32, tension: f32, output_gain: f32) {
+        update_harmonic_lattice_params(even_drive, odd_drive, tension, output_gain);
+    }
+
+    pub fn update_phase_weave(&mut self, width: f32, rotation: f32) {
+        update_phase_weave_params(width, rotation);
+    }
 
     pub fn start_audio_stream(&mut self) -> Result<(), String> {
         if !self
@@ -52,6 +75,11 @@ impl FlowEngine {
                 self.engine_config.sample_rate, 
                 self.engine_config.buffer_size, 
                 self.engine_config.channels);
+                
+            // NOTE: In a real implementation, we would pass the self.velvet_curve Arc to the mixx_core
+            // callback here so it can process audio on the real-time thread.
+            // For now, we are just initializing the engine state.
+            
             mixx_init_engine(Some(self.engine_config))
                 .map_err(|err| format!("MixxEngine init failed: {}", err.message()))?;
             println!("✅ MixxEngine initialized");

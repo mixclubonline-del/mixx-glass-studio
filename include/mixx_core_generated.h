@@ -8,6 +8,43 @@
 #include <stdint.h>
 #include <stdlib.h>
 
+/**
+ * MIDI Processing Engine
+ *
+ * Provides MIDI event handling for:
+ * - Note on/off with velocity
+ * - Control change (CC) messages
+ * - Program changes
+ * - Pitch bend
+ * - MIDI clock synchronization
+ * Standard MIDI channel count
+ */
+#define MIDI_CHANNELS 16
+
+#define MODULATION 1
+
+#define BREATH 2
+
+#define VOLUME 7
+
+#define PAN 10
+
+#define EXPRESSION 11
+
+#define SUSTAIN 64
+
+#define PORTAMENTO 65
+
+#define SOSTENUTO 66
+
+#define SOFT_PEDAL 67
+
+#define ALL_SOUND_OFF 120
+
+#define RESET_ALL 121
+
+#define ALL_NOTES_OFF 123
+
 typedef struct MixxEngineConfig {
   uint32_t sample_rate;
   uint32_t buffer_size;

@@ -1,4 +1,4 @@
-import React, { useMemo } from 'react';
+import React, { useMemo, useEffect, useState } from 'react';
 import { MixxGlassSlider, MixxGlassFader, MixxGlassMeter, useFlowMotion, usePulseAnimation } from '../mixxglass';
 import {
   MIXER_STRIP_MAX_WIDTH,
@@ -7,6 +7,10 @@ import {
 } from './mixerConstants';
 import { deriveTrackALSFeedback, hexToRgba } from '../../utils/ALS';
 import { spacing, typography, layout, effects, transitions, composeStyles } from '../../design-system';
+import { LoudnessMeter } from '../LoudnessMeter';
+import { useMasterChain } from '../../hooks/useMasterChain';
+import { useAudioExport } from '../../hooks/useAudioExport';
+import { MasteringProfile, PROFILE_INFO } from '../../types/rust-audio';
 
 interface FlowMasterStripProps {
   volume: number;
@@ -21,6 +25,9 @@ interface FlowMasterStripProps {
 
 const MASTER_PRIMARY = '#ede9fe';
 const MASTER_GLOW = '#f5d0fe';
+
+// Mastering profile names
+const PROFILE_NAMES = ['Streaming', 'Club', 'Broadcast', 'Vinyl', 'Audiophile'];
 
 // Component for pulsing labels
 const PulsingLabels: React.FC<{ labels: string[] }> = ({ labels }) => {
@@ -129,6 +136,34 @@ const FlowMasterStrip: React.FC<FlowMasterStripProps> = ({
     });
   }, [analysis?.level, analysis?.transient, volume]);
 
+  // Master chain state (Phase 29)
+  const { initialize, setProfile, profile, initialized } = useMasterChain(48000);
+  const [showProfileDropdown, setShowProfileDropdown] = useState(false);
+
+  // Audio export (Phase 29)
+  const { exportToPath, isExporting, error: exportError, lastExportPath } = useAudioExport();
+  
+  const handleExport = async () => {
+    // Generate test audio (sine wave for now)
+    const sampleRate = 48000;
+    const duration = 5; // 5 seconds
+    const samples = new Float32Array(sampleRate * duration * 2);
+    for (let i = 0; i < samples.length; i += 2) {
+      const t = i / 2 / sampleRate;
+      const freq = 440 * (1 + 0.1 * Math.sin(2 * Math.PI * 0.5 * t)); // Vibrato
+      samples[i] = Math.sin(2 * Math.PI * freq * t) * 0.5;
+      samples[i + 1] = samples[i];
+    }
+    
+    const path = `/tmp/aura_export_${Date.now()}.wav`;
+    await exportToPath(path, { samples, bitDepth: 24 });
+  };
+
+  // Initialize master chain on mount
+  useEffect(() => {
+    initialize(MasteringProfile.Streaming);
+  }, [initialize]);
+
   // Animated entrance
   const entranceStyle = useFlowMotion(
     { opacity: 1, scale: 1 },
@@ -195,10 +230,103 @@ const FlowMasterStrip: React.FC<FlowMasterStripProps> = ({
                 fontSize: '0.6875rem', // 11px minimum
                 color: 'rgba(230, 240, 255, 0.75)',
               }
-            )}>Flow</span>
+            )}>{initialized ? PROFILE_NAMES[profile] : 'Init...'}</span>
           </div>
-          <PulsingLabels labels={['Body', 'Soul', 'Air', 'Silk']} />
+          {/* Profile Selector (Phase 29) */}
+          <div style={{ position: 'relative' }}>
+            <button
+              onClick={() => setShowProfileDropdown(!showProfileDropdown)}
+              style={{
+                background: 'rgba(14,32,62,0.8)',
+                border: '1px solid rgba(102, 140, 198, 0.4)',
+                borderRadius: '4px',
+                padding: '4px 8px',
+                color: '#e6f0ff',
+                fontSize: '10px',
+                cursor: 'pointer',
+                textTransform: 'uppercase',
+                letterSpacing: '0.5px',
+              }}
+            >
+              {PROFILE_NAMES[profile]} ▼
+            </button>
+            {showProfileDropdown && (
+              <div style={{
+                position: 'absolute',
+                top: '100%',
+                left: 0,
+                zIndex: 50,
+                background: 'rgba(9,18,36,0.95)',
+                border: '1px solid rgba(102, 140, 198, 0.5)',
+                borderRadius: '4px',
+                minWidth: '100px',
+                marginTop: '2px',
+              }}>
+                {PROFILE_NAMES.map((name, idx) => (
+                  <button
+                    key={name}
+                    onClick={() => {
+                      setProfile(idx as MasteringProfile);
+                      setShowProfileDropdown(false);
+                    }}
+                    style={{
+                      display: 'block',
+                      width: '100%',
+                      padding: '6px 10px',
+                      background: idx === profile ? 'rgba(102, 140, 198, 0.3)' : 'transparent',
+                      border: 'none',
+                      color: '#e6f0ff',
+                      fontSize: '10px',
+                      textAlign: 'left',
+                      cursor: 'pointer',
+                    }}
+                  >
+                    {name}
+                  </button>
+                ))}
+              </div>
+            )}
+          </div>
         </div>
+      </div>
+
+      {/* LUFS Metering (Phase 29) */}
+      <div style={{ padding: '8px 12px', borderBottom: '1px solid rgba(102, 140, 198, 0.3)' }}>
+        <LoudnessMeter compact targetLUFS={PROFILE_INFO[profile]?.lufs ?? -14} />
+      </div>
+
+      {/* Export Button (Phase 29) */}
+      <div style={{ padding: '8px 12px', borderBottom: '1px solid rgba(102, 140, 198, 0.3)' }}>
+        <button
+          onClick={handleExport}
+          disabled={isExporting}
+          style={{
+            width: '100%',
+            padding: '8px 12px',
+            background: isExporting ? 'rgba(102, 140, 198, 0.3)' : 'linear-gradient(135deg, rgba(102,140,198,0.6), rgba(136,96,208,0.5))',
+            border: '1px solid rgba(102, 140, 198, 0.5)',
+            borderRadius: '6px',
+            color: '#e6f0ff',
+            fontSize: '11px',
+            fontWeight: 600,
+            textTransform: 'uppercase' as const,
+            letterSpacing: '1px',
+            cursor: isExporting ? 'not-allowed' : 'pointer',
+            transition: 'all 0.2s ease',
+          }}
+        >
+          {isExporting ? 'Exporting...' : '⬇ Export'}
+        </button>
+        {lastExportPath && (
+          <div style={{ fontSize: '9px', color: '#8892a6', marginTop: '4px', textAlign: 'center' as const }}>
+            Last: {lastExportPath.split('/').pop()}
+          </div>
+        )}
+        {exportError && (
+          <div style={{ fontSize: '9px', color: '#ff6b6b', marginTop: '4px', textAlign: 'center' as const }}>
+            {exportError}
+          </div>
+        )}
       </div>
 
       <div style={composeStyles(

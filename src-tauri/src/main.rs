@@ -4,6 +4,8 @@
 mod flow_engine;
 mod quantum;
 mod git;
+mod dsp;
+mod analysis_engine; // Added
 
 use flow_engine::FlowEngine;
 use quantum::superposition::{SuperpositionEngine, MeasurementBasis, CollapsePolicy};
@@ -129,6 +131,34 @@ fn flow_arm_recording(armed: bool) -> Result<String, String> {
     }
 }
 
+// Added: Velvet Curve Commands
+#[tauri::command]
+fn set_velvet_curve_params(warmth: f32, silk_edge: f32, emotion: f32, power: f32) -> Result<String, String> {
+    let mut engine_guard = FLOW_ENGINE.lock().map_err(|e| format!("Failed to lock engine: {}", e))?;
+
+    if let Some(engine) = engine_guard.as_mut() {
+        // Assuming update_velvet_curve is implemented on FlowEngine
+        engine.update_velvet_curve(warmth, silk_edge, emotion, power);
+        Ok(format!("Velvet Curve Updated: W={:.2} S={:.2} E={:.2} P={:.2}", warmth, silk_edge, emotion, power))
+    } else {
+        Err("F.L.O.W. Engine not initialized".to_string())
+    }
+}
+
+// Added: Harmonic Lattice Commands
+#[tauri::command]
+fn set_harmonic_lattice_params(even_drive: f32, odd_drive: f32, tension: f32, output_gain: f32) -> Result<String, String> {
+    let mut engine_guard = FLOW_ENGINE.lock().map_err(|e| format!("Failed to lock engine: {}", e))?;
+
+    if let Some(engine) = engine_guard.as_mut() {
+        engine.update_harmonic_lattice(even_drive, odd_drive, tension, output_gain);
+        Ok(format!("Harmonic Lattice Updated: E={:.2} O={:.2} T={:.2} G={:.2}", even_drive, odd_drive, tension, output_gain))
+    } else {
+        Err("F.L.O.W. Engine not initialized".to_string())
+    }
+}
+
+
 // Quantum Superposition Engine Commands
 #[tauri::command]
 fn quantum_create_superposition(state_ids: Vec<String>, weights: Option<Vec<f64>>) -> Result<String, String> {
@@ -227,6 +257,459 @@ fn quantum_get_superposition_status() -> Result<serde_json::Value, String> {
     Ok(status)
 }
 
+
+// Added: Phase Weave Commands
+#[tauri::command]
+fn set_phase_weave_params(width: f32, rotation: f32) -> Result<String, String> {
+    let mut engine_guard = FLOW_ENGINE.lock().map_err(|e| format!("Failed to lock engine: {}", e))?;
+
+    if let Some(engine) = engine_guard.as_mut() {
+        mixx_core::update_phase_weave_params(width, rotation);
+        Ok(format!("Phase Weave Updated: Width={:.2} Rotation={:.2}", width, rotation))
+    } else {
+        Err("F.L.O.W. Engine not initialized".to_string())
+    }
+}
+
+// Quantum Automation Commands
+#[tauri::command]
+fn quantum_auto_set_param(name: String, value: f32) {
+    mixx_core::quantum_set_parameter(&name, value);
+}
+
+#[tauri::command]
+fn quantum_auto_undo(name: String) -> Option<f32> {
+    mixx_core::quantum_undo_parameter(&name)
+}
+
+#[tauri::command]
+fn quantum_auto_predict() {
+    mixx_core::quantum_predict();
+}
+
+#[tauri::command]
+fn quantum_auto_get_param(name: String) -> Option<f32> {
+    mixx_core::quantum_get_parameter(&name)
+}
+
+// Plugin Chain Commands
+#[tauri::command]
+fn plugin_set_enabled(slot_name: String, enabled: bool) {
+    mixx_core::plugin_chain_set_enabled(&slot_name, enabled);
+}
+
+#[tauri::command]
+fn plugin_set_bypass(slot_name: String, bypass: bool) {
+    mixx_core::plugin_chain_set_bypass(&slot_name, bypass);
+}
+
+#[tauri::command]
+fn plugin_chain_get_status() -> (usize, u64) {
+    mixx_core::plugin_chain_status()
+}
+
+// Neural Inference Commands
+#[tauri::command]
+fn neural_infer_genre_cmd() -> (String, f32) {
+    mixx_core::neural_infer_genre()
+}
+
+#[tauri::command]
+fn neural_infer_pattern_cmd() -> (f32, f32, String) {
+    mixx_core::neural_infer_pattern()
+}
+
+#[tauri::command]
+fn neural_suggest_params() -> Vec<(String, f32, f32)> {
+    mixx_core::neural_suggest_parameters()
+}
+
+#[tauri::command]
+fn neural_get_stats() -> (u64, usize) {
+    mixx_core::neural_stats()
+}
+
+// Transport Commands
+#[tauri::command]
+fn transport_play_cmd() {
+    mixx_core::transport_play();
+}
+
+#[tauri::command]
+fn transport_pause_cmd() {
+    mixx_core::transport_pause();
+}
+
+#[tauri::command]
+fn transport_stop_cmd() {
+    mixx_core::transport_stop();
+}
+
+#[tauri::command]
+fn transport_seek_cmd(sample: u64) {
+    mixx_core::transport_seek(sample);
+}
+
+#[tauri::command]
+fn transport_get_state() -> (bool, u64, u32, u8, f32) {
+    mixx_core::transport_state()
+}
+
+// Audio Device Management Commands
+#[tauri::command]
+fn audio_list_inputs_cmd() -> Vec<(String, String, bool)> {
+    mixx_core::audio_list_inputs()
+}
+
+#[tauri::command]
+fn audio_list_outputs_cmd() -> Vec<(String, String, bool)> {
+    mixx_core::audio_list_outputs()
+}
+
+#[tauri::command]
+fn audio_select_input_cmd(device_id: String) -> bool {
+    mixx_core::audio_select_input(&device_id)
+}
+
+#[tauri::command]
+fn audio_select_output_cmd(device_id: String) -> bool {
+    mixx_core::audio_select_output(&device_id)
+}
+
+// MIDI Commands
+#[tauri::command]
+fn midi_play_cmd() {
+    mixx_core::midi_play();
+}
+
+#[tauri::command]
+fn midi_stop_cmd() {
+    mixx_core::midi_stop();
+}
+
+#[tauri::command]
+fn midi_record_cmd() {
+    mixx_core::midi_record();
+}
+
+#[tauri::command]
+fn midi_get_state() -> (bool, bool, u64) {
+    mixx_core::midi_state()
+}
+
+#[tauri::command]
+fn midi_send_note(channel: u8, note: u8, velocity: u8, note_on: bool) {
+    if note_on {
+        mixx_core::midi_note_on(channel, note, velocity);
+    } else {
+        mixx_core::midi_note_off(channel, note);
+    }
+}
+
+// Clip Manager Commands
+#[tauri::command]
+fn clip_create_midi_cmd(name: String, length_samples: u64) -> u64 {
+    mixx_core::clip_create_midi(&name, length_samples)
+}
+
+#[tauri::command]
+fn clip_create_region_cmd(clip_id: u64, start_time: u64, track_index: usize) -> u64 {
+    mixx_core::clip_create_region(clip_id, start_time, track_index)
+}
+
+#[tauri::command]
+fn clip_delete_region_cmd(region_id: u64) {
+    mixx_core::clip_delete_region(region_id);
+}
+
+#[tauri::command]
+fn clip_get_stats() -> (usize, usize) {
+    mixx_core::clip_stats()
+}
+
+// Mixer Commands
+#[tauri::command]
+fn mixer_add_audio_track_cmd(name: String) -> u64 {
+    mixx_core::mixer_add_audio_track(&name)
+}
+
+#[tauri::command]
+fn mixer_add_midi_track_cmd(name: String) -> u64 {
+    mixx_core::mixer_add_midi_track(&name)
+}
+
+#[tauri::command]
+fn mixer_set_volume_cmd(track_id: u64, volume: f32) {
+    mixx_core::mixer_set_volume(track_id, volume);
+}
+
+#[tauri::command]
+fn mixer_toggle_mute_cmd(track_id: u64) -> bool {
+    mixx_core::mixer_toggle_mute(track_id)
+}
+
+#[tauri::command]
+fn mixer_toggle_solo_cmd(track_id: u64) -> bool {
+    mixx_core::mixer_toggle_solo(track_id)
+}
+
+#[tauri::command]
+fn mixer_get_stats() -> (usize, usize, usize) {
+    mixx_core::mixer_stats()
+}
+
+// History Commands
+#[tauri::command]
+fn history_undo_cmd() -> Option<String> {
+    mixx_core::history_undo()
+}
+
+#[tauri::command]
+fn history_redo_cmd() -> Option<String> {
+    mixx_core::history_redo()
+}
+
+#[tauri::command]
+fn history_can_undo_redo() -> (bool, bool) {
+    (mixx_core::history_can_undo(), mixx_core::history_can_redo())
+}
+
+#[tauri::command]
+fn history_get_descriptions() -> (Option<String>, Option<String>) {
+    mixx_core::history_descriptions()
+}
+
+#[tauri::command]
+fn history_get_stats() -> (usize, usize, u64) {
+    mixx_core::history_stats()
+}
+
+// Session Commands
+#[tauri::command]
+fn session_new_project_cmd(name: String) {
+    mixx_core::session_new_project(&name);
+}
+
+#[tauri::command]
+fn session_get_project_name() -> String {
+    mixx_core::session_project_name()
+}
+
+#[tauri::command]
+fn session_set_tempo_cmd(tempo: f32) {
+    mixx_core::session_set_tempo(tempo);
+}
+
+#[tauri::command]
+fn session_save_cmd() -> Result<String, String> {
+    mixx_core::session_save()
+}
+
+#[tauri::command]
+fn session_load_cmd(json: String) -> Result<(), String> {
+    mixx_core::session_load(&json)
+}
+
+#[tauri::command]
+fn session_get_stats() -> (usize, usize, bool, u64) {
+    mixx_core::session_stats()
+}
+
+// Tempo Map Commands
+#[tauri::command]
+fn tempo_add_cmd(position: u64, bpm: f32) {
+    mixx_core::tempo_add(position, bpm);
+}
+
+#[tauri::command]
+fn tempo_at_cmd(position: u64) -> f32 {
+    mixx_core::tempo_at(position)
+}
+
+#[tauri::command]
+fn tempo_add_marker_cmd(position: u64, name: String) -> u64 {
+    mixx_core::tempo_add_marker(position, &name)
+}
+
+#[tauri::command]
+fn tempo_snap_cmd(position: u64, grid_division: u8) -> u64 {
+    mixx_core::tempo_snap_to_grid(position, grid_division)
+}
+
+#[tauri::command]
+fn tempo_get_stats() -> (usize, usize, usize) {
+    mixx_core::tempo_stats()
+}
+
+// Effects info command (effects use plugin chain system)
+#[tauri::command]
+fn effects_info() -> Vec<String> {
+    vec![
+        "ParametricEQ - 4-band EQ with biquad filters".to_string(),
+        "Compressor - Dynamics processor with attack/release".to_string(),
+        "Delay - Stereo delay with feedback".to_string(),
+        "Reverb - Algorithmic Freeverb-style reverb".to_string(),
+    ]
+}
+
+// ============================================================================
+// Master Chain Commands (Phase 24)
+// ============================================================================
+
+use mixx_core::master_chain::{MasterChain, MasteringProfile};
+use std::sync::RwLock;
+
+// Global Master Chain instance
+static MASTER_CHAIN: Lazy<RwLock<Option<MasterChain>>> = Lazy::new(|| RwLock::new(None));
+
+#[tauri::command]
+fn master_chain_create(sample_rate: f32, profile: u32) -> Result<String, String> {
+    let mastering_profile = MasteringProfile::from_value(profile);
+    let chain = MasterChain::new(sample_rate, mastering_profile);
+    
+    let mut guard = MASTER_CHAIN.write().map_err(|e| format!("Lock error: {}", e))?;
+    *guard = Some(chain);
+    
+    Ok(format!("Master chain created with {:?} profile", mastering_profile))
+}
+
+#[tauri::command]
+fn master_chain_set_profile(profile: u32) -> Result<String, String> {
+    let mut guard = MASTER_CHAIN.write().map_err(|e| format!("Lock error: {}", e))?;
+    
+    if let Some(ref mut chain) = *guard {
+        let mastering_profile = MasteringProfile::from_value(profile);
+        chain.apply_profile(mastering_profile);
+        Ok(format!("Profile set to {:?}", mastering_profile))
+    } else {
+        Err("Master chain not initialized".to_string())
+    }
+}
+
+#[tauri::command]
+fn master_chain_get_meters() -> Result<serde_json::Value, String> {
+    let guard = MASTER_CHAIN.read().map_err(|e| format!("Lock error: {}", e))?;
+    
+    if let Some(ref chain) = *guard {
+        let meters = chain.get_meters();
+        Ok(serde_json::json!({
+            "momentary_lufs": meters.momentary_lufs,
+            "short_term_lufs": meters.short_term_lufs,
+            "integrated_lufs": meters.integrated_lufs,
+            "true_peak_db": meters.true_peak_db,
+            "profile": format!("{:?}", chain.profile())
+        }))
+    } else {
+        Err("Master chain not initialized".to_string())
+    }
+}
+
+#[tauri::command]
+fn master_chain_set_parameter(name: String, value: f32) -> Result<String, String> {
+    let mut guard = MASTER_CHAIN.write().map_err(|e| format!("Lock error: {}", e))?;
+    
+    if let Some(ref mut chain) = *guard {
+        use mixx_core::processor::AudioProcessor;
+        chain.set_parameter(&name, value);
+        Ok(format!("Parameter {} set to {}", name, value))
+    } else {
+        Err("Master chain not initialized".to_string())
+    }
+}
+
+// ============================================================================
+// Audio Export Commands (Phase 24)
+// ============================================================================
+
+use mixx_core::audio_export::{AudioExporter, ExportConfig, ExportFormat};
+use mixx_core::mixx_plugins::{Dither, DitherType};
+
+#[tauri::command]
+async fn audio_export_wav(
+    path: String,
+    sample_rate: u32,
+    channels: u16,
+    bit_depth: u8,
+    samples: Vec<f32>,
+) -> Result<String, String> {
+    let format = match bit_depth {
+        16 => ExportFormat::Wav16,
+        24 => ExportFormat::Wav24,
+        32 => ExportFormat::Wav32Float,
+        _ => return Err(format!("Unsupported bit depth: {}", bit_depth)),
+    };
+    
+    // Apply TPDF dithering for non-float exports (Phase 24)
+    let processed_samples = if bit_depth < 32 {
+        let mut dither = Dither::new();
+        dither.bit_depth = bit_depth as u32;
+        dither.dither_type = DitherType::Triangular;
+        dither.noise_shaping = bit_depth == 16; // Enable noise shaping for 16-bit
+        
+        let mut output = samples.clone();
+        for chunk in output.chunks_mut(2) {
+            if chunk.len() == 2 {
+                let (l, r) = dither.process_stereo(chunk[0], chunk[1]);
+                chunk[0] = l;
+                chunk[1] = r;
+            }
+        }
+        output
+    } else {
+        samples
+    };
+    
+    let config = ExportConfig {
+        format,
+        sample_rate,
+        channels,
+        dither: false, // Already applied above
+        normalize: false,
+        normalize_target_lufs: -14.0,
+    };
+    
+    AudioExporter::export(&path, &processed_samples, &config, None)
+        .map_err(|e| format!("Export failed: {}", e))?;
+    
+    Ok(format!("Exported to {} with {}dB dither", path, if bit_depth < 32 { "TPDF" } else { "no" }))
+}
+
+#[tauri::command]
+fn audio_export_formats() -> Vec<serde_json::Value> {
+    vec![
+        serde_json::json!({"id": "wav16", "name": "WAV 16-bit", "extension": "wav"}),
+        serde_json::json!({"id": "wav24", "name": "WAV 24-bit", "extension": "wav"}),
+        serde_json::json!({"id": "wav32", "name": "WAV 32-bit float", "extension": "wav"}),
+        serde_json::json!({"id": "flac16", "name": "FLAC 16-bit", "extension": "flac"}),
+        serde_json::json!({"id": "flac24", "name": "FLAC 24-bit", "extension": "flac"}),
+    ]
+}
+
+// ============================================================================
+// Plugin Info Commands (Phase 24)
+// ============================================================================
+
+#[tauri::command]
+fn mixx_plugins_info() -> Vec<serde_json::Value> {
+    vec![
+        serde_json::json!({"name": "MixxVerb", "type": "Reverb", "params": ["mix", "time", "preDelay"]}),
+        serde_json::json!({"name": "MixxDelay", "type": "Delay", "params": ["time", "feedback", "mix", "tone"]}),
+        serde_json::json!({"name": "MixxGlue", "type": "Compressor", "params": ["threshold", "ratio", "release", "mix"]}),
+        serde_json::json!({"name": "MixxDrive", "type": "Saturator", "params": ["drive", "warmth", "mix", "color"]}),
+        serde_json::json!({"name": "MixxLimiter", "type": "Limiter", "params": ["ceiling", "drive", "lookahead"]}),
+        serde_json::json!({"name": "MixxClipper", "type": "Clipper", "params": ["ceiling", "drive", "softness", "mix"]}),
+        serde_json::json!({"name": "MixxAura", "type": "Widener", "params": ["tone", "width", "shine", "moodLock"]}),
+        serde_json::json!({"name": "MixxFX", "type": "Modulation", "params": ["drive", "tone", "depth", "mix"]}),
+        serde_json::json!({"name": "MixxPolish", "type": "Enhancer", "params": ["clarity", "air", "balance"]}),
+        serde_json::json!({"name": "MixxTune", "type": "VocalTuner", "params": ["retuneSpeed", "formant", "humanize", "mix"]}),
+        serde_json::json!({"name": "PrimeEQ", "type": "3BandEQ", "params": ["lowGain", "midGain", "highGain", "smartFocus"]}),
+        serde_json::json!({"name": "TimeWarp", "type": "TimeStretch", "params": ["stretch", "bend", "quantize", "slew"]}),
+        serde_json::json!({"name": "VelvetTruePeakLimiter", "type": "Limiter", "params": ["threshold", "lookahead"]}),
+        serde_json::json!({"name": "VelvetLoudnessMeter", "type": "Metering", "params": ["reset"]}),
+        serde_json::json!({"name": "Dither", "type": "Dither", "params": ["bit_depth", "dither_type", "noise_shaping"]}),
+    ]
+}
+
 fn main() {
     // Initialize logger for MixxEngine debug output
     // Set RUST_LOG=mixx_core=info to see engine logs, or RUST_LOG=debug for verbose
@@ -245,6 +728,13 @@ fn main() {
                     let _ = window.show();
                 }
             }
+            
+            // Start Analysis Engine Loop
+            analysis_engine::start_analysis_loop(app.handle().clone());
+            
+            // Start Loudness Metering Loop (Phase 24)
+            analysis_engine::start_metering_loop(app.handle().clone());
+            
             Ok(())
         })
         .invoke_handler(tauri::generate_handler![
@@ -258,6 +748,10 @@ fn main() {
             flow_set_bpm,
             flow_set_space_pad,
             flow_arm_recording,
+            flow_arm_recording,
+            set_velvet_curve_params,
+            set_harmonic_lattice_params, // Added
+            set_phase_weave_params, // Added
             // Quantum Superposition Engine Commands
             quantum_create_superposition,
             quantum_measure_superposition,
@@ -266,7 +760,81 @@ fn main() {
             // Git Operations
             git::git_status,
             git::git_pull,
-            git::git_fetch
+            git::git_fetch,
+            // Quantum Automation Commands
+            quantum_auto_set_param,
+            quantum_auto_undo,
+            quantum_auto_predict,
+            quantum_auto_get_param,
+            // Plugin Chain Commands
+            plugin_set_enabled,
+            plugin_set_bypass,
+            plugin_chain_get_status,
+            // Neural Inference Commands
+            neural_infer_genre_cmd,
+            neural_infer_pattern_cmd,
+            neural_suggest_params,
+            neural_get_stats,
+            // Transport Commands
+            transport_play_cmd,
+            transport_pause_cmd,
+            transport_stop_cmd,
+            transport_seek_cmd,
+            transport_get_state,
+            // Audio Device Management Commands
+            audio_list_inputs_cmd,
+            audio_list_outputs_cmd,
+            audio_select_input_cmd,
+            audio_select_output_cmd,
+            // MIDI Commands
+            midi_play_cmd,
+            midi_stop_cmd,
+            midi_record_cmd,
+            midi_get_state,
+            midi_send_note,
+            // Clip Manager Commands
+            clip_create_midi_cmd,
+            clip_create_region_cmd,
+            clip_delete_region_cmd,
+            clip_get_stats,
+            // Mixer Commands
+            mixer_add_audio_track_cmd,
+            mixer_add_midi_track_cmd,
+            mixer_set_volume_cmd,
+            mixer_toggle_mute_cmd,
+            mixer_toggle_solo_cmd,
+            mixer_get_stats,
+            // History Commands
+            history_undo_cmd,
+            history_redo_cmd,
+            history_can_undo_redo,
+            history_get_descriptions,
+            history_get_stats,
+            // Session Commands
+            session_new_project_cmd,
+            session_get_project_name,
+            session_set_tempo_cmd,
+            session_save_cmd,
+            session_load_cmd,
+            session_get_stats,
+            // Tempo Map Commands
+            tempo_add_cmd,
+            tempo_at_cmd,
+            tempo_add_marker_cmd,
+            tempo_snap_cmd,
+            tempo_get_stats,
+            // Effects Commands (use plugin chain API)
+            effects_info,
+            // Phase 24: Master Chain Commands
+            master_chain_create,
+            master_chain_set_profile,
+            master_chain_get_meters,
+            master_chain_set_parameter,
+            // Phase 24: Audio Export Commands
+            audio_export_wav,
+            audio_export_formats,
+            // Phase 24: Plugin Info
+            mixx_plugins_info
         ])
         .run(tauri::generate_context!())
         .expect("error while running tauri application");

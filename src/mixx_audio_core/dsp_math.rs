@@ -90,8 +90,6 @@ impl Mul<f32> for Complex {
 
 /// Vector operations optimized for audio processing
 pub mod vector {
-    use super::*;
-
     /// Add two vectors element-wise
     pub fn add_vectors(a: &[f32], b: &[f32]) -> Vec<f32> {
         assert_eq!(a.len(), b.len());
@@ -207,6 +205,8 @@ pub mod fft {
 
 /// Five Pillars specific operations
 pub mod five_pillars {
+    use super::vector;
+
     /// Velvet Curve processing
     /// Applies the signature MixxClub velvet curve to audio samples
     pub fn velvet_curve_process(samples: &[f32], warmth: f32, silk: f32) -> Vec<f32> {

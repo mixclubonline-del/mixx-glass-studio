@@ -8,7 +8,7 @@
  */
 
 use std::fs::File;
-use std::io::{BufReader, BufWriter, Read, Seek, SeekFrom, Write};
+use std::io::{BufReader, BufWriter, Read, Write};
 use std::path::Path;
 
 /// Audio file metadata
@@ -100,7 +100,7 @@ impl MixxAudioFormat {
             .map_err(|e| FormatError::IoError(e.to_string()))?;
 
         // Parse fmt chunk
-        let audio_format = u16::from_le_bytes([fmt_data[0], fmt_data[1]]);
+        let _audio_format = u16::from_le_bytes([fmt_data[0], fmt_data[1]]);
         let channels = u16::from_le_bytes([fmt_data[2], fmt_data[3]]);
         let sample_rate = u32::from_le_bytes([
             fmt_data[4],

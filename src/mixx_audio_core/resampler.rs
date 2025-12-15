@@ -139,7 +139,7 @@ impl MixxResampler {
                 let t = pos as f32;
                 output[out_idx] = self.last_sample * (1.0 - t) + sample * t;
                 out_idx += 1;
-                pos += self.ratio as f32;
+                pos += self.ratio;
             }
 
             self.last_sample = sample;

@@ -23,6 +23,10 @@ import { FourAnchors, MusicalContext } from '../types/sonic-architecture';
 import { IAudioEngine } from '../types/audio-graph';
 import { breathingPattern, warmthModulation } from '../core/beat-locked-lfo';
 import { als } from '../utils/alsFeedback';
+import { invoke } from '@tauri-apps/api/core'; // Import Tauri invoke
+
+// Check if we are running in a Tauri environment
+const isTauri = typeof window !== 'undefined' && '__TAURI__' in window;
 
 export interface VelvetCurveState {
   warmth: number;
@@ -76,6 +80,10 @@ export class VelvetCurveEngine implements IAudioEngine {
   private powerCompressor: DynamicsCompressorNode | null = null;
   private harmonicEnhancer: BiquadFilterNode | null = null;
   private outputGainNode: GainNode | null = null; // Internal output gain before makeup
+
+  // Rust Synchronization Debounce
+  private lastRustUpdate = 0;
+  private rustUpdatePending = false;
 
 
   constructor(audioContext: BaseAudioContext | null = null, config?: VelvetCurveConfig) {
@@ -140,6 +148,7 @@ export class VelvetCurveEngine implements IAudioEngine {
     this.state.emotion = Math.max(0, Math.min(1, this.state.emotion));
 
     this.updateProcessingParameters();
+    this.syncToRust(); // Sync to Rust
   }
 
   /**
@@ -222,6 +231,7 @@ export class VelvetCurveEngine implements IAudioEngine {
     }
 
     this.updateProcessingParameters();
+    this.syncToRust(); // Sync to Rust
   }
 
   /**
@@ -343,7 +353,10 @@ export class VelvetCurveEngine implements IAudioEngine {
 
     // Update power curve with sentience enhancement
     const enhancedPower = this.state.power * sentienceMultiplier;
-    this.powerCompressor.ratio.setTargetAtTime(2 + (enhancedPower * 3), now, rampTime);
+    const currentRatio = this.powerCompressor.ratio.value;
+    const targetRatio = 2 + (enhancedPower * 3);
+    // Smooth ratio manually if needed, or use setTargetAtTime
+    this.powerCompressor.ratio.setTargetAtTime(targetRatio, now, rampTime);
 
     // Update harmonic enhancement with coherence boost
     const enhancedBalance = this.state.balance * coherenceMultiplier;
@@ -351,20 +364,52 @@ export class VelvetCurveEngine implements IAudioEngine {
   }
 
   /**
+   * Sync current state to Rust backend
+   * Throttled to prevent flooding IPC
+   */
+  private syncToRust(): void {
+    if (!isTauri || this.rustUpdatePending) return;
+
+    this.rustUpdatePending = true;
+    requestAnimationFrame(() => {
+        // Double check invoke exists (for safety)
+        if (typeof invoke === 'function') {
+            invoke('set_velvet_curve_params', {
+                warmth: this.state.warmth,
+                silkEdge: this.state.silkEdge,
+                emotion: this.state.emotion,
+                power: this.state.power
+            }).catch(e => {
+                if (import.meta.env.DEV) {
+                    // console.warn('VelvetCurve Rust Sync Failed:', e);
+                }
+            });
+        }
+        this.rustUpdatePending = false;
+    });
+  }
+
+  /**
    * Set warmth level (0-1)
    */
   setParameter(paramName: string, value: number): void {
+    let changed = false;
     switch (paramName) {
-      case 'warmth': this.setWarmth(value); break;
-      case 'silkEdge': this.setSilkEdge(value); break;
-      case 'emotion': this.setEmotion(value); break;
-      case 'power': this.setPower(value); break;
-      case 'balance': this.setBalance(value); break;
+      case 'warmth': this.setWarmth(value); changed = true; break;
+      case 'silkEdge': this.setSilkEdge(value); changed = true; break;
+      case 'emotion': this.setEmotion(value); changed = true; break;
+      case 'power': this.setPower(value); changed = true; break;
+      case 'balance': this.setBalance(value); changed = true; break;
       default: 
         // Unknown parameter - log in DEV mode only
         if (import.meta.env.DEV) {
           als.warning(`VelvetCurveEngine: Unknown parameter ${paramName}`);
         }
+    }
+    
+    // Explicit sync on manual interaction
+    if (changed) {
+        this.syncToRust();
     }
   }
 
