@@ -66,8 +66,19 @@ const FlowFader: React.FC<FlowFaderProps> = ({
     [onChange]
   );
 
-  const valueToDB = (v: number) =>
-    v === 0 ? "-∞" : `${(20 * Math.log10(v)).toFixed(1)} dB`;
+  // Convert value to doctrine-compliant level (no raw dB!)
+  // FLOW Doctrine: temperature/energy vocabulary
+  const valueToLevel = (v: number): string => {
+    if (v === 0) return "Silent";
+    if (v < 0.1) return "Whisper";
+    if (v < 0.25) return "Soft";
+    if (v < 0.5) return "Moderate";
+    if (v < 0.7) return "Present";
+    if (v < 0.85) return "Warm";
+    if (v < 0.95) return "Hot";
+    if (v < 1.1) return "Peak";
+    return "Limit";
+  };
 
   const handlePointerDown = useCallback(
     (event: React.PointerEvent<HTMLDivElement>) => {
@@ -194,7 +205,7 @@ const FlowFader: React.FC<FlowFaderProps> = ({
         pulse={pulse}
         showDB={showDB}
         showDBBubble={showDBBubble}
-        valueToDB={valueToDB}
+        valueToLevel={valueToLevel}
         value={value}
       >
         {showDB && showDBBubble && (
@@ -218,7 +229,7 @@ const FlowFader: React.FC<FlowFaderProps> = ({
               }
             )}
           >
-            {valueToDB(value)}
+            {valueToLevel(value)}
           </div>
         )}
       </PulsingFaderThumb>
@@ -316,10 +327,10 @@ const PulsingFaderThumb: React.FC<{
   pulse: number;
   showDB: boolean;
   showDBBubble: boolean;
-  valueToDB: (v: number) => string;
+  valueToLevel: (v: number) => string;
   value: number;
   children?: React.ReactNode;
-}> = ({ trackColor, glowColor, sliderRatio, intensity, pulse, showDB, showDBBubble, valueToDB, value, children }) => {
+}> = ({ trackColor, glowColor, sliderRatio, intensity, pulse, showDB, showDBBubble, valueToLevel, value, children }) => {
   const pulseOpacity = usePulseAnimation({
     duration: 1800,
     minOpacity: 0.95,
@@ -388,7 +399,7 @@ const PulsingFaderThumb: React.FC<{
             }
           )}
         >
-          {valueToDB(value)}
+          {valueToLevel(value)}
         </div>
       )}
       {children}

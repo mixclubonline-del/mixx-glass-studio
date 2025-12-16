@@ -937,7 +937,7 @@ const FlowChannelStrip: React.FC<FlowChannelStripProps> = memo(
                   color: 'rgba(230, 240, 255, 0.6)',
                 }
               )}>
-                Flow {(flow * 100).toFixed(0)}%
+                Flow {flow > 0.7 ? 'Intense' : flow > 0.4 ? 'Active' : 'Subtle'}
               </div>
               <div style={composeStyles(
                 typography.transform('uppercase'),
@@ -947,7 +947,7 @@ const FlowChannelStrip: React.FC<FlowChannelStripProps> = memo(
                   color: 'rgba(230, 240, 255, 0.6)',
                 }
               )}>
-                Pulse {(pulse * 100).toFixed(0)}%
+                Pulse {pulse > 0.7 ? 'Strong' : pulse > 0.3 ? 'Present' : 'Calm'}
               </div>
             </div>
 
@@ -983,7 +983,7 @@ const FlowChannelStrip: React.FC<FlowChannelStripProps> = memo(
                 }
               )}>
                 <span>Crest</span>
-                <span>{crestFactor.toFixed(2)}</span>
+                <span>{crestFactor > 12 ? 'Dynamic' : crestFactor > 6 ? 'Punchy' : 'Dense'}</span>
               </div>
               <div style={composeStyles(
                 layout.flex.container('row'),

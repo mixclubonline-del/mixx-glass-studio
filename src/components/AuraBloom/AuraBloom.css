@@ -1,0 +1,319 @@
+/**
+ * AURA Bloom Styles
+ * 
+ * Glassmorphic petal-based radial menu system.
+ * Organic leaf shapes with luminous edges and soft glows.
+ */
+
+/* ============================================
+   CONTAINER
+   ============================================ */
+
+.aura-bloom {
+  position: fixed;
+  z-index: 1000;
+  pointer-events: none;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.aura-bloom--welcome {
+  inset: 0;
+  background: radial-gradient(
+    ellipse at center,
+    rgba(10, 10, 15, 0.95) 0%,
+    rgba(10, 10, 15, 0.99) 100%
+  );
+}
+
+.aura-bloom--floating {
+  width: 400px;
+  height: 400px;
+}
+
+.aura-bloom__container {
+  position: relative;
+  width: 320px;
+  height: 320px;
+  pointer-events: auto;
+}
+
+/* ============================================
+   CORE (Center Hub)
+   ============================================ */
+
+.aura-core {
+  position: absolute;
+  left: 50%;
+  top: 50%;
+  transform: translate(-50%, -50%);
+  width: 100px;
+  height: 100px;
+  border-radius: 50%;
+  
+  /* Glassmorphism */
+  background: linear-gradient(
+    135deg,
+    rgba(139, 92, 246, 0.15) 0%,
+    rgba(10, 10, 15, 0.9) 100%
+  );
+  backdrop-filter: blur(24px) saturate(180%);
+  -webkit-backdrop-filter: blur(24px) saturate(180%);
+  border: 1px solid rgba(255, 255, 255, 0.12);
+  
+  /* Glow */
+  box-shadow:
+    0 0 40px rgba(139, 92, 246, 0.4),
+    inset 0 0 30px rgba(139, 92, 246, 0.15);
+  
+  /* Interactive */
+  cursor: pointer;
+  transition: transform 0.4s cubic-bezier(0.23, 1, 0.32, 1),
+              box-shadow 0.4s ease;
+  
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  z-index: 10;
+}
+
+.aura-core:hover {
+  transform: translate(-50%, -50%) scale(1.05);
+  box-shadow:
+    0 0 60px rgba(139, 92, 246, 0.6),
+    inset 0 0 40px rgba(139, 92, 246, 0.25);
+}
+
+.aura-core__title {
+  font-size: 16px;
+  font-weight: 700;
+  letter-spacing: 0.2em;
+  color: #fff;
+  text-shadow: 0 0 12px rgba(139, 92, 246, 0.8);
+  text-transform: uppercase;
+}
+
+.aura-core__subtitle {
+  font-size: 9px;
+  letter-spacing: 0.15em;
+  color: rgba(255, 255, 255, 0.5);
+  text-transform: uppercase;
+  margin-top: 4px;
+}
+
+/* Inner ring decoration */
+.aura-core::before {
+  content: '';
+  position: absolute;
+  inset: 6px;
+  border-radius: 50%;
+  border: 1px solid rgba(255, 255, 255, 0.08);
+  pointer-events: none;
+}
+
+/* ============================================
+   PETALS
+   ============================================ */
+
+.aura-petal {
+  position: absolute;
+  left: 50%;
+  top: 50%;
+  width: 80px;
+  height: 80px;
+  margin-left: -40px;
+  margin-top: -40px;
+  
+  /* Reset button styles */
+  border: none;
+  background: transparent;
+  cursor: pointer;
+  
+  /* Animation */
+  transition: transform 0.5s cubic-bezier(0.23, 1, 0.32, 1),
+              opacity 0.4s ease;
+  transform-origin: center center;
+  pointer-events: auto;
+}
+
+.aura-petal--closed {
+  transform: translate(0, 0) scale(0.3);
+  opacity: 0;
+  pointer-events: none;
+}
+
+.aura-petal:disabled {
+  cursor: not-allowed;
+  opacity: 0.4;
+}
+
+/* Petal SVG shape */
+.aura-petal__shape {
+  position: absolute;
+  inset: 0;
+  overflow: visible;
+}
+
+.aura-petal__path {
+  fill: rgba(139, 92, 246, 0.12);
+  stroke: rgba(255, 255, 255, 0.15);
+  stroke-width: 1;
+  transition: fill 0.3s ease, stroke 0.3s ease, filter 0.3s ease;
+  filter: drop-shadow(0 0 8px rgba(139, 92, 246, 0.3));
+}
+
+.aura-petal:hover .aura-petal__path,
+.aura-petal:focus-visible .aura-petal__path {
+  fill: rgba(139, 92, 246, 0.22);
+  stroke: rgba(255, 255, 255, 0.35);
+  filter: drop-shadow(0 0 20px rgba(139, 92, 246, 0.6));
+}
+
+/* Petal content */
+.aura-petal__content {
+  position: absolute;
+  inset: 0;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  pointer-events: none;
+  z-index: 1;
+}
+
+.aura-petal__icon {
+  width: 22px;
+  height: 22px;
+  color: rgba(255, 255, 255, 0.85);
+  margin-bottom: 4px;
+  transition: transform 0.3s ease, color 0.3s ease;
+}
+
+.aura-petal:hover .aura-petal__icon {
+  transform: scale(1.15);
+  color: #fff;
+}
+
+.aura-petal__label {
+  font-size: 9px;
+  font-weight: 600;
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+  color: rgba(255, 255, 255, 0.7);
+  transition: color 0.3s ease;
+}
+
+.aura-petal:hover .aura-petal__label {
+  color: #fff;
+}
+
+/* ============================================
+   ANIMATIONS
+   ============================================ */
+
+@keyframes aura-breathe {
+  0%, 100% {
+    transform: translate(-50%, -50%) scale(1);
+    box-shadow:
+      0 0 40px rgba(139, 92, 246, 0.4),
+      inset 0 0 30px rgba(139, 92, 246, 0.15);
+  }
+  50% {
+    transform: translate(-50%, -50%) scale(1.02);
+    box-shadow:
+      0 0 50px rgba(139, 92, 246, 0.5),
+      inset 0 0 35px rgba(139, 92, 246, 0.2);
+  }
+}
+
+.aura-core--breathing {
+  animation: aura-breathe 4s ease-in-out infinite;
+}
+
+@keyframes aura-petal-bloom {
+  from {
+    transform: translate(0, 0) scale(0.3);
+    opacity: 0;
+  }
+  to {
+    opacity: 1;
+  }
+}
+
+@keyframes aura-background-pulse {
+  0%, 100% {
+    opacity: 0.95;
+  }
+  50% {
+    opacity: 0.98;
+  }
+}
+
+.aura-bloom--welcome {
+  animation: aura-background-pulse 6s ease-in-out infinite;
+}
+
+/* ============================================
+   WELCOME MODE SPECIFICS
+   ============================================ */
+
+.aura-bloom--welcome .aura-bloom__container {
+  width: 420px;
+  height: 420px;
+}
+
+.aura-bloom--welcome .aura-core {
+  width: 130px;
+  height: 130px;
+}
+
+.aura-bloom--welcome .aura-core__title {
+  font-size: 20px;
+}
+
+.aura-bloom--welcome .aura-petal {
+  width: 96px;
+  height: 96px;
+  margin-left: -48px;
+  margin-top: -48px;
+}
+
+/* ============================================
+   TOOLTIP
+   ============================================ */
+
+.aura-tooltip {
+  position: absolute;
+  left: 50%;
+  top: -80px;
+  transform: translateX(-50%);
+  padding: 12px 20px;
+  
+  background: rgba(5, 5, 10, 0.95);
+  backdrop-filter: blur(16px);
+  border: 1px solid rgba(255, 255, 255, 0.1);
+  border-radius: 14px;
+  box-shadow: 0 0 40px rgba(139, 92, 246, 0.3);
+  
+  text-align: center;
+  pointer-events: none;
+  z-index: 100;
+  min-width: 140px;
+}
+
+.aura-tooltip__title {
+  font-size: 12px;
+  font-weight: 700;
+  letter-spacing: 0.15em;
+  text-transform: uppercase;
+  color: #fff;
+  margin-bottom: 4px;
+}
+
+.aura-tooltip__description {
+  font-size: 11px;
+  color: rgba(255, 255, 255, 0.6);
+  line-height: 1.4;
+}

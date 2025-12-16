@@ -55,6 +55,14 @@ export function CompGhost({
   // Color shifts from green to brighter green based on score
   const greenIntensity = Math.floor(100 + (bestTake.score * 155)); // 100-255
   
+  // ALS: Score to quality label (doctrine-compliant, no raw numbers)
+  const scoreToQuality = (score: number): string => {
+    if (score >= 0.9) return 'Excellent';
+    if (score >= 0.8) return 'Great';
+    if (score >= 0.7) return 'Good';
+    return 'Promising';
+  };
+  
   return (
     <div
       className="comp-ghost"
@@ -70,10 +78,11 @@ export function CompGhost({
         borderRight: `2px solid rgba(0, ${greenIntensity}, 0, ${Math.min(1.0, opacity * 3)})`,
         pointerEvents: 'none',
         zIndex: 4, // Above clips, below auto-punch and selection/playhead
-        boxShadow: `inset 0 0 20px rgba(0, ${greenIntensity}, 0, ${opacity * 0.4})`,
-        transition: 'opacity 0.3s ease-out, border-color 0.3s ease-out, left 0.1s linear, width 0.1s linear',
+        boxShadow: `inset 0 0 20px rgba(0, ${greenIntensity}, 0, ${opacity * 0.4}), 0 0 ${8 + bestTake.score * 12}px rgba(0, ${greenIntensity}, 0, ${opacity * 0.5})`,
+        transition: 'opacity 0.3s ease-out, border-color 0.3s ease-out, left 0.1s linear, width 0.1s linear, box-shadow 0.3s ease-out',
+        animation: bestTake.score >= 0.8 ? 'comp-pulse 2s ease-in-out infinite' : undefined,
       }}
-      title={`Best Take (Score: ${(bestTake.score * 100).toFixed(0)}%)`}
+      title={`Best Take: ${scoreToQuality(bestTake.score)}`}
     />
   );
 }

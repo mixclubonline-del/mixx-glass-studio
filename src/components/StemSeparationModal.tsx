@@ -79,7 +79,7 @@ const StemSeparationModal: React.FC<StemSeparationModalProps> = ({ onClose, onSe
             alsChannel="momentum"
             alsValue={selectedStems.size / availableStems.length}
           >
-            Separate ({selectedStems.size}) Stems
+            Separate {selectedStems.size >= 8 ? 'Full' : selectedStems.size >= 5 ? 'Multi' : selectedStems.size >= 2 ? 'Core' : 'Single'} Stems
           </MixxGlassButton>
         </MixxGlassDialogFooter>
       </form>

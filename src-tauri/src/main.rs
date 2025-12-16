@@ -5,7 +5,12 @@ mod flow_engine;
 mod quantum;
 mod git;
 mod dsp;
-mod analysis_engine; // Added
+mod stem_separation;  // Phase 33: Local Demucs
+use dsp::commands::*;
+use stem_separation::*;
+mod analysis_engine;
+mod local_llm;  // Phase 37: Local LLM
+use local_llm::*; // Added
 
 use flow_engine::FlowEngine;
 use quantum::superposition::{SuperpositionEngine, MeasurementBasis, CollapsePolicy};
@@ -263,7 +268,7 @@ fn quantum_get_superposition_status() -> Result<serde_json::Value, String> {
 fn set_phase_weave_params(width: f32, rotation: f32) -> Result<String, String> {
     let mut engine_guard = FLOW_ENGINE.lock().map_err(|e| format!("Failed to lock engine: {}", e))?;
 
-    if let Some(engine) = engine_guard.as_mut() {
+    if let Some(_engine) = engine_guard.as_mut() {
         mixx_core::update_phase_weave_params(width, rotation);
         Ok(format!("Phase Weave Updated: Width={:.2} Rotation={:.2}", width, rotation))
     } else {
@@ -553,163 +558,6 @@ fn effects_info() -> Vec<String> {
 }
 
 // ============================================================================
-// Master Chain Commands (Phase 24)
-// ============================================================================
-
-use mixx_core::master_chain::{MasterChain, MasteringProfile};
-use std::sync::RwLock;
-
-// Global Master Chain instance
-static MASTER_CHAIN: Lazy<RwLock<Option<MasterChain>>> = Lazy::new(|| RwLock::new(None));
-
-#[tauri::command]
-fn master_chain_create(sample_rate: f32, profile: u32) -> Result<String, String> {
-    let mastering_profile = MasteringProfile::from_value(profile);
-    let chain = MasterChain::new(sample_rate, mastering_profile);
-    
-    let mut guard = MASTER_CHAIN.write().map_err(|e| format!("Lock error: {}", e))?;
-    *guard = Some(chain);
-    
-    Ok(format!("Master chain created with {:?} profile", mastering_profile))
-}
-
-#[tauri::command]
-fn master_chain_set_profile(profile: u32) -> Result<String, String> {
-    let mut guard = MASTER_CHAIN.write().map_err(|e| format!("Lock error: {}", e))?;
-    
-    if let Some(ref mut chain) = *guard {
-        let mastering_profile = MasteringProfile::from_value(profile);
-        chain.apply_profile(mastering_profile);
-        Ok(format!("Profile set to {:?}", mastering_profile))
-    } else {
-        Err("Master chain not initialized".to_string())
-    }
-}
-
-#[tauri::command]
-fn master_chain_get_meters() -> Result<serde_json::Value, String> {
-    let guard = MASTER_CHAIN.read().map_err(|e| format!("Lock error: {}", e))?;
-    
-    if let Some(ref chain) = *guard {
-        let meters = chain.get_meters();
-        Ok(serde_json::json!({
-            "momentary_lufs": meters.momentary_lufs,
-            "short_term_lufs": meters.short_term_lufs,
-            "integrated_lufs": meters.integrated_lufs,
-            "true_peak_db": meters.true_peak_db,
-            "profile": format!("{:?}", chain.profile())
-        }))
-    } else {
-        Err("Master chain not initialized".to_string())
-    }
-}
-
-#[tauri::command]
-fn master_chain_set_parameter(name: String, value: f32) -> Result<String, String> {
-    let mut guard = MASTER_CHAIN.write().map_err(|e| format!("Lock error: {}", e))?;
-    
-    if let Some(ref mut chain) = *guard {
-        use mixx_core::processor::AudioProcessor;
-        chain.set_parameter(&name, value);
-        Ok(format!("Parameter {} set to {}", name, value))
-    } else {
-        Err("Master chain not initialized".to_string())
-    }
-}
-
-// ============================================================================
-// Audio Export Commands (Phase 24)
-// ============================================================================
-
-use mixx_core::audio_export::{AudioExporter, ExportConfig, ExportFormat};
-use mixx_core::mixx_plugins::{Dither, DitherType};
-
-#[tauri::command]
-async fn audio_export_wav(
-    path: String,
-    sample_rate: u32,
-    channels: u16,
-    bit_depth: u8,
-    samples: Vec<f32>,
-) -> Result<String, String> {
-    let format = match bit_depth {
-        16 => ExportFormat::Wav16,
-        24 => ExportFormat::Wav24,
-        32 => ExportFormat::Wav32Float,
-        _ => return Err(format!("Unsupported bit depth: {}", bit_depth)),
-    };
-    
-    // Apply TPDF dithering for non-float exports (Phase 24)
-    let processed_samples = if bit_depth < 32 {
-        let mut dither = Dither::new();
-        dither.bit_depth = bit_depth as u32;
-        dither.dither_type = DitherType::Triangular;
-        dither.noise_shaping = bit_depth == 16; // Enable noise shaping for 16-bit
-        
-        let mut output = samples.clone();
-        for chunk in output.chunks_mut(2) {
-            if chunk.len() == 2 {
-                let (l, r) = dither.process_stereo(chunk[0], chunk[1]);
-                chunk[0] = l;
-                chunk[1] = r;
-            }
-        }
-        output
-    } else {
-        samples
-    };
-    
-    let config = ExportConfig {
-        format,
-        sample_rate,
-        channels,
-        dither: false, // Already applied above
-        normalize: false,
-        normalize_target_lufs: -14.0,
-    };
-    
-    AudioExporter::export(&path, &processed_samples, &config, None)
-        .map_err(|e| format!("Export failed: {}", e))?;
-    
-    Ok(format!("Exported to {} with {}dB dither", path, if bit_depth < 32 { "TPDF" } else { "no" }))
-}
-
-#[tauri::command]
-fn audio_export_formats() -> Vec<serde_json::Value> {
-    vec![
-        serde_json::json!({"id": "wav16", "name": "WAV 16-bit", "extension": "wav"}),
-        serde_json::json!({"id": "wav24", "name": "WAV 24-bit", "extension": "wav"}),
-        serde_json::json!({"id": "wav32", "name": "WAV 32-bit float", "extension": "wav"}),
-        serde_json::json!({"id": "flac16", "name": "FLAC 16-bit", "extension": "flac"}),
-        serde_json::json!({"id": "flac24", "name": "FLAC 24-bit", "extension": "flac"}),
-    ]
-}
-
-// ============================================================================
-// Plugin Info Commands (Phase 24)
-// ============================================================================
-
-#[tauri::command]
-fn mixx_plugins_info() -> Vec<serde_json::Value> {
-    vec![
-        serde_json::json!({"name": "MixxVerb", "type": "Reverb", "params": ["mix", "time", "preDelay"]}),
-        serde_json::json!({"name": "MixxDelay", "type": "Delay", "params": ["time", "feedback", "mix", "tone"]}),
-        serde_json::json!({"name": "MixxGlue", "type": "Compressor", "params": ["threshold", "ratio", "release", "mix"]}),
-        serde_json::json!({"name": "MixxDrive", "type": "Saturator", "params": ["drive", "warmth", "mix", "color"]}),
-        serde_json::json!({"name": "MixxLimiter", "type": "Limiter", "params": ["ceiling", "drive", "lookahead"]}),
-        serde_json::json!({"name": "MixxClipper", "type": "Clipper", "params": ["ceiling", "drive", "softness", "mix"]}),
-        serde_json::json!({"name": "MixxAura", "type": "Widener", "params": ["tone", "width", "shine", "moodLock"]}),
-        serde_json::json!({"name": "MixxFX", "type": "Modulation", "params": ["drive", "tone", "depth", "mix"]}),
-        serde_json::json!({"name": "MixxPolish", "type": "Enhancer", "params": ["clarity", "air", "balance"]}),
-        serde_json::json!({"name": "MixxTune", "type": "VocalTuner", "params": ["retuneSpeed", "formant", "humanize", "mix"]}),
-        serde_json::json!({"name": "PrimeEQ", "type": "3BandEQ", "params": ["lowGain", "midGain", "highGain", "smartFocus"]}),
-        serde_json::json!({"name": "TimeWarp", "type": "TimeStretch", "params": ["stretch", "bend", "quantize", "slew"]}),
-        serde_json::json!({"name": "VelvetTruePeakLimiter", "type": "Limiter", "params": ["threshold", "lookahead"]}),
-        serde_json::json!({"name": "VelvetLoudnessMeter", "type": "Metering", "params": ["reset"]}),
-        serde_json::json!({"name": "Dither", "type": "Dither", "params": ["bit_depth", "dither_type", "noise_shaping"]}),
-    ]
-}
-
 fn main() {
     // Initialize logger for MixxEngine debug output
     // Set RUST_LOG=mixx_core=info to see engine logs, or RUST_LOG=debug for verbose
@@ -834,7 +682,19 @@ fn main() {
             audio_export_wav,
             audio_export_formats,
             // Phase 24: Plugin Info
-            mixx_plugins_info
+            mixx_plugins_info,
+            plugin_set_enabled,
+            plugin_set_bypass,
+            // Phase 33: Stem Separation Commands
+            stem_check_demucs,
+            stem_separate_with_demucs,
+            stem_get_models,
+            // Phase 37: Local LLM Commands
+            llm_check_ollama,
+            llm_complete,
+            llm_list_models,
+            llm_pull_model,
+            llm_aura_mixing_suggestion
         ])
         .run(tauri::generate_context!())
         .expect("error while running tauri application");

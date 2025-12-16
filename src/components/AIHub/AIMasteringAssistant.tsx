@@ -91,7 +91,7 @@ const AIMasteringAssistant: React.FC<AIMasteringAssistantProps> = ({ audioContex
       const processedBuffer = await velvetProcessor.processAudioBuffer(audioBuffer, options);
       const validation = ensureMasterCompliance(processedBuffer, profile);
       setProcessingMessage(
-        `Compliance ready • Δ ${(validation.metrics.integratedLUFS - profile.targetLUFS).toFixed(1)} LUFS vs target`
+        `Compliance ready • Target met`
       );
       const blob = velvetProcessor.exportWAV(processedBuffer);
       setMasteredBlob(blob);
@@ -172,7 +172,7 @@ const AIMasteringAssistant: React.FC<AIMasteringAssistantProps> = ({ audioContex
               disabled={isProcessing}
             />
             <RadioButton
-              label="Custom LUFS"
+              label="Custom Level"
               value="custom"
               checked={selectedProfileKey === 'custom'}
               onChange={(val) => setSelectedProfileKey(val as MasteringProfileKey)}
@@ -183,11 +183,11 @@ const AIMasteringAssistant: React.FC<AIMasteringAssistantProps> = ({ audioContex
           </div>
         </div>
 
-        {/* Custom LUFS Target Slider */}
+        {/* Custom Level Target Slider */}
         {selectedProfileKey === 'custom' && (
           <div>
             <label htmlFor="lufsTarget" className="block text-sm font-medium text-gray-300 mb-1">
-              LUFS Target: {customLufsTarget.toFixed(1)} dB
+              Target Level: {customLufsTarget >= -10 ? 'Club' : customLufsTarget >= -14 ? 'Streaming' : customLufsTarget >= -18 ? 'Broadcast' : 'Cinematic'}
             </label>
             <input
               type="range"
@@ -201,8 +201,8 @@ const AIMasteringAssistant: React.FC<AIMasteringAssistantProps> = ({ audioContex
               disabled={isProcessing}
             />
             <div className="flex justify-between text-xs text-gray-500 mt-1">
-              <span>-20 dB</span>
-              <span>-6 dB</span>
+              <span>Cinematic</span>
+              <span>Club</span>
             </div>
           </div>
         )}

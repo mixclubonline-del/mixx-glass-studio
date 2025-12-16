@@ -34,11 +34,19 @@ export const GlassFader: React.FC<GlassFaderProps> = ({
     onChangeRef.current = onChange;
   }, [onChange]);
 
-  // Convert value to dB
-  const valueToDB = (v: number) => {
-    if (v === 0) return "-∞";
-    return `${(20 * Math.log10(v)).toFixed(1)} dB`;
+  // Convert value to doctrine-compliant level (no raw dB!)
+  // FLOW Doctrine: temperature/energy vocabulary
+  const valueToLevel = (v: number): string => {
+    if (v === 0) return "Silent";
+    if (v < 0.1) return "Whisper";
+    if (v < 0.25) return "Soft";
+    if (v < 0.5) return "Moderate";
+    if (v < 0.7) return "Present";
+    if (v < 0.85) return "Warm";
+    if (v < 0.95) return "Hot";
+    return "Peak";
   };
+
 
   const handleMove = useCallback((e: MouseEvent | TouchEvent) => {
     if (!ref.current || !dragging) return;
@@ -133,7 +141,7 @@ export const GlassFader: React.FC<GlassFaderProps> = ({
       >
         {showDB && (
           <div className="glass-fader-db">
-            {valueToDB(value)}
+            {valueToLevel(value)}
           </div>
         )}
         <div className="glass-fader-glow" />

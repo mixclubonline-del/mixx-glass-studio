@@ -13,7 +13,6 @@
  */
 
 pub mod audio_format;
-// pub mod audio_io;  // Future: will replace cpal
 pub mod audio_io;
 pub mod clip_region;
 pub mod dsp_math;
@@ -31,11 +30,10 @@ pub mod resampler;
 pub mod session;
 pub mod tempo_map;
 pub mod track_mixer;
-pub mod simd_utils;
 pub mod velvet_curve;
+pub mod simd_utils;
 pub mod master_chain;
 pub mod audio_export;
 
 pub use audio_format::{AudioFile, AudioMetadata, FormatError, MixxAudioFormat};
 pub use dsp_math::Complex;
-

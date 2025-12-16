@@ -1,0 +1,383 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>AURA Bloom</title>
+  <style>
+    * {
+      margin: 0;
+      padding: 0;
+      box-sizing: border-box;
+    }
+
+    body {
+      min-height: 100vh;
+      background: linear-gradient(135deg, #0a0a12 0%, #12101a 50%, #0d0b14 100%);
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      font-family: 'Inter', -apple-system, BlinkMacSystemFont, sans-serif;
+      overflow: hidden;
+    }
+
+    .bloom-container {
+      position: relative;
+      width: 500px;
+      height: 500px;
+    }
+
+    /* Central AURA hub */
+    .bloom-core {
+      position: absolute;
+      left: 50%;
+      top: 50%;
+      transform: translate(-50%, -50%);
+      width: 120px;
+      height: 120px;
+      border-radius: 50%;
+      background: radial-gradient(circle at 30% 30%, 
+        rgba(100, 120, 180, 0.25) 0%, 
+        rgba(40, 50, 80, 0.6) 50%, 
+        rgba(20, 25, 45, 0.9) 100%
+      );
+      backdrop-filter: blur(20px);
+      -webkit-backdrop-filter: blur(20px);
+      border: 1px solid rgba(150, 180, 255, 0.15);
+      box-shadow: 
+        0 0 60px rgba(100, 150, 255, 0.2),
+        inset 0 0 40px rgba(100, 150, 255, 0.1);
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      z-index: 100;
+      cursor: pointer;
+      transition: transform 0.3s ease, box-shadow 0.3s ease;
+    }
+
+    .bloom-core:hover {
+      transform: translate(-50%, -50%) scale(1.05);
+      box-shadow: 
+        0 0 80px rgba(100, 150, 255, 0.35),
+        inset 0 0 50px rgba(100, 150, 255, 0.15);
+    }
+
+    .bloom-core-text {
+      font-size: 22px;
+      font-weight: 600;
+      letter-spacing: 0.25em;
+      color: rgba(255, 255, 255, 0.9);
+      text-shadow: 0 0 20px rgba(150, 200, 255, 0.6);
+    }
+
+    /* Petal wrapper */
+    .petal {
+      position: absolute;
+      left: 50%;
+      top: 50%;
+      width: 90px;
+      height: 160px;
+      transform-origin: center bottom;
+      cursor: pointer;
+      transition: filter 0.3s ease, transform 0.3s ease;
+    }
+
+    .petal:hover {
+      filter: brightness(1.3) drop-shadow(0 0 20px rgba(150, 200, 255, 0.5));
+      transform: var(--petal-transform) scale(1.08);
+    }
+
+    /* Petal SVG shape - organic teardrop */
+    .petal svg {
+      width: 100%;
+      height: 100%;
+      overflow: visible;
+    }
+
+    .petal-shape {
+      fill: url(#petalGradient);
+      stroke: rgba(180, 210, 255, 0.25);
+      stroke-width: 0.5;
+      filter: url(#petalGlow);
+    }
+
+    /* Petal content */
+    .petal-content {
+      position: absolute;
+      top: 25%;
+      left: 50%;
+      transform: translateX(-50%);
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      gap: 8px;
+      pointer-events: none;
+    }
+
+    .petal-icon {
+      width: 28px;
+      height: 28px;
+      stroke: rgba(200, 220, 255, 0.85);
+      stroke-width: 1.5;
+      fill: none;
+    }
+
+    .petal-label {
+      font-size: 11px;
+      font-weight: 500;
+      letter-spacing: 0.1em;
+      text-transform: uppercase;
+      color: rgba(200, 220, 255, 0.8);
+      text-shadow: 0 0 10px rgba(100, 150, 255, 0.5);
+    }
+
+    /* Position each petal */
+    .petal:nth-child(1) { --petal-transform: translate(-50%, -100%) rotate(0deg); transform: var(--petal-transform); }
+    .petal:nth-child(2) { --petal-transform: translate(-50%, -100%) rotate(45deg); transform: var(--petal-transform); }
+    .petal:nth-child(3) { --petal-transform: translate(-50%, -100%) rotate(90deg); transform: var(--petal-transform); }
+    .petal:nth-child(4) { --petal-transform: translate(-50%, -100%) rotate(135deg); transform: var(--petal-transform); }
+    .petal:nth-child(5) { --petal-transform: translate(-50%, -100%) rotate(180deg); transform: var(--petal-transform); }
+    .petal:nth-child(6) { --petal-transform: translate(-50%, -100%) rotate(225deg); transform: var(--petal-transform); }
+    .petal:nth-child(7) { --petal-transform: translate(-50%, -100%) rotate(270deg); transform: var(--petal-transform); }
+    .petal:nth-child(8) { --petal-transform: translate(-50%, -100%) rotate(315deg); transform: var(--petal-transform); }
+
+    /* Counter-rotate content to keep it upright */
+    .petal:nth-child(1) .petal-content { transform: translateX(-50%) rotate(0deg); }
+    .petal:nth-child(2) .petal-content { transform: translateX(-50%) rotate(-45deg); }
+    .petal:nth-child(3) .petal-content { transform: translateX(-50%) rotate(-90deg); }
+    .petal:nth-child(4) .petal-content { transform: translateX(-50%) rotate(-135deg); }
+    .petal:nth-child(5) .petal-content { transform: translateX(-50%) rotate(-180deg); }
+    .petal:nth-child(6) .petal-content { transform: translateX(-50%) rotate(-225deg); }
+    .petal:nth-child(7) .petal-content { transform: translateX(-50%) rotate(-270deg); }
+    .petal:nth-child(8) .petal-content { transform: translateX(-50%) rotate(-315deg); }
+
+    /* Ambient glow behind everything */
+    .ambient-glow {
+      position: absolute;
+      inset: -50px;
+      background: radial-gradient(circle at center, 
+        rgba(100, 150, 255, 0.08) 0%, 
+        transparent 60%
+      );
+      pointer-events: none;
+    }
+  </style>
+</head>
+<body>
+  <!-- SVG Defs for gradients and filters -->
+  <svg width="0" height="0" style="position:absolute">
+    <defs>
+      <!-- Organic petal gradient - cyan to purple -->
+      <linearGradient id="petalGradient" x1="0%" y1="0%" x2="100%" y2="100%">
+        <stop offset="0%" stop-color="rgba(100, 180, 255, 0.15)" />
+        <stop offset="50%" stop-color="rgba(140, 160, 220, 0.12)" />
+        <stop offset="100%" stop-color="rgba(180, 140, 220, 0.18)" />
+      </linearGradient>
+
+      <!-- Glow filter -->
+      <filter id="petalGlow" x="-50%" y="-50%" width="200%" height="200%">
+        <feGaussianBlur in="SourceGraphic" stdDeviation="4" result="blur" />
+        <feComposite in="SourceGraphic" in2="blur" operator="over" />
+      </filter>
+    </defs>
+  </svg>
+
+  <div class="bloom-container">
+    <div class="ambient-glow"></div>
+
+    <!-- 8 Petals - ADJUST THE PATH "d" ATTRIBUTE FOR ORGANIC CURVES -->
+    <div class="petal" data-action="brush">
+      <svg viewBox="0 0 90 160">
+        <path class="petal-shape" d="
+          M 45 160
+          C 20 130, 5 100, 10 60
+          C 15 30, 30 10, 45 5
+          C 60 10, 75 30, 80 60
+          C 85 100, 70 130, 45 160
+          Z
+        "/>
+      </svg>
+      <div class="petal-content">
+        <svg class="petal-icon" viewBox="0 0 24 24">
+          <path d="M3 17.25V21h3.75L17.81 9.94l-3.75-3.75L3 17.25z"/>
+          <path d="M20.71 7.04a1 1 0 0 0 0-1.41l-2.34-2.34a1 1 0 0 0-1.41 0l-1.83 1.83 3.75 3.75 1.83-1.83z"/>
+        </svg>
+        <span class="petal-label">Brush</span>
+      </div>
+    </div>
+
+    <div class="petal" data-action="layers">
+      <svg viewBox="0 0 90 160">
+        <path class="petal-shape" d="
+          M 45 160
+          C 20 130, 5 100, 10 60
+          C 15 30, 30 10, 45 5
+          C 60 10, 75 30, 80 60
+          C 85 100, 70 130, 45 160
+          Z
+        "/>
+      </svg>
+      <div class="petal-content">
+        <svg class="petal-icon" viewBox="0 0 24 24">
+          <path d="M12 2L2 7l10 5 10-5-10-5z"/>
+          <path d="M2 17l10 5 10-5"/>
+          <path d="M2 12l10 5 10-5"/>
+        </svg>
+        <span class="petal-label">Layers</span>
+      </div>
+    </div>
+
+    <div class="petal" data-action="adjust">
+      <svg viewBox="0 0 90 160">
+        <path class="petal-shape" d="
+          M 45 160
+          C 20 130, 5 100, 10 60
+          C 15 30, 30 10, 45 5
+          C 60 10, 75 30, 80 60
+          C 85 100, 70 130, 45 160
+          Z
+        "/>
+      </svg>
+      <div class="petal-content">
+        <svg class="petal-icon" viewBox="0 0 24 24">
+          <line x1="4" y1="21" x2="4" y2="14"/>
+          <line x1="4" y1="10" x2="4" y2="3"/>
+          <line x1="12" y1="21" x2="12" y2="12"/>
+          <line x1="12" y1="8" x2="12" y2="3"/>
+          <line x1="20" y1="21" x2="20" y2="16"/>
+          <line x1="20" y1="12" x2="20" y2="3"/>
+          <circle cx="4" cy="12" r="2"/>
+          <circle cx="12" cy="10" r="2"/>
+          <circle cx="20" cy="14" r="2"/>
+        </svg>
+        <span class="petal-label">Adjust</span>
+      </div>
+    </div>
+
+    <div class="petal" data-action="filters">
+      <svg viewBox="0 0 90 160">
+        <path class="petal-shape" d="
+          M 45 160
+          C 20 130, 5 100, 10 60
+          C 15 30, 30 10, 45 5
+          C 60 10, 75 30, 80 60
+          C 85 100, 70 130, 45 160
+          Z
+        "/>
+      </svg>
+      <div class="petal-content">
+        <svg class="petal-icon" viewBox="0 0 24 24">
+          <circle cx="9" cy="9" r="6"/>
+          <circle cx="15" cy="15" r="6"/>
+        </svg>
+        <span class="petal-label">Filters</span>
+      </div>
+    </div>
+
+    <div class="petal" data-action="export">
+      <svg viewBox="0 0 90 160">
+        <path class="petal-shape" d="
+          M 45 160
+          C 20 130, 5 100, 10 60
+          C 15 30, 30 10, 45 5
+          C 60 10, 75 30, 80 60
+          C 85 100, 70 130, 45 160
+          Z
+        "/>
+      </svg>
+      <div class="petal-content">
+        <svg class="petal-icon" viewBox="0 0 24 24">
+          <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/>
+          <polyline points="17 8 12 3 7 8"/>
+          <line x1="12" y1="3" x2="12" y2="15"/>
+        </svg>
+        <span class="petal-label">Export</span>
+      </div>
+    </div>
+
+    <div class="petal" data-action="settings">
+      <svg viewBox="0 0 90 160">
+        <path class="petal-shape" d="
+          M 45 160
+          C 20 130, 5 100, 10 60
+          C 15 30, 30 10, 45 5
+          C 60 10, 75 30, 80 60
+          C 85 100, 70 130, 45 160
+          Z
+        "/>
+      </svg>
+      <div class="petal-content">
+        <svg class="petal-icon" viewBox="0 0 24 24">
+          <circle cx="12" cy="12" r="3"/>
+          <path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 0 1-2.83 2.83l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-4 0v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 0 1-2.83-2.83l.06-.06a1.65 1.65 0 0 0 .33-1.82 1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1 0-4h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 0 1 2.83-2.83l.06.06a1.65 1.65 0 0 0 1.82.33H9a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 4 0v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 0 1 2.83 2.83l-.06.06a1.65 1.65 0 0 0-.33 1.82V9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 0 4h-.09a1.65 1.65 0 0 0-1.51 1z"/>
+        </svg>
+        <span class="petal-label">Settings</span>
+      </div>
+    </div>
+
+    <div class="petal" data-action="help">
+      <svg viewBox="0 0 90 160">
+        <path class="petal-shape" d="
+          M 45 160
+          C 20 130, 5 100, 10 60
+          C 15 30, 30 10, 45 5
+          C 60 10, 75 30, 80 60
+          C 85 100, 70 130, 45 160
+          Z
+        "/>
+      </svg>
+      <div class="petal-content">
+        <svg class="petal-icon" viewBox="0 0 24 24">
+          <circle cx="12" cy="12" r="10"/>
+          <path d="M9.09 9a3 3 0 0 1 5.83 1c0 2-3 3-3 3"/>
+          <line x1="12" y1="17" x2="12.01" y2="17"/>
+        </svg>
+        <span class="petal-label">Help</span>
+      </div>
+    </div>
+
+    <div class="petal" data-action="share">
+      <svg viewBox="0 0 90 160">
+        <path class="petal-shape" d="
+          M 45 160
+          C 20 130, 5 100, 10 60
+          C 15 30, 30 10, 45 5
+          C 60 10, 75 30, 80 60
+          C 85 100, 70 130, 45 160
+          Z
+        "/>
+      </svg>
+      <div class="petal-content">
+        <svg class="petal-icon" viewBox="0 0 24 24">
+          <circle cx="18" cy="5" r="3"/>
+          <circle cx="6" cy="12" r="3"/>
+          <circle cx="18" cy="19" r="3"/>
+          <line x1="8.59" y1="13.51" x2="15.42" y2="17.49"/>
+          <line x1="15.41" y1="6.51" x2="8.59" y2="10.49"/>
+        </svg>
+        <span class="petal-label">Share</span>
+      </div>
+    </div>
+
+    <!-- Central hub -->
+    <div class="bloom-core">
+      <span class="bloom-core-text">AURA</span>
+    </div>
+  </div>
+
+  <script>
+    // Click handlers
+    document.querySelectorAll('.petal').forEach(petal => {
+      petal.addEventListener('click', () => {
+        const action = petal.dataset.action;
+        console.log('Petal clicked:', action);
+        // Replace with your action handler
+      });
+    });
+
+    document.querySelector('.bloom-core').addEventListener('click', () => {
+      console.log('Core clicked - toggle menu');
+    });
+  </script>
+</body>
+</html>

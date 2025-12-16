@@ -26,7 +26,6 @@
     "@google/genai": "^1.28.0",
     "@google/generative-ai": "^0.24.1",
     "@hookform/resolvers": "^3.3.2",
-    "@supabase/supabase-js": "^2.38.4",
     "@tauri-apps/api": "^2.9.0",
     "@tensorflow/tfjs": "^4.22.0",
     "@tensorflow/tfjs-backend-webgpu": "^4.22.0",

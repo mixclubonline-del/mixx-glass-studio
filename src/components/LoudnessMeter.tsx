@@ -36,26 +36,46 @@ export function LoudnessMeter({
   // Determine if true peak is clipping
   const isClipping = useMemo(() => truePeak > -0.1, [truePeak]);
 
+  // FLOW Doctrine: Convert LUFS to energy vocabulary (no raw numbers!)
+  const lufsToEnergy = (lufs: number): string => {
+    if (!isFinite(lufs) || lufs < -50) return "Silent";
+    if (lufs < -30) return "Quiet";
+    if (lufs < -20) return "Subtle";
+    if (lufs < -16) return "Moderate";
+    if (lufs < -12) return "Present";
+    if (lufs < -8) return "Warm";
+    if (lufs < -4) return "Hot";
+    return "Loud";
+  };
+
+  // Map target to description
+  const getTargetDescription = (): string => {
+    if (targetLUFS >= -10) return "Club";
+    if (targetLUFS >= -14) return "Streaming";
+    if (targetLUFS >= -20) return "Broadcast";
+    return "Cinematic";
+  };
+
   if (compact) {
     return (
       <div className={`loudness-meter-compact ${className}`} style={styles.compact}>
         <div style={styles.compactValue}>
-          <span style={styles.label}>LUFS</span>
+          <span style={styles.label}>LEVEL</span>
           <span style={{
             ...styles.value,
             color: isOverTarget(integrated) ? '#ff4444' : '#00ff88',
           }}>
-            {formatted.integrated}
+            {lufsToEnergy(integrated)}
           </span>
         </div>
         {showTruePeak && (
           <div style={styles.compactValue}>
-            <span style={styles.label}>TP</span>
+            <span style={styles.label}>PEAK</span>
             <span style={{
               ...styles.value,
               color: isClipping ? '#ff4444' : '#aaaaaa',
             }}>
-              {formatted.truePeak}
+              {isClipping ? 'Clipping!' : 'Safe'}
             </span>
           </div>
         )}
@@ -88,7 +108,7 @@ export function LoudnessMeter({
             }}
           />
         </div>
-        <span style={styles.value}>{formatted.momentary}</span>
+        <span style={styles.value}>{lufsToEnergy(momentary)}</span>
       </div>
 
       {/* Short-term */}
@@ -109,7 +129,7 @@ export function LoudnessMeter({
             }}
           />
         </div>
-        <span style={styles.value}>{formatted.shortTerm}</span>
+        <span style={styles.value}>{lufsToEnergy(shortTerm)}</span>
       </div>
 
       {/* Integrated */}
@@ -134,14 +154,14 @@ export function LoudnessMeter({
           ...styles.value,
           fontWeight: 'bold',
         }}>
-          {formatted.integrated}
+          {lufsToEnergy(integrated)}
         </span>
       </div>
 
       {/* True Peak */}
       {showTruePeak && (
         <div style={styles.meterRow}>
-          <span style={styles.label}>TP</span>
+          <span style={styles.label}>PEAK</span>
           <div style={styles.barContainer}>
             <div
               style={{
@@ -155,14 +175,14 @@ export function LoudnessMeter({
             ...styles.value,
             color: isClipping ? '#ff0000' : 'inherit',
           }}>
-            {formatted.truePeak}
+            {isClipping ? 'Clipping!' : 'Safe'}
           </span>
         </div>
       )}
 
       {/* Target indicator */}
       <div style={styles.footer}>
-        <span style={styles.targetLabel}>Target: {targetLUFS} LUFS</span>
+        <span style={styles.targetLabel}>Target: {getTargetDescription()}</span>
       </div>
     </div>
   );

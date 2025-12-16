@@ -38,3 +38,13 @@ export {
   type BenchmarkResult,
 } from './WebGPUBenchmark';
 
+
+// Phase 35: GPU Audio Processing
+export {
+  getGPUAudioProcessor,
+  initializeGPUAudio,
+  gpuFFT,
+  gpuSpectralAnalysis,
+  type GPUAudioStatus,
+  type SpectralAnalysis,
+} from './GPUAudioProcessor';

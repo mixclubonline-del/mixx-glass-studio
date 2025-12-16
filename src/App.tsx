@@ -1,4 +1,5 @@
 import React, { useState, useRef, createRef, useCallback, useEffect, useMemo } from 'react';
+import { DomainBridge, useMixerBridgeSync, useTransportBridgeSync } from './domains';
 import FXWindow from './components/FXWindow';
 import FXRack from './components/FXRack';
 import AdaptiveWaveformHeader from './components/AdaptiveWaveformHeader';
@@ -20,7 +21,7 @@ import { useArrange, ArrangeClip, ClipId } from "./hooks/useArrange";
 import { ArrangeWindow } from "./components/ArrangeWindow";
 import { FlowTransitionEngine } from "./components/flow/FlowTransitionEngine";
 import { WideGlassConsole } from "./components/mixer/WideGlassConsole";
-import FlowWelcomeHub from './components/FlowWelcomeHub';
+import { AuraWelcome, AuraFloatingHub } from './components/AuraBloom';
 import ImportModal from './components/ImportModal';
 import FlowConsole from './components/mixer/Mixer';
 import TrapSamplerConsole from './components/sampler/TrapSamplerConsole';
@@ -69,6 +70,7 @@ import { usePrimeBrainExporter } from './ai/usePrimeBrainExporter';
 import { useStemSeparationExporter } from './core/import/useStemSeparationExporter';
 import { recordPrimeBrainEvent, subscribeToPrimeBrainEvents, type PrimeBrainEvent } from './ai/primeBrainEvents';
 import { PrimeBrainDebugOverlay } from './components/dev/PrimeBrainDebugOverlay';
+import { AuraBloomTestButton } from './components/dev/AuraBloomTestButton';
 import { FlowLoopWrapper } from './core/loop/FlowLoopWrapper';
 import { recordViewSwitch, updatePlaybackState, updateRecordState } from './core/loop/flowLoopEvents';
 import { initThermalSync } from './core/als/thermalSync';
@@ -1370,6 +1372,21 @@ const FlowRuntime: React.FC<FlowRuntimeProps> = ({ arrangeFocusToken }) => {
   const [mixerSettings, setMixerSettings] = useState<{ [key: string]: MixerSettings }>(() => createInitialMixerSettings());
   const [soloedTracks, setSoloedTracks] = useState(new Set<string>());
   const [masterVolume, setMasterVolume] = useState(0.8);
+
+  // --- DOMAIN BRIDGE SYNC ---
+  // Sync FlowRuntime state to domain contexts for child components
+  useMixerBridgeSync({
+    mixerSettings,
+    soloedTracks,
+    masterVolume,
+  });
+  useTransportBridgeSync({
+    isPlaying,
+    currentTime,
+    bpm,
+    isLooping,
+  });
+
   const [masterBalance, setMasterBalance] = useState(0);
   const [translationProfile, setTranslationProfile] = useState<TranslationProfileKey>('flat');
   const [recordingOptions, setRecordingOptions] = useState(() => ({ ...INITIAL_RECORDING_OPTIONS }));
@@ -7826,11 +7843,10 @@ const FlowRuntime: React.FC<FlowRuntimeProps> = ({ arrangeFocusToken }) => {
         </OverlayPortal>
 
         <OverlayPortal containerId="mixx-bloom-floating-portal">
-          <BloomFloatingHub
-            menuConfig={bloomFloatingMenu}
-            alsPulseAgent={bloomPulseAgent}
+          <AuraFloatingHub
             position={floatingBloomPosition}
             onPositionChange={handleFloatingBloomPositionChange}
+            alsPulseAgent={bloomPulseAgent}
           />
         </OverlayPortal>
 
@@ -7980,6 +7996,9 @@ const FlowRuntime: React.FC<FlowRuntimeProps> = ({ arrangeFocusToken }) => {
           flowContext={flowContext}
           snapshotInputs={primeBrainSnapshotInputs}
         />
+        
+        {/* AURA Bloom Test Button (dev only) */}
+        <AuraBloomTestButton />
         
         <FileInput
           ref={fileInputRef}
@@ -8409,10 +8428,14 @@ const App: React.FC = () => {
   }, [hasEnteredFlow]);
 
   if (!hasEnteredFlow) {
-    return <FlowWelcomeHub onEnterFlow={handleEnterFlow} />;
+    return <AuraWelcome onEnterFlow={handleEnterFlow} />;
   }
 
-  return <FlowRuntime arrangeFocusToken={arrangeFocusToken} />;
+  return (
+    <DomainBridge>
+      <FlowRuntime arrangeFocusToken={arrangeFocusToken} />
+    </DomainBridge>
+  );
 };
 
 export default App;

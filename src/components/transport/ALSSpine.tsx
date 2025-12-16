@@ -160,16 +160,16 @@ const ALSSpine: React.FC<ALSSpineProps> = ({
           }}
         >
           <div style={{ marginBottom: '2px' }}>
-            Level: {(clampedLevel * 100).toFixed(1)}%
+            Level: {clampedLevel >= 0.95 ? 'Peak' : clampedLevel >= 0.8 ? 'Hot' : clampedLevel >= 0.5 ? 'Present' : clampedLevel >= 0.2 ? 'Soft' : 'Quiet'}
           </div>
           {lufs !== undefined && (
             <div style={{ marginBottom: '2px' }}>
-              LUFS: {lufs.toFixed(1)}
+              Energy: {lufs > -10 ? 'Loud' : lufs > -14 ? 'Strong' : lufs > -18 ? 'Moderate' : lufs > -24 ? 'Subtle' : 'Quiet'}
             </div>
           )}
           {clampedPeak > 0 && (
             <div>
-              Peak: {(clampedPeak * 100).toFixed(1)}%
+              Peak: {clampedPeak >= 0.95 ? 'Clipping!' : clampedPeak >= 0.8 ? 'Hot' : 'Safe'}
             </div>
           )}
         </div>

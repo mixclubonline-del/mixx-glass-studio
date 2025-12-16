@@ -20,6 +20,22 @@ export interface ExportOptions {
   samples: Float32Array;
 }
 
+// Check if we're in Tauri environment
+const isTauri = typeof window !== 'undefined' && '__TAURI__' in window;
+
+// Helper to dynamically import Tauri dialog at runtime (bypasses Vite static analysis)
+async function getTauriDialog(): Promise<{ save: (options: unknown) => Promise<string | null> } | null> {
+  if (!isTauri) return null;
+  try {
+    // Use Function constructor to create truly dynamic import that Vite won't analyze
+    const importFn = new Function('specifier', 'return import(specifier)');
+    const module = await importFn('@tauri-apps/api/dialog');
+    return module;
+  } catch {
+    return null;
+  }
+}
+
 export function useAudioExport() {
   const [state, setState] = useState<ExportState>({
     isExporting: false,
@@ -52,17 +68,25 @@ export function useAudioExport() {
     } = options;
 
     try {
-      // Dynamic import to avoid build errors if dialog plugin not installed
-      const { save } = await import('@tauri-apps/api/dialog');
+      let path: string | null = null;
       
-      // Show save dialog
-      const path = await save({
-        filters: [{
-          name: 'Audio Files',
-          extensions: ['wav'],
-        }],
-        defaultPath: `export_${Date.now()}.wav`,
-      });
+      // Try to use Tauri dialog if available
+      const dialogModule = await getTauriDialog();
+      if (dialogModule) {
+        path = await dialogModule.save({
+          filters: [{
+            name: 'Audio Files',
+            extensions: ['wav'],
+          }],
+          defaultPath: `export_${Date.now()}.wav`,
+        });
+      }
+      
+      // Web fallback
+      if (!path && !isTauri) {
+        console.log('[AudioExport] Web mode - using default path');
+        path = `export_${Date.now()}.wav`;
+      }
 
       if (!path) {
         return null; // User cancelled

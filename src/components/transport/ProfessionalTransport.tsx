@@ -3,10 +3,23 @@
  * 
  * Studio-grade transport controls with glass aesthetic.
  * Replaces toy-like buttons with precise, tactile controls.
+ * ALS-integrated: play button pulses when playing.
  */
 
 import React from 'react';
 import { PlayIcon, PauseIcon, RewindIcon, FastForwardIcon, LoopIcon } from '../icons';
+
+// ALS Transport Styles - inject pulse animations
+const alsTransportStyles = `
+  @keyframes transport-play-pulse {
+    0%, 100% { box-shadow: 0 6px 18px rgba(110,86,255,0.18); }
+    50% { box-shadow: 0 6px 24px rgba(110,86,255,0.35), 0 0 12px rgba(110,86,255,0.3); }
+  }
+  @keyframes transport-loop-pulse {
+    0%, 100% { box-shadow: 0 0 4px rgba(139,123,255,0.3); }
+    50% { box-shadow: 0 0 10px rgba(139,123,255,0.5); }
+  }
+`;
 
 interface ProfessionalTransportProps {
   isPlaying: boolean;
@@ -43,22 +56,25 @@ export const ProfessionalTransport: React.FC<ProfessionalTransportProps> = ({
   className = '',
 }) => {
   return (
-    <div
-      className={`transport-slab ${className}`}
-      style={{
-        display: 'flex',
-        gap: '12px',
-        alignItems: 'center',
-        justifyContent: 'center',
-        padding: '10px 16px',
-        borderRadius: '12px',
-        background: 'linear-gradient(180deg, rgba(255,255,255,0.82), rgba(240,238,255,0.6))',
-        boxShadow: '0 6px 18px rgba(68,54,120,0.08), inset 0 1px 0 rgba(255,255,255,0.5)',
-        border: '1px solid var(--glass-border)',
-        backdropFilter: 'blur(10px) saturate(120%)',
-        WebkitBackdropFilter: 'blur(10px) saturate(120%)',
-      }}
-    >
+    <>
+      {/* ALS: Inject animation styles */}
+      <style>{alsTransportStyles}</style>
+      <div
+        className={`transport-slab ${className}`}
+        style={{
+          display: 'flex',
+          gap: '12px',
+          alignItems: 'center',
+          justifyContent: 'center',
+          padding: '10px 16px',
+          borderRadius: '12px',
+          background: 'linear-gradient(180deg, rgba(255,255,255,0.82), rgba(240,238,255,0.6))',
+          boxShadow: '0 6px 18px rgba(68,54,120,0.08), inset 0 1px 0 rgba(255,255,255,0.5)',
+          border: '1px solid var(--glass-border)',
+          backdropFilter: 'blur(10px) saturate(120%)',
+          WebkitBackdropFilter: 'blur(10px) saturate(120%)',
+        }}
+      >
       {/* Cue backward */}
       <button
         type="button"
@@ -116,12 +132,15 @@ export const ProfessionalTransport: React.FC<ProfessionalTransportProps> = ({
           alignItems: 'center',
           justifyContent: 'center',
           background: `linear-gradient(180deg, var(--accent), var(--accent-strong))`,
-          boxShadow: '0 6px 18px rgba(110,86,255,0.18)',
+          boxShadow: isPlaying 
+            ? '0 6px 24px rgba(110,86,255,0.35), 0 0 12px rgba(110,86,255,0.3)'
+            : '0 6px 18px rgba(110,86,255,0.18)',
           border: 'none',
           color: 'white',
           cursor: 'pointer',
           transformOrigin: 'center',
           transition: 'all 0.15s ease',
+          animation: isPlaying ? 'transport-play-pulse 1.5s ease-in-out infinite' : 'none',
         }}
         onMouseEnter={(e) => {
           e.currentTarget.style.transform = 'translateY(-2px) scale(1.02)';
@@ -229,6 +248,7 @@ export const ProfessionalTransport: React.FC<ProfessionalTransportProps> = ({
           cursor: 'pointer',
           transition: 'all 0.15s ease',
           position: 'relative',
+          animation: isLooping ? 'transport-loop-pulse 2s ease-in-out infinite' : 'none',
         }}
         onMouseEnter={(e) => {
           e.currentTarget.style.background = isLooping
@@ -266,7 +286,8 @@ export const ProfessionalTransport: React.FC<ProfessionalTransportProps> = ({
           />
         )}
       </button>
-    </div>
+      </div>
+    </>
   );
 };
 

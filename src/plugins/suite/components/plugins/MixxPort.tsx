@@ -1,9 +1,9 @@
 
-import React, { useState, useEffect } from 'react';
+import React, { useState } from 'react';
+import { invoke } from '@tauri-apps/api/core';
 import { PluginContainer } from '../shared/PluginContainer';
 import { Knob } from '../shared/Knob';
 import { MixxPortSettings, PluginComponentProps } from '../../types';
-import { PrimeBrainStub } from '../../lib/PrimeBrainStub';
 
 const SegmentedControl: React.FC<{ label: string, options: string[], value: string, onChange: (val: string) => void }> = ({ label, options, value, onChange }) => (
     <div className="flex flex-col items-center gap-2">
@@ -79,7 +79,8 @@ const RenderVisualizer: React.FC<{ progress: number, isRendering: boolean, isCom
                     0% { transform: rotate(var(--angle)) translateY(0) scale(0); opacity: 1; }
                     100% { transform: rotate(var(--angle)) translateY(${radius}px) scale(1); opacity: 0; }
                 }
-            `}</style>
+            `}
+            </style>
              <div className="absolute font-orbitron text-2xl text-violet-200">{Math.round(progress)}%</div>
         </div>
     );
@@ -91,30 +92,55 @@ export const MixxPort: React.FC<PluginComponentProps<MixxPortSettings>> = ({
     const { format, quality } = pluginState;
     const [isRendering, setIsRendering] = useState(false);
     const [progress, setProgress] = useState(0);
+    const [error, setError] = useState<string | null>(null);
 
     const handleValueChange = (param: keyof MixxPortSettings, value: number | string) => {
         setPluginState({ [param]: value });
-        PrimeBrainStub.sendEvent('parameter_change', { plugin: 'mixx-port', parameter: param, value });
     };
 
-    const startRender = () => {
+    const startRender = async () => {
         if (isRendering) return;
         setIsRendering(true);
         setProgress(0);
-        PrimeBrainStub.sendEvent('export_started', { format, quality });
+        setError(null);
 
-        const interval = setInterval(() => {
-            setProgress(prev => {
-                const next = prev + Math.random() * 5;
-                if (next >= 100) {
-                    clearInterval(interval);
-                    setIsRendering(false);
-                    PrimeBrainStub.sendEvent('export_finished', { format, quality });
-                    return 100;
-                }
-                return next;
+        try {
+            // Get bit depth from quality (0-100 maps to 16/24/32)
+            const bitDepth = quality < 33 ? 16 : quality < 66 ? 24 : 32;
+            
+            // For now, export a test tone (in real usage, this would come from the engine)
+            const sampleRate = 48000;
+            const duration = 1; // 1 second test
+            const samples = new Float32Array(sampleRate * 2 * duration);
+            for (let i = 0; i < samples.length; i += 2) {
+                const t = i / 2 / sampleRate;
+                const tone = Math.sin(2 * Math.PI * 440 * t) * 0.5;
+                samples[i] = tone;
+                samples[i + 1] = tone;
+            }
+
+            // Simulate progress while exporting
+            const progressInterval = setInterval(() => {
+                setProgress(p => Math.min(p + 10, 90));
+            }, 100);
+
+            const result = await invoke<string>('audio_export_wav', {
+                path: `/tmp/mixx_export_${Date.now()}.wav`,
+                sampleRate,
+                channels: 2,
+                bitDepth,
+                samples: Array.from(samples),
             });
-        }, 100);
+
+            clearInterval(progressInterval);
+            setProgress(100);
+            console.log('Export result:', result);
+        } catch (err) {
+            setError(err instanceof Error ? err.message : String(err));
+            console.error('Export failed:', err);
+        } finally {
+            setTimeout(() => setIsRendering(false), 500);
+        }
     };
 
     const isComplete = progress === 100;
@@ -124,8 +150,12 @@ export const MixxPort: React.FC<PluginComponentProps<MixxPortSettings>> = ({
             <div className="w-full h-full flex flex-col items-center justify-center gap-8 p-4">
                 <RenderVisualizer progress={progress} isRendering={isRendering} isComplete={isComplete} />
 
+                {error && (
+                    <div className="text-red-400 text-sm">{error}</div>
+                )}
+
                 <div className="flex flex-wrap justify-center items-center gap-4">
-                    <SegmentedControl label="Format" options={['wav', 'mp3', 'mixx']} value={format} onChange={(v) => handleValueChange('format', v)} />
+                    <SegmentedControl label="Format" options={['wav', 'flac']} value={format === 'mp3' ? 'wav' : format} onChange={(v) => handleValueChange('format', v)} />
                     <Knob label="Quality" value={quality} setValue={(v) => handleValueChange('quality', v)} paramName="quality" isLearning={isLearning('quality')} onMidiLearn={onMidiLearn} />
                 </div>
                 

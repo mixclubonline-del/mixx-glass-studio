@@ -66,6 +66,13 @@ export function AutoPunchGhost({
   // Opacity based on confidence (0.4-1.0 maps to 0.25-0.45)
   const opacity = 0.25 + (ghost.confidence - 0.4) * (0.45 - 0.25) / (1.0 - 0.4);
   
+  // ALS: Confidence to prediction quality (doctrine-compliant, no raw numbers)
+  const confidenceToLabel = (c: number): string => {
+    if (c >= 0.8) return 'Strong';
+    if (c >= 0.6) return 'Likely';
+    return 'Possible';
+  };
+  
   return (
     <div
       className="auto-punch-ghost"
@@ -81,10 +88,11 @@ export function AutoPunchGhost({
         borderRight: `2px solid rgba(255, 0, 0, ${Math.min(1.0, opacity * 2)})`,
         pointerEvents: 'none',
         zIndex: 5, // Above clips, below selection/playhead
-        boxShadow: `inset 0 0 20px rgba(255, 0, 0, ${opacity * 0.3})`,
-        transition: 'opacity 0.2s ease-out, border-color 0.2s ease-out, left 0.1s linear, width 0.1s linear',
+        boxShadow: `inset 0 0 20px rgba(255, 0, 0, ${opacity * 0.3}), 0 0 ${6 + ghost.confidence * 10}px rgba(255, 0, 0, ${opacity * 0.4})`,
+        transition: 'opacity 0.2s ease-out, border-color 0.2s ease-out, left 0.1s linear, width 0.1s linear, box-shadow 0.2s ease-out',
+        animation: ghost.confidence >= 0.7 ? 'punch-pulse 1.5s ease-in-out infinite' : undefined,
       }}
-      title={`Auto-Punch Prediction (${(ghost.confidence * 100).toFixed(0)}% confidence)`}
+      title={`Auto-Punch: ${confidenceToLabel(ghost.confidence)} prediction`}
     />
   );
 }

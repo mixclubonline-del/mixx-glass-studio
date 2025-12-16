@@ -121,7 +121,7 @@ const TrackCapsule: React.FC<TrackCapsuleProps> = ({
               </div>
               <div className="text-right">
                 <div className="text-lg font-semibold text-ink">
-                  {(alsFeedback.intensity * 100).toFixed(0)}%
+                  {alsFeedback.intensity >= 0.8 ? 'Intense' : alsFeedback.intensity >= 0.5 ? 'Present' : alsFeedback.intensity >= 0.2 ? 'Subtle' : 'Calm'}
                 </div>
                 <div className="text-xs uppercase tracking-[0.35em] text-ink/60">
                   ALS Energy
@@ -132,7 +132,7 @@ const TrackCapsule: React.FC<TrackCapsuleProps> = ({
             <div className="rounded-2xl border border-white/10 bg-white/2 backdrop-blur px-4 py-3 space-y-3">
               <div className="flex items-center justify-between text-sm text-ink/80">
                 <span>Lane Height</span>
-                <span>{Math.round(laneHeight)} px</span>
+                <span>{laneHeight >= 180 ? 'Expanded' : laneHeight >= 100 ? 'Standard' : laneHeight >= 60 ? 'Compact' : 'Collapsed'}</span>
               </div>
               <input
                 className="w-full accent-cyan-300"

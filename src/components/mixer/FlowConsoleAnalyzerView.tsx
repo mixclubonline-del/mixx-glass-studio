@@ -322,7 +322,7 @@ export const FlowConsoleAnalyzerView: React.FC<FlowConsoleAnalyzerViewProps> = (
                     }
                   )}
                 >
-                  {correlation.toFixed(2)}
+                  {correlation > 0.9 ? 'Mono' : correlation > 0.7 ? 'Wide' : correlation > 0 ? 'Stereo' : 'Phase!'}
                 </span>
                 <span style={composeStyles(
                   spacing.mt(1),
@@ -333,7 +333,7 @@ export const FlowConsoleAnalyzerView: React.FC<FlowConsoleAnalyzerViewProps> = (
                     color: 'rgba(230, 240, 255, 0.5)',
                   }
                 )}>
-                  {correlation > 0.9 ? 'Mono' : correlation > 0.7 ? 'Wide' : correlation > 0 ? 'Stereo' : 'Out of Phase'}
+                  {correlation > 0.9 ? 'Strong Center' : correlation > 0.7 ? 'Balanced Spread' : correlation > 0 ? 'Full Width' : 'Check Phase'}
                 </span>
               </div>
             </div>
@@ -484,6 +484,18 @@ export const FlowConsoleAnalyzerView: React.FC<FlowConsoleAnalyzerViewProps> = (
   );
 };
 
+// FLOW Doctrine: Convert LUFS to energy vocabulary
+const lufsToEnergy = (lufs: number): string => {
+  if (!isFinite(lufs) || lufs < -50) return "Silent";
+  if (lufs < -30) return "Quiet";
+  if (lufs < -20) return "Subtle";
+  if (lufs < -16) return "Moderate";
+  if (lufs < -12) return "Present";
+  if (lufs < -8) return "Warm";
+  if (lufs < -4) return "Hot";
+  return "Loud";
+};
+
 // Component for pulsing LUFS indicator
 const PulsingLUFSIndicator: React.FC<{
   value: number;
@@ -536,7 +548,7 @@ const PulsingLUFSIndicator: React.FC<{
           }
         )}
       >
-        {value.toFixed(1)}
+        {lufsToEnergy(value)}
       </span>
       <span style={composeStyles(
         typography.transform('uppercase'),
@@ -546,7 +558,7 @@ const PulsingLUFSIndicator: React.FC<{
           color: 'rgba(230, 240, 255, 0.5)',
         }
       )}>
-        LUFS
+        LEVEL
       </span>
     </div>
   );

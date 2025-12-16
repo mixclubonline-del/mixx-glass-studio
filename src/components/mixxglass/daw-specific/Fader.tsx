@@ -122,8 +122,18 @@ export const MixxGlassFader: React.FC<MixxGlassFaderProps> = ({
     [onChange, disabled]
   );
 
-  const valueToDB = (v: number) =>
-    v === 0 ? '-∞' : `${(20 * Math.log10(v)).toFixed(1)} dB`;
+  // FLOW Doctrine: Convert value to level description (no raw dB!)
+  const valueToLevel = (v: number): string => {
+    if (v === 0) return "Silent";
+    if (v < 0.1) return "Whisper";
+    if (v < 0.25) return "Soft";
+    if (v < 0.5) return "Moderate";
+    if (v < 0.7) return "Present";
+    if (v < 0.85) return "Warm";
+    if (v < 0.95) return "Hot";
+    if (v < 1.1) return "Peak";
+    return "Limit";
+  };
 
   const handlePointerDown = useCallback(
     (event: React.PointerEvent<HTMLDivElement>) => {
@@ -345,7 +355,7 @@ export const MixxGlassFader: React.FC<MixxGlassFaderProps> = ({
               {temperature.label} ({temperature.intensity > 0.7 ? 'high' : 'moderate'} energy)
             </span>
           ) : (
-            valueToDB(value)
+            valueToLevel(value)
           )}
         </div>
       )}

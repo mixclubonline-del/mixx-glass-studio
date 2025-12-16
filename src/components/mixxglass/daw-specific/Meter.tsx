@@ -188,7 +188,7 @@ export const MixxGlassMeter: React.FC<MixxGlassMeterProps> = ({
             { fontFamily: 'monospace', color: temperature.color, textShadow: `0 0 4px ${alsFeedback?.glowColor || temperature.color}` }
           )}
         >
-          {(clampedLevel * 100).toFixed(0)}%
+          {clampedLevel >= 0.95 ? 'Peak' : clampedLevel >= 0.8 ? 'Hot' : clampedLevel >= 0.5 ? 'Present' : clampedLevel >= 0.2 ? 'Soft' : 'Quiet'}
         </div>
       )}
     </div>
