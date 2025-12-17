@@ -191,16 +191,36 @@ export const ArrangeClip: React.FC<Props> = ({
       }}
       onClick={(e) => { onSelect(e.shiftKey); e.stopPropagation(); }}
     >
-      {/* ALS Glow */}
+      {/* ALS Energy Halo - pulses with audio activity */}
       {feedback && (
-        <div className="absolute inset-0 pointer-events-none opacity-70 transition-opacity duration-200" style={{ mixBlendMode: 'screen' }}>
+        <div className="absolute inset-0 pointer-events-none transition-opacity duration-200" style={{ mixBlendMode: 'screen' }}>
+          {/* Outer glow halo */}
           <div
-            className="absolute inset-[12%] rounded-xl blur-2xl"
+            className="absolute -inset-1 rounded-lg blur-lg"
             style={{
-              background: `radial-gradient(circle at 50% 50%, ${hexToRgba(feedback.glowColor, 0.55)} 0%, transparent 65%)`,
-              opacity: 0.7 + feedback.intensity * 0.45,
+              background: `radial-gradient(circle at 50% 50%, ${hexToRgba(feedback.glowColor, 0.3 + feedback.intensity * 0.3)} 0%, transparent 70%)`,
+              opacity: feedback.pulse > 0.3 ? 0.8 : 0.4,
+              animation: feedback.pulse > 0.5 ? 'clip-pulse 0.8s ease-in-out infinite' : 'none',
             }}
           />
+          {/* Inner glow */}
+          <div
+            className="absolute inset-[8%] rounded-xl blur-2xl"
+            style={{
+              background: `radial-gradient(circle at 50% 50%, ${hexToRgba(feedback.glowColor, 0.55)} 0%, transparent 65%)`,
+              opacity: 0.6 + feedback.intensity * 0.4,
+            }}
+          />
+          {/* Hot indicator - appears at high energy */}
+          {feedback.temperature === 'hot' && (
+            <div 
+              className="absolute inset-0 rounded-md"
+              style={{
+                boxShadow: `inset 0 0 20px ${hexToRgba(feedback.glowColor, 0.4)}, 0 0 12px ${hexToRgba(feedback.glowColor, 0.5)}`,
+                animation: 'clip-hot-glow 1.2s ease-in-out infinite',
+              }}
+            />
+          )}
         </div>
       )}
 

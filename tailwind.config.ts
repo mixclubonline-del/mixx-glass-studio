@@ -26,16 +26,18 @@ const config: Config = {
         background: "hsl(var(--background))",
         foreground: "hsl(var(--foreground))",
         ink: {
-          DEFAULT: "#e6f0ff",
-          soft: "#c7d9ff",
-          muted: "#94aed7",
-          inverted: "#091326",
+          DEFAULT: "#F1F5F9",
+          soft: "#CBD5E1",
+          muted: "rgba(241, 245, 249, 0.6)",
+          subtle: "rgba(241, 245, 249, 0.4)",
+          inverted: "#0A0A0F",
         },
         glass: {
-          surface: "rgba(9,18,36,0.82)",
-          soft: "rgba(12,24,46,0.68)",
-          border: "rgba(102,140,198,0.45)",
-          mist: "rgba(87,124,189,0.22)",
+          surface: "rgba(15, 15, 26, 0.85)",
+          soft: "rgba(26, 16, 51, 0.72)",
+          elevated: "rgba(139, 92, 246, 0.08)",
+          border: "rgba(139, 92, 246, 0.25)",
+          mist: "rgba(139, 92, 246, 0.12)",
         },
         primary: {
           DEFAULT: "hsl(var(--primary))",
@@ -65,32 +67,74 @@ const config: Config = {
           DEFAULT: "hsl(var(--card))",
           foreground: "hsl(var(--card-foreground))",
         },
-        // MixClub Brand Colors
+        // ═══════════════════════════════════════════════════════════════════
+        // AURA BRAND PALETTE
+        // ═══════════════════════════════════════════════════════════════════
+        aura: {
+          // Primary: Violet (creativity, mystical, premium)
+          violet: {
+            DEFAULT: "#8B5CF6",
+            50: "#F5F3FF",
+            100: "#EDE9FE",
+            200: "#DDD6FE",
+            300: "#C4B5FD",
+            400: "#A78BFA",
+            500: "#8B5CF6",
+            600: "#7C3AED",
+            700: "#6D28D9",
+            800: "#5B21B6",
+            900: "#4C1D95",
+          },
+          // Secondary: Magenta (energy, passion)
+          magenta: {
+            DEFAULT: "#EC4899",
+            light: "#F472B6",
+            dark: "#DB2777",
+          },
+          // Tertiary: Cyan (flow state, technology)
+          cyan: {
+            DEFAULT: "#22D3EE",
+            light: "#67E8F9",
+            dark: "#06B6D4",
+          },
+          // Accent: Amber (premium, golden quality)
+          amber: {
+            DEFAULT: "#F59E0B",
+            light: "#FBBF24",
+            dark: "#D97706",
+          },
+          // Deep: Indigo (spirituality, depth)
+          indigo: {
+            DEFAULT: "#6366F1",
+            light: "#818CF8",
+            dark: "#4F46E5",
+          },
+          // Backgrounds
+          space: "#0A0A0F",
+          night: "#0F0F1A",
+          twilight: "#1A1033",
+          deep: "#12081F",
+        },
+        // Legacy support (gradual migration)
         mixx: {
           blue: "#56C8FF",
-          violet: "#A57CFF", 
-          magenta: "#FF67C7",
-          pink: "#FF4D8D",
-          ice: "#EAF2FF",
+          violet: "#8B5CF6", 
+          magenta: "#EC4899",
+          pink: "#F472B6",
+          ice: "#F1F5F9",
         },
         velvet: {
-          50: "#FDF4FF",
-          100: "#FAE8FF", 
-          200: "#F5D0FE",
-          300: "#F0ABFC",
-          400: "#E879F9",
-          500: "#D946EF",
-          600: "#C026D3",
-          700: "#A21CAF",
-          800: "#86198F",
-          900: "#701A75",
+          50: "#F5F3FF",
+          100: "#EDE9FE", 
+          200: "#DDD6FE",
+          300: "#C4B5FD",
+          400: "#A78BFA",
+          500: "#8B5CF6",
+          600: "#7C3AED",
+          700: "#6D28D9",
+          800: "#5B21B6",
+          900: "#4C1D95",
         },
-        // Professional glass UI tokens
-        'mixx-bg': '#F6F6FA',
-        'mixx-glass-tint': 'rgba(238,232,255,0.56)',
-        'mixx-accent': '#8B7BFF',
-        'mixx-accent-strong': '#6E56FF',
-        'mixx-muted': '#4B4B57',
       },
       boxShadow: {
         'mixx-elev': '0 8px 30px rgba(26,21,44,0.08)',

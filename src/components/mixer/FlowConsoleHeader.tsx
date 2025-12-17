@@ -64,8 +64,9 @@ export const FlowConsoleHeader: React.FC<FlowConsoleHeaderProps> = ({
         effects.border.bottom(),
         effects.backdrop.blur('strong'),
         {
-          borderBottom: '1px solid rgba(102, 140, 198, 0.6)',
-          background: 'rgba(8,12,24,0.85)',
+          borderBottom: '1px solid rgba(139, 92, 246, 0.35)',
+          background: 'linear-gradient(180deg, rgba(26, 16, 51, 0.92), rgba(15, 15, 26, 0.95))',
+          boxShadow: '0 8px 32px rgba(0, 0, 0, 0.3), inset 0 1px 0 rgba(139, 92, 246, 0.1)',
           ...(className ? { className } : {}),
         }
       )}
@@ -81,7 +82,7 @@ export const FlowConsoleHeader: React.FC<FlowConsoleHeaderProps> = ({
           typography.tracking.widest,
           {
             fontSize: '0.55rem',
-            color: 'rgba(230, 240, 255, 0.55)',
+            color: 'rgba(241, 245, 249, 0.5)',
           }
         )}>
           View
@@ -93,8 +94,8 @@ export const FlowConsoleHeader: React.FC<FlowConsoleHeaderProps> = ({
           spacing.p(1),
           effects.border.radius.xl,
           {
-            border: '1px solid rgba(102, 140, 198, 0.7)',
-            background: 'rgba(6,14,28,0.65)',
+            border: '1px solid rgba(139, 92, 246, 0.3)',
+            background: 'rgba(15, 15, 26, 0.75)',
           }
         )}>
           {VIEW_MODE_DEFINITIONS.map(({ id, label, icon }) => {
@@ -262,7 +263,7 @@ export const FlowConsoleHeader: React.FC<FlowConsoleHeaderProps> = ({
                   color: '#e6f0ff',
                 }
               )}>
-                {Math.round(flow * 100)}%
+                {flow >= 0.8 ? 'High' : flow >= 0.5 ? 'Active' : flow >= 0.2 ? 'Low' : 'Idle'}
               </span>
             </div>
             <div style={composeStyles(
@@ -291,7 +292,7 @@ export const FlowConsoleHeader: React.FC<FlowConsoleHeaderProps> = ({
                   color: '#e6f0ff',
                 }
               )}>
-                {Math.round(pulse * 100)}%
+                {pulse >= 0.8 ? 'Strong' : pulse >= 0.5 ? 'Active' : pulse >= 0.2 ? 'Soft' : 'Still'}
               </span>
             </div>
           </div>

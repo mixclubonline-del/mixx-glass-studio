@@ -47,7 +47,7 @@ const MixxDriveVisualizer: React.FC<VisualizerProps<MixxDriveParams>> = ({
             })}
           </div>
           <div className="text-[0.65rem] uppercase tracking-[0.35em] text-rose-100/70">
-            Warmth {params.warmth}
+            {params.warmth >= 75 ? 'Saturated' : params.warmth >= 50 ? 'Warm' : params.warmth >= 25 ? 'Gentle' : 'Clean'}
           </div>
         </div>
       </div>

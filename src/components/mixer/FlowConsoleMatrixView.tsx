@@ -123,7 +123,7 @@ const MatrixRow: React.FC<{
               color: 'rgba(230, 240, 255, 0.5)',
             }
           )}>
-            {Math.round(row.intensity * 100)}%
+            {row.intensity >= 0.8 ? 'Hot' : row.intensity >= 0.5 ? 'Active' : row.intensity >= 0.2 ? 'Low' : 'Idle'}
           </span>
         </div>
       </div>

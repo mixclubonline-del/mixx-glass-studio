@@ -1,6 +1,6 @@
 /**
  * Wide Glass Console Styles
- * Mixx Glass DNA: atmospheric, frosted, light-purple, elevation glow.
+ * AURA Design: atmospheric, deep violet glass, ethereal glow.
  */
 
 .wide-glass-console {
@@ -8,16 +8,24 @@
   z-index: 9999;
   width: 88vw;
   height: 52vh;
-  background: rgba(255, 255, 255, 0.06);
-  backdrop-filter: blur(22px) saturate(180%);
-  border: 1px solid rgba(255, 255, 255, 0.12);
-  border-radius: var(--flow-radius-2xl);
-  transition: transform 0.25s ease, opacity 0.2s ease;
+  background: linear-gradient(
+    165deg,
+    rgba(26, 16, 51, 0.85) 0%,
+    rgba(15, 15, 26, 0.92) 100%
+  );
+  -webkit-backdrop-filter: blur(28px) saturate(180%);
+  backdrop-filter: blur(28px) saturate(180%);
+  border: 1px solid rgba(139, 92, 246, 0.25);
+  border-radius: 24px;
+  transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
   box-shadow:
-    0 0 25px rgba(150, 90, 255, 0.35),
-    inset 0 0 35px rgba(255, 255, 255, 0.04);
+    0 0 40px rgba(139, 92, 246, 0.25),
+    0 0 80px rgba(236, 72, 153, 0.12),
+    0 25px 60px rgba(0, 0, 0, 0.45),
+    inset 0 1px 0 rgba(255, 255, 255, 0.08),
+    inset 0 0 40px rgba(139, 92, 246, 0.05);
   pointer-events: auto;
-  will-change: transform, opacity;
+  will-change: transform, opacity, box-shadow;
 }
 
 .console-body {
@@ -26,8 +34,8 @@
   overflow: hidden;
   display: flex;
   flex-direction: row;
-  gap: calc(var(--flow-scale) * 22px);
-  padding: calc(var(--flow-scale) * 22px);
+  gap: clamp(16px, 2vw, 28px);
+  padding: clamp(16px, 2vw, 28px);
 }
 
 .console-placeholder {
@@ -36,22 +44,35 @@
   display: flex;
   align-items: center;
   justify-content: center;
-  color: rgba(255, 255, 255, 0.3);
-  font-size: var(--flow-font-md);
+  color: rgba(241, 245, 249, 0.35);
+  font-size: 0.85rem;
   text-transform: uppercase;
-  letter-spacing: 0.2em;
+  letter-spacing: 0.3em;
 }
 
-/* Glass physics - subtle hover effect */
+/* AURA hover - intensified glow */
 .wide-glass-console:hover {
   box-shadow:
-    0 0 35px rgba(150, 90, 255, 0.45),
-    inset 0 0 45px rgba(255, 255, 255, 0.06);
-  border-color: rgba(255, 255, 255, 0.18);
+    0 0 60px rgba(139, 92, 246, 0.35),
+    0 0 100px rgba(236, 72, 153, 0.2),
+    0 0 140px rgba(34, 211, 238, 0.1),
+    0 30px 80px rgba(0, 0, 0, 0.5),
+    inset 0 1px 0 rgba(255, 255, 255, 0.12),
+    inset 0 0 50px rgba(139, 92, 246, 0.08);
+  border-color: rgba(139, 92, 246, 0.4);
+  transform: translateY(-2px);
 }
 
-/* Ensure console doesn't interfere with other UI */
+/* Focus state for accessibility */
+.wide-glass-console:focus-within {
+  border-color: rgba(139, 92, 246, 0.6);
+  box-shadow:
+    0 0 0 2px rgba(139, 92, 246, 0.3),
+    0 0 60px rgba(139, 92, 246, 0.4),
+    0 30px 80px rgba(0, 0, 0, 0.5);
+}
+
+/* Ensure console children are interactive */
 .wide-glass-console * {
   pointer-events: auto;
 }
-

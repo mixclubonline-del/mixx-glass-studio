@@ -2,13 +2,19 @@
  * AuraFloatingHub Component
  * 
  * Draggable floating bloom menu for in-session navigation.
- * Replaces BloomFloatingHub with the new BloomMenu component.
+ * Supports contextual menus based on current BloomContext.
+ * Uses the AURA Design System tokens.
  */
 
 import React, { useState, useRef, useCallback, useEffect } from 'react';
 import { BloomMenu } from './BloomMenu';
 import { publishBloomSignal } from '../../state/flowSignals';
+import { 
+  AuraPalette, 
+  auraAlpha 
+} from '../../theme/aura-tokens';
 import type { PulsePalette } from '../../utils/ALS';
+import type { ContextualMenuItem } from './contextualBloomItems';
 
 interface AuraFloatingHubProps {
   /** Position of the hub */
@@ -19,6 +25,12 @@ interface AuraFloatingHubProps {
   alsPulseAgent?: PulsePalette | null;
   /** Callback when an action is triggered */
   onAction?: (action: string, payload?: unknown) => void;
+  /** Current bloom context (e.g., 'arrange', 'mix', 'master') */
+  bloomContext?: string;
+  /** Dynamic contextual menu items based on current context */
+  contextualItems?: ContextualMenuItem[];
+  /** Override accent color based on context */
+  contextAccent?: string;
 }
 
 export const AuraFloatingHub: React.FC<AuraFloatingHubProps> = ({
@@ -26,6 +38,9 @@ export const AuraFloatingHub: React.FC<AuraFloatingHubProps> = ({
   onPositionChange,
   alsPulseAgent,
   onAction,
+  bloomContext,
+  contextualItems,
+  contextAccent,
 }) => {
   const [isOpen, setIsOpen] = useState(false);
   const [isDragging, setIsDragging] = useState(false);
@@ -115,34 +130,43 @@ export const AuraFloatingHub: React.FC<AuraFloatingHubProps> = ({
       onPointerMove={handlePointerMove}
       onPointerUp={handlePointerUp}
     >
-      {/* Drag handle overlay - invisible but captures drag events on core */}
-      <div 
-        className="bloom-core-drag-handle absolute left-1/2 top-1/2 -translate-x-1/2 -translate-y-1/2 w-[120px] h-[120px] rounded-full pointer-events-auto z-[60]"
-        style={{
-          cursor: isDragging ? 'grabbing' : 'grab',
-        }}
-      />
-
-      {/* ALS glow feedback */}
+      {/* ALS glow feedback - using AURA palette */}
       <div 
         className="absolute left-1/2 top-1/2 -translate-x-1/2 -translate-y-1/2 w-[200px] h-[200px] rounded-full pointer-events-none"
         style={{
-          background: `radial-gradient(circle, rgba(139, 92, 246, ${glowIntensity * 0.3}) 0%, transparent 70%)`,
+          background: `radial-gradient(circle, 
+            ${auraAlpha(AuraPalette.violet.DEFAULT, glowIntensity * 0.3)} 0%, 
+            ${auraAlpha(AuraPalette.cyan.DEFAULT, glowIntensity * 0.15)} 40%,
+            transparent 70%
+          )`,
           filter: `blur(${20 + glowIntensity * 20}px)`,
           opacity: isOpen ? 1 : 0.5,
           transition: 'opacity 0.5s ease',
+          zIndex: 1,
         }}
       />
 
-      {/* BloomMenu in tool variant */}
-      <div className="pointer-events-auto">
+      {/* BloomMenu in tool variant - z-index 10 so petals render above glow */}
+      <div className="pointer-events-auto relative" style={{ zIndex: 10 }}>
         <BloomMenu
           variant="tool"
           isOpen={isOpen}
           onOpenChange={setIsOpen}
           onItemSelect={handleItemSelect}
+          items={contextualItems}
+          context={bloomContext}
+          accentColor={contextAccent}
         />
       </div>
+      
+      {/* Drag handle overlay - SMALLER, only covers core center, z-index above BloomMenu's core */}
+      <div 
+        className="bloom-core-drag-handle absolute left-1/2 top-1/2 -translate-x-1/2 -translate-y-1/2 w-[80px] h-[80px] rounded-full pointer-events-auto"
+        style={{
+          cursor: isDragging ? 'grabbing' : 'grab',
+          zIndex: 20,
+        }}
+      />
     </div>
   );
 };

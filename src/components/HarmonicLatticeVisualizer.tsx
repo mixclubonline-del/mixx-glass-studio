@@ -41,7 +41,7 @@ const HarmonicZone: React.FC<HarmonicZoneProps> = ({ zone, name, isPlaying }) =>
         />
         <span className="relative text-xs font-bold text-white uppercase">{name}</span>
       </div>
-      <p className="text-gray-500 mt-2 text-xs">{intensity.toFixed(1)}</p>
+      <p className="text-gray-500 mt-2 text-xs">{intensity >= 1.5 ? 'Glowing' : intensity >= 1.0 ? 'Active' : intensity >= 0.5 ? 'Subtle' : 'Dormant'}</p>
     </div>
   );
 };

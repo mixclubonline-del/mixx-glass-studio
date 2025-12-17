@@ -18,6 +18,14 @@ export interface StatusDescriptor {
 
 const VELVET_TARGET_BAND = 1;
 
+// Tone to color mapping
+const TONE_COLORS: Record<StatusState, { bg: string; border: string; text: string }> = {
+  ready: { bg: 'rgba(34, 197, 94, 0.15)', border: 'rgba(34, 197, 94, 0.5)', text: '#86efac' },
+  soft: { bg: 'rgba(234, 179, 8, 0.15)', border: 'rgba(234, 179, 8, 0.5)', text: '#fef08a' },
+  hot: { bg: 'rgba(239, 68, 68, 0.15)', border: 'rgba(239, 68, 68, 0.5)', text: '#fca5a5' },
+  settling: { bg: 'rgba(148, 163, 184, 0.1)', border: 'rgba(148, 163, 184, 0.3)', text: '#94a3b8' },
+};
+
 function evaluateLoudness(
   value: number,
   target: number,
@@ -138,7 +146,61 @@ export function deriveComplianceStatus(
   };
 }
 
-const VelvetComplianceHUD: React.FC<VelvetComplianceHUDProps> = () => null;
+// Status indicator component
+const StatusIndicator: React.FC<{ label: string; status: StatusDescriptor }> = ({ label, status }) => {
+  const colors = TONE_COLORS[status.tone];
+  return (
+    <div 
+      style={{
+        display: 'flex',
+        alignItems: 'center',
+        justifyContent: 'space-between',
+        padding: '6px 10px',
+        background: colors.bg,
+        border: `1px solid ${colors.border}`,
+        borderRadius: '6px',
+        marginBottom: '4px',
+      }}
+    >
+      <span style={{ fontSize: '9px', color: 'rgba(230, 240, 255, 0.7)', textTransform: 'uppercase', letterSpacing: '0.5px' }}>
+        {label}
+      </span>
+      <span style={{ fontSize: '10px', fontWeight: 600, color: colors.text, textTransform: 'uppercase' }}>
+        {status.label}
+      </span>
+    </div>
+  );
+};
+
+const VelvetComplianceHUD: React.FC<VelvetComplianceHUDProps> = ({ metrics, profile, className }) => {
+  const status = deriveComplianceStatus(metrics, profile);
+  
+  return (
+    <div 
+      className={className}
+      style={{
+        background: 'rgba(9, 18, 36, 0.85)',
+        border: '1px solid rgba(102, 140, 198, 0.4)',
+        borderRadius: '8px',
+        padding: '10px',
+        backdropFilter: 'blur(8px)',
+      }}
+    >
+      <div style={{ 
+        fontSize: '10px', 
+        color: 'rgba(230, 240, 255, 0.6)', 
+        textTransform: 'uppercase', 
+        letterSpacing: '1px',
+        marginBottom: '8px',
+        textAlign: 'center',
+      }}>
+        Velvet Compliance
+      </div>
+      <StatusIndicator label="Energy" status={status.loudness} />
+      <StatusIndicator label="Dynamics" status={status.dynamics} />
+      <StatusIndicator label="Crest" status={status.crest} />
+    </div>
+  );
+};
 
 export default VelvetComplianceHUD;
-

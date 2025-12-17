@@ -214,7 +214,7 @@ export const FlowConsoleCompactView: React.FC<FlowConsoleCompactViewProps> = ({
                   color: 'rgba(230, 240, 255, 0.45)',
                 }
               )}>
-                {Math.round(settings.volume * 100)}%
+                {settings.volume >= 0.8 ? 'Loud' : settings.volume >= 0.5 ? 'Normal' : settings.volume >= 0.2 ? 'Quiet' : 'Silent'}
               </span>
             </div>
 

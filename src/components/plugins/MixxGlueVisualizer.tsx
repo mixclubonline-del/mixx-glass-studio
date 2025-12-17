@@ -50,7 +50,7 @@ const MixxGlueVisualizer: React.FC<VisualizerProps<MixxGlueParams>> = ({
             })}
           </div>
           <div className="text-[0.65rem] uppercase tracking-[0.35em] text-sky-200/70">
-            Mix {params.mix}%
+            {params.mix >= 75 ? 'Full Glue' : params.mix >= 50 ? 'Blended' : params.mix >= 25 ? 'Touch' : 'Parallel'}
           </div>
         </div>
       </div>

@@ -1013,7 +1013,7 @@ const FlowChannelStrip: React.FC<FlowChannelStripProps> = memo(
                 }
               )}>
                 <span>Sends</span>
-                <span>{Math.round(sendEnergy * 100)}%</span>
+                <span>{sendEnergy >= 0.8 ? 'Hot' : sendEnergy >= 0.5 ? 'Active' : sendEnergy >= 0.2 ? 'Low' : 'Idle'}</span>
               </div>
             </div>
 
@@ -2176,7 +2176,7 @@ const FlowChannelStrip: React.FC<FlowChannelStripProps> = memo(
                   color: 'rgba(230, 240, 255, 0.45)',
                 }
               )}>
-                Sub {Math.round(Math.min(1, Math.max(0, analysis?.rms ?? 0)) * 100)}%
+                Sub {(analysis?.rms ?? 0) >= 0.8 ? 'Strong' : (analysis?.rms ?? 0) >= 0.5 ? 'Active' : (analysis?.rms ?? 0) >= 0.2 ? 'Soft' : 'Silent'}
               </span>
             </div>
             <div style={composeStyles(

@@ -184,7 +184,7 @@ const PrimeBrainInterface: React.FC<PrimeBrainInterfaceProps> = ({ clip, onClose
                             }}
                         >
                             <span className="text-[9px] font-bold uppercase tracking-widest text-slate-300 mb-1">Time</span>
-                            <span className="text-xl font-mono text-white tracking-widest">{timeStretchRate.toFixed(2)}x</span>
+                            <span className="text-xl font-mono text-white tracking-widest">{timeStretchRate >= 1.5 ? 'Fast' : timeStretchRate >= 1.1 ? 'Faster' : timeStretchRate >= 0.95 ? 'Normal' : timeStretchRate >= 0.7 ? 'Slower' : 'Slow'}</span>
                         </div>
                         <span className="text-[9px] uppercase tracking-widest text-slate-500 mt-4 opacity-0 group-hover:opacity-100 transition-opacity">
                             {isWarping ? 'Warping...' : 'Drag to Warp'}

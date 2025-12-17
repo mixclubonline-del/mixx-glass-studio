@@ -176,13 +176,13 @@ const ProfessionalTrackHeader: React.FC<ProfessionalTrackHeaderProps> = ({
     background: `linear-gradient(135deg, ${hexToRgba(
       baseColor,
       0.12 + intensity * 0.24
-    )} 0%, rgba(6,10,22,0.92) 70%)`,
+    )} 0%, rgba(15, 15, 26, 0.94) 60%, rgba(26, 16, 51, 0.88) 100%)`,
     boxShadow: isSelected
-      ? `0 0 28px ${hexToRgba(glowColor, 0.18 + intensity * 0.32)}`
-      : undefined,
+      ? `0 0 32px ${hexToRgba(glowColor, 0.2 + intensity * 0.35)}, inset 0 0 20px ${hexToRgba(baseColor, 0.08)}`
+      : `inset 0 0 12px rgba(139, 92, 246, 0.04)`,
     opacity: collapsed ? 0.72 : 1,
     filter: collapsed ? 'saturate(0.8)' : 'none',
-    transition: 'all 220ms ease-out',
+    transition: 'all 220ms cubic-bezier(0.4, 0, 0.2, 1)',
   };
 
   if (isArmed) {
@@ -819,7 +819,7 @@ const ProfessionalTrackHeader: React.FC<ProfessionalTrackHeaderProps> = ({
                     boxShadow: 'inset 0 2px 4px rgba(0,0,0,0.2)',
                   }
                 )}
-                title={`Volume ${Math.round(volume * 100)}%`}
+                title={pan === 0 ? 'Volume Center' : `Volume ${pan > 0 ? 'Right' : 'Left'}`}
               >
                 <div
                   style={composeStyles(
@@ -850,9 +850,9 @@ const ProfessionalTrackHeader: React.FC<ProfessionalTrackHeaderProps> = ({
                     letterSpacing: '0.2em',
                   }
                 )}
-                title={`Pan ${pan >= 0 ? 'R' : 'L'}${Math.abs(pan * 100).toFixed(0)}%`}
+                title={pan === 0 ? 'Centered' : Math.abs(pan) >= 0.8 ? (pan > 0 ? 'Hard Right' : 'Hard Left') : Math.abs(pan) >= 0.4 ? (pan > 0 ? 'Right' : 'Left') : (pan > 0 ? 'Slight Right' : 'Slight Left')}
               >
-                {pan === 0 ? 'CENTER' : `${pan > 0 ? 'R' : 'L'} ${Math.abs(pan * 100).toFixed(0)}%`}
+                {pan === 0 ? 'CENTER' : Math.abs(pan) >= 0.8 ? (pan > 0 ? 'HARD R' : 'HARD L') : Math.abs(pan) >= 0.4 ? (pan > 0 ? 'RIGHT' : 'LEFT') : (pan > 0 ? 'R' : 'L')}
               </div>
             </div>
           </div>

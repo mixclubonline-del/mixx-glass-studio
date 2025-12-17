@@ -14,7 +14,7 @@ import TrackContextMenu from './components/TrackContextMenu';
 import RenameTrackModal from './components/RenameTrackModal';
 import ChangeColorModal from './components/ChangeColorModal';
 import { BloomDock } from './components/BloomHUD/BloomDock';
-import { BloomFloatingHub, BloomFloatingMenu } from './components/BloomHUD/BloomFloatingHub';
+import { BloomFloatingMenu } from './components/BloomHUD/BloomFloatingHub';
 import type { BloomFloatingMenuItem } from './components/BloomHUD/BloomFloatingHub';
 import { SaveIcon, LoadIcon, SparklesIcon, SquaresPlusIcon, MixerIcon, PlusCircleIcon, StarIcon, SplitIcon, MergeIcon, RefreshIcon, BrainIcon, AutomationIcon, ChatIcon, ImageIcon, MicrophoneIcon, LoopIcon, CopyIcon, BulbIcon } from './components/icons';
 import { useArrange, ArrangeClip, ClipId } from "./hooks/useArrange";
@@ -70,7 +70,9 @@ import { usePrimeBrainExporter } from './ai/usePrimeBrainExporter';
 import { useStemSeparationExporter } from './core/import/useStemSeparationExporter';
 import { recordPrimeBrainEvent, subscribeToPrimeBrainEvents, type PrimeBrainEvent } from './ai/primeBrainEvents';
 import { PrimeBrainDebugOverlay } from './components/dev/PrimeBrainDebugOverlay';
-import { AuraBloomTestButton } from './components/dev/AuraBloomTestButton';
+// AuraFloatingHub imported from AuraBloom index at line 24
+import { useBloomActions } from './components/AuraBloom/useBloomActions';
+import { getContextualItems, getContextAccent } from './components/AuraBloom/contextualBloomItems';
 import { FlowLoopWrapper } from './core/loop/FlowLoopWrapper';
 import { recordViewSwitch, updatePlaybackState, updateRecordState } from './core/loop/flowLoopEvents';
 import { initThermalSync } from './core/als/thermalSync';
@@ -3401,6 +3403,68 @@ const FlowRuntime: React.FC<FlowRuntimeProps> = ({ arrangeFocusToken }) => {
       unregisterShortcut('recover-autosave-ctrl');
     };
   }, [setIsRecoveryOpen]); // Only depend on setIsRecoveryOpen (stable setState function)
+
+  // ═══════════════════════════════════════════════════════════════════════════
+  // AURA BLOOM MENU ACTION HANDLERS
+  // Wire up the bloom menu signals to actual DAW functions
+  // ═══════════════════════════════════════════════════════════════════════════
+  useBloomActions({
+    onSaveProject: () => {
+      handleSaveProjectRef.current().catch(console.error);
+    },
+    onNewProject: () => {
+      // Reset to default state for new project
+      console.log('[BloomActions] New project requested');
+      // TODO: Implement new project dialog
+    },
+    onOpenProject: () => {
+      // Trigger file input for loading project
+      setFileInputContext('load');
+      fileInputRef.current?.click();
+    },
+    onImportAudio: () => {
+      setFileInputContext('import');
+      fileInputRef.current?.click();
+    },
+    onShowExport: () => {
+      // TODO: Show export modal when implemented
+      console.log('[BloomActions] Export requested');
+    },
+    onToggleMixer: () => {
+      // Switch to mixer view
+      setActiveView('mixer');
+    },
+    onOpenPluginBrowser: () => {
+      // TODO: Open plugin browser
+      console.log('[BloomActions] Plugin browser requested');
+    },
+    onOpenSettings: () => {
+      // TODO: Open settings modal
+      console.log('[BloomActions] Settings requested');
+    },
+    onToggleRecord: () => {
+      // Toggle recording state
+      if (isPlaying) {
+        handleStopClick();
+      } else {
+        handlePlayClick();
+      }
+    },
+    onPlay: () => {
+      handlePlayClick();
+    },
+    onStop: () => {
+      handleStopClick();
+    },
+    onOpenAIHub: () => {
+      // TODO: Open AI hub
+      console.log('[BloomActions] AI Hub requested');
+    },
+    onOpenHelp: () => {
+      // TODO: Open help
+      console.log('[BloomActions] Help requested');
+    },
+  });
 
   // Handler to restore from auto-save
   const handleRestoreFromAutoSave = useCallback((state: PersistedProjectState) => {
@@ -7847,6 +7911,9 @@ const FlowRuntime: React.FC<FlowRuntimeProps> = ({ arrangeFocusToken }) => {
             position={floatingBloomPosition}
             onPositionChange={handleFloatingBloomPositionChange}
             alsPulseAgent={bloomPulseAgent}
+            bloomContext={bloomContext}
+            contextualItems={getContextualItems(bloomContext)}
+            contextAccent={getContextAccent(bloomContext)}
           />
         </OverlayPortal>
 
@@ -7996,9 +8063,6 @@ const FlowRuntime: React.FC<FlowRuntimeProps> = ({ arrangeFocusToken }) => {
           flowContext={flowContext}
           snapshotInputs={primeBrainSnapshotInputs}
         />
-        
-        {/* AURA Bloom Test Button (dev only) */}
-        <AuraBloomTestButton />
         
         <FileInput
           ref={fileInputRef}

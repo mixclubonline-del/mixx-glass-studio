@@ -185,14 +185,14 @@ const MixxTuneVisualizer: React.FC<VisualizerProps<MixxTuneParams>> = ({
           <span className="h-3 w-3 rounded-full bg-cyan-400/60" />
         </div>
         <div className="absolute top-4 right-4 text-[0.65rem] uppercase tracking-[0.35em] text-cyan-200/70">
-          Retune {params.retuneSpeed}
+          {params.retuneSpeed >= 75 ? 'Robotic' : params.retuneSpeed >= 50 ? 'Snappy' : params.retuneSpeed >= 25 ? 'Natural' : 'Loose'}
         </div>
         <div className="absolute bottom-4 left-4 text-[0.65rem] uppercase tracking-[0.35em] text-cyan-200/70">
-          Humanize {params.humanize}
+          {params.humanize >= 75 ? 'Organic' : params.humanize >= 50 ? 'Natural' : params.humanize >= 25 ? 'Subtle' : 'Precise'}
         </div>
         <div className="absolute bottom-4 right-4 text-[0.65rem] uppercase tracking-[0.35em]">
           <span className={params.emotiveLock ? "text-pink-300" : "text-cyan-200/70"}>
-            {params.emotiveLock ? "Emotive Lock Engaged" : `Mix ${params.mix}%`}
+            {params.emotiveLock ? "Emotive Lock" : params.mix >= 75 ? 'Full' : params.mix >= 50 ? 'Blended' : params.mix >= 25 ? 'Touch' : 'Subtle'}
           </span>
         </div>
       </div>

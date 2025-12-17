@@ -343,7 +343,7 @@ const ArrangeTrackHeader: React.FC<ArrangeTrackHeaderProps> = ({
                   boxShadow: 'inset 0 2px 4px rgba(0,0,0,0.2)',
                 }
               )}
-              title={`Volume ${Math.round(volume * 100)}%`}
+              title={volume >= 0.8 ? 'Volume Loud' : volume >= 0.5 ? 'Volume Normal' : volume >= 0.2 ? 'Volume Quiet' : 'Volume Silent'}
             >
               <div
                 style={composeStyles(
@@ -374,9 +374,9 @@ const ArrangeTrackHeader: React.FC<ArrangeTrackHeaderProps> = ({
                   letterSpacing: '0.2em',
                 }
               )}
-              title={`Pan ${pan >= 0 ? 'R' : 'L'}${Math.abs(pan * 100).toFixed(0)}%`}
+              title={pan === 0 ? 'Centered' : Math.abs(pan) >= 0.8 ? (pan > 0 ? 'Hard Right' : 'Hard Left') : Math.abs(pan) >= 0.4 ? (pan > 0 ? 'Right' : 'Left') : (pan > 0 ? 'Slight Right' : 'Slight Left')}
             >
-              {pan === 0 ? 'CENTER' : `${pan > 0 ? 'R' : 'L'} ${Math.abs(pan * 100).toFixed(0)}%`}
+              {pan === 0 ? 'CENTER' : Math.abs(pan) >= 0.8 ? (pan > 0 ? 'HARD R' : 'HARD L') : Math.abs(pan) >= 0.4 ? (pan > 0 ? 'RIGHT' : 'LEFT') : (pan > 0 ? 'R' : 'L')}
             </div>
           </div>
         </div>

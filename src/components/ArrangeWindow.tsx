@@ -1584,7 +1584,7 @@ export const ArrangeWindow: React.FC<Props> = (props) => {
               <PlusIcon className="w-3.5 h-3.5" />
             </button>
             <span className="mx-1 text-[9px] uppercase tracking-[0.3em]">
-              {Math.round(waveformOptions.heightMultiplier * 100)}%
+              {waveformOptions.heightMultiplier >= 1.5 ? 'XL' : waveformOptions.heightMultiplier >= 1.0 ? 'Normal' : waveformOptions.heightMultiplier >= 0.7 ? 'Compact' : 'Mini'}
             </span>
           </div>
           <div className="flex items-center gap-1 text-white/60">

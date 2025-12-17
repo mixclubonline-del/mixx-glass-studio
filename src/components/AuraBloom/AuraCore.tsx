@@ -4,15 +4,19 @@
  * The central hub of the bloom menu - an ethereal, living orb
  * with layered aurora effects, rich multi-color blending, and pulsing energy.
  * 
- * AURA Color Palette:
- * - Violet (#8B5CF6) - Primary mystical/creative
- * - Cyan (#22D3EE) - Flow/technology  
- * - Magenta (#EC4899) - Energy/warmth
- * - Amber (#F59E0B) - Premium/golden
- * - Indigo (#6366F1) - Deep/spiritual
+ * Uses the AURA Design System tokens for consistent styling.
  */
 
 import React, { memo } from 'react';
+import { 
+  AuraPalette, 
+  AuraEffects, 
+  AuraKeyframes,
+  auraAlpha 
+} from '../../theme/aura-tokens';
+
+// Extract palette colors for readability
+const { violet, cyan, magenta, amber, indigo } = AuraPalette;
 
 interface AuraCoreProps {
   /** Size variant */
@@ -37,6 +41,10 @@ export const AuraCore: React.FC<AuraCoreProps> = memo(({
   const isLarge = size === 'large';
   const coreSize = isLarge ? 160 : 120;
   
+  // Dynamic opacity based on open state
+  const openAlpha = isOpen ? 1 : 0.6;
+  const closedAlpha = isOpen ? 0.6 : 1;
+  
   return (
     <div 
       className={`
@@ -60,11 +68,11 @@ export const AuraCore: React.FC<AuraCoreProps> = memo(({
           inset: -100,
           background: `
             radial-gradient(ellipse 60% 80% at 30% 20%,
-              rgba(139, 92, 246, ${isOpen ? 0.2 : 0.12}) 0%,
+              ${auraAlpha(violet.DEFAULT, isOpen ? 0.2 : 0.12)} 0%,
               transparent 60%
             ),
             radial-gradient(ellipse 70% 60% at 70% 80%,
-              rgba(236, 72, 153, ${isOpen ? 0.15 : 0.08}) 0%,
+              ${auraAlpha(magenta.DEFAULT, isOpen ? 0.15 : 0.08)} 0%,
               transparent 50%
             )
           `,
@@ -80,11 +88,11 @@ export const AuraCore: React.FC<AuraCoreProps> = memo(({
           inset: -80,
           background: `
             radial-gradient(ellipse 50% 70% at 80% 30%,
-              rgba(34, 211, 238, ${isOpen ? 0.18 : 0.1}) 0%,
+              ${auraAlpha(cyan.DEFAULT, isOpen ? 0.18 : 0.1)} 0%,
               transparent 50%
             ),
             radial-gradient(ellipse 60% 50% at 20% 70%,
-              rgba(99, 102, 241, ${isOpen ? 0.15 : 0.08}) 0%,
+              ${auraAlpha(indigo.DEFAULT, isOpen ? 0.15 : 0.08)} 0%,
               transparent 50%
             )
           `,
@@ -100,12 +108,12 @@ export const AuraCore: React.FC<AuraCoreProps> = memo(({
           inset: -60,
           background: `
             radial-gradient(ellipse 40% 50% at 50% 20%,
-              rgba(245, 158, 11, ${isOpen ? 0.1 : 0.05}) 0%,
+              ${auraAlpha(amber.DEFAULT, isOpen ? 0.1 : 0.05)} 0%,
               transparent 40%
             )
           `,
           filter: 'blur(30px)',
-          animation: 'aura-pulse-slow 6s ease-in-out infinite',
+          animation: 'aura-pulse 6s ease-in-out infinite',
         }}
       />
 
@@ -116,7 +124,7 @@ export const AuraCore: React.FC<AuraCoreProps> = memo(({
         className="absolute rounded-full pointer-events-none overflow-hidden"
         style={{
           inset: -30,
-          animation: 'spin 25s linear infinite',
+          animation: 'aura-spin 25s linear infinite',
         }}
       >
         <div 
@@ -126,16 +134,16 @@ export const AuraCore: React.FC<AuraCoreProps> = memo(({
             background: `conic-gradient(
               from 0deg,
               transparent 0%,
-              rgba(139, 92, 246, 0.35) 8%,
-              rgba(236, 72, 153, 0.25) 16%,
+              ${auraAlpha(violet.DEFAULT, 0.35)} 8%,
+              ${auraAlpha(magenta.DEFAULT, 0.25)} 16%,
               transparent 24%,
               transparent 33%,
-              rgba(34, 211, 238, 0.3) 41%,
-              rgba(99, 102, 241, 0.25) 49%,
+              ${auraAlpha(cyan.DEFAULT, 0.3)} 41%,
+              ${auraAlpha(indigo.DEFAULT, 0.25)} 49%,
               transparent 57%,
               transparent 66%,
-              rgba(245, 158, 11, 0.2) 74%,
-              rgba(139, 92, 246, 0.25) 82%,
+              ${auraAlpha(amber.DEFAULT, 0.2)} 74%,
+              ${auraAlpha(violet.DEFAULT, 0.25)} 82%,
               transparent 90%,
               transparent 100%
             )`,
@@ -151,7 +159,7 @@ export const AuraCore: React.FC<AuraCoreProps> = memo(({
         className="absolute rounded-full pointer-events-none overflow-hidden"
         style={{
           inset: -15,
-          animation: 'spin 18s linear infinite reverse',
+          animation: 'aura-spin-reverse 18s linear infinite',
         }}
       >
         <div 
@@ -161,13 +169,13 @@ export const AuraCore: React.FC<AuraCoreProps> = memo(({
             background: `conic-gradient(
               from 60deg,
               transparent 0%,
-              rgba(236, 72, 153, 0.3) 12%,
+              ${auraAlpha(magenta.DEFAULT, 0.3)} 12%,
               transparent 25%,
               transparent 40%,
-              rgba(34, 211, 238, 0.25) 55%,
+              ${auraAlpha(cyan.DEFAULT, 0.25)} 55%,
               transparent 70%,
               transparent 85%,
-              rgba(245, 158, 11, 0.2) 95%,
+              ${auraAlpha(amber.DEFAULT, 0.2)} 95%,
               transparent 100%
             )`,
             filter: 'blur(12px)',
@@ -186,8 +194,8 @@ export const AuraCore: React.FC<AuraCoreProps> = memo(({
             className="absolute rounded-full pointer-events-none"
             style={{
               inset: -32,
-              border: '1px dashed rgba(139, 92, 246, 0.3)',
-              animation: 'spin 30s linear infinite',
+              border: AuraEffects.rings.dashed.violet,
+              animation: 'aura-spin 30s linear infinite',
             }}
           />
           
@@ -196,8 +204,8 @@ export const AuraCore: React.FC<AuraCoreProps> = memo(({
             className="absolute rounded-full pointer-events-none"
             style={{
               inset: -20,
-              border: '1px dotted rgba(34, 211, 238, 0.25)',
-              animation: 'spin 22s linear infinite reverse',
+              border: AuraEffects.rings.dotted.cyan,
+              animation: 'aura-spin-reverse 22s linear infinite',
             }}
           />
           
@@ -206,9 +214,9 @@ export const AuraCore: React.FC<AuraCoreProps> = memo(({
             className="absolute rounded-full pointer-events-none"
             style={{
               inset: -8,
-              border: '1px solid rgba(236, 72, 153, 0.15)',
-              boxShadow: '0 0 10px rgba(236, 72, 153, 0.2)',
-              animation: 'spin 35s linear infinite',
+              border: AuraEffects.rings.solid.magenta,
+              boxShadow: AuraEffects.rings.glow.magenta,
+              animation: 'aura-spin 35s linear infinite',
             }}
           />
         </>
@@ -225,15 +233,15 @@ export const AuraCore: React.FC<AuraCoreProps> = memo(({
               transparent 30%
             ),
             radial-gradient(circle at 75% 80%, 
-              rgba(139, 92, 246, 0.2) 0%, 
+              ${auraAlpha(violet.DEFAULT, 0.2)} 0%, 
               transparent 35%
             ),
             radial-gradient(circle at 20% 80%, 
-              rgba(34, 211, 238, 0.15) 0%, 
+              ${auraAlpha(cyan.DEFAULT, 0.15)} 0%, 
               transparent 30%
             ),
             radial-gradient(circle at 80% 20%, 
-              rgba(236, 72, 153, 0.12) 0%, 
+              ${auraAlpha(magenta.DEFAULT, 0.12)} 0%, 
               transparent 30%
             ),
             radial-gradient(circle at center, 
@@ -242,15 +250,15 @@ export const AuraCore: React.FC<AuraCoreProps> = memo(({
             )
           `,
           boxShadow: `
-            inset 0 0 30px rgba(139, 92, 246, ${isOpen ? 0.35 : 0.2}),
-            inset 0 0 60px rgba(34, 211, 238, ${isOpen ? 0.15 : 0.08}),
-            inset 0 0 40px rgba(236, 72, 153, ${isOpen ? 0.1 : 0.05}),
-            0 0 50px rgba(139, 92, 246, ${isOpen ? 0.5 : 0.25}),
-            0 0 80px rgba(34, 211, 238, ${isOpen ? 0.25 : 0.12}),
-            0 0 100px rgba(236, 72, 153, ${isOpen ? 0.15 : 0.08})
+            inset 0 0 30px ${auraAlpha(violet.DEFAULT, isOpen ? 0.35 : 0.2)},
+            inset 0 0 60px ${auraAlpha(cyan.DEFAULT, isOpen ? 0.15 : 0.08)},
+            inset 0 0 40px ${auraAlpha(magenta.DEFAULT, isOpen ? 0.1 : 0.05)},
+            0 0 50px ${auraAlpha(violet.DEFAULT, isOpen ? 0.5 : 0.25)},
+            0 0 80px ${auraAlpha(cyan.DEFAULT, isOpen ? 0.25 : 0.12)},
+            0 0 100px ${auraAlpha(magenta.DEFAULT, isOpen ? 0.15 : 0.08)}
           `,
           border: `1px solid rgba(255, 255, 255, ${isOpen ? 0.35 : 0.18})`,
-          backdropFilter: 'blur(20px)',
+          backdropFilter: AuraEffects.glass.backdropFilterHeavy,
           transition: 'all 0.5s ease',
         }}
       >
@@ -261,14 +269,14 @@ export const AuraCore: React.FC<AuraCoreProps> = memo(({
             inset: '20%',
             background: `
               radial-gradient(circle at 40% 30%,
-                rgba(139, 92, 246, 0.5) 0%,
-                rgba(236, 72, 153, 0.3) 30%,
-                rgba(34, 211, 238, 0.2) 60%,
+                ${auraAlpha(violet.DEFAULT, 0.5)} 0%,
+                ${auraAlpha(magenta.DEFAULT, 0.3)} 30%,
+                ${auraAlpha(cyan.DEFAULT, 0.2)} 60%,
                 transparent 100%
               )
             `,
             filter: 'blur(10px)',
-            animation: 'aura-core-pulse 3s ease-in-out infinite',
+            animation: 'aura-pulse 3s ease-in-out infinite',
           }}
         />
         
@@ -279,12 +287,12 @@ export const AuraCore: React.FC<AuraCoreProps> = memo(({
             inset: '30%',
             background: `
               radial-gradient(circle at 60% 70%,
-                rgba(245, 158, 11, 0.25) 0%,
+                ${auraAlpha(amber.DEFAULT, 0.25)} 0%,
                 transparent 60%
               )
             `,
             filter: 'blur(8px)',
-            animation: 'aura-core-pulse 4s ease-in-out infinite reverse',
+            animation: 'aura-pulse 4s ease-in-out infinite reverse',
           }}
         />
         
@@ -311,8 +319,8 @@ export const AuraCore: React.FC<AuraCoreProps> = memo(({
             width: '35%',
             height: '25%',
             background: `linear-gradient(315deg, 
-              rgba(139, 92, 246, 0.3) 0%, 
-              rgba(236, 72, 153, 0.15) 50%,
+              ${auraAlpha(violet.DEFAULT, 0.3)} 0%, 
+              ${auraAlpha(magenta.DEFAULT, 0.15)} 50%,
               transparent 100%
             )`,
             filter: 'blur(8px)',
@@ -327,11 +335,11 @@ export const AuraCore: React.FC<AuraCoreProps> = memo(({
         className="absolute rounded-full pointer-events-none"
         style={{
           inset: '12%',
-          border: `1px solid rgba(139, 92, 246, ${isOpen ? 0.5 : 0.3})`,
+          border: `1px solid ${auraAlpha(violet.DEFAULT, isOpen ? 0.5 : 0.3)}`,
           boxShadow: `
-            0 0 15px rgba(139, 92, 246, ${isOpen ? 0.4 : 0.2}),
-            0 0 8px rgba(34, 211, 238, ${isOpen ? 0.3 : 0.15}),
-            inset 0 0 15px rgba(236, 72, 153, ${isOpen ? 0.2 : 0.1})
+            0 0 15px ${auraAlpha(violet.DEFAULT, isOpen ? 0.4 : 0.2)},
+            0 0 8px ${auraAlpha(cyan.DEFAULT, isOpen ? 0.3 : 0.15)},
+            inset 0 0 15px ${auraAlpha(magenta.DEFAULT, isOpen ? 0.2 : 0.1)}
           `,
           transition: 'all 0.5s ease',
         }}
@@ -345,12 +353,7 @@ export const AuraCore: React.FC<AuraCoreProps> = memo(({
           style={{
             fontSize: isLarge ? 28 : 22,
             color: 'rgba(255, 255, 255, 0.95)',
-            textShadow: `
-              0 0 15px rgba(139, 92, 246, 0.9),
-              0 0 30px rgba(236, 72, 153, 0.5),
-              0 0 45px rgba(34, 211, 238, 0.4),
-              0 0 60px rgba(245, 158, 11, 0.25)
-            `,
+            textShadow: AuraEffects.textGlow.aura,
             transition: 'all 0.3s ease',
           }}
         >
@@ -362,8 +365,8 @@ export const AuraCore: React.FC<AuraCoreProps> = memo(({
           <span 
             className="text-[9px] uppercase tracking-[0.3em] mt-1"
             style={{
-              color: 'rgba(167, 139, 250, 0.7)',
-              textShadow: '0 0 10px rgba(139, 92, 246, 0.5)',
+              color: auraAlpha(violet[400], 0.7),
+              textShadow: `0 0 10px ${auraAlpha(violet.DEFAULT, 0.5)}`,
             }}
           >
             Start
@@ -377,9 +380,9 @@ export const AuraCore: React.FC<AuraCoreProps> = memo(({
           className="absolute inset-0 rounded-full pointer-events-none"
           style={{
             background: `radial-gradient(circle, 
-              rgba(139, 92, 246, 0.5) 0%, 
-              rgba(236, 72, 153, 0.3) 40%,
-              rgba(34, 211, 238, 0.2) 70%,
+              ${auraAlpha(violet.DEFAULT, 0.5)} 0%, 
+              ${auraAlpha(magenta.DEFAULT, 0.3)} 40%,
+              ${auraAlpha(cyan.DEFAULT, 0.2)} 70%,
               transparent 100%
             )`,
             animation: 'aura-ripple 0.6s ease-out forwards',
@@ -387,45 +390,8 @@ export const AuraCore: React.FC<AuraCoreProps> = memo(({
         />
       )}
 
-      {/* ===== CSS KEYFRAMES ===== */}
-      <style>{`
-        @keyframes aura-drift {
-          0%, 100% { 
-            transform: translate(0, 0) scale(1); 
-            opacity: 0.8; 
-          }
-          25% { 
-            transform: translate(5px, -5px) scale(1.05); 
-          }
-          50% { 
-            transform: translate(-3px, 3px) scale(1.02); 
-            opacity: 1; 
-          }
-          75% { 
-            transform: translate(-5px, -3px) scale(0.98); 
-          }
-        }
-        
-        @keyframes aura-pulse-slow {
-          0%, 100% { transform: scale(1); opacity: 0.6; }
-          50% { transform: scale(1.15); opacity: 0.9; }
-        }
-        
-        @keyframes aura-core-pulse {
-          0%, 100% { transform: scale(1) rotate(0deg); opacity: 0.6; }
-          50% { transform: scale(1.15) rotate(10deg); opacity: 0.9; }
-        }
-        
-        @keyframes aura-ripple {
-          0% { transform: scale(1); opacity: 0.9; }
-          100% { transform: scale(1.6); opacity: 0; }
-        }
-        
-        @keyframes spin {
-          from { transform: rotate(0deg); }
-          to { transform: rotate(360deg); }
-        }
-      `}</style>
+      {/* ===== KEYFRAME ANIMATIONS ===== */}
+      <style>{AuraKeyframes}</style>
     </div>
   );
 });
