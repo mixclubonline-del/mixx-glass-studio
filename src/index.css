@@ -87,6 +87,18 @@
   --accent: #8B5CF6;
   --accent-strong: #7C3AED;
   --muted: #6B7280;
+  /* Project Layout */
+  --header-height: 220px;
+}
+
+.flow-main-content {
+  top: var(--header-height);
+  bottom: 0;
+}
+
+.dynamic-glow-surface {
+  background-color: var(--bg-glow-color, transparent);
+  transition: background-color 0.15s ease-out;
 }
 
 body {

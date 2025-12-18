@@ -12,10 +12,12 @@ export interface SessionDomainContextType {
   isMixerOpen: boolean;
   isExportModalOpen: boolean;
   isAIHubOpen: boolean;
+  isStemSeparationModalOpen: boolean;
   
   // Active selections for panels
   activePanelClipId: string | null;
   activePanelTrackId: string | null;
+  activeStemClipId: string | null;
   
   // Playhead following
   followPlayhead: boolean;
@@ -30,5 +32,7 @@ export interface SessionDomainContextType {
   closeExportModal: () => void;
   openAIHub: () => void;
   closeAIHub: () => void;
+  openStemSeparation: (clipId: string) => void;
+  closeStemSeparation: () => void;
   setFollowPlayhead: (follow: boolean | ((prev: boolean) => boolean)) => void;
 }

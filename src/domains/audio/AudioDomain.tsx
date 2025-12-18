@@ -56,6 +56,7 @@ export interface AudioDomainActions {
   
   // Getters (for components that need refs or current values)
   getAudioContext: () => AudioContext | null;
+  getContext: () => AudioContext | null;
   getSignalMatrix: () => ReturnType<typeof createSignalMatrix> | null;
   getMasterNodes: () => VelvetMasterChain | null;
   getTranslationMatrix: () => TranslationMatrix | null;
@@ -63,6 +64,9 @@ export interface AudioDomainActions {
   
   // Progress setters
   setImportMessage: (msg: string | null) => void;
+  
+  // Utilities
+  analyzeAudioBuffer: (buffer: AudioBuffer) => Promise<{ rms: number; peak: number; level: number; transient: boolean; waveform: number[] }>;
 }
 
 export interface AudioDomainContextType extends AudioDomainState, AudioDomainActions {}
@@ -266,6 +270,38 @@ export function AudioDomainProvider({ children }: AudioDomainProviderProps) {
     setImportMessageState(msg);
   }, []);
 
+  const getContext = useCallback(() => audioContextRef.current, []);
+
+  const analyzeAudioBuffer = useCallback(async (buffer: AudioBuffer) => {
+    let peak = 0;
+    let sumSquares = 0;
+    const timeDomain = buffer.getChannelData(0);
+    
+    for (let i = 0; i < timeDomain.length; i++) {
+        const sample = timeDomain[i];
+        const absolute = Math.abs(sample);
+        if (absolute > peak) peak = absolute;
+        sumSquares += sample * sample;
+    }
+    
+    const rms = Math.sqrt(sumSquares / timeDomain.length);
+    
+    // Basic waveform for visualization
+    const waveform: number[] = [];
+    const step = Math.floor(timeDomain.length / 100);
+    for (let i = 0; i < 100; i++) {
+        waveform.push(timeDomain[i * step] || 0);
+    }
+
+    return {
+        rms,
+        peak,
+        level: rms,
+        transient: peak > rms * 4, // Simple heuristic
+        waveform
+    };
+  }, []);
+
   // Cleanup on unmount
   useEffect(() => {
     return () => {
@@ -291,11 +327,13 @@ export function AudioDomainProvider({ children }: AudioDomainProviderProps) {
     recalibrateMaster,
     setTranslationProfile,
     getAudioContext,
+    getContext,
     getSignalMatrix,
     getMasterNodes,
     getTranslationMatrix,
     getStemIntegration,
     setImportMessage,
+    analyzeAudioBuffer,
   };
 
   return (

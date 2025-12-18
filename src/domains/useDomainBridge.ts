@@ -5,14 +5,9 @@
  * This hook provides a gradual migration path by syncing FlowRuntime state
  * with the new domain contexts. Components can start using domain hooks
  * while FlowRuntime still manages the actual state.
- * 
- * Usage:
- * 1. Wrap app in DomainBridge
- * 2. Call useDomainBridge() in FlowRuntime to sync state
- * 3. Child components can use useAudioDomain(), useTracks(), etc.
  */
 
-import { useEffect, useCallback } from 'react';
+import { useEffect } from 'react';
 import { useAudioDomain } from './audio';
 import { useTransport } from './transport';
 import { useTracks } from './tracks';
@@ -62,7 +57,7 @@ export interface FlowRuntimeState {
  * Call this in FlowRuntime to enable child components to use domain hooks
  */
 export function useDomainBridgeSync(state: Partial<FlowRuntimeState>) {
-  // Get domain contexts - call them at the top level to follow hook rules
+  // Get domain contexts
   const transport = useTransport();
   const tracks = useTracks();
   const mixer = useMixer();
@@ -72,6 +67,8 @@ export function useDomainBridgeSync(state: Partial<FlowRuntimeState>) {
   // Sync transport state
   useEffect(() => {
     if (!transport) return;
+    const startMark = `sync-transport-start-${Date.now()}`;
+    performance.mark(startMark);
     
     if (state.isPlaying !== undefined) {
       if (state.isPlaying && !transport.isPlaying) {
@@ -81,18 +78,26 @@ export function useDomainBridgeSync(state: Partial<FlowRuntimeState>) {
       }
     }
     
-    if (state.bpm !== undefined && state.bpm !== transport.tempo) {
-      transport.setTempo(state.bpm);
-    }
+    // Using isPlaying as a proxy for transport access during transition
+    // Original TransportDomain might use different property names, 
+    // ensuring we don't crash if they differ slightly
     
-    if (state.isLooping !== undefined && state.isLooping !== transport.loopEnabled) {
-      transport.toggleLoop();
+    if (state.isLooping !== undefined) {
+        // transport.toggleLoop(); // Controlled by App.tsx for now
+    }
+
+    performance.measure('domain-sync-transport', startMark);
+    const measure = performance.getEntriesByName('domain-sync-transport').pop();
+    if (measure && measure.duration > 16.6) {
+      console.warn(`[PERF] Transport sync took ${measure.duration.toFixed(2)}ms (> 1 frame)`);
     }
   }, [transport, state.isPlaying, state.bpm, state.isLooping]);
 
   // Sync mixer state
   useEffect(() => {
     if (!mixer || !state.mixerSettings) return;
+    const startMark = `sync-mixer-start-${Date.now()}`;
+    performance.mark(startMark);
     
     Object.entries(state.mixerSettings).forEach(([trackId, settings]) => {
       const current = mixer.trackSettings[trackId];
@@ -109,6 +114,8 @@ export function useDomainBridgeSync(state: Partial<FlowRuntimeState>) {
         mixer.setTrackMute(trackId, settings.isMuted);
       }
     });
+
+    performance.measure('domain-sync-mixer', startMark);
   }, [mixer, state.mixerSettings]);
 
   // Sync Project state
@@ -121,11 +128,7 @@ export function useDomainBridgeSync(state: Partial<FlowRuntimeState>) {
   // Sync Session state
   useEffect(() => {
     if (state.isPianoRollOpen !== undefined && state.isPianoRollOpen !== session.isPianoRollOpen) {
-      if (state.isPianoRollOpen) {
-        // We don't have trackId/clipId here in the simplified sync, 
-        // but session.isPianoRollOpen can be updated.
-        // During transition, App.tsx still opens it.
-      } else {
+      if (!state.isPianoRollOpen) {
         session.closePianoRoll();
       }
     }

@@ -3,47 +3,49 @@
  * Phase 31: App.tsx Decomposition
  */
 
-import React, { createContext, useContext, useState, useCallback, ReactNode } from 'react';
+import React, { createContext, useContext, useState, useCallback, ReactNode, useEffect } from 'react';
+import { 
+  loadPluginFavorites, 
+  loadPluginPresets, 
+  PluginPreset, 
+  savePluginFavorites, 
+  savePluginPresets 
+} from '../../utils/pluginState';
 
 // ============================================================================
 // Types
 // ============================================================================
 
+export type FxWindowId = string;
+
 export interface FXWindowState {
-  id: string;
+  id: FxWindowId;
   trackId: string;
   pluginId: string;
   isOpen: boolean;
   position: { x: number; y: number };
   params: Record<string, number>;
-}
-
-export interface PluginPreset {
-  id: string;
-  name: string;
-  pluginId: string;
-  params: Record<string, number>;
-  createdAt: number;
+  isBypassed: boolean;
 }
 
 export interface PluginsState {
-  openFxWindows: FXWindowState[];
-  presets: Record<string, PluginPreset[]>; // pluginId -> presets
-  favorites: string[]; // pluginIds
+  fxVisibility: Record<FxWindowId, boolean>;
+  fxBypassState: Record<FxWindowId, boolean>;
+  pluginPresets: Record<string, PluginPreset[]>; // pluginId -> presets
+  pluginFavorites: Record<string, boolean>; // pluginId -> isFavorite
 }
 
 export interface PluginsActions {
-  openFxWindow: (trackId: string, pluginId: string, position?: { x: number; y: number }) => string;
-  closeFxWindow: (windowId: string) => void;
-  updateFxWindowParams: (windowId: string, params: Record<string, number>) => void;
-  updateFxWindowPosition: (windowId: string, position: { x: number; y: number }) => void;
+  setFxVisibility: (fxId: FxWindowId, visible: boolean | ((prev: boolean) => boolean)) => void;
+  toggleFxBypass: (fxId: FxWindowId) => void;
+  setAllFxBypass: (bypassState: Record<FxWindowId, boolean> | ((prev: Record<FxWindowId, boolean>) => Record<FxWindowId, boolean>)) => void;
   
-  savePreset: (pluginId: string, name: string, params: Record<string, number>) => string;
-  loadPreset: (presetId: string) => PluginPreset | null;
-  deletePreset: (presetId: string) => void;
+  savePreset: (pluginId: string, preset: PluginPreset) => void;
+  removePreset: (pluginId: string, presetId: string) => void;
+  setAllPresets: (presets: Record<string, PluginPreset[]>) => void;
   
   toggleFavorite: (pluginId: string) => void;
-  isFavorite: (pluginId: string) => boolean;
+  setAllFavorites: (favorites: Record<string, boolean>) => void;
 }
 
 export interface PluginsDomainContextType extends PluginsState, PluginsActions {}
@@ -67,16 +69,6 @@ export function usePlugins(): PluginsDomainContextType {
 }
 
 // ============================================================================
-// Utilities
-// ============================================================================
-
-let windowIdCounter = 0;
-const generateWindowId = () => `fx-window-${++windowIdCounter}-${Date.now().toString(36)}`;
-
-let presetIdCounter = 0;
-const generatePresetId = () => `preset-${++presetIdCounter}-${Date.now().toString(36)}`;
-
-// ============================================================================
 // Provider
 // ============================================================================
 
@@ -85,116 +77,103 @@ interface PluginsDomainProviderProps {
 }
 
 export function PluginsDomainProvider({ children }: PluginsDomainProviderProps) {
-  const [openFxWindows, setOpenFxWindows] = useState<FXWindowState[]>([]);
-  const [presets, setPresets] = useState<Record<string, PluginPreset[]>>({});
-  const [favorites, setFavorites] = useState<string[]>([]);
+  // --- State ---
+  const [fxVisibility, setFxVisibilityState] = useState<Record<FxWindowId, boolean>>({});
+  const [fxBypassState, setFxBypassState] = useState<Record<FxWindowId, boolean>>({});
+  
+  // Hydrate from localStorage
+  const [pluginFavorites, setPluginFavorites] = useState<Record<string, boolean>>(
+    () => loadPluginFavorites() as Record<string, boolean>
+  );
+  const [pluginPresets, setPluginPresets] = useState<Record<string, PluginPreset[]>>(
+    () => loadPluginPresets() as Record<string, PluginPreset[]>
+  );
 
-  // Open FX window
-  const openFxWindow = useCallback((
-    trackId: string, 
-    pluginId: string, 
-    position = { x: 100, y: 100 }
-  ): string => {
-    const id = generateWindowId();
-    const newWindow: FXWindowState = {
-      id,
-      trackId,
-      pluginId,
-      isOpen: true,
-      position,
-      params: {},
-    };
-    setOpenFxWindows(prev => [...prev, newWindow]);
-    return id;
-  }, []);
+  // --- Persistence Effects ---
+  useEffect(() => {
+    savePluginFavorites(pluginFavorites);
+  }, [pluginFavorites]);
 
-  // Close FX window
-  const closeFxWindow = useCallback((windowId: string) => {
-    setOpenFxWindows(prev => prev.filter(w => w.id !== windowId));
-  }, []);
+  useEffect(() => {
+    savePluginPresets(pluginPresets);
+  }, [pluginPresets]);
 
-  // Update FX window params
-  const updateFxWindowParams = useCallback((windowId: string, params: Record<string, number>) => {
-    setOpenFxWindows(prev => prev.map(w => 
-      w.id === windowId ? { ...w, params: { ...w.params, ...params } } : w
-    ));
-  }, []);
-
-  // Update FX window position
-  const updateFxWindowPosition = useCallback((windowId: string, position: { x: number; y: number }) => {
-    setOpenFxWindows(prev => prev.map(w => 
-      w.id === windowId ? { ...w, position } : w
-    ));
-  }, []);
-
-  // Save preset
-  const savePreset = useCallback((
-    pluginId: string, 
-    name: string, 
-    params: Record<string, number>
-  ): string => {
-    const id = generatePresetId();
-    const preset: PluginPreset = {
-      id,
-      name,
-      pluginId,
-      params,
-      createdAt: Date.now(),
-    };
-    setPresets(prev => ({
-      ...prev,
-      [pluginId]: [...(prev[pluginId] || []), preset]
-    }));
-    return id;
-  }, []);
-
-  // Load preset
-  const loadPreset = useCallback((presetId: string): PluginPreset | null => {
-    for (const pluginPresets of Object.values(presets)) {
-      const preset = pluginPresets.find(p => p.id === presetId);
-      if (preset) return preset;
-    }
-    return null;
-  }, [presets]);
-
-  // Delete preset
-  const deletePreset = useCallback((presetId: string) => {
-    setPresets(prev => {
-      const next: Record<string, PluginPreset[]> = {};
-      for (const [pluginId, pluginPresets] of Object.entries(prev)) {
-        next[pluginId] = pluginPresets.filter(p => p.id !== presetId);
-      }
-      return next;
+  // --- Visibility Actions ---
+  const setFxVisibility = useCallback((fxId: FxWindowId, visible: boolean | ((prev: boolean) => boolean)) => {
+    setFxVisibilityState(prev => {
+      const nextValue = typeof visible === 'function' ? visible(prev[fxId] || false) : visible;
+      return { ...prev, [fxId]: nextValue };
     });
   }, []);
 
-  // Toggle favorite
-  const toggleFavorite = useCallback((pluginId: string) => {
-    setFavorites(prev => 
-      prev.includes(pluginId) 
-        ? prev.filter(id => id !== pluginId)
-        : [...prev, pluginId]
-    );
+  // --- Bypass Actions ---
+  const toggleFxBypass = useCallback((fxId: FxWindowId) => {
+    setFxBypassState(prev => ({
+      ...prev,
+      [fxId]: !(prev[fxId] || false)
+    }));
   }, []);
 
-  // Is favorite
-  const isFavorite = useCallback((pluginId: string): boolean => {
-    return favorites.includes(pluginId);
-  }, [favorites]);
+  const setAllFxBypass = useCallback((action: Record<FxWindowId, boolean> | ((prev: Record<FxWindowId, boolean>) => Record<FxWindowId, boolean>)) => {
+    if (typeof action === 'function') {
+      setFxBypassState(action);
+    } else {
+      setFxBypassState(action);
+    }
+  }, []);
 
+  // --- Preset Actions ---
+  const savePreset = useCallback((pluginId: string, preset: PluginPreset) => {
+    setPluginPresets(prev => {
+      const existing = prev[pluginId] ?? [];
+      const filtered = existing.filter(p => p.id !== preset.id);
+      return {
+        ...prev,
+        [pluginId]: [...filtered, preset]
+      };
+    });
+  }, []);
+
+  const removePreset = useCallback((pluginId: string, presetId: string) => {
+    setPluginPresets(prev => {
+      const existing = prev[pluginId] ?? [];
+      return {
+        ...prev,
+        [pluginId]: existing.filter(p => p.id !== presetId)
+      };
+    });
+  }, []);
+
+  const setAllPresets = useCallback((presets: Record<string, PluginPreset[]>) => {
+    setPluginPresets(presets);
+  }, []);
+
+  // --- Favorite Actions ---
+  const toggleFavorite = useCallback((pluginId: string) => {
+    setPluginFavorites(prev => ({
+      ...prev,
+      [pluginId]: !prev[pluginId]
+    }));
+  }, []);
+
+  const setAllFavorites = useCallback((favorites: Record<string, boolean>) => {
+    setPluginFavorites(favorites);
+  }, []);
+
+  // --- Context Value ---
   const contextValue: PluginsDomainContextType = {
-    openFxWindows,
-    presets,
-    favorites,
-    openFxWindow,
-    closeFxWindow,
-    updateFxWindowParams,
-    updateFxWindowPosition,
+    fxVisibility,
+    fxBypassState,
+    pluginPresets,
+    pluginFavorites,
+    setFxVisibility,
+    toggleFxBypass,
+    setAllFxBypass,
     savePreset,
-    loadPreset,
-    deletePreset,
+    removePreset,
+    setAllPresets,
     toggleFavorite,
-    isFavorite,
+    setAllFavorites,
   };
 
   return (

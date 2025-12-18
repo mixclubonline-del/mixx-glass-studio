@@ -404,7 +404,7 @@ pub fn master_chain_process_samples(samples: &mut [f32], profile_id: Option<u32>
             }
             
             // Process through the master chain
-            use crate::mixx_audio_core::audio_processor::AudioProcessor;
+            use crate::mixx_audio_core::processor::AudioProcessor;
             chain.process(samples, 2); // Stereo
             
             info!("MasterChain: Processed {} samples for export", samples.len() / 2);

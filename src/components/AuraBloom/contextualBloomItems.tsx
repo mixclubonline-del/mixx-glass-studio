@@ -58,6 +58,7 @@ const ICON_SIZE = 24;
 export const arrangeItems: ContextualMenuItem[] = [
   { id: 'addTrack', label: 'Track', icon: <PlusIcon size={ICON_SIZE} />, action: 'addTrack', color: BLOOM_CONTEXT_ACCENTS.arrange },
   { id: 'duplicate', label: 'Copy', icon: <CopyIcon size={ICON_SIZE} />, action: 'duplicateClips', color: '#f6cfff' },
+  { id: 'stems', label: 'Stems', icon: <WaveformIcon size={ICON_SIZE} />, action: 'stems:show', color: '#4be0b6' },
   { id: 'split', label: 'Split', icon: <ScissorsIcon size={ICON_SIZE} />, action: 'splitSelection', color: '#9dd6ff' },
   { id: 'plugins', label: 'Plugins', icon: <PluginsIcon size={ICON_SIZE} />, action: 'plugins:browser:open', color: '#e879f9' },
   { id: 'undo', label: 'Undo', icon: <UndoIcon size={ICON_SIZE} />, action: 'undo', color: '#8be4ff' },

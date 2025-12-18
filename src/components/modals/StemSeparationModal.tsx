@@ -5,6 +5,7 @@ interface StemSeparationModalProps {
   onClose: () => void;
   onSeparate: (selectedStems: string[]) => void;
   initialSelection?: string[];
+  clipName?: string;
 }
 
 const AVAILABLE_STEMS = [
@@ -23,7 +24,12 @@ const AVAILABLE_STEMS = [
 
 const DEFAULT_SELECTION = ['Vocals', 'Drums', 'Bass', 'Other Instruments'];
 
-const StemSeparationModal: React.FC<StemSeparationModalProps> = ({ onClose, onSeparate, initialSelection }) => {
+const StemSeparationModal: React.FC<StemSeparationModalProps> = ({ 
+  onClose, 
+  onSeparate, 
+  initialSelection,
+  clipName
+}) => {
   const [selectedStems, setSelectedStems] = useState<Set<string>>(new Set(initialSelection ?? DEFAULT_SELECTION));
 
   useEffect(() => {
@@ -82,12 +88,19 @@ const StemSeparationModal: React.FC<StemSeparationModalProps> = ({ onClose, onSe
             transform: `scale(${(modalAnimation.style as any).scale})`,
           }}
         >
-        <h2 className="mb-2 text-center text-xl font-bold tracking-[0.4em] text-gray-200">
+        <h2 className="mb-1 text-center text-xl font-bold tracking-[0.4em] text-gray-200 uppercase">
           STEM SEPARATION
         </h2>
-        <p className="mb-6 text-center text-sm text-gray-400">
-          Select the stems you want Hybrid Transformer Demucs to extract.
-        </p>
+        <div className="mb-4 text-center">
+          {clipName && (
+            <div className="text-cyan-400 font-mono text-xs mb-1 tracking-widest uppercase truncate max-w-full px-4">
+              {clipName}
+            </div>
+          )}
+          <p className="text-xs text-gray-400">
+            Select the stems you want Hybrid Transformer Demucs to extract.
+          </p>
+        </div>
 
         <form onSubmit={handleSubmit} className="flex flex-1 flex-col overflow-hidden min-h-0">
           <div className="flex-1 overflow-y-auto pr-2 mb-4">

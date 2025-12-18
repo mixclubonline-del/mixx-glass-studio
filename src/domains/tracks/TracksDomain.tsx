@@ -3,57 +3,80 @@
  * Phase 31: App.tsx Decomposition
  */
 
-import React, { createContext, useContext, useState, useCallback, useRef, ReactNode } from 'react';
+import React, { createContext, useContext, useState, useCallback, ReactNode } from 'react';
+import { useArrange, ArrangeClip } from '../../hooks/useArrange';
 
 // ============================================================================
 // Types
 // ============================================================================
 
-export type TrackRole = 'vocals' | 'drums' | 'bass' | 'guitar' | 'piano' | 'synths' | 'strings' | 'other';
-export type TrackColor = 'cyan' | 'magenta' | 'blue' | 'green' | 'purple' | 'crimson';
-export type TrackGroup = 'Vocals' | 'Harmony' | 'Adlibs' | 'Bass' | 'Drums' | 'Instruments';
-export type WaveformType = 'dense' | 'sparse' | 'varied' | 'bass';
+// From App.tsx
+export type TrackRole = 'twoTrack' | 'hushRecord' | 'standard';
 
 export interface Track {
   id: string;
   trackName: string;
-  trackColor: TrackColor;
-  waveformType: WaveformType;
-  group: TrackGroup;
-  role: TrackRole;
+  trackColor: 'cyan' | 'magenta' | 'blue' | 'green' | 'purple' | 'crimson';
+  waveformType: 'dense' | 'sparse' | 'varied' | 'bass';
+  group: 'Vocals' | 'Harmony' | 'Adlibs' | 'Bass' | 'Drums' | 'Instruments';
   isProcessing?: boolean;
+  role: TrackRole;
   locked?: boolean;
 }
 
-export interface Clip {
-  id: string;
-  trackId: string;
-  startTime: number;
-  duration: number;
-  buffer?: AudioBuffer;
-  name: string;
-  offset: number;
-}
+// From useArrange.ts
+export type { ArrangeClip as Clip } from '../../hooks/useArrange';
+import { ArrangeClip as Clip } from '../../hooks/useArrange';
 
 export interface TracksState {
   tracks: Track[];
-  clips: Record<string, Clip[]>; // trackId -> clips
   selectedTrackId: string | null;
+  // Arrange state
+  clips: Clip[];
+  selection: { start: number; end: number } | null;
   selectedClipIds: string[];
+  pixelsPerSecond: number;
+  scrollX: number;
+  ppsAPI: {
+    value: number;
+    set: (pps: number) => void;
+    zoomBy: (factor: number, anchorSec: number) => void;
+  };
+  canUndo: boolean;
+  canRedo: boolean;
 }
 
 export interface TracksActions {
+  // Track Actions
   addTrack: (track: Omit<Track, 'id'>) => string;
   removeTrack: (trackId: string) => void;
   updateTrack: (trackId: string, updates: Partial<Track>) => void;
   selectTrack: (trackId: string | null) => void;
-  
-  addClip: (trackId: string, clip: Omit<Clip, 'id'>) => string;
+  setAllTracks: (tracks: Track[]) => void;
+  reorderTracks: (fromIndex: number, toIndex: number) => void;
+
+  // Clip / Arrange actions (proxied from useArrange)
+  addClip: (clip: Omit<Clip, 'id'>) => string; 
   removeClip: (clipId: string) => void;
   updateClip: (clipId: string, updates: Partial<Clip>) => void;
   selectClips: (clipIds: string[]) => void;
-  
-  reorderTracks: (fromIndex: number, toIndex: number) => void;
+  setAllClips: (clips: Clip[]) => void;
+
+  setClips: (clips: Clip[] | ((prev: Clip[]) => Clip[])) => void;
+  setSelection: (start: number, end: number) => void;
+  clearSelection: () => void;
+  setPps: (pps: number) => void;
+  zoomBy: (factor: number, anchorSec: number) => void;
+  setScrollX: (x: number) => void;
+  moveClip: (id: string, newStart: number, newTrackId: string) => void;
+  resizeClip: (id: string, newStart: number, newDuration: number, newSourceStart?: number) => void;
+  updateClipProperties: (id: string, props: Partial<Clip>) => void;
+  onSplitAt: (clipId: string, splitTime: number) => void;
+  splitSelection: (splitTime: number) => void;
+  setClipsSelect: (ids: string[], selected: boolean) => void;
+  duplicateClips: (ids: string[]) => void;
+  undo: () => void;
+  redo: () => void;
 }
 
 export interface TracksDomainContextType extends TracksState, TracksActions {}
@@ -96,86 +119,52 @@ interface TracksDomainProviderProps {
 
 export function TracksDomainProvider({ children }: TracksDomainProviderProps) {
   const [tracks, setTracks] = useState<Track[]>([]);
-  const [clips, setClips] = useState<Record<string, Clip[]>>({});
   const [selectedTrackId, setSelectedTrackId] = useState<string | null>(null);
-  const [selectedClipIds, setSelectedClipIds] = useState<string[]>([]);
 
-  // Add track
+  // Use Arrange Hook (State source of truth for clips)
+  const arrange = useArrange({ clips: [] });
+  
+  // Destructure arrange for clarity
+  const { 
+    clips, setClips, selection, setSelection, clearSelection, 
+    ppsAPI, scrollX, setScrollX, 
+    moveClip, resizeClip, onSplitAt, setClipsSelect, 
+    duplicateClips, updateClipProperties, splitSelection,
+    undo, redo, canUndo, canRedo 
+  } = arrange;
+
+  // --- Track Actions ---
+
   const addTrack = useCallback((trackData: Omit<Track, 'id'>): string => {
     const id = generateTrackId();
     const track: Track = { ...trackData, id };
     setTracks(prev => [...prev, track]);
-    setClips(prev => ({ ...prev, [id]: [] }));
     return id;
   }, []);
 
-  // Remove track
   const removeTrack = useCallback((trackId: string) => {
     setTracks(prev => prev.filter(t => t.id !== trackId));
-    setClips(prev => {
-      const next = { ...prev };
-      delete next[trackId];
-      return next;
-    });
+    // Also remove clips for this track
+    setClips(prev => prev.filter(c => c.trackId !== trackId));
     if (selectedTrackId === trackId) {
       setSelectedTrackId(null);
     }
-  }, [selectedTrackId]);
+  }, [selectedTrackId, setClips]);
 
-  // Update track
   const updateTrack = useCallback((trackId: string, updates: Partial<Track>) => {
     setTracks(prev => prev.map(t => 
       t.id === trackId ? { ...t, ...updates } : t
     ));
   }, []);
 
-  // Select track
   const selectTrack = useCallback((trackId: string | null) => {
     setSelectedTrackId(trackId);
   }, []);
 
-  // Add clip
-  const addClip = useCallback((trackId: string, clipData: Omit<Clip, 'id'>): string => {
-    const id = generateClipId();
-    const clip: Clip = { ...clipData, id };
-    setClips(prev => ({
-      ...prev,
-      [trackId]: [...(prev[trackId] || []), clip]
-    }));
-    return id;
+  const setAllTracks = useCallback((tracks: Track[]) => {
+    setTracks(tracks);
   }, []);
 
-  // Remove clip
-  const removeClip = useCallback((clipId: string) => {
-    setClips(prev => {
-      const next: Record<string, Clip[]> = {};
-      for (const [trackId, trackClips] of Object.entries(prev)) {
-        next[trackId] = trackClips.filter(c => c.id !== clipId);
-      }
-      return next;
-    });
-    setSelectedClipIds(prev => prev.filter(id => id !== clipId));
-  }, []);
-
-  // Update clip
-  const updateClip = useCallback((clipId: string, updates: Partial<Clip>) => {
-    setClips(prev => {
-      const next: Record<string, Clip[]> = {};
-      for (const [trackId, trackClips] of Object.entries(prev)) {
-        next[trackId] = trackClips.map(c => 
-          c.id === clipId ? { ...c, ...updates } : c
-        );
-      }
-      return next;
-    });
-  }, []);
-
-  // Select clips
-  const selectClips = useCallback((clipIds: string[]) => {
-    setSelectedClipIds(clipIds);
-  }, []);
-
-  // Reorder tracks
   const reorderTracks = useCallback((fromIndex: number, toIndex: number) => {
     setTracks(prev => {
       const next = [...prev];
@@ -185,20 +174,77 @@ export function TracksDomainProvider({ children }: TracksDomainProviderProps) {
     });
   }, []);
 
+  // --- Clip Actions (Wrappers) ---
+
+  const addClip = useCallback((clipData: Omit<Clip, 'id'>): string => {
+    const id = generateClipId();
+    const clip: Clip = { ...clipData, id };
+    setClips(prev => [...prev, clip]);
+    return id;
+  }, [setClips]);
+  
+  const removeClip = useCallback((clipId: string) => {
+    setClips(prev => prev.filter(c => c.id !== clipId));
+  }, [setClips]);
+
+  const updateClip = useCallback((clipId: string, updates: Partial<Clip>) => {
+      updateClipProperties(clipId, updates);
+  }, [updateClipProperties]);
+
+  const selectClips = useCallback((clipIds: string[]) => {
+      setClipsSelect(clipIds, true);
+  }, [setClipsSelect]);
+
+  const setAllClips = useCallback((clips: Clip[]) => {
+    setClips(clips);
+  }, [setClips]);
+
+
   const contextValue: TracksDomainContextType = {
+    // Track State
     tracks,
-    clips,
     selectedTrackId,
-    selectedClipIds,
+    
+    // Arrange State (from hook)
+    clips,
+    selection,
+    selectedClipIds: clips.filter(c => c.selected).map(c => c.id),
+    pixelsPerSecond: ppsAPI.value,
+    ppsAPI,
+    scrollX,
+    canUndo: canUndo(),
+    canRedo: canRedo(),
+    
+    // Track Actions
     addTrack,
     removeTrack,
     updateTrack,
     selectTrack,
+    setAllTracks,
+    reorderTracks,
+    
+    // Arrange Actions
     addClip,
     removeClip,
     updateClip,
     selectClips,
-    reorderTracks,
+    setAllClips,
+    setClips,
+    
+    setSelection,
+    clearSelection,
+    setPps: ppsAPI.set,
+    zoomBy: ppsAPI.zoomBy,
+    setScrollX,
+    moveClip,
+    resizeClip,
+    updateClipProperties,
+    onSplitAt,
+    splitSelection,
+    setClipsSelect,
+    duplicateClips,
+    undo,
+    redo
   };
 
   return (

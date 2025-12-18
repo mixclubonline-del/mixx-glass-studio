@@ -21,10 +21,12 @@ export function SessionDomainProvider({ children }: SessionDomainProviderProps) 
   const [isMixerOpen, setIsMixerOpen] = useState(false);
   const [isExportModalOpen, setIsExportModalOpen] = useState(false);
   const [isAIHubOpen, setIsAIHubOpen] = useState(false);
+  const [isStemSeparationModalOpen, setIsStemSeparationModalOpen] = useState(false);
   
   // Active selections for panels
   const [activePanelClipId, setActivePanelClipId] = useState<string | null>(null);
   const [activePanelTrackId, setActivePanelTrackId] = useState<string | null>(null);
+  const [activeStemClipId, setActiveStemClipId] = useState<string | null>(null);
   
   // Playhead following
   const [followPlayhead, setFollowPlayhead] = useState(true);
@@ -79,6 +81,17 @@ export function SessionDomainProvider({ children }: SessionDomainProviderProps) 
   const closeAIHub = useCallback(() => {
     setIsAIHubOpen(false);
   }, []);
+
+  // Stem Separation actions
+  const openStemSeparation = useCallback((clipId: string) => {
+    setActiveStemClipId(clipId);
+    setIsStemSeparationModalOpen(true);
+    console.log('[SessionDomain] Stem Separation opened for:', clipId);
+  }, []);
+
+  const closeStemSeparation = useCallback(() => {
+    setIsStemSeparationModalOpen(false);
+  }, []);
   
   const value: SessionDomainContextType = {
     isPianoRollOpen,
@@ -98,6 +111,10 @@ export function SessionDomainProvider({ children }: SessionDomainProviderProps) 
     closeExportModal,
     openAIHub,
     closeAIHub,
+    isStemSeparationModalOpen,
+    activeStemClipId,
+    openStemSeparation,
+    closeStemSeparation,
     setFollowPlayhead,
   };
   

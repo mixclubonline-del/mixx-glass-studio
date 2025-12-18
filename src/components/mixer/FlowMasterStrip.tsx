@@ -12,8 +12,8 @@ import { useMasterChain } from '../../hooks/useMasterChain';
 import { MasteringProfile, PROFILE_INFO } from '../../types/rust-audio';
 import { useLoudnessMeters } from '../../hooks/useLoudnessMeters';
 import { rustMasterBridge } from '../../audio/RustMasterBridge';
+import { useSession } from '../../domains/session/SessionDomainProvider';
 import './FlowMasterStrip.css';
-import ExportModal from '../modals/ExportModal';
 
 interface FlowMasterStripProps {
   volume: number;
@@ -110,9 +110,7 @@ const FlowMasterStrip: React.FC<FlowMasterStripProps> = ({
   // Master chain state (Phase 29)
   const { initialize, setProfile, profile, initialized } = useMasterChain(48000);
   const [showProfileDropdown, setShowProfileDropdown] = useState(false);
-
-  // Audio export modal state (Phase 32)
-  const [showExportModal, setShowExportModal] = useState(false);
+  const session = useSession();
 
   // Initialize master chain on mount
   useEffect(() => {
@@ -253,7 +251,7 @@ const FlowMasterStrip: React.FC<FlowMasterStripProps> = ({
       {/* Export Button (Phase 32) */}
       <div style={{ padding: '8px 12px', borderBottom: '1px solid rgba(102, 140, 198, 0.3)' }}>
         <button
-          onClick={() => setShowExportModal(true)}
+          onClick={() => session.openExportModal()}
           className="export-button"
         >
           ⬇ Export
@@ -335,11 +333,6 @@ const FlowMasterStrip: React.FC<FlowMasterStripProps> = ({
         {/* Native Engine Status & SIMD Toggle (Phase 32 & 34) */}
         <NativeEngineStatus />
       </div>
-
-      {/* Export Modal (Phase 32) */}
-      {showExportModal && (
-        <ExportModal onClose={() => setShowExportModal(false)} />
-      )}
     </div>
   );
 };
@@ -441,10 +434,6 @@ const NativeEngineStatus: React.FC = () => {
 };
 
 
-// Export Modal Wrapper for FlowMasterStrip
-const ExportModalWrapper: React.FC<{ show: boolean; onClose: () => void }> = ({ show, onClose }) => {
-  if (!show) return null;
-  return <ExportModal onClose={onClose} />;
-};
+// Native Engine Status Component (Phase 32, 34 & 40)
 
 export default FlowMasterStrip;
