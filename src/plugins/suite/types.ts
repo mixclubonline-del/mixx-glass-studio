@@ -284,6 +284,7 @@ export interface SuitePluginSurfaceProps {
   trackId: string;
   trackName?: string;
   existingPluginIds: string[];
+  initialPluginId?: string;
   onAddPlugin?: (pluginId: string) => void;
   onClose?: () => void;
 }

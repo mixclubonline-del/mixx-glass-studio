@@ -5,70 +5,7 @@
  * These events are read by gatherSessionSignals() every 40ms.
  */
 
-declare global {
-  interface Window {
-    __mixx_editEvents?: Array<{ distance: number; timestamp: number }>;
-    __mixx_toolSwitches?: Array<{ tool: string; timestamp: number }>;
-    __mixx_zoomEvents?: Array<{ delta: number; pos: number; timestamp: number }>;
-    __mixx_viewSwitches?: Array<{ view: string; timestamp: number }>;
-    __mixx_playbackState?: {
-      playing: boolean;
-      looping: boolean;
-      playCount?: number;
-      cursor?: number;
-      regionLength?: number;
-      cursorLock?: boolean;
-    };
-    __mixx_recordState?: {
-      recording: boolean;
-      armedTrack: boolean;
-      noiseFloor: number;
-      threshold?: number;
-      hush?: boolean;
-    };
-    __mixx_punchHistory?: Array<{
-      ts: number;
-      cursor: number;
-      duration?: number;
-      type?: string;
-    }>;
-    __mixx_recordTaps?: Array<{
-      ts: number;
-    }>;
-    __mixx_takeMemory?: Array<{
-      startTime: number;
-      endTime: number;
-      regionStart: number;
-      regionEnd: number;
-      duration: number;
-      breathInMs: number;
-      barPosition: number;
-      flowDuringTake: number;
-      hushEvents: number;
-    }>;
-    __mixx_autoPunch?: {
-      start: number;
-      end: number;
-      duration: number;
-      confidence: number;
-    };
-    __mixx_compBrain?: Array<{
-      id: string;
-      score: number;
-      flow: number;
-      energySlope: number;
-      timingAccuracy: number;
-      noiseScore: number;
-      duration: number;
-      barPosition: number;
-      punchStrength: number;
-      phrasing: {
-        start: number;
-        end: number;
-      };
-    }>;
-  }
-}
+// Window interface extensions moved to src/types/globals.d.ts
 
 const MAX_EVENTS = 50; // Keep last 50 events per type (safety limit)
 const EVENT_TTL_MS = 2000; // Events expire after 2 seconds (fallback)
@@ -144,6 +81,9 @@ export function updatePlaybackState(state: {
   playing?: boolean;
   looping?: boolean;
   playCount?: number;
+  cursor?: number;
+  regionLength?: number;
+  cursorLock?: boolean;
 }): void {
   if (typeof window === 'undefined') return;
   if (!window.__mixx_playbackState) {
@@ -164,6 +104,7 @@ export function updateRecordState(update: {
   noiseFloor?: number;
   threshold?: number;
   hush?: boolean;
+  recordStart?: number;
 }): void {
   if (typeof window === 'undefined') return;
   if (!window.__mixx_recordState) {

@@ -17,14 +17,7 @@ interface BreathingPlayheadProps {
   className?: string;
 }
 
-declare global {
-  interface Window {
-    __als?: {
-      pulse?: number;
-      temperature?: string;
-    };
-  }
-}
+// Window interface extensions moved to src/types/globals.d.ts
 
 export function BreathingPlayhead({ x, pulse, className }: BreathingPlayheadProps) {
   const [currentPulse, setCurrentPulse] = useState(pulse ?? 0);

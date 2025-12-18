@@ -1,11 +1,11 @@
 
 import React, { useState, useMemo } from 'react';
-import { useFlowMotion, useAnimatePresence, AnimatePresence } from '../../../../components/mixxglass';
+import { useFlowMotion, useAnimatePresence, AnimatePresence } from '../../../components/mixxglass';
 import { PLUGIN_TIERS, TierName, PluginKey, findPlugin } from '../constants';
 import { pluginPreviews } from './shared/MiniVisualizers';
 import { PluginBrowserProps, Plugin } from '../types';
 import { SearchIcon, MenuIcon, RefreshCwIcon, ArrowUpDownIcon, CheckCircleIcon } from './shared/Icons';
-import { MixxGlassKnob } from '../../../../components/mixxglass';
+import { MixxGlassKnob } from '../../../components/mixxglass';
 
 const allPluginsWithKeys = Object.entries(PLUGIN_TIERS).flatMap(([tierName, tierData]) =>
   Object.entries(tierData).map(([pluginKey, pluginData]) => ({

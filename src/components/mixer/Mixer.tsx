@@ -15,9 +15,9 @@ import FlowChannelStrip from './FlowChannelStrip';
 import FlowMasterStrip from './FlowMasterStrip';
 import FlowBusStrip from './FlowBusStrip';
 import FlowConsoleHeader, { type ConsoleViewMode } from './FlowConsoleHeader';
-import FlowConsoleMatrixView from './FlowConsoleMatrixView';
+import { FlowConsoleMatrixView } from './FlowConsoleMatrixView';
 import FlowConsoleAnalyzerView, { type AnalyzerType } from './FlowConsoleAnalyzerView';
-import FlowConsoleCompactView from './FlowConsoleCompactView';
+import { FlowConsoleCompactView } from './FlowConsoleCompactView';
 import {
   MIXER_CONSOLE_MAX_WIDTH,
   MIXER_CONSOLE_MIN_WIDTH,
@@ -108,6 +108,12 @@ interface FlowConsoleProps {
   isPlaying?: boolean;
   currentTime?: number;
   followPlayhead?: boolean;
+  /** Bus control props */
+  busSettings?: Record<string, { gain: number; isMuted: boolean; isSoloed: boolean; parallelSmash?: number }>;
+  onBusGainChange?: (busId: string, gain: number) => void;
+  onBusMuteToggle?: (busId: string) => void;
+  onBusSoloToggle?: (busId: string) => void;
+  onBusParallelSmashChange?: (busId: string, value: number) => void;
 }
 
 const computeStageHeights = () => {
@@ -173,6 +179,12 @@ const FlowConsole: React.FC<FlowConsoleProps> = ({
   isPlaying = false,
   currentTime = 0,
   followPlayhead = false,
+  // Bus controls
+  busSettings,
+  onBusGainChange,
+  onBusMuteToggle,
+  onBusSoloToggle,
+  onBusParallelSmashChange,
 }) => {
   const [stageHeights, setStageHeights] = useState(computeStageHeights);
   const scrollContainerRef = useRef<HTMLDivElement>(null);
@@ -290,18 +302,18 @@ const FlowConsole: React.FC<FlowConsoleProps> = ({
           <div 
             ref={scrollContainerRef}
             style={composeStyles(
-              layout.position.relative,
-              layout.width.full,
+              layout.position.relative as React.CSSProperties,
+              layout.width.full as React.CSSProperties,
               { height: '100%' },
-              layout.overflow.x.auto
+              layout.overflow.x.auto as React.CSSProperties
             )}
             onWheel={handleWheel}
           >
             <div
               style={composeStyles(
-                layout.position.relative,
+                layout.position.relative as React.CSSProperties,
                 { margin: '0 auto' },
-                layout.flex.container('col'),
+                layout.flex.container('col') as React.CSSProperties,
                 { height: '100%' },
                 {
                   width: stageWidth,
@@ -394,7 +406,9 @@ const FlowConsole: React.FC<FlowConsoleProps> = ({
                   />
                 );
               })}
-              {buses.map((bus) => (
+              {buses.map((bus) => {
+                const settings = busSettings?.[bus.id];
+                return (
                 <FlowBusStrip
                   key={`bus-${bus.id}`}
                   busId={bus.id}
@@ -411,8 +425,19 @@ const FlowConsole: React.FC<FlowConsoleProps> = ({
                   busTransient={bus.busTransient}
                   onSelectBus={onSelectBus}
                   isActive={selectedBusId === bus.id}
+                  // Bus control props
+                  gain={settings?.gain ?? 1.0}
+                  isMuted={settings?.isMuted ?? false}
+                  isSoloed={settings?.isSoloed ?? false}
+                  onGainChange={onBusGainChange}
+                  onMuteToggle={onBusMuteToggle}
+                  onSoloToggle={onBusSoloToggle}
+                  sidechainActive={bus.id === 'harmonic-lattice' || bus.id === 'velvet-floor'}
+                  parallelSmash={settings?.parallelSmash}
+                  onParallelSmashChange={onBusParallelSmashChange}
                 />
-              ))}
+              );
+              })}
               <div style={{ width: '32px', flexShrink: 0 }} />
                 <FlowMasterStrip
                   volume={masterVolume}
@@ -451,45 +476,45 @@ const FlowConsole: React.FC<FlowConsoleProps> = ({
         }
       )}>
         <div style={composeStyles(
-          layout.position.absolute,
+          layout.position.absolute as React.CSSProperties,
           { inset: 0 },
-          { pointerEvents: 'none' }
+          { pointerEvents: 'none' } as React.CSSProperties
         )}>
           <div style={composeStyles(
-            layout.position.absolute,
+            layout.position.absolute as React.CSSProperties,
             { left: 0, right: 0, top: 0 },
             {
               height: '128px',
               background: 'linear-gradient(to bottom, rgba(21,45,88,0.9), transparent)',
-            }
+            } as React.CSSProperties
           )} />
           <div style={composeStyles(
-            layout.position.absolute,
+            layout.position.absolute as React.CSSProperties,
             { top: 0, bottom: 0, left: 0 },
             {
               width: '80px',
               background: 'linear-gradient(to right, rgba(12,28,58,0.75), rgba(12,28,58,0.2), transparent)',
-            }
+            } as React.CSSProperties
           )} />
           <div style={composeStyles(
-            layout.position.absolute,
+            layout.position.absolute as React.CSSProperties,
             { top: 0, bottom: 0, right: 0 },
             {
               width: '80px',
               background: 'linear-gradient(to left, rgba(12,28,58,0.75), rgba(12,28,58,0.2), transparent)',
-            }
+            } as React.CSSProperties
           )} />
           <div style={composeStyles(
-            layout.position.absolute,
+            layout.position.absolute as React.CSSProperties,
             { left: '50%', top: '32px' },
-            transitions.transform.combine('translateX(-50%)'),
-            effects.border.radius.full,
+            transitions.transform.combine('translateX(-50%)') as React.CSSProperties,
+            effects.border.radius.full as React.CSSProperties,
             {
               height: '4px',
               width: '66.666%',
               background: 'linear-gradient(to right, rgba(64,120,210,0.45), rgba(126,162,235,0.35), rgba(64,120,210,0.45))',
               filter: 'blur(4px)',
-            }
+            } as React.CSSProperties
           )} />
         </div>
         
@@ -515,11 +540,11 @@ const FlowConsole: React.FC<FlowConsoleProps> = ({
 
         {/* View Content */}
         <div style={composeStyles(
-          layout.position.relative,
-          layout.width.full,
+          layout.position.relative as React.CSSProperties,
+          layout.width.full as React.CSSProperties,
           {
             height: 'calc(100% - 80px)',
-          }
+          } as React.CSSProperties
         )}>
           {renderView()}
         </div>

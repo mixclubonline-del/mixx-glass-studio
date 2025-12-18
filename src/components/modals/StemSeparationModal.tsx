@@ -56,7 +56,7 @@ const StemSeparationModal: React.FC<StemSeparationModalProps> = ({ onClose, onSe
     initial: { opacity: 0 },
     animate: { opacity: 1 },
     exit: { opacity: 0 },
-    transition: { duration: 300, easing: 'cubic-bezier(0.25, 0.46, 0.45, 0.94)' },
+    transition: { duration: 300, easing: 'ease-out' }, // Standard CSS easing name
   });
 
   const modalAnimation = useAnimatePresence({
@@ -64,7 +64,7 @@ const StemSeparationModal: React.FC<StemSeparationModalProps> = ({ onClose, onSe
     initial: { opacity: 0, scale: 0.96 },
     animate: { opacity: 1, scale: 1 },
     exit: { opacity: 0, scale: 0.96 },
-    transition: { duration: 350, easing: 'cubic-bezier(0.25, 0.46, 0.45, 0.94)' },
+    transition: { duration: 200, easing: 'ease-out' },
   });
 
   return (
@@ -79,7 +79,7 @@ const StemSeparationModal: React.FC<StemSeparationModalProps> = ({ onClose, onSe
           onClick={(event) => event.stopPropagation()}
           style={{
             opacity: modalAnimation.style.opacity,
-            transform: `scale(${modalAnimation.style.scale})`,
+            transform: `scale(${(modalAnimation.style as any).scale})`,
           }}
         >
         <h2 className="mb-2 text-center text-xl font-bold tracking-[0.4em] text-gray-200">

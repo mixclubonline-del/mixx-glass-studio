@@ -74,6 +74,20 @@ export class PrimeBrainLLM {
   }
 
   /**
+   * Access specific Gemini models directly
+   */
+  get models() {
+    return this.geminiClient.models;
+  }
+
+  /**
+   * Access Gemini Live API directly
+   */
+  get live() {
+    return (this.geminiClient as any).preview.liveSessions;
+  }
+
+  /**
    * Get cache statistics
    */
   getCacheStats() {
@@ -92,8 +106,11 @@ export class PrimeBrainLLM {
       maxTokens?: number;
       systemPrompt?: string;
       model?: string;
-      thinkingConfig?: { thinkingBudget?: number };
+      thinkingConfig?: {
+        thinkingBudget?: number;
+      };
       useMixxRecall?: boolean;
+      useCache?: boolean;
     }
   ): AsyncGenerator<string, void, unknown> {
     // Inject Mixx Recall context if enabled
@@ -330,7 +347,10 @@ export class PrimeBrainLLM {
    * Create a live session for real-time audio transcription
    */
   async createLiveSession(config?: LiveSessionConfig): Promise<LiveSession> {
-    const session = await this.geminiClient.preview.liveSessions.create({
+    if (!(this.geminiClient as any).preview?.liveSessions) {
+      throw new Error("Live sessions are not available or supported by the current Gemini client configuration.");
+    }
+    const session = await (this.geminiClient as any).preview.liveSessions.create({
       model: 'gemini-2.5-flash',
       config: {
         speechConfig: {

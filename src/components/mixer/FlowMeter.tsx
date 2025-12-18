@@ -144,12 +144,7 @@ const PulsingMeterBackground: React.FC<{
   pulse: number;
   flowFollow: number;
 }> = ({ glow, pulse, flowFollow }) => {
-  const pulseOpacity = usePulseAnimation({
-    duration: 2500,
-    minOpacity: 0.6,
-    maxOpacity: 1,
-    easing: 'ease-in-out',
-  });
+  const pulseOpacity = usePulseAnimation(0.6, 1, 2500, 'ease-in-out');
   return (
     <div
       style={composeStyles(
@@ -162,7 +157,7 @@ const PulsingMeterBackground: React.FC<{
             0.25 + pulse * 0.3 + flowFollow * 0.2
           )} 0%, transparent 100%)`,
           boxShadow: `inset 0 0 ${20 + pulse * 15 + flowFollow * 10}px ${hexToRgba(glow, 0.15 + pulse * 0.25)}`,
-          opacity: pulseOpacity.opacity,
+          opacity: pulseOpacity,
         }
       )}
     />
@@ -177,25 +172,18 @@ const PulsingMeterBar: React.FC<{
   pulse: number;
   flowFollow: number;
 }> = ({ height, gradient, glow, pulse, flowFollow }) => {
-  const pulseOpacity = usePulseAnimation({
-    duration: 1600,
-    minOpacity: 0.85,
-    maxOpacity: 1,
-    easing: 'ease-in-out',
-  });
+  const pulseOpacity = usePulseAnimation(0.85, 1, 1600, 'ease-in-out');
   return (
-    <div
-      style={composeStyles(
+      <div style={composeStyles(
         layout.width.full,
         {
           height: `${height}%`,
           background: gradient,
           boxShadow: `0 0 ${12 + pulse * 8 + flowFollow * 6}px ${hexToRgba(glow, 0.45 + pulse * 0.3)}`,
-          opacity: pulseOpacity.opacity,
+          opacity: pulseOpacity,
           transformOrigin: 'bottom',
         }
-      )}
-    />
+      )} />
   );
 };
 
@@ -205,12 +193,7 @@ const PulsingPeakIndicator: React.FC<{
   glow: string;
   transient: boolean;
 }> = ({ position, glow, transient }) => {
-  const pulseScale = usePulseAnimation({
-    duration: 350,
-    minScale: 1,
-    maxScale: 1.4,
-    easing: 'ease-in-out',
-  });
+  const pulseScale = usePulseAnimation(1, 1.4, 350, 'ease-in-out');
   return (
     <div
       style={composeStyles(
@@ -222,7 +205,7 @@ const PulsingPeakIndicator: React.FC<{
           bottom: `${position}%`,
           background: hexToRgba(glow, transient ? 0.9 : 0.7),
           boxShadow: `0 0 10px ${hexToRgba(glow, 0.6)}`,
-          transform: transient ? `scaleX(${pulseScale.scale})` : 'scaleX(1)',
+          transform: transient ? `scaleX(${pulseScale})` : 'scaleX(1)',
         }
       )}
     />

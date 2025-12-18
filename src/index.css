@@ -21,6 +21,9 @@
 @tailwind components;
 @tailwind utilities;
 
+@import './theme/aura.css';
+
+
 /* Mixx button styles are imported in index.tsx */
 
 :root {
@@ -35,19 +38,11 @@
    * Secondary: Magenta → Cyan gradient (energy to flow)
    */
   
-  /* Core AURA Brand Colors */
-  --aura-violet: #8B5CF6;
+  /* Core AURA Brand Colors (Imported from theme/aura.css) */
   --aura-violet-light: #A78BFA;
   --aura-violet-dark: #6D28D9;
-  --aura-magenta: #EC4899;
-  --aura-cyan: #22D3EE;
-  --aura-amber: #F59E0B;
-  --aura-indigo: #6366F1;
   
-  /* Deep Space Backgrounds (AURA Void) */
-  --aura-space: #0A0A0F;
-  --aura-night: #0F0F1A;
-  --aura-twilight: #1A1033;
+  /* Deep Space Backgrounds (Imported from theme/aura.css) */
   --aura-deep: #12081F;
   
   /* Glass Surface System */
@@ -97,13 +92,25 @@
 body {
   margin: 0;
   min-height: 100vh;
-  /* AURA Deep Space Background */
+  /* AURA Deep Space Background with Subtle Backdrop Image */
   background: 
+    /* Ethereal gradient overlays */
     radial-gradient(ellipse at 20% -10%, rgba(139, 92, 246, 0.25), transparent 50%),
     radial-gradient(ellipse at 80% 20%, rgba(236, 72, 153, 0.15), transparent 45%),
     radial-gradient(ellipse at 50% 80%, rgba(34, 211, 238, 0.1), transparent 50%),
     radial-gradient(circle at 30% 60%, rgba(99, 102, 241, 0.12), transparent 40%),
-    linear-gradient(145deg, var(--aura-space, #0A0A0F) 0%, var(--aura-twilight, #1A1033) 100%);
+    /* Subtle AURA backdrop image - whispers through */
+    linear-gradient(to bottom, rgba(10, 10, 15, 0.75), rgba(10, 10, 15, 0.85)),
+    url('/assets/aura-backdrop.jpg');
+  background-size: 
+    100% 100%, 
+    100% 100%, 
+    100% 100%, 
+    100% 100%, 
+    100% 100%, 
+    cover;
+  background-position: center;
+  background-attachment: fixed;
   transition: background 1.2s ease-out;
   color: var(--ink-foreground);
   overflow: hidden;

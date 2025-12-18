@@ -5,20 +5,7 @@
  * Shows contextual hints and meta-feedback above dock.
  */
 
-declare global {
-  interface Window {
-    __primeBrain?: {
-      guidance?: string;
-      active?: boolean;
-    };
-    __primeBrainInstance?: {
-      state?: {
-        guidance?: string;
-        active?: boolean;
-      };
-    };
-  }
-}
+// Window interface extensions moved to src/types/globals.d.ts
 
 export interface PrimeBrainState {
   guidance: string;
@@ -30,7 +17,7 @@ export interface PrimeBrainState {
  * Get current Prime Brain state
  */
 export function getPrimeBrainState(): PrimeBrainState {
-  const brain = window.__primeBrain || window.__primeBrainInstance?.state || {};
+  const brain = (window as any).__primeBrain || (window as any).__primeBrainInstance?.state || {};
   
   return {
     guidance: brain.guidance || "",

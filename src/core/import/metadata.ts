@@ -163,7 +163,7 @@ export function createMetadataSummary(metadata: StemMetadata): {
   
   return {
     type: metadata.type,
-    bpm: metadata.bpm,
+    bpm: metadata.bpm || 0,
     key: metadata.key,
     stemCount: metadata.stems.length,
     readyForPunch: hasVocals && metadata.type === 'vocal',

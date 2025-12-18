@@ -130,8 +130,8 @@ export function detectRole(
     if (
       pitchVar !== undefined &&
       pitchVar < 0.03 &&
-      spectral.body !== undefined &&
-      spectral.body > 0.35
+      (spectral as any).body !== undefined &&
+      (spectral as any).body > 0.35
     ) {
       if (lowerName.includes('harmony') || lowerName.includes('harm')) {
         return 'VOCAL_HARMONY';
@@ -193,7 +193,7 @@ export function detectRole(
     lowerName.includes('backing') ||
     lowerName.includes('track') ||
     lowerName.includes('beat') ||
-    spectral.harmonic !== undefined && spectral.harmonic > 0.6
+    (spectral as any).harmonic !== undefined && (spectral as any).harmonic > 0.6
   ) {
     return 'MUSIC';
   }

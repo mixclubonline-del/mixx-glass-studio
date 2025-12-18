@@ -49,9 +49,9 @@ export const MixxGlassToggle: React.FC<MixxGlassToggleProps> = ({
   );
 
   const sizeStyles = {
-    sm: { width: '32px', height: '18px', thumb: '14px' },
-    md: { width: '44px', height: '24px', thumb: '20px' },
-    lg: { width: '56px', height: '30px', thumb: '26px' },
+    sm: { width: 32, height: 18, thumb: 14 },
+    md: { width: 44, height: 24, thumb: 20 },
+    lg: { width: 56, height: 30, thumb: 26 },
   };
 
   const styles = sizeStyles[size];

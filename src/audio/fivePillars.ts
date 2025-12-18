@@ -4,6 +4,12 @@ import {
   VelvetFloorSettings,
 } from '../types/sonic-architecture';
 
+export type {
+  HarmonicLatticeSettings,
+  PhaseWeaveSettings,
+  VelvetFloorSettings,
+};
+
 export interface PillarStage<TSettings> {
   input: GainNode;
   output: GainNode;
@@ -24,7 +30,7 @@ export function createSaturationCurve(amount: number): Float32Array {
     curve[i] = y;
   }
 
-  return curve;
+  return curve as any;
 }
 
 export function createVelvetFloorStage(

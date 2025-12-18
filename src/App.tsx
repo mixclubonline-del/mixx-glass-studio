@@ -29,6 +29,7 @@ import ViewDeck from './components/layout/ViewDeck';
 import OverlayPortal from './components/layout/OverlayPortal';
 import VelvetComplianceHUD from './components/ALS/VelvetComplianceHUD';
 import PrimeBrainInterface from './components/PrimeBrainInterface';
+import SuitePluginSurface from './plugins/suite/SuitePluginSurface';
 import { useAutoSave } from './hooks/useAutoSave';
 import { AutoSaveStatus } from './components/AutoSaveStatus';
 import { AutoSaveRecovery } from './components/AutoSaveRecovery';
@@ -481,7 +482,7 @@ const computeDockDefaultPosition = (): Point => {
 const computeHubDefaultPosition = (dockPosition?: Point): Point => {
   if (typeof window === 'undefined') {
     // Default: top-right (matches CSS default)
-    return { x: window.innerWidth - 220 - 90, y: 240 }; // 220 = HUB_SIZE.width, 90 = right offset
+    return { x: 1000 - 220 - 90, y: 240 }; // Fallback width 1000px
   }
   // Default: top-right (matches CSS: top: 240px, right: 90px)
   const x = window.innerWidth - HUB_SIZE.width - 90; // 90px from right (matches CSS)
@@ -679,7 +680,7 @@ interface ImportProgressEntry {
   parentId?: string;
 }
 
-interface PersistedProjectState {
+export interface PersistedProjectState {
   tracks?: TrackData[];
   clips?: any[];
   mixerSettings?: Record<string, MixerSettings>;
@@ -1589,7 +1590,7 @@ const FlowRuntime: React.FC<FlowRuntimeProps> = ({ arrangeFocusToken }) => {
     setRecordingOptions((prev) => {
       const nextState = { ...prev, [option]: !prev[option] };
       publishAlsSignal({
-        source: 'recording-option',
+        source: 'system', // Use 'system' as source for recording options for now
         option,
         active: nextState[option],
       });
@@ -1604,7 +1605,7 @@ const FlowRuntime: React.FC<FlowRuntimeProps> = ({ arrangeFocusToken }) => {
     appendHistoryNote({
       id: `take-marker-${timestamp}`,
       timestamp: Date.now(),
-      scope: 'recording',
+      scope: 'system',
       message: `${summary} • ${report.notes[0] ?? 'Monitor engaged.'}`,
       accent: '#f97316',
     });
@@ -2210,7 +2211,7 @@ const FlowRuntime: React.FC<FlowRuntimeProps> = ({ arrangeFocusToken }) => {
 
   // Center console when mix view is activated
   useEffect(() => {
-    if (viewMode === 'mix' && typeof window !== 'undefined') {
+    if (viewMode === 'mixer' && typeof window !== 'undefined') {
       // Center console: (viewport width - console width) / 2, (viewport height - console height) / 2
       const consoleWidth = window.innerWidth * 0.88; // 88vw
       const consoleHeight = window.innerHeight * 0.52; // 52vh
@@ -3005,6 +3006,7 @@ const FlowRuntime: React.FC<FlowRuntimeProps> = ({ arrangeFocusToken }) => {
       profile: {
         name: 'Streaming Standard',
         targetLUFS: -14,
+        truePeakCeiling: -1,
         velvetFloor: { depth: 70, translation: 'deep', warmth: 60 },
         harmonicLattice: { character: 'warm', presence: 75, airiness: 70 },
         phaseWeave: { width: 80, monoCompatibility: 90 },
@@ -3099,10 +3101,11 @@ const FlowRuntime: React.FC<FlowRuntimeProps> = ({ arrangeFocusToken }) => {
       setAudioBuffers((prev) => ({ ...prev, [newBufferId]: processedBuffer }));
 
       const newTrackId = `track-import-${timestamp}`;
-      const newTrack: TrackData = {
+      const newTrack: any = {
         id: newTrackId,
         trackName: profile.trackName,
         trackColor: profile.color,
+        autoRole: (profile as any).autoRole,
         waveformType: profile.waveformType,
         group: profile.group,
         isProcessing: true,
@@ -3432,7 +3435,7 @@ const FlowRuntime: React.FC<FlowRuntimeProps> = ({ arrangeFocusToken }) => {
     },
     onToggleMixer: () => {
       // Switch to mixer view
-      setActiveView('mixer');
+      setViewMode('mixer');
     },
     onOpenPluginBrowser: () => {
       // TODO: Open plugin browser
@@ -3445,16 +3448,14 @@ const FlowRuntime: React.FC<FlowRuntimeProps> = ({ arrangeFocusToken }) => {
     onToggleRecord: () => {
       // Toggle recording state
       if (isPlaying) {
-        handleStopClick();
-      } else {
-        handlePlayClick();
+        handlePlayPause();
       }
     },
     onPlay: () => {
-      handlePlayClick();
+      if (!isPlaying) handlePlayPause();
     },
     onStop: () => {
-      handleStopClick();
+      if (isPlaying) handlePlayPause();
     },
     onOpenAIHub: () => {
       // TODO: Open AI hub
@@ -3764,7 +3765,7 @@ const FlowRuntime: React.FC<FlowRuntimeProps> = ({ arrangeFocusToken }) => {
           const next = { ...prev };
           zustandTracks.forEach(track => {
             if (!next[track.id]) {
-              const volume = track.role === 'two-track' ? 0.82 : 
+              const volume = track.role === 'twoTrack' ? 0.82 : 
                            track.role === 'hushRecord' ? 0.78 : 0.75;
               next[track.id] = { volume, pan: 0, isMuted: false };
             }
@@ -5525,7 +5526,7 @@ const FlowRuntime: React.FC<FlowRuntimeProps> = ({ arrangeFocusToken }) => {
         setAudioBuffers({ 'default': buffer });
 
         masterNodesRef.current = await buildMasterChain(createdCtx);
-        if (isCancelled || createdCtx.state === "closed") {
+        if (isCancelled || (createdCtx.state as string) === "closed") {
           return;
         }
         // Initialize Mixx Club Signal Matrix (buses -> master)
@@ -5641,11 +5642,11 @@ const FlowRuntime: React.FC<FlowRuntimeProps> = ({ arrangeFocusToken }) => {
           if (loudnessListenerRef.current) {
             meter.removeEventListener('metrics', loudnessListenerRef.current as EventListener);
           }
-          if (isCancelled || createdCtx.state === "closed") {
+          if (isCancelled || (createdCtx.state as string) === "closed") {
             return;
           }
           await meter.initialize(createdCtx);
-          if (isCancelled || createdCtx.state === "closed") {
+          if (isCancelled || (createdCtx.state as string) === "closed") {
             return;
           }
           meter.reset();
@@ -5660,7 +5661,7 @@ const FlowRuntime: React.FC<FlowRuntimeProps> = ({ arrangeFocusToken }) => {
           meter.addEventListener('metrics', handler as EventListener);
           loudnessListenerRef.current = handler;
 
-          if (isCancelled || createdCtx.state === "closed" || !masterNodesRef.current) {
+          if (isCancelled || (createdCtx.state as string) === "closed" || !masterNodesRef.current) {
             return;
           }
           const complianceTap = masterNodesRef.current.complianceTap;
@@ -5686,7 +5687,7 @@ const FlowRuntime: React.FC<FlowRuntimeProps> = ({ arrangeFocusToken }) => {
 
         setMasterReady(true);
         
-        if (isCancelled || createdCtx.state === "closed") {
+        if (isCancelled || (createdCtx.state as string) === "closed") {
           return;
         }
         const initialPluginRegistry = getPluginRegistry(createdCtx);
@@ -5699,12 +5700,12 @@ const FlowRuntime: React.FC<FlowRuntimeProps> = ({ arrangeFocusToken }) => {
         engineInstancesRef.current.clear();
         for (const plugin of initialPluginRegistry) {
             if (isCancelled) break;
-            if (createdCtx.state === "closed") {
+            if ((createdCtx.state as string) === "closed") {
               break;
             }
             
             // Ensure context is in a valid state before creating engine
-            if (createdCtx.state === "closed" || createdCtx.state === "interrupted") {
+            if ((createdCtx.state as string) === 'interrupted') {
               console.warn(`[FX] Cannot create engine for '${plugin.id}' - context is ${createdCtx.state}`);
               break;
             }
@@ -5716,7 +5717,7 @@ const FlowRuntime: React.FC<FlowRuntimeProps> = ({ arrangeFocusToken }) => {
                   engine.input.context === createdCtx && engine.output.context === createdCtx) {
                 engineInstancesRef.current.set(plugin.id, engine);
                 if (typeof engine.initialize === 'function' && !engine.getIsInitialized()) {
-                    if (isCancelled || createdCtx.state === "closed") {
+                    if (isCancelled || (createdCtx.state as string) === "closed") {
                       break;
                     }
                     await engine.initialize(createdCtx);
@@ -5978,7 +5979,7 @@ const FlowRuntime: React.FC<FlowRuntimeProps> = ({ arrangeFocusToken }) => {
       if (!ctx || pluginRegistry.length === 0) return;
       
       // Guard: Only run if context state is running or suspended (not closed)
-      if (ctx.state === 'closed') return;
+      if ((ctx.state as string) === 'closed') return;
       
       // Guard: Wait for engines to be initialized before building routing graph
       // Check if we have engines for at least some plugins
@@ -6535,7 +6536,7 @@ const FlowRuntime: React.FC<FlowRuntimeProps> = ({ arrangeFocusToken }) => {
 
     useEffect(() => {
         const ctx = audioContextRef.current;
-        if (!ctx || ctx.state === 'closed') return;
+        if (!ctx || (ctx.state as string) === 'closed') return;
 
         const analysisLoop = () => {
             if (!isPlayingRef.current) {
@@ -7062,7 +7063,7 @@ const FlowRuntime: React.FC<FlowRuntimeProps> = ({ arrangeFocusToken }) => {
           // Reorder items based on Prime Brain guidance (subtle, only in active mode)
           if (primeMode === 'active' && suggestions.showBloomMenu && item.name.toLowerCase().includes('analyze')) {
             // Boost "Analyze" items when tension is high
-            if (primeBrainSnapshotInputs?.harmonicState.tension > 0.6) {
+            if (primeBrainSnapshotInputs?.harmonicState?.tension !== undefined && primeBrainSnapshotInputs.harmonicState.tension > 0.6) {
               enhanced = {
                 ...enhanced,
                 description: enhanced.description ? `${enhanced.description} • High tension detected` : 'High tension detected',
@@ -7698,7 +7699,7 @@ const FlowRuntime: React.FC<FlowRuntimeProps> = ({ arrangeFocusToken }) => {
                     }}
                     onOpenPluginSettings={handleOpenPluginSettings}
                     automationParamMenu={automationParamMenu}
-                    onOpenAutomationParamMenu={(x, y, trackId) =>
+                    onOpenAutomationParamMenu={(x: number, y: number, trackId: string) =>
                       setAutomationParamMenu({ x, y, trackId })
                     }
                     onCloseAutomationParamMenu={() => setAutomationParamMenu(null)}
@@ -7750,7 +7751,7 @@ const FlowRuntime: React.FC<FlowRuntimeProps> = ({ arrangeFocusToken }) => {
                     onRenameTrack={handleRenameTrack}
                     inserts={inserts}
                     fxWindows={fxWindows}
-                    onAddPlugin={handleAddPlugin}
+                    onAddPlugin={(trackId: string, pluginId: string) => handleAddPlugin(trackId, pluginId)}
                     onRemovePlugin={handleRemovePlugin}
                     onMovePlugin={handleMovePlugin}
                     onOpenPluginBrowser={(trackId: string) => {
@@ -7792,7 +7793,7 @@ const FlowRuntime: React.FC<FlowRuntimeProps> = ({ arrangeFocusToken }) => {
             ]}
           />
                 {/* Wide Glass Console for Mix View */}
-                {currentView === "mix" && (
+                {currentView === "mixer" && (
                   <>
                     {/* Dimmed ArrangeWindow overlay */}
                     <div className="absolute inset-0 opacity-30 pointer-events-none">
@@ -8052,7 +8053,7 @@ const FlowRuntime: React.FC<FlowRuntimeProps> = ({ arrangeFocusToken }) => {
                 setIsPluginBrowserOpen(false);
                 setTrackIdForPluginBrowser(null);
               }}
-              onClose={handleClosePluginBrowser}
+              onClose={() => setIsPluginBrowserOpen(false)}
             />
           </div>
         )}
@@ -8135,7 +8136,7 @@ const FlowRuntime: React.FC<FlowRuntimeProps> = ({ arrangeFocusToken }) => {
                   zustandTracks.forEach(track => {
                     if (!next[track.id]) {
                       // Default volume based on track role
-                      const volume = track.role === 'two-track' ? 0.82 : 
+                      const volume = track.role === 'twoTrack' ? 0.82 : 
                                    track.role === 'hushRecord' ? 0.78 : 0.75;
                       next[track.id] = { volume, pan: 0, isMuted: false };
                     }
@@ -8200,7 +8201,7 @@ const FlowRuntime: React.FC<FlowRuntimeProps> = ({ arrangeFocusToken }) => {
               const newBuffers: Record<string, AudioBuffer> = {};
               
               const baseTimestamp = Date.now();
-              result.tracks.forEach((trackConfig, index) => {
+              result.tracks.forEach((trackConfig: any, index) => {
                 // Generate unique track ID with timestamp + index + random
                 const trackId = `track-${baseTimestamp}-${index}-${Math.random().toString(36).substring(2, 7)}`;
                 const bufferId = `buffer-${baseTimestamp}-${index}-${Math.random().toString(36).substring(2, 7)}`;

@@ -4,12 +4,21 @@ import { ArrangeClip as ClipModel, useArrange, ClipId } from "../hooks/useArrang
 import { recordSessionProbeTimelineEvent } from "../hooks/useSessionProbe";
 import { ArrangeClip } from "./ArrangeClip";
 import { quantizeSeconds, secondsPerBar, secondsPerBeat } from "../utils/time";
-import { TrackData, MixerSettings, AutomationPoint, TrackAnalysisData, FxWindowId } from "../App";
+import { TrackData, MixerSettings, AutomationPoint, TrackAnalysisData, FxWindowId, FxWindowConfig } from "../App";
 import ArrangeTrackHeader from "./ArrangeTrackHeader";
 import ProfessionalTrackHeader from "./ProfessionalTrackHeader";
 import AutomationLane from "./AutomationLane";
 import { deriveTrackALSFeedback, TrackALSFeedback, hexToRgba } from "../utils/ALS";
 import { findNearestZeroCrossing } from "../utils/zeroCrossing";
+import {
+  AuraPalette,
+  AuraColors,
+  AuraEffects,
+  AuraGradients,
+  AuraMotion,
+  AuraKeyframes,
+  auraAlpha,
+} from "../theme/aura-tokens";
 import {
   TrackUIState,
   TrackContextMode,
@@ -142,8 +151,19 @@ type Props = {
   onToggleSolo?: (trackId: string) => void;
   onToggleArm?: (trackId: string) => void;
   onAddPlugin?: (trackId: string, pluginId: FxWindowId) => void;
+  onRemovePlugin?: (trackId: string, index: number) => void;
+  onMovePlugin?: (trackId: string, fromIndex: number, toIndex: number) => void;
+  onOpenPluginBrowser?: (trackId: string) => void;
+  onOpenPluginSettings?: (fxId: FxWindowId, trackId?: string) => void;
+  onMixerChange?: (trackId: string, setting: keyof MixerSettings, value: number | boolean) => void;
+  automationParamMenu?: { x: number; y: number; trackId: string } | null;
+  onOpenAutomationParamMenu?: (x: number, y: number, trackId: string) => void;
+  onCloseAutomationParamMenu?: () => void;
+  onToggleAutomationLaneWithParam?: (trackId: string, fxId: string, paramName: string) => void;
   onToggleTrackCollapse?: (trackId: string) => void;
+  onRequestTrackCapsule?: (trackId: string) => void;
   inserts?: Record<string, FxWindowId[]>;
+  fxWindows?: FxWindowConfig[];
   trackSendLevels?: Record<string, Record<string, number>>;
 };
 
@@ -1501,8 +1521,15 @@ export const ArrangeWindow: React.FC<Props> = (props) => {
   const playheadVisible = playheadX > -80 && playheadX < contentWidth + 80;
   return (
     <div 
-      className="relative w-full rounded-3xl border border-glass-border flex bg-glass-surface backdrop-blur-2xl shadow-[0_45px_95px_rgba(4,12,26,0.55)] text-ink"
-      style={{ height, ...style }} // Merge the style prop here
+      className="relative w-full overflow-hidden flex flex-col text-ink"
+      style={{ 
+        height, 
+        backgroundColor: AuraColors.space,
+        borderRadius: '32px',
+        border: `1px solid ${auraAlpha('#ffffff', 0.08)}`,
+        boxShadow: '0 45px 95px rgba(2, 6, 12, 0.75)',
+        ...style 
+      }} 
       onMouseMove={onMouseMove}
       onMouseUp={onMouseUp}
       onMouseLeave={onMouseUp}
@@ -1641,7 +1668,12 @@ export const ArrangeWindow: React.FC<Props> = (props) => {
           </button>
         </div>
       </div>
-      <div className="relative flex-shrink-0 bg-glass-surface-soft border-r border-glass-border backdrop-blur-xl" style={{ width: trackHeaderWidth }}>
+      <div className="relative flex-shrink-0 border-r border-glass-border backdrop-blur-3xl animate-aura-bloom-in" 
+           style={{ 
+             width: trackHeaderWidth,
+             backgroundColor: auraAlpha(AuraColors.void, 0.4),
+             borderRight: `1px solid ${auraAlpha(AuraColors.violet, 0.1)}`
+           }}>
         <div
           className="absolute top-0 right-0 z-20 h-full w-2 cursor-col-resize"
           onMouseDown={(e) => {
@@ -1744,7 +1776,13 @@ export const ArrangeWindow: React.FC<Props> = (props) => {
           viewportWidth={viewportWidth}
           timelineHeight={height - RULER_H - TIMELINE_NAVIGATOR_H}
         />
-        <div className="absolute left-0 right-0 top-0 h-[24px] bg-glass-surface-soft border-b border-glass-border select-none backdrop-blur-lg" onMouseDown={onRulerDown}>
+        <div className="absolute left-0 right-0 top-0 h-[24px] select-none backdrop-blur-xl z-20" 
+             style={{ 
+               background: `linear-gradient(180deg, ${auraAlpha(AuraColors.twilight, 0.8)} 0%, ${auraAlpha(AuraColors.space, 0.9)} 100%)`,
+               borderBottom: `1px solid ${auraAlpha(AuraColors.cyan, 0.15)}`,
+               boxShadow: `0 4px 12px ${auraAlpha('#000000', 0.25)}`
+             }} 
+             onMouseDown={onRulerDown}>
             <div className="relative" style={{ width: contentWidth, transform: `translateX(-${scrollX}px)` }}>
               {microGuides.map(({ x }, i) => (
                 <div
@@ -1752,14 +1790,14 @@ export const ArrangeWindow: React.FC<Props> = (props) => {
                   className="absolute bottom-0 h-1 border-l"
                   style={{
                     left: x,
-                    borderColor: `rgba(255,255,255,${0.05 + (masterAnalysis?.level ?? 0) * 0.15})`,
+                    borderColor: auraAlpha(AuraColors.cyan, 0.1 + (masterAnalysis?.level ?? 0) * 0.2),
                   }}
                 />
               ))}
-              {beats.map(({x}, i) => (<div key={`beat-${i}`} className="absolute bottom-0 h-2 border-l border-glass-border" style={{ left: x }} /> ))}
+              {beats.map(({x}, i) => (<div key={`beat-${i}`} className="absolute bottom-0 h-2 border-l" style={{ left: x, borderColor: auraAlpha(AuraColors.cyan, 0.15) }} /> ))}
               {bars.map(({bar,x}) => (
-                  <div key={`bar-${bar}`} className="absolute top-0 bottom-0 border-l border-glass-border/60" style={{ left: x }}>
-                    <div className="absolute top-1 left-1 text-[10px] text-ink/80 font-mono">{bar}</div>
+                  <div key={`bar-${bar}`} className="absolute top-0 bottom-0 border-l" style={{ left: x, borderColor: auraAlpha(AuraColors.violet, 0.2) }}>
+                    <div className="absolute top-1 left-1 text-[9px] uppercase tracking-widest font-mono" style={{ color: auraAlpha(AuraColors.violet, 0.8), textShadow: AuraEffects.textGlow.subtle }}>{bar}</div>
                   </div>
               ))}
               <div className="absolute inset-0 cursor-text" />
@@ -1985,30 +2023,42 @@ export const ArrangeWindow: React.FC<Props> = (props) => {
                     />
                     
                     {/* Legacy glow effects (kept for visual continuity) */}
-                    <div
-                      className="absolute top-0 w-[120px] h-full transition-all duration-300"
-                      style={{
-                        left: playheadX - 60,
-                        opacity: isPlaying ? 0.7 : 0.4,
-                        background: isPlaying
-                          ? `radial-gradient(circle, ${hexToRgba(playheadColor?.light ?? '#67e8f9', 0.55)} 0%, transparent 70%)`
-                          : `radial-gradient(circle, ${hexToRgba(playheadColor?.color ?? '#06b6d4', 0.4)} 0%, transparent 70%)`,
-                        filter: 'blur(14px)',
-                      }}
-                    />
-
                     {isPlaying && (
                       <div
-                        className="absolute top-0 h-full animate-playhead-trail"
+                        className="absolute top-0 h-full"
                         style={{
-                          left: '-70px',
-                          right: '100%',
-                          background: `linear-gradient(90deg, transparent 0%, ${hexToRgba(playheadColor?.light ?? '#67e8f9', 0.5)} 100%)`,
-                          filter: 'blur(12px)',
-                          opacity: 0.6 + glowIntensity * 0.3,
+                          left: playheadX - 120,
+                          width: 240,
+                          background: `radial-gradient(circle at center, ${auraAlpha(AuraColors.cyan, 0.4)} 0%, transparent 70%)`,
+                          filter: 'blur(32px)',
+                          opacity: 0.4 + glowIntensity * 0.4,
+                          animation: 'aura-breathe 3s ease-in-out infinite',
                         }}
                       />
                     )}
+
+                    <div
+                      className="absolute top-0 w-[2px] h-full"
+                      style={{
+                        left: playheadX - 1,
+                        background: AuraGradients.ocean,
+                        boxShadow: isPlaying
+                          ? `0 0 20px ${auraAlpha(AuraColors.cyan, 0.8)}, 0 0 40px ${auraAlpha(AuraColors.violet, 0.4)}`
+                          : `0 0 10px ${auraAlpha(AuraColors.cyan, 0.6)}`,
+                      }}
+                    />
+
+                    <div
+                      className="absolute -top-1.5 left-0 w-3 h-4 -translate-x-1/2 rounded-full"
+                      style={{
+                        left: playheadX,
+                        background: AuraColors.cyan,
+                        boxShadow: AuraEffects.neon.cyan,
+                        opacity: isPlaying ? 1 : 0.8,
+                      }}
+                    >
+                      <div className="absolute inset-0 rounded-full animate-ping opacity-30 bg-cyan-400" />
+                    </div>
 
                     <div
                       className="absolute top-0 w-[3px] h-full rounded-sm"

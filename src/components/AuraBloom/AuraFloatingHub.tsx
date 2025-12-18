@@ -15,6 +15,8 @@ import {
 } from '../../theme/aura-tokens';
 import type { PulsePalette } from '../../utils/ALS';
 import type { ContextualMenuItem } from './contextualBloomItems';
+import type { PluginInventoryItem } from '../../audio/pluginTypes';
+import type { FxWindowId } from '../../App';
 
 interface AuraFloatingHubProps {
   /** Position of the hub */
@@ -31,6 +33,12 @@ interface AuraFloatingHubProps {
   contextualItems?: ContextualMenuItem[];
   /** Override accent color based on context */
   contextAccent?: string;
+  /** Plugin inventory for embedded plugin panel */
+  pluginInventory?: PluginInventoryItem[];
+  /** Active track ID for plugin routing */
+  activeTrackId?: string;
+  /** Callback when a plugin is added */
+  onAddPlugin?: (trackId: string, pluginId: FxWindowId) => void;
 }
 
 export const AuraFloatingHub: React.FC<AuraFloatingHubProps> = ({
@@ -41,6 +49,9 @@ export const AuraFloatingHub: React.FC<AuraFloatingHubProps> = ({
   bloomContext,
   contextualItems,
   contextAccent,
+  pluginInventory,
+  activeTrackId,
+  onAddPlugin,
 }) => {
   const [isOpen, setIsOpen] = useState(false);
   const [isDragging, setIsDragging] = useState(false);
@@ -115,7 +126,7 @@ export const AuraFloatingHub: React.FC<AuraFloatingHubProps> = ({
   }, [onAction]);
 
   // Glow intensity from ALS
-  const glowIntensity = alsPulseAgent?.glowStrength ?? 0.3;
+  const glowIntensity = alsPulseAgent?.pulseStrength ?? 0.3;
 
   return (
     <div
@@ -156,6 +167,9 @@ export const AuraFloatingHub: React.FC<AuraFloatingHubProps> = ({
           items={contextualItems}
           context={bloomContext}
           accentColor={contextAccent}
+          pluginInventory={pluginInventory}
+          activeTrackId={activeTrackId}
+          onAddPlugin={onAddPlugin}
         />
       </div>
       

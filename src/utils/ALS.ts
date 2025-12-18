@@ -145,6 +145,7 @@ export interface ALSActionPulse {
   glow: string;
   halo: string;
   strength: number;
+  intensity: number;
   decayMs: number;
 }
 
@@ -181,6 +182,7 @@ export const deriveActionPulse = (
     glow: mixHexColors(palette.glow, "#ffffff", 0.25 + strength * 0.3),
     halo: mixHexColors(palette.halo, palette.glow, 0.2 + strength * 0.45),
     strength,
+    intensity: energy,
     decayMs,
   };
 };

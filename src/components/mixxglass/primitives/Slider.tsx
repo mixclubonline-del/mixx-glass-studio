@@ -26,6 +26,7 @@ export interface MixxGlassSliderProps {
   size?: 'sm' | 'md' | 'lg';
   className?: string;
   disabled?: boolean;
+  style?: React.CSSProperties;
   // Precision features
   enableFineTuning?: boolean; // Enable Shift/Ctrl fine-tuning
   enableKeyboard?: boolean; // Enable keyboard control
@@ -55,6 +56,7 @@ export const MixxGlassSlider: React.FC<MixxGlassSliderProps> = ({
   size = 'md',
   className = '',
   disabled = false,
+  style,
   enableFineTuning = false,
   enableKeyboard = false,
   enableWheel = false,
@@ -327,7 +329,7 @@ export const MixxGlassSlider: React.FC<MixxGlassSliderProps> = ({
   );
 
   return (
-    <div className={`mixxglass-slider ${className}`}>
+    <div className={`mixxglass-slider ${className}`} style={style}>
       <div
         ref={sliderRef}
         style={trackStyle}

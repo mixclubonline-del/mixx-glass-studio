@@ -16,15 +16,7 @@ interface FlowPulseBarProps {
   className?: string;
 }
 
-declare global {
-  interface Window {
-    __als?: {
-      pulse?: number;
-      temperature?: string;
-    };
-    __mixx_masterAnalyser?: AnalyserNode;
-  }
-}
+// Window interface extensions moved to src/types/globals.d.ts
 
 export function FlowPulseBar({ pulse, className }: FlowPulseBarProps) {
   const [currentPulse, setCurrentPulse] = useState(pulse || 0);
@@ -41,7 +33,7 @@ export function FlowPulseBar({ pulse, className }: FlowPulseBarProps) {
     
     // Read from global ALS
     const updatePulse = () => {
-      const alsPulse = window.__als?.pulse || 0;
+      const alsPulse = (window.__als as any)?.pulse || 0;
       setCurrentPulse(alsPulse);
     };
     
@@ -75,7 +67,7 @@ export function FlowPulseBar({ pulse, className }: FlowPulseBarProps) {
     window.addEventListener('resize', updateCanvasSize);
     
     const drawWaveform = () => {
-      const analyser = window.__mixx_masterAnalyser;
+      const analyser = (window as any).__mixx_masterAnalyser;
       
       // Clear canvas
       ctx.clearRect(0, 0, canvas.width, canvas.height);
@@ -137,7 +129,7 @@ export function FlowPulseBar({ pulse, className }: FlowPulseBarProps) {
   
   // Get thermal color for pulse bar and waveform
   const getThermalColor = () => {
-    const temp = window.__als?.temperature || 'cold';
+    const temp = (window.__als as any)?.temperature || 'cold';
     switch (temp) {
       case 'cold':
         return '#78a0ff';
@@ -155,7 +147,7 @@ export function FlowPulseBar({ pulse, className }: FlowPulseBarProps) {
   };
   
   const getThermalGradient = () => {
-    const temp = window.__als?.temperature || 'cold';
+    const temp = (window.__als as any)?.temperature || 'cold';
     switch (temp) {
       case 'cold':
         return 'linear-gradient(90deg, #78a0ff, #96b4ff, #b4c8ff)';

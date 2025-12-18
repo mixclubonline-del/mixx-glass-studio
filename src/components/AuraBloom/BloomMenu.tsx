@@ -4,9 +4,11 @@
  * Unified glassmorphic petal-based radial menu for Flow DAW.
  * Supports two variants: 'home' (welcome screen) and 'tool' (floating hub).
  * Uses AURA Design System for consistent ethereal styling.
+ * 
+ * Now includes embedded Plugin Grid that expands when Plugins petal is clicked.
  */
 
-import React, { useState, useCallback } from 'react';
+import React, { useState, useCallback, useMemo } from 'react';
 import { Petal } from './Petal';
 import { AuraCore } from './AuraCore';
 import {
@@ -38,6 +40,8 @@ import {
   AuraKeyframes,
   auraAlpha 
 } from '../../theme/aura-tokens';
+import type { PluginInventoryItem } from '../../audio/pluginTypes';
+import type { FxWindowId } from '../../App';
 
 // Extract palette colors
 const { violet, cyan, magenta, indigo, amber } = AuraPalette;
@@ -96,6 +100,12 @@ interface BloomMenuProps {
   isOpen?: boolean;
   /** Callback when open state changes */
   onOpenChange?: (open: boolean) => void;
+  /** Plugin inventory for embedded plugin grid */
+  pluginInventory?: PluginInventoryItem[];
+  /** Active track ID for plugin routing */
+  activeTrackId?: string;
+  /** Callback when a plugin is added */
+  onAddPlugin?: (trackId: string, pluginId: FxWindowId) => void;
 }
 
 export const BloomMenu: React.FC<BloomMenuProps> = ({ 
@@ -107,15 +117,26 @@ export const BloomMenu: React.FC<BloomMenuProps> = ({
   onEnterFlow,
   isOpen: controlledOpen,
   onOpenChange,
+  pluginInventory = [],
+  activeTrackId,
+  onAddPlugin,
 }) => {
   const [activeItem, setActiveItem] = useState<string | null>(null);
   const [isCoreActive, setIsCoreActive] = useState(false);
-  const [internalOpen, setInternalOpen] = useState(false); 
+  const [internalOpen, setInternalOpen] = useState(false);
+  const [showPluginPanel, setShowPluginPanel] = useState(false);
 
   const isHome = variant === 'home';
   
   // Use dynamic items if provided, otherwise fall back to defaults
   const menuItems = items ?? (isHome ? HOME_ITEMS : TOOL_ITEMS);
+
+  // Curated plugins for quick access (top 8)
+  const curatedPlugins = useMemo(() => {
+    return pluginInventory
+      .filter(p => p.isCurated)
+      .slice(0, 8);
+  }, [pluginInventory]);
 
   // Controlled vs uncontrolled open state
   const isOpen = controlledOpen !== undefined ? controlledOpen : internalOpen;
@@ -125,6 +146,10 @@ export const BloomMenu: React.FC<BloomMenuProps> = ({
     } else {
       setInternalOpen(open);
     }
+    // Close plugin panel when menu closes
+    if (!open) {
+      setShowPluginPanel(false);
+    }
   }, [onOpenChange]);
 
   // Spread the petals out more in home mode
@@ -133,6 +158,13 @@ export const BloomMenu: React.FC<BloomMenuProps> = ({
   const handlePetalClick = useCallback((item: MenuItem) => {
     console.log(`Petal clicked: ${item.id}`);
     setActiveItem(item.id);
+    
+    // Special handling for Plugins - toggle embedded panel instead of action
+    if (item.id === 'plugins' && pluginInventory.length > 0) {
+      setShowPluginPanel(prev => !prev);
+      setTimeout(() => setActiveItem(null), 200);
+      return; // Don't close menu or publish signal
+    }
     
     // Publish bloom signal to Flow's event system
     publishBloomSignal({
@@ -162,7 +194,17 @@ export const BloomMenu: React.FC<BloomMenuProps> = ({
 
     // Reset active item animation after a short delay
     setTimeout(() => setActiveItem(null), 200);
-  }, [isHome, onEnterFlow, onItemSelect, setIsOpen]);
+  }, [isHome, onEnterFlow, onItemSelect, setIsOpen, pluginInventory.length]);
+
+  const handlePluginClick = useCallback((pluginId: FxWindowId) => {
+    if (activeTrackId && onAddPlugin) {
+      onAddPlugin(activeTrackId, pluginId);
+      // Brief feedback then close panel
+      setTimeout(() => {
+        setShowPluginPanel(false);
+      }, 200);
+    }
+  }, [activeTrackId, onAddPlugin]);
 
   const handleCoreClick = useCallback(() => {
     // Haptic feedback for core interaction
@@ -279,6 +321,84 @@ export const BloomMenu: React.FC<BloomMenuProps> = ({
           isActive={isCoreActive}
           onClick={handleCoreClick}
         />
+
+        {/* Embedded Plugin Grid Panel */}
+        {showPluginPanel && curatedPlugins.length > 0 && (
+          <div
+            className="absolute left-1/2 -translate-x-1/2 pointer-events-auto"
+            style={{
+              top: isHome ? '620px' : '520px',
+              width: '400px',
+              padding: '16px',
+              borderRadius: '16px',
+              background: auraAlpha(violet[900], 0.95),
+              border: `1px solid ${auraAlpha(magenta.DEFAULT, 0.3)}`,
+              boxShadow: `0 20px 60px rgba(0,0,0,0.5), 0 0 40px ${auraAlpha(magenta.DEFAULT, 0.15)}`,
+              backdropFilter: 'blur(20px)',
+              animation: 'aura-fade-in 0.3s ease-out',
+            }}
+          >
+            <div className="flex items-center justify-between mb-3">
+              <span 
+                className="text-[10px] uppercase tracking-[0.3em]"
+                style={{ color: auraAlpha(cyan.DEFAULT, 0.7) }}
+              >
+                Quick Plugins
+              </span>
+              <button
+                onClick={() => setShowPluginPanel(false)}
+                className="w-6 h-6 rounded-full flex items-center justify-center transition-all hover:scale-110"
+                style={{
+                  background: auraAlpha(violet[800], 0.5),
+                  border: `1px solid ${auraAlpha(violet.DEFAULT, 0.3)}`,
+                  color: auraAlpha(cyan.DEFAULT, 0.6),
+                }}
+                title="Close plugin panel"
+              >
+                ×
+              </button>
+            </div>
+            <div className="grid grid-cols-4 gap-2">
+              {curatedPlugins.map((plugin) => (
+                <button
+                  key={plugin.id}
+                  onClick={() => handlePluginClick(plugin.id)}
+                  className="p-3 rounded-lg text-center transition-all hover:scale-105 active:scale-95"
+                  style={{
+                    background: `linear-gradient(135deg, 
+                      hsla(${plugin.lightingProfile.hueStart}, 60%, 40%, 0.4),
+                      hsla(${plugin.lightingProfile.hueEnd}, 50%, 35%, 0.3)
+                    )`,
+                    border: `1px solid ${auraAlpha(violet.DEFAULT, 0.25)}`,
+                    boxShadow: `0 4px 12px ${auraAlpha(plugin.glow, 0.2)}`,
+                  }}
+                  title={plugin.description}
+                >
+                  <span 
+                    className="block text-[9px] uppercase tracking-wider font-medium truncate"
+                    style={{ color: 'rgba(255,255,255,0.9)' }}
+                  >
+                    {plugin.name}
+                  </span>
+                  <span 
+                    className="block text-[7px] uppercase tracking-wide mt-1 truncate"
+                    style={{ color: auraAlpha(cyan[200], 0.6) }}
+                  >
+                    {plugin.tier}
+                  </span>
+                </button>
+              ))}
+            </div>
+            {!activeTrackId && (
+              <div 
+                className="mt-3 text-center text-[9px] uppercase tracking-wider"
+                style={{ color: auraAlpha(amber.DEFAULT, 0.7) }}
+              >
+                Select a track to add plugins
+              </div>
+            )}
+          </div>
+        )}
       </div>
     </>
   );

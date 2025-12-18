@@ -2,9 +2,10 @@ import React from "react";
 
 interface InputMonitorIconProps {
   className?: string;
+  style?: React.CSSProperties;
 }
 
-export const InputMonitorIcon: React.FC<InputMonitorIconProps> = ({ className }) => (
+export const InputMonitorIcon: React.FC<InputMonitorIconProps> = ({ className, style }) => (
   <svg
     viewBox="0 0 24 24"
     fill="none"
@@ -13,6 +14,7 @@ export const InputMonitorIcon: React.FC<InputMonitorIconProps> = ({ className })
     strokeLinecap="round"
     strokeLinejoin="round"
     className={className}
+    style={style}
   >
     <circle cx="12" cy="12" r="3" />
     <path d="M 12 1 L 12 3" />

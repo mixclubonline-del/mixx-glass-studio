@@ -117,31 +117,31 @@ const FlowFader: React.FC<FlowFaderProps> = ({
       window.removeEventListener("pointermove", handlePointerMove);
       window.removeEventListener("pointerup", handlePointerUp);
     };
-  }, [handlePointerValue, isDragging]);
+  }, [isDragging, handlePointerValue, showDB]);
 
-  // Calculate position directly - NO animation during drag for instant response
-  const sliderRatio = clamp(value / 1.2, 0, 1);
-  const intensity = alsFeedback?.intensity ?? 0;
-  const pulse = alsFeedback?.pulse ?? 0;
-
-  // Keyboard control
   const handleKeyDown = useCallback(
-    (e: React.KeyboardEvent) => {
-      let delta = 0;
-      if (e.key === "ArrowUp") delta = 0.005;
-      if (e.key === "ArrowDown") delta = -0.005;
-      if (e.shiftKey) delta *= 0.25;
-      if (e.altKey) delta *= 6;
-      if (delta !== 0) {
-        onChange(clamp(value + delta, 0, 1.2));
-        if (showDB) {
-          setShowDBBubble(true);
-          setTimeout(() => setShowDBBubble(false), 600);
+    (e: React.KeyboardEvent<HTMLDivElement>) => {
+      if (e.key === "ArrowUp" || e.key === "ArrowDown") {
+        e.preventDefault(); // Prevent scrolling
+        let delta = 0;
+        if (e.key === "ArrowUp") delta = 0.005;
+        if (e.key === "ArrowDown") delta = -0.005;
+        if (e.shiftKey) delta *= 0.25; // Fine tune
+        if (e.altKey) delta *= 6; // Coarse tune (or faster)
+        if (delta !== 0) {
+          onChange(clamp(value + delta, 0, 1.2));
+          if (showDB) {
+            setShowDBBubble(true);
+            setTimeout(() => setShowDBBubble(false), 600);
+          }
         }
       }
     },
     [value, onChange, showDB]
   );
+
+  const intensity = alsFeedback?.intensity ?? 0;
+  const pulse = alsFeedback?.pulse ?? 0;
 
   return (
     <div
@@ -216,7 +216,7 @@ const FlowFader: React.FC<FlowFaderProps> = ({
               transitions.transform.combine('translateX(-50%)'),
               spacing.px(2),
               spacing.py(1),
-              effects.border.radius.md,
+              effects.border.radius.custom('4px 4px 0 0'),
               {
                 fontSize: '10px',
                 fontFamily: 'monospace',
@@ -245,7 +245,7 @@ const FlowFader: React.FC<FlowFaderProps> = ({
           <span
             key={index}
             style={composeStyles(
-              effects.border.radius.full,
+              effects.border.radius.custom('8px 8px 0 0'),
               {
                 display: 'block',
                 width: '4px',
@@ -266,12 +266,7 @@ const PulsingFaderBackground: React.FC<{
   glowColor: string;
   intensity: number;
 }> = ({ glowColor, intensity }) => {
-  const pulseOpacity = usePulseAnimation({
-    duration: 2200,
-    minOpacity: 0.6,
-    maxOpacity: 1,
-    easing: 'ease-in-out',
-  });
+  const pulseOpacity = usePulseAnimation(0.6, 1, 2500, 'ease-in-out');
   return (
     <div
       style={composeStyles(
@@ -282,7 +277,7 @@ const PulsingFaderBackground: React.FC<{
             glowColor,
             0.25 + intensity * 0.35
           )} 0%, transparent 100%)`,
-          opacity: pulseOpacity.opacity,
+          opacity: pulseOpacity,
         }
       )}
     />
@@ -294,12 +289,7 @@ const PulsingFaderCenterLine: React.FC<{
   glowColor: string;
   intensity: number;
 }> = ({ glowColor, intensity }) => {
-  const pulseOpacity = usePulseAnimation({
-    duration: 3200,
-    minOpacity: 0.3,
-    maxOpacity: 0.7,
-    easing: 'ease-in-out',
-  });
+  const pulseOpacity = usePulseAnimation(0.3, 0.7, 3200, 'ease-in-out');
   return (
     <div
       style={composeStyles(
@@ -311,7 +301,7 @@ const PulsingFaderCenterLine: React.FC<{
             glowColor,
             0.45 + intensity * 0.35
           )} 45%, transparent 100%)`,
-          opacity: pulseOpacity.opacity,
+          opacity: pulseOpacity,
         }
       )}
     />
@@ -331,18 +321,8 @@ const PulsingFaderThumb: React.FC<{
   value: number;
   children?: React.ReactNode;
 }> = ({ trackColor, glowColor, sliderRatio, intensity, pulse, showDB, showDBBubble, valueToLevel, value, children }) => {
-  const pulseOpacity = usePulseAnimation({
-    duration: 1800,
-    minOpacity: 0.95,
-    maxOpacity: 1,
-    easing: 'ease-in-out',
-  });
-  const pulseScale = usePulseAnimation({
-    duration: 1800,
-    minScale: 1,
-    maxScale: 1 + pulse * 0.05,
-    easing: 'ease-in-out',
-  });
+  const pulseOpacity = usePulseAnimation(0.85, 1, 1600, 'ease-in-out');
+  const pulseScale = usePulseAnimation(1, 1.4, 350, 'ease-in-out');
   // Professional fader cap: instant position, fast visual transitions
   return (
     <div
@@ -368,11 +348,11 @@ const PulsingFaderThumb: React.FC<{
             inset 0 1px 0 rgba(255, 255, 255, 0.15),
             inset 0 -1px 0 rgba(0, 0, 0, 0.2)
           `,
-          opacity: pulseOpacity.opacity,
+          opacity: pulseOpacity,
           // Instant position - NO transition on top/transform
           // Fast transitions for visual properties only
           transition: 'box-shadow 80ms ease-out, border-color 80ms ease-out, background 80ms ease-out, opacity 80ms ease-out',
-          transform: 'translateX(-50%)',
+          transform: `translateX(-50%) scaleX(${pulseScale})`,
           // Performance optimization
           willChange: 'top, box-shadow',
         }

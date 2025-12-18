@@ -78,7 +78,8 @@ class ModelQuantizer {
     const quantizedModel = tf.sequential();
     
     // Copy layers with quantized weights
-    for (const layerConfig of config.layers || []) {
+    const layers = (config.layers as any[]) || [];
+    for (const layerConfig of layers) {
       const layer = originalModel.layers.find(l => l.name === layerConfig.name);
       if (!layer) continue;
       

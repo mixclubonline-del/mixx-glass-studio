@@ -1,9 +1,4 @@
-/**
- * MixxGlass Typography System
- * 
- * Proprietary typography utilities replacing Tailwind typography classes
- * Integrates with Flow responsive system and ALS
- */
+import React from 'react';
 
 export type FontSize = 'xs' | 'sm' | 'base' | 'lg' | 'xl' | '2xl' | '3xl' | '4xl' | '5xl' | '6xl';
 export type FontWeight = 'light' | 'normal' | 'medium' | 'semibold' | 'bold' | 'extrabold';
@@ -45,28 +40,28 @@ export const typography = {
   /**
    * Font size
    */
-  size: (size: FontSize) => ({
+  size: (size: FontSize): React.CSSProperties => ({
     fontSize: fontSizeMap[size],
   }),
   
   /**
    * Font weight
    */
-  weight: (weight: FontWeight) => ({
-    fontWeight: fontWeightMap[weight],
+  weight: (weight: FontWeight): React.CSSProperties => ({
+    fontWeight: fontWeightMap[weight] as any, // Cast to any because React expects 'bold' | 'normal' | number
   }),
   
   /**
    * Text alignment
    */
-  align: (align: TextAlign) => ({
+  align: (align: TextAlign): React.CSSProperties => ({
     textAlign: align,
   }),
   
   /**
    * Text transform
    */
-  transform: (transform: TextTransform) => ({
+  transform: (transform: TextTransform): React.CSSProperties => ({
     textTransform: transform,
   }),
   
@@ -74,24 +69,24 @@ export const typography = {
    * Letter spacing (tracking)
    */
   tracking: {
-    tighter: { letterSpacing: '-0.05em' },
-    tight: { letterSpacing: '-0.025em' },
-    normal: { letterSpacing: '0em' },
-    wide: { letterSpacing: '0.025em' },
-    wider: { letterSpacing: '0.05em' },
-    widest: { letterSpacing: '0.1em' },
+    tighter: { letterSpacing: '-0.05em' } as React.CSSProperties,
+    tight: { letterSpacing: '-0.025em' } as React.CSSProperties,
+    normal: { letterSpacing: '0em' } as React.CSSProperties,
+    wide: { letterSpacing: '0.025em' } as React.CSSProperties,
+    wider: { letterSpacing: '0.05em' } as React.CSSProperties,
+    widest: { letterSpacing: '0.1em' } as React.CSSProperties,
   },
   
   /**
    * Line height
    */
   leading: {
-    none: { lineHeight: '1' },
-    tight: { lineHeight: '1.25' },
-    snug: { lineHeight: '1.375' },
-    normal: { lineHeight: '1.5' },
-    relaxed: { lineHeight: '1.625' },
-    loose: { lineHeight: '2' },
+    none: { lineHeight: '1' } as React.CSSProperties,
+    tight: { lineHeight: '1.25' } as React.CSSProperties,
+    snug: { lineHeight: '1.375' } as React.CSSProperties,
+    normal: { lineHeight: '1.5' } as React.CSSProperties,
+    relaxed: { lineHeight: '1.625' } as React.CSSProperties,
+    loose: { lineHeight: '2' } as React.CSSProperties,
   },
   
   /**
@@ -99,10 +94,10 @@ export const typography = {
    */
   color: {
     ink: {
-      DEFAULT: { color: 'var(--ink-foreground)' },
-      soft: { color: 'var(--ink-soft)' },
-      muted: { color: 'var(--ink-muted)' },
-      inverted: { color: 'var(--ink-inverted)' },
+      DEFAULT: { color: 'var(--ink-foreground)' } as React.CSSProperties,
+      soft: { color: 'var(--ink-soft)' } as React.CSSProperties,
+      muted: { color: 'var(--ink-muted)' } as React.CSSProperties,
+      inverted: { color: 'var(--ink-inverted)' } as React.CSSProperties,
     },
   },
   
@@ -113,7 +108,7 @@ export const typography = {
     /**
      * Body text - Primary readable text (13px)
      */
-    body: () => ({
+    body: (): React.CSSProperties => ({
       ...typography.size('base'),
       ...typography.weight('normal'),
       ...typography.leading.normal,
@@ -124,7 +119,7 @@ export const typography = {
     /**
      * Heading - Clear hierarchy (17px)
      */
-    heading: () => ({
+    heading: (): React.CSSProperties => ({
       ...typography.size('xl'),
       ...typography.weight('semibold'),
       ...typography.leading.tight,
@@ -134,7 +129,7 @@ export const typography = {
     /**
      * Heading 1 - Large display (24px)
      */
-    h1: () => ({
+    h1: (): React.CSSProperties => ({
       ...typography.size('3xl'),
       ...typography.weight('bold'),
       ...typography.leading.tight,
@@ -144,7 +139,7 @@ export const typography = {
     /**
      * Heading 2 - Section heading (20px)
      */
-    h2: () => ({
+    h2: (): React.CSSProperties => ({
       ...typography.size('2xl'),
       ...typography.weight('bold'),
       ...typography.leading.tight,
@@ -154,7 +149,7 @@ export const typography = {
     /**
      * Heading 3 - Subsection (17px)
      */
-    h3: () => ({
+    h3: (): React.CSSProperties => ({
       ...typography.size('xl'),
       ...typography.weight('semibold'),
       ...typography.leading.snug,
@@ -164,7 +159,7 @@ export const typography = {
     /**
      * Label - Clear, scannable (12px, semibold, uppercase)
      */
-    label: () => ({
+    label: (): React.CSSProperties => ({
       ...typography.size('sm'),
       ...typography.weight('semibold'),
       ...typography.transform('uppercase'),
@@ -176,7 +171,7 @@ export const typography = {
     /**
      * Small text - Secondary info (12px)
      */
-    small: () => ({
+    small: (): React.CSSProperties => ({
       ...typography.size('sm'),
       ...typography.weight('normal'),
       ...typography.leading.normal,
@@ -186,7 +181,7 @@ export const typography = {
     /**
      * Caption - Tertiary info (11px minimum)
      */
-    caption: () => ({
+    caption: (): React.CSSProperties => ({
       ...typography.size('xs'),
       ...typography.weight('normal'),
       ...typography.leading.relaxed,
@@ -196,7 +191,7 @@ export const typography = {
     /**
      * Value - Numeric display (13px, medium weight)
      */
-    value: () => ({
+    value: (): React.CSSProperties => ({
       ...typography.size('base'),
       ...typography.weight('medium'),
       ...typography.leading.normal,

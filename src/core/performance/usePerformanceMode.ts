@@ -21,20 +21,7 @@
 
 // No React hooks needed - reads directly from window globals
 
-declare global {
-  interface Window {
-    __mixx_recordState?: {
-      recording: boolean;
-      armedTrack: boolean;
-      noiseFloor: number;
-      threshold?: number;
-    };
-    __mixx_playbackState?: {
-      playing: boolean;
-      looping: boolean;
-    };
-  }
-}
+// Window interface extensions moved to src/types/globals.d.ts
 
 export interface PerformanceModeState {
   isPerformance: boolean;
@@ -64,8 +51,8 @@ export function usePerformanceMode(): PerformanceModeState {
     };
   }
 
-  const recordState = window.__mixx_recordState || {};
-  const playbackState = window.__mixx_playbackState || {};
+  const recordState = window.__mixx_recordState || { recording: false, armedTrack: false, noiseFloor: 0 };
+  const playbackState = window.__mixx_playbackState || { playing: false, looping: false };
   
   const isArmed = !!recordState.armedTrack;
   const isRecording = !!recordState.recording;

@@ -92,7 +92,7 @@ const AddTrackModal: React.FC<AddTrackModalProps> = ({ onClose, onAddTrack }) =>
                 style={composeStyles(
                   layout.width.full,
                   spacing.p(2),
-                  effects.border.radius.default,
+                  effects.border.radius.md,
                   transitions.transition.standard('all', 200, 'ease-out'),
                   {
                     background: 'rgba(0,0,0,0.3)',
@@ -137,7 +137,7 @@ const AddTrackModal: React.FC<AddTrackModalProps> = ({ onClose, onAddTrack }) =>
                 style={composeStyles(
                   layout.width.full,
                   spacing.p(2),
-                  effects.border.radius.default,
+                  effects.border.radius.md,
                   transitions.transition.standard('all', 200, 'ease-out'),
                   {
                     background: 'rgba(0,0,0,0.3)',
@@ -180,7 +180,7 @@ const AddTrackModal: React.FC<AddTrackModalProps> = ({ onClose, onAddTrack }) =>
                 style={composeStyles(
                   layout.width.full,
                   spacing.p(2),
-                  effects.border.radius.default,
+                  effects.border.radius.md,
                   transitions.transition.standard('all', 200, 'ease-out'),
                   {
                     background: 'rgba(0,0,0,0.3)',

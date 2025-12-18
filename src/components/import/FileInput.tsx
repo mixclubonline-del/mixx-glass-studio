@@ -24,53 +24,20 @@ import { syncALSToPulseResult, syncALSToPulse, updateGlobalALS } from '../../cor
 import { hasAudioPlaying } from '../../core/loop/audioLevelDetector';
 import { ImportInspector, type ImportStep } from './ImportInspector';
 import type { FlowPulseResult } from '../../core/pulse/flowPulseEngine';
+import type { StemResult } from '../../core/import/stemEngine';
 import { als } from '../../utils/alsFeedback';
 
-declare global {
-  interface Window {
-    __flow_lastImport?: {
-      stems: Record<string, AudioBuffer | null>;
-      metadata: StemMetadata;
-      info: {
-        sampleRate: number;
-        channels: number;
-        duration: number;
-        length: number;
-        format?: string;
-      };
-    };
-    __primeBrainInstance?: {
-      updateFromImport?: (metadata: StemMetadata) => void;
-      state?: {
-        flow: number;
-        momentum: number;
-        tension: number;
-      };
-    };
-    __primeBrain?: {
-      guidance: string;
-    };
-    __als?: {
-      flow: number;
-      temperature: string;
-      guidance: string;
-      pulse?: number; // Flow Pulse % (0-100)
-      momentum?: number; // Momentum score (0-100)
-      pressure?: number; // Pressure score (0-100)
-      harmony?: number; // Harmony score (0-100)
-    };
-    __bloom_ready?: boolean;
-    __mixx_session?: {
-      addTrack: (config: TrackConfig) => { id: string };
-      addClip: (config: {
-        trackId: string;
-        buffer: AudioBuffer;
-        start: number;
-        metadata: StemMetadata;
-      }) => void;
-    };
-  }
+export interface TrackConfig {
+  name: string;
+  type: 'vocal' | 'instrument' | 'drum' | 'other';
+  buffer: AudioBuffer;
+  metadata: StemMetadata;
+  readyForPunch: boolean;
+  readyForComp: boolean;
+  color: string;
 }
+
+// Window interface extensions moved to src/types/globals.d.ts
 
 interface FileInputProps {
   onImportComplete?: (result: {
@@ -154,8 +121,8 @@ export const FileInput = forwardRef<FileInputHandle, FileInputProps>(({
     try {
       // Initialize Flow brain globals
       if (typeof window !== 'undefined') {
-        window.__als = window.__als || { flow: 0, temperature: 'cooling', guidance: '' };
-        window.__primeBrain = window.__primeBrain || { guidance: '' };
+        (window as any).__als = (window as any).__als || { flow: 0, temperature: 'cooling', guidance: '' };
+        (window as any).__primeBrain = (window as any).__primeBrain || { guidance: '' };
         window.__bloom_ready = false;
       }
       
@@ -167,8 +134,8 @@ export const FileInput = forwardRef<FileInputHandle, FileInputProps>(({
         window.__als.flow = 48;
         window.__als.guidance = 'Flow is preparing to listen.';
       }
-      if (typeof window !== 'undefined' && window.__primeBrain) {
-        window.__primeBrain.guidance = 'Flow is preparing to listen.';
+      if (typeof window !== 'undefined' && (window as any).__primeBrain) {
+        (window as any).__primeBrain.guidance = 'Flow is preparing to listen.';
       }
       await new Promise(resolve => setTimeout(resolve, 150)); // Breathing delay
       
@@ -179,8 +146,8 @@ export const FileInput = forwardRef<FileInputHandle, FileInputProps>(({
         window.__als.flow = 54; // 48 + 1 * 6
         window.__als.guidance = 'Scanning waveform structure.';
       }
-      if (typeof window !== 'undefined' && window.__primeBrain) {
-        window.__primeBrain.guidance = 'Scanning waveform structure.';
+      if (typeof window !== 'undefined' && (window as any).__primeBrain) {
+        (window as any).__primeBrain.guidance = 'Scanning waveform structure.';
       }
       
       // Create AudioContext for import (can be optimized later to reuse App's context)
@@ -206,8 +173,8 @@ export const FileInput = forwardRef<FileInputHandle, FileInputProps>(({
         window.__als.flow = 60;
         window.__als.guidance = 'Separating vocals and instruments.';
       }
-      if (typeof window !== 'undefined' && window.__primeBrain) {
-        window.__primeBrain.guidance = 'Separating vocals and instruments.';
+      if (typeof window !== 'undefined' && (window as any).__primeBrain) {
+        (window as any).__primeBrain.guidance = 'Separating vocals and instruments.';
       }
       
       markStepDone(2);
@@ -221,8 +188,8 @@ export const FileInput = forwardRef<FileInputHandle, FileInputProps>(({
         window.__als.flow = 66;
         window.__als.guidance = 'Organizing lanes and roles.';
       }
-      if (typeof window !== 'undefined' && window.__primeBrain) {
-        window.__primeBrain.guidance = 'Organizing lanes and roles.';
+      if (typeof window !== 'undefined' && (window as any).__primeBrain) {
+        (window as any).__primeBrain.guidance = 'Organizing lanes and roles.';
       }
       
       // Get main audio buffer from first stem for Flow Pulse computation
@@ -281,8 +248,8 @@ export const FileInput = forwardRef<FileInputHandle, FileInputProps>(({
         window.__als.temperature = 'balanced';
         window.__als.guidance = 'Optimizing for performance.';
       }
-      if (typeof window !== 'undefined' && window.__primeBrain) {
-        window.__primeBrain.guidance = 'Optimizing for performance.';
+      if (typeof window !== 'undefined' && (window as any).__primeBrain) {
+        (window as any).__primeBrain.guidance = 'Optimizing for performance.';
       }
       
       // Load tracks into session (if session API exists)
@@ -330,8 +297,8 @@ export const FileInput = forwardRef<FileInputHandle, FileInputProps>(({
       
       // Wake ALS + Prime Brain on import
       const brain = typeof window !== 'undefined' ? window.__primeBrainInstance : null;
-      if (brain?.updateFromImport) {
-        brain.updateFromImport(result.metadata);
+      if ((brain as any)?.updateFromImport) {
+        (brain as any).updateFromImport(result.metadata);
       }
       
       // Final step
@@ -341,16 +308,16 @@ export const FileInput = forwardRef<FileInputHandle, FileInputProps>(({
       
       // Final Flow brain update
       if (typeof window !== 'undefined') {
-        if (window.__als) {
-          window.__als.flow = 75;
-          window.__als.temperature = 'balanced';
-          window.__als.guidance = 'Your arrangement is ready.';
+        if ((window as any).__als) {
+          (window as any).__als.flow = 75;
+          (window as any).__als.temperature = 'balanced';
+          (window as any).__als.guidance = 'Your arrangement is ready.';
         }
-        if (window.__primeBrain) {
-          window.__primeBrain.guidance = 'Your arrangement is ready.';
+        if ((window as any).__primeBrain) {
+          (window as any).__primeBrain.guidance = 'Your arrangement is ready.';
         }
         // Bloom ready
-        window.__bloom_ready = true;
+        (window as any).__bloom_ready = true;
       }
       
       // Wait a moment for user to see completion, then hide inspector
@@ -366,9 +333,9 @@ export const FileInput = forwardRef<FileInputHandle, FileInputProps>(({
       if (mainBuffer && typeof window !== 'undefined') {
         const pulseResult = computeFlowPulse(mainBuffer, result.metadata);
         if (pulseResult.pulse.length > 0) {
-          const finalALS = syncALSToPulseResult(pulseResult, result.metadata);
           const masterAnalyser = (window as any).__mixx_masterAnalyser as AnalyserNode | null;
           const hasAudio = hasAudioPlaying(masterAnalyser);
+          const finalALS = syncALSToPulseResult(pulseResult, result.metadata);
           updateGlobalALS(finalALS, hasAudio);
         }
       }
@@ -401,7 +368,7 @@ export const FileInput = forwardRef<FileInputHandle, FileInputProps>(({
         onImportComplete({ 
           tracks: trackConfigs, 
           metadata: result.metadata,
-          stems: result.stems, // Include stems for direct hydration
+          stems: result.stems as any, // Include stems for direct hydration
           audioBuffers: zustandBuffers, // Include buffers from Zustand
         });
       }
@@ -421,13 +388,13 @@ export const FileInput = forwardRef<FileInputHandle, FileInputProps>(({
       
       // Reset ALS on error
       if (typeof window !== 'undefined') {
-        window.__als = window.__als || {};
-        window.__als.pulse = 0;
-        window.__als.flow = 0;
-        window.__als.temperature = 'cold';
-        (window.__als as any).momentum = 0;
-        (window.__als as any).pressure = 0;
-        (window.__als as any).harmony = 0;
+        (window as any).__als = (window as any).__als || {};
+        (window as any).__als.pulse = 0;
+        (window as any).__als.flow = 0;
+        (window as any).__als.temperature = 'cold';
+        ((window as any).__als as any).momentum = 0;
+        ((window as any).__als as any).pressure = 0;
+        ((window as any).__als as any).harmony = 0;
       }
       
       // Hide inspector on error

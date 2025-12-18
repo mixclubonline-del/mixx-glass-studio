@@ -7,16 +7,7 @@
 
 import { useEffect, useState } from 'react';
 
-declare global {
-  interface Window {
-    __mixx_autoPunch?: {
-      start: number;
-      end: number;
-      duration: number;
-      confidence: number;
-    };
-  }
-}
+// Window interface extensions moved to src/types/globals.d.ts
 
 interface AutoPunchGhostProps {
   pixelsPerSecond: number;

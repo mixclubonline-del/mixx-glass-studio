@@ -1,5 +1,5 @@
 import React, { useEffect, useMemo, useRef, useState } from "react";
-import { hexToRgba } from "../../utils/ALS";
+import { AuraColors, AuraEffects, AuraGradients, auraAlpha } from "../../theme/aura-tokens";
 
 type TimelineNavigatorProps = {
   contentWidth: number;
@@ -213,11 +213,12 @@ const TimelineNavigator: React.FC<TimelineNavigatorProps> = ({
         )}
         <div
           data-nav="thumb"
-          className="absolute inset-y-[3px] rounded-lg border border-white/30 bg-white/40 shadow-[0_12px_32px_rgba(3,10,20,0.45)] hover:bg-white/55 active:bg-white/60 transition-colors duration-100 cursor-grab active:cursor-grabbing"
+          className="absolute inset-y-[3px] rounded-lg border border-white/20 bg-white/20 backdrop-blur-md shadow-2xl hover:bg-white/30 active:bg-white/40 transition-all duration-150 cursor-grab active:cursor-grabbing"
           style={{
             width: thumbWidth,
             left: thumbLeft,
-            boxShadow: `0 6px 18px ${hexToRgba("#67e8f9", 0.22)}`,
+            boxShadow: `0 6px 18px ${auraAlpha(AuraColors.cyan, 0.2)}`,
+            border: `1px solid ${auraAlpha('#ffffff', 0.15)}`,
           }}
           onMouseDown={handleThumbMouseDown}
         />

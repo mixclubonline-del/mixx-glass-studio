@@ -1,2 +1,2 @@
 export { ProfessionalTransport, default as Transport } from './ProfessionalTransport';
-export { ALSSpine, default as Spine } from './ALSSpine';
+export { default as ALSSpine, default as Spine } from './ALSSpine';

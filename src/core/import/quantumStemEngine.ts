@@ -288,7 +288,7 @@ export class QuantumStemFeatureExtractor {
       const normalized = this.normalizeFeatures(allFeatures);
       
       // Create tensor
-      const featureTensor = tf.tensor2d([normalized]);
+      const featureTensor = tf.tensor2d(normalized, [1, normalized.length]);
       
       // Use Quantum Neural Network's pattern recognizer for quantum superposition
       // This creates richer feature representation through quantum activation

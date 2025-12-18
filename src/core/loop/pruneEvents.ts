@@ -7,14 +7,7 @@
  * This keeps arrays from exploding and ensures the behavior engine stays fast.
  */
 
-declare global {
-  interface Window {
-    __mixx_editEvents?: Array<{ distance: number; timestamp: number }>;
-    __mixx_toolSwitches?: Array<{ tool: string; timestamp: number }>;
-    __mixx_zoomEvents?: Array<{ delta: number; pos: number; timestamp: number }>;
-    __mixx_viewSwitches?: Array<{ view: string; timestamp: number }>;
-  }
-}
+// Window interface extensions moved to src/types/globals.d.ts
 
 /**
  * Prune a single event array by removing events older than the window
@@ -55,4 +48,3 @@ export function pruneEvents(): void {
   
   // playback + record states are objects, not arrays — don't prune
 }
-

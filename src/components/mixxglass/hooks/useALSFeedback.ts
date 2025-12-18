@@ -6,6 +6,7 @@
 
 import { useMemo } from 'react';
 import { generateALSFeedback, type ALSChannel, type ALSFeedback } from '../utils/alsHelpers';
+export type { ALSChannel };
 
 export interface UseALSFeedbackOptions {
   channel: ALSChannel;

@@ -10,4 +10,5 @@ export { Petal } from './Petal';
 export { AuraCore } from './AuraCore';
 export { AuraWelcome } from './AuraWelcome';
 export { AuraFloatingHub } from './AuraFloatingHub';
+export { AuraBloom } from './AuraBloom';
 export * from './bloomIcons';

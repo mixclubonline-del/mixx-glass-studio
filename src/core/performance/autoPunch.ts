@@ -18,57 +18,7 @@
  * That's what an engineer does. Now the Studio does it too.
  */
 
-declare global {
-  interface Window {
-    __mixx_takeMemory?: Array<{
-      startTime: number;
-      endTime: number;
-      regionStart: number;
-      regionEnd: number;
-      duration: number;
-      breathInMs: number;
-      barPosition: number;
-      flowDuringTake: number;
-      hushEvents: number;
-    }>;
-    __mixx_punchHistory?: Array<{
-      ts: number;
-      cursor: number;
-      duration?: number;
-      type?: string;
-    }>;
-    __mixx_playbackState?: {
-      playing: boolean;
-      looping: boolean;
-      playCount?: number;
-      cursor?: number;
-      regionStart?: number;
-      regionEnd?: number;
-      cursorLock?: boolean;
-    };
-    __mixx_recordState?: {
-      recording: boolean;
-      armedTrack: boolean;
-      noiseFloor: number;
-      threshold?: number;
-      hush?: boolean;
-    };
-    __mixx_autoPunch?: {
-      start: number; // Timeline position in seconds
-      end: number; // Timeline position in seconds
-      duration: number; // Duration in seconds
-      confidence: number; // 0-1, how confident the prediction is
-    };
-    __primeBrainInstance?: {
-      state?: {
-        flow?: number;
-        pulse?: number;
-        momentum?: number;
-        tension?: number;
-      };
-    };
-  }
-}
+// Window interface extensions moved to src/types/globals.d.ts
 
 export interface AutoPunchPrediction {
   start: number; // Timeline position in seconds
@@ -98,9 +48,9 @@ export function useAutoPunch(): { autoPunch: AutoPunchPrediction | null } {
   
   const mem = window.__mixx_takeMemory || [];
   const punches = window.__mixx_punchHistory || [];
-  const playback = window.__mixx_playbackState || {};
-  const rec = window.__mixx_recordState || {};
-  const brain = window.__primeBrainInstance?.state || {};
+  const playback = window.__mixx_playbackState || { playing: false, looping: false, playCount: 0, cursor: 0, regionStart: 0, regionEnd: 0, cursorLock: false };
+  const rec = window.__mixx_recordState || { recording: false, armedTrack: false, noiseFloor: 0, threshold: 0, hush: false, lastBreathMs: 0 };
+  const brain = window.__primeBrainInstance?.state as any || { flow: 0.5, momentum: 0.5, pulse: 0.5 };
   
   // Need at least 2 takes to predict pattern
   if (mem.length < 2) {
@@ -128,9 +78,9 @@ export function useAutoPunch(): { autoPunch: AutoPunchPrediction | null } {
   const avgStart = (last1.regionStart + last2.regionStart) / 2;
   
   // Flow-cadence anticipation
-  const flow = brain.flow ?? 0;
-  const momentum = brain.momentum ?? 0;
-  const pulse = brain.pulse ?? 0;
+  const flow = brain.flow ?? 0.5;
+  const momentum = brain.momentum ?? 0.5;
+  const pulse = brain.pulse ?? 0.5;
   
   const cadenceBoost = flow > 0.7 && momentum > 0.65 ? 1 : 0;
   

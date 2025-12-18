@@ -22,35 +22,7 @@
 
 import type { TakeMemory } from './takeMemory';
 
-declare global {
-  interface Window {
-    __mixx_takeMemory?: TakeMemory[];
-    __mixx_playbackState?: {
-      playing: boolean;
-      looping: boolean;
-      playCount?: number;
-      cursor?: number;
-      regionStart?: number;
-      regionEnd?: number;
-      cursorLock?: boolean;
-      beatsPerMinute?: number;
-    };
-    __mixx_recordState?: {
-      recording: boolean;
-      armedTrack: boolean;
-      noiseFloor: number;
-      threshold?: number;
-      hush?: boolean;
-    };
-    __mixx_punchHistory?: Array<{
-      ts: number;
-      cursor: number;
-      duration?: number;
-      type?: string;
-    }>;
-    __mixx_compBrain?: CompTake[];
-  }
-}
+// Window interface extensions moved to src/types/globals.d.ts
 
 export interface CompTake {
   id: string;
@@ -155,7 +127,10 @@ function computeScore(mem: TakeMemory): number {
  * Takes closer to beat divisions score higher.
  */
 function getTiming(mem: TakeMemory): number {
-  const beats = window.__mixx_playbackState?.beatsPerMinute || 120;
+  const brain = window.__primeBrainInstance?.state || { flow: 0.5 };
+  const playback = window.__mixx_playbackState || { playing: false, looping: false, cursor: 0, beatsPerMinute: 120 };
+  const currentFlow = brain.flow ?? 0.5;
+  const beats = playback.beatsPerMinute || 120;
   const msPerBeat = 60000 / beats;
   
   // Closer to beat divisions = better

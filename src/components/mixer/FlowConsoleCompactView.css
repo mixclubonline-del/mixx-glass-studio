@@ -1,0 +1,143 @@
+/* FlowConsoleCompactView.css */
+
+.flow-compact-container {
+  display: flex;
+  flex-flow: row wrap;
+  height: 100%;
+  gap: 8px; /* spacing.gap(2) */
+  overflow: auto;
+  padding: 16px; /* spacing.px(4), spacing.py(4) */
+}
+
+/* Track Strip Container */
+.flow-compact-track {
+  position: relative;
+  display: flex;
+  flex-direction: column;
+  gap: 6px; /* spacing.gap(1.5) */
+  padding: 8px; /* spacing.p(2) */
+  border-radius: 12px; /* effects.border.radius.xl */
+  transition: all 0.2s ease-out; /* transitions.transition.standard */
+  width: 128px;
+  border: 1px solid rgba(102, 140, 198, 0.6);
+  background: rgba(6, 14, 28, 0.5);
+  cursor: pointer;
+}
+
+.flow-compact-track--selected {
+  border-color: rgba(103, 232, 249, 0.7);
+  background: rgba(16, 50, 95, 0.6);
+  box-shadow: 0 0 16px rgba(56, 189, 248, 0.4);
+}
+
+/* Header (Name + Solo) */
+.flow-compact-header {
+  display: flex;
+  flex-direction: row;
+  align-items: center;
+  justify-content: space-between;
+}
+
+.flow-compact-name {
+  text-transform: uppercase;
+  letter-spacing: 0.1em; /* typography.tracking.widest */
+  font-size: 0.45rem;
+  color: rgba(230, 240, 255, 0.85);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.flow-compact-solo-dot {
+  width: 6px;
+  height: 6px;
+  border-radius: 9999px; /* effects.border.radius.full */
+  background: rgba(251, 191, 36, 1);
+  box-shadow: 0 0 6px rgba(251, 191, 36, 0.8);
+}
+
+/* Meter */
+.flow-compact-meter {
+  position: relative;
+  width: 100%;
+  overflow: hidden;
+  border-radius: 8px; /* effects.border.radius.lg */
+  height: 32px;
+  border: 1px solid rgba(102, 140, 198, 0.4);
+  background: rgba(4, 8, 18, 0.8);
+}
+
+.flow-compact-meter-bar {
+  position: absolute;
+  bottom: 0;
+  left: 0;
+  width: 100%;
+  /* Height, background, boxShadow set via inline style for dynamic values */
+}
+
+.flow-compact-transient {
+  position: absolute;
+  inset: 0;
+  /* background via inline style */
+}
+
+/* Fader (Input) */
+.flow-compact-fader__container {
+  position: relative;
+}
+
+.flow-compact-fader {
+  width: 100%;
+  border-radius: 9999px;
+  height: 4px;
+  cursor: pointer;
+  appearance: none;
+  -webkit-appearance: none;
+  /* background set via inline style for progress */
+}
+
+/* Stats / Info Row */
+.flow-compact-stats {
+  display: flex;
+  flex-direction: row;
+  align-items: center;
+  justify-content: space-between;
+}
+
+.flow-compact-temp-wrapper {
+  display: flex;
+  flex-direction: row;
+  align-items: center;
+  gap: 4px; /* spacing.gap(1) */
+}
+
+.flow-compact-temp-dot {
+  width: 6px;
+  height: 6px;
+  border-radius: 9999px;
+  /* background, boxShadow, opacity dynamic */
+}
+
+.flow-compact-temp-text {
+  text-transform: uppercase;
+  letter-spacing: 0.1em;
+  font-size: 0.38rem;
+  color: rgba(230, 240, 255, 0.55);
+}
+
+.flow-compact-vol-text {
+  text-transform: uppercase;
+  letter-spacing: 0.1em;
+  font-size: 0.38rem;
+  color: rgba(230, 240, 255, 0.45);
+}
+
+/* Selection Pulse */
+.flow-compact-selection {
+  position: absolute;
+  inset: 0;
+  border-radius: 12px; /* effects.border.radius.xl matched with container */
+  border: 2px solid rgba(103, 232, 249, 0.6);
+  pointer-events: none;
+  /* boxShadow dynamic */
+}

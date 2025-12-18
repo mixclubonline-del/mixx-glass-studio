@@ -1,0 +1,254 @@
+/* FlowConsoleMatrixView.css */
+
+.flow-matrix-container {
+  display: flex;
+  flex-direction: column;
+  height: 100%;
+  gap: 16px;
+  padding: 16px 24px;
+  overflow: auto;
+}
+
+/* Header */
+.flow-matrix-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  border-bottom: 1px solid rgba(102, 140, 198, 0.6);
+  padding-bottom: 12px;
+}
+
+.flow-matrix-title {
+  text-transform: uppercase;
+  letter-spacing: 0.15em;
+  font-size: 0.65rem;
+  color: #e6f0ff;
+  margin: 0;
+}
+
+.flow-matrix-subtitle {
+  margin-top: 4px;
+  text-transform: uppercase;
+  letter-spacing: 0.1em;
+  font-size: 0.42rem;
+  color: rgba(230, 240, 255, 0.5);
+}
+
+.flow-matrix-active-count {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  text-transform: uppercase;
+  letter-spacing: 0.1em;
+  font-size: 0.42rem;
+  color: rgba(230, 240, 255, 0.55);
+}
+
+.flow-matrix-count-badge {
+  padding: 2px 8px;
+  border-radius: 9999px;
+  background: rgba(16, 185, 129, 0.3);
+  color: rgba(110, 231, 183, 1);
+}
+
+/* Grid Layout */
+.flow-matrix-grid-wrapper {
+  flex: 1;
+  overflow: auto;
+}
+
+.flow-matrix-grid-content {
+  display: inline-block;
+  min-width: 100%;
+}
+
+/* Column Headers (Buses) */
+.flow-matrix-col-headers {
+  position: sticky;
+  top: 0;
+  z-index: 10;
+  margin-bottom: 8px;
+  display: flex;
+  gap: 8px;
+  border-bottom: 1px solid rgba(102, 140, 198, 0.4);
+  padding-bottom: 8px;
+  background: var(--glass-surface); /* Assuming variable exists, or fallback */
+  backdrop-filter: blur(8px);
+}
+
+.flow-matrix-track-name-col {
+  width: 128px;
+  flex-shrink: 0;
+}
+
+.flow-matrix-bus-header {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 4px;
+  padding: 8px 12px;
+  border-radius: 12px;
+  transition: all 0.2s ease-out;
+  cursor: pointer;
+  border: 1px solid rgba(102, 140, 198, 0.6);
+  background: rgba(6, 14, 28, 0.5);
+}
+
+.flow-matrix-bus-header:hover {
+  border-color: rgba(102, 140, 198, 0.45);
+  transform: scale(1.02);
+}
+
+.flow-matrix-bus-header:active {
+  transform: scale(0.98);
+}
+
+.flow-matrix-bus-header--selected {
+  border-color: rgba(103, 232, 249, 0.7);
+  background: rgba(16, 50, 95, 0.7);
+  box-shadow: 0 0 12px rgba(56, 189, 248, 0.3);
+  transform: scale(1.02);
+}
+
+.flow-matrix-bus-name {
+  text-transform: uppercase;
+  letter-spacing: 0.1em;
+  font-size: 0.5rem;
+  color: rgba(255, 255, 255, 0.7);
+}
+
+.flow-matrix-bus-header--selected .flow-matrix-bus-name {
+  color: rgba(125, 211, 252, 1);
+}
+
+.flow-matrix-bus-indicator {
+  width: 100%;
+  height: 4px;
+  border-radius: 9999px;
+}
+
+/* Rows (Tracks) */
+.flow-matrix-rows {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.flow-matrix-row {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+/* Track Info Cell */
+.flow-matrix-track-cell {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  width: 128px;
+  flex-shrink: 0;
+}
+
+.flow-matrix-track-meter {
+  width: 4px;
+  height: 32px;
+  border-radius: 9999px;
+}
+
+.flow-matrix-track-info {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+}
+
+.flow-matrix-track-name {
+  text-transform: uppercase;
+  letter-spacing: 0.1em;
+  font-size: 0.5rem;
+  color: rgba(230, 240, 255, 0.85);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.flow-matrix-track-status {
+  text-transform: uppercase;
+  letter-spacing: 0.1em;
+  font-size: 0.42rem;
+  color: rgba(230, 240, 255, 0.5);
+}
+
+/* Send Cell */
+.flow-matrix-send-cell {
+  flex: 1;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.flow-matrix-send-knob {
+  position: relative;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 100%;
+  height: 40px;
+  border-radius: 8px;
+  transition: all 0.2s ease-out;
+  cursor: pointer;
+  border: 1px solid rgba(102, 140, 198, 0.4);
+  background: rgba(4, 10, 20, 0.4);
+}
+
+.flow-matrix-send-knob--selected {
+  border-color: rgba(103, 232, 249, 0.5);
+}
+
+.flow-matrix-send-knob--active {
+  background: rgba(6, 14, 28, 0.6);
+}
+
+.flow-matrix-send-knob:hover {
+  background: rgba(6, 14, 28, 0.6);
+  transform: scale(1.05);
+}
+
+.flow-matrix-send-knob--active:hover {
+  background: rgba(8, 18, 34, 0.8);
+}
+
+.flow-matrix-send-knob:active {
+  transform: scale(0.95);
+}
+
+/* Level Indicator */
+.flow-matrix-level-bar-container {
+  position: relative;
+  overflow: hidden;
+  border-radius: 9999px;
+  height: 6px;
+  width: 75%;
+  background: rgba(0, 0, 0, 0.4);
+}
+
+.flow-matrix-level-bar {
+  height: 100%;
+  border-radius: 9999px;
+}
+
+/* Animations */
+.flow-matrix-pulse-indicator {
+  position: absolute;
+  inset: 0;
+  border-radius: 8px;
+  pointer-events: none;
+}
+
+.flow-matrix-energy-pulse {
+  position: absolute;
+  inset: 0;
+  border-radius: 8px;
+  pointer-events: none;
+}

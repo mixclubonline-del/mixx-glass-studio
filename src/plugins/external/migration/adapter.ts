@@ -17,6 +17,7 @@ import { syncStateToEngine } from '../adapters/audioEngineAdapter';
 import type { IAudioEngine } from '../../../types/audio-graph';
 import type { PluginId, PluginCatalogEntry } from '../../../audio/pluginTypes';
 import { PlaceholderAudioEngine } from '../../../audio/plugins';
+import { PLUGIN_CATALOG } from '../../../audio/pluginCatalog';
 
 /**
  * Maps external plugin keys to current plugin IDs
@@ -66,9 +67,13 @@ export function createPluginConfig(
   id: PluginId;
   name: string;
   description: string;
-  tier: string;
+  tier: any;
   component: React.FC<any>;
   engineInstance: (ctx: BaseAudioContext) => IAudioEngine;
+  tierLabel: string;
+  parameters: string[];
+  moodResponse: string;
+  lightingProfile: any;
 } {
   const pluginInfo = findPlugin(pluginKey);
   const pluginId = PLUGIN_ID_MAP[pluginKey];
@@ -86,13 +91,19 @@ export function createPluginConfig(
     return new PlaceholderAudioEngine(audioCtx);
   };
 
+  const catalogEntry = PLUGIN_CATALOG[pluginId];
+
   return {
     id: pluginId,
     name: pluginInfo.name,
     description: pluginInfo.description,
-    tier: pluginInfo.tier,
+    tier: pluginInfo.tier as any,
     component: WrappedComponent,
     engineInstance: engineInstanceFactory,
+    tierLabel: catalogEntry?.tierLabel ?? 'External Plugin',
+    parameters: catalogEntry?.parameters ?? [],
+    moodResponse: catalogEntry?.moodResponse ?? 'Standard external processing.',
+    lightingProfile: (catalogEntry?.lightingProfile ?? { hueStart: 0, hueEnd: 0, motion: 'float' }) as any,
   };
 }
 

@@ -2,7 +2,7 @@
 
 import React from 'react';
 
-type IconProps = {
+type IconProps = React.SVGProps<SVGSVGElement> & {
   className?: string;
 };
 

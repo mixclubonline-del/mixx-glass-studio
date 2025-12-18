@@ -28,9 +28,9 @@ export const SettingsPanel: React.FC<SettingsPanelProps> = ({ isActive, onClose,
 
     const panelAnimation = useAnimatePresence({
         isVisible: isActive,
-        initial: { x: '-100%', opacity: 0 },
-        animate: { x: '0%', opacity: 1 },
-        exit: { x: '-100%', opacity: 0 },
+        initial: { x: -256, opacity: 0 },
+        animate: { x: 0, opacity: 1 },
+        exit: { x: -256, opacity: 0 },
         transition: {
             duration: dynamicDuration,
             easing: 'ease-out',

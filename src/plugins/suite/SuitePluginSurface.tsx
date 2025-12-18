@@ -129,10 +129,11 @@ const SuitePluginSurface: React.FC<SuitePluginSurfaceProps> = ({
   trackId,
   trackName,
   existingPluginIds,
+  initialPluginId,
   onAddPlugin,
   onClose,
 }) => {
-  const [activePlugin, setActivePlugin] = useState<PluginKey | null>(null);
+  const [activePlugin, setActivePlugin] = useState<PluginKey | null>(initialPluginId as PluginKey ?? null);
   const [view, setView] = useState<'plugin' | 'halo'>('plugin');
   const [sessionContext, setSessionContext] = useState<SessionContext>({ mood: 'Neutral' });
   const [pluginStates, setPluginStates] = useState<PluginStates>(INITIAL_PLUGIN_STATES);
@@ -225,7 +226,7 @@ const SuitePluginSurface: React.FC<SuitePluginSurfaceProps> = ({
   }, []);
 
   const handleMidiMessage = useCallback((message: MIDIMessageEvent) => {
-    if (!isControlChange(message) || !message.target) return;
+    if (!message.data || !isControlChange(message) || !message.target) return;
 
     const [, cc, value] = message.data;
     const deviceId = (message.target as any).id;

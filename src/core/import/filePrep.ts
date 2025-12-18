@@ -130,7 +130,7 @@ export async function toMono(audioBuffer: AudioBuffer): Promise<AudioBuffer> {
     return await ctx.startRendering();
   } catch (error) {
     // If context is interrupted, return original buffer
-    if (ctx.state === 'interrupted') {
+    if ((ctx.state as string) === 'interrupted') {
       // Context interrupted - graceful fallback (no ALS needed, expected behavior)
       return audioBuffer;
     }
@@ -201,7 +201,7 @@ export async function normalizeBuffer(
   let timeoutId: ReturnType<typeof setTimeout> | null = null;
   const renderPromise = ctx.startRendering().catch((error) => {
     // If context is interrupted, return original buffer
-    if (ctx.state === 'interrupted') {
+    if ((ctx.state as string) === 'interrupted') {
       // Context interrupted - graceful fallback (no ALS needed)
       return audioBuffer;
     }

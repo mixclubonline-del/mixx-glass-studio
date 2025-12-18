@@ -27,7 +27,7 @@ export interface TransientProfile {
 }
 
 export interface AudioClassification {
-  type: 'vocal' | 'beat' | 'twotrack' | 'stems' | 'sample' | 'loop' | 'chop' | 'unknown';
+  type: 'vocal' | 'beat' | 'twotrack' | 'stems' | 'sample' | 'loop' | 'chop' | 'full' | 'unknown';
   spectral: SpectralProfile;
   transients: TransientProfile;
   rms: number; // Overall RMS level (0-1)

@@ -9,11 +9,7 @@
 
 import { als } from '../../utils/alsFeedback';
 
-declare global {
-  interface Window {
-    __mixx_ai_vocal?: (buffer: AudioBuffer) => Promise<AudioBuffer>;
-  }
-}
+// Window interface extensions moved to src/types/globals.d.ts
 
 /**
  * Extract vocals using AI model.
@@ -23,8 +19,8 @@ declare global {
  */
 export async function aiVocalModel(audioBuffer: AudioBuffer): Promise<AudioBuffer> {
   // Check if AI model is available
-  if (typeof window !== 'undefined' && window.__mixx_ai_vocal) {
-    return window.__mixx_ai_vocal(audioBuffer);
+  if (typeof window !== 'undefined' && (window as any).__mixx_ai_vocal) {
+    return (window as any).__mixx_ai_vocal(audioBuffer);
   }
   
   // Fallback: Simple spectral subtraction (placeholder)

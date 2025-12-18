@@ -1,7 +1,7 @@
 
 
 import React from 'react';
-import { useFlowMotion, useAnimatePresence, AnimatePresence } from '../../../../components/mixxglass';
+import { useFlowMotion, useAnimatePresence, AnimatePresence } from '../../../components/mixxglass';
 import { SidePanelProps, Preset } from '../types';
 import { XIcon } from './shared/Icons';
 import { mapRange } from '../lib/utils'; // Import mapRange
@@ -50,11 +50,6 @@ export const SidePanel: React.FC<SidePanelProps> = (props) => {
     const dynamicStiffness = mapRange(globalSettings.animationIntensity, 0, 100, 350, 500);
     const dynamicDamping = mapRange(globalSettings.animationIntensity, 0, 100, 35, 20);
 
-    const panelVariants: Variants = {
-        hidden: { x: '-100%', opacity: 0 },
-        visible: { x: '0%', opacity: 1, transition: { type: 'spring', stiffness: dynamicStiffness, damping: dynamicDamping } },
-        exit: { x: '-100%', opacity: 0, transition: { type: 'spring', stiffness: dynamicStiffness + 50, damping: dynamicDamping + 5 } }, // Slightly different exit transition
-    };
 
     const PresetsPanel: React.FC<Pick<SidePanelProps, 'presets' | 'onSavePreset' | 'onLoadPreset' | 'onDeletePreset'>> = ({ presets, onSavePreset, onLoadPreset, onDeletePreset }) => (
         <div className="p-4 flex flex-col h-full">
@@ -112,10 +107,10 @@ export const SidePanel: React.FC<SidePanelProps> = (props) => {
 
 
     const panelAnimation = useAnimatePresence({
-        isVisible: activePanel !== null && activePanel !== 'routing' && activePanel !== 'settings',
-        initial: { x: '-100%', opacity: 0 },
-        animate: { x: '0%', opacity: 1 },
-        exit: { x: '-100%', opacity: 0 },
+        isVisible: activePanel !== null && activePanel !== 'routing',
+        initial: { x: -256, opacity: 0 },
+        animate: { x: 0, opacity: 1 },
+        exit: { x: -256, opacity: 0 },
         transition: {
             duration: mapRange(globalSettings.animationIntensity, 0, 100, 300, 200),
             easing: 'ease-out',

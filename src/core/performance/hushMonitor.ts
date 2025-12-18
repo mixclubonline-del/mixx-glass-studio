@@ -17,17 +17,7 @@
  * - Bloom stays silent
  */
 
-declare global {
-  interface Window {
-    __mixx_recordState?: {
-      recording: boolean;
-      armedTrack: boolean;
-      noiseFloor: number;
-      threshold?: number;
-      hush?: boolean;
-    };
-  }
-}
+// Window interface extensions moved to src/types/globals.d.ts
 
 /**
  * Monitor HUSH noise floor and update recording state.
@@ -40,12 +30,15 @@ declare global {
 export function monitorHush(noiseFloor: number, threshold: number = 0.22): boolean {
   if (typeof window === 'undefined') return false;
   
+  // Fallback for __mixx_recordState if not initialized elsewhere
+  // This should ideally be managed by a dedicated state management system
   if (!window.__mixx_recordState) {
     window.__mixx_recordState = {
       recording: false,
       armedTrack: false,
       noiseFloor: 0,
-      threshold,
+      threshold: 0, // Initialize with a default or 0, will be updated below
+      hush: false,
     };
   }
   
@@ -82,4 +75,3 @@ export function calculatePeakToPeak(levels: number[]): number {
   const max = Math.max(...levels);
   return max - min;
 }
-

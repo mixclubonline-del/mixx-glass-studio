@@ -52,11 +52,7 @@ export interface QuantumSchedulerTrace {
 }
 
 // Session Probe integration
-declare global {
-  interface Window {
-    __quantum_scheduler_traces?: QuantumSchedulerTrace[];
-  }
-}
+// Window interface extensions moved to src/types/globals.d.ts
 
 class QuantumScheduler {
   private audioQueue: QuantumTask[] = [];
@@ -329,7 +325,8 @@ class QuantumScheduler {
   private checkAudioStarvation(): void {
     if (this.audioQueue.length > 0) {
       const oldestTask = this.audioQueue[0];
-      if (oldestTask && performance.now() - oldestTask.metadata?.queuedAt > this.audioStarvationThreshold) {
+      const queuedAt = (oldestTask.metadata as Record<string, any>)?.queuedAt;
+      if (oldestTask && typeof queuedAt === 'number' && performance.now() - queuedAt > this.audioStarvationThreshold) {
         this.stats.audioStarvationWarnings++;
         als.warning(`[QuantumScheduler] Audio starvation detected - queue backlog: ${this.audioQueue.length}`);
       }

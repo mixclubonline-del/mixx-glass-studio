@@ -176,13 +176,14 @@ const PluginBrowser: React.FC<PluginBrowserProps> = ({
     <div
       style={composeStyles(
         layout.position.fixed,
-        { inset: 0, zIndex: 160 },
+        { inset: 0, zIndex: 200 },
         layout.flex.container('row'),
-        layout.flex.align.center,
+        layout.flex.align.start,
         layout.flex.justify.center,
         {
-          background: 'rgba(2,4,12,0.76)',
-          backdropFilter: 'blur(48px)',
+          paddingTop: '60px',
+          background: 'rgba(5,8,18,0.88)',
+          backdropFilter: 'blur(32px)',
         }
       )}
       onClick={onClose}
@@ -194,11 +195,11 @@ const PluginBrowser: React.FC<PluginBrowserProps> = ({
           layout.overflow.hidden,
           effects.border.radius.xl,
           {
-            height: '620px',
-            width: '880px',
-            border: '1px solid rgba(255,255,255,0.1)',
-            background: 'rgba(6,14,32,0.85)',
-            boxShadow: '0 45px 120px rgba(4,10,26,0.65)',
+            height: '560px',
+            width: '820px',
+            border: '1px solid rgba(139, 92, 246, 0.35)',
+            background: 'rgba(10,14,28,0.98)',
+            boxShadow: '0 35px 90px rgba(0,0,0,0.7), 0 0 50px rgba(139, 92, 246, 0.1)',
           }
         )}
         onClick={(event) => event.stopPropagation()}
@@ -381,22 +382,8 @@ const PluginBrowser: React.FC<PluginBrowserProps> = ({
                     draggable
                     onDragStart={(e) => handleDragStart(e, plugin.id)}
                     onClick={() => handleAdd(plugin.id)}
-                    onMouseEnter={() => handleHover(plugin.id)}
-                    style={composeStyles(
-                      effects.border.radius.xl,
-                      spacing.px(4),
-                      spacing.py(2),
-                      transitions.transition.standard('all', 200, 'ease-out'),
-                      {
-                        border: '1px solid rgba(255,255,255,0.12)',
-                        background: 'rgba(12,24,48,0.78)',
-                        textAlign: 'left',
-                        cursor: 'grab',
-                        backgroundImage: gradientFor(plugin),
-                        boxShadow: `0 0 28px ${hexToRgba(plugin.glow, 0.26)}`,
-                      }
-                    )}
                     onMouseEnter={(e) => {
+                      handleHover(plugin.id);
                       e.currentTarget.style.borderColor = 'rgba(255,255,255,0.25)';
                       e.currentTarget.style.background = 'rgba(16,36,68,0.85)';
                     }}
@@ -537,22 +524,8 @@ const PluginBrowser: React.FC<PluginBrowserProps> = ({
                           key={plugin.id}
                           draggable
                           onDragStart={(e) => handleDragStart(e, plugin.id)}
-                          onMouseEnter={() => handleHover(plugin.id)}
-                          style={composeStyles(
-                            layout.position.relative,
-                            layout.flex.container('col'),
-                            layout.flex.justify.between,
-                            effects.border.radius.xl,
-                            spacing.p(5),
-                            transitions.transition.standard('all', 200, 'ease-out'),
-                            {
-                              border: '1px solid rgba(255,255,255,0.1)',
-                              background: 'rgba(8,16,36,0.78)',
-                              backgroundImage: gradientFor(plugin),
-                              cursor: 'grab',
-                            }
-                          )}
                           onMouseEnter={(e) => {
+                            handleHover(plugin.id);
                             e.currentTarget.style.borderColor = 'rgba(255,255,255,0.25)';
                             e.currentTarget.style.boxShadow = '0 22px 48px rgba(6,16,38,0.55)';
                           }}
@@ -621,11 +594,6 @@ const PluginBrowser: React.FC<PluginBrowserProps> = ({
                                     : 'rgba(255,255,255,0.6)',
                                 }
                               )}
-                              onMouseEnter={(e) => {
-                                if (!isFavorite) {
-                                  e.currentTarget.style.color = 'white';
-                                }
-                              }}
                               onMouseLeave={(e) => {
                                 if (!isFavorite) {
                                   e.currentTarget.style.color = 'rgba(255,255,255,0.6)';
@@ -695,11 +663,6 @@ const PluginBrowser: React.FC<PluginBrowserProps> = ({
                                   cursor: isAdded ? 'default' : 'pointer',
                                 }
                               )}
-                              onMouseEnter={(e) => {
-                                if (!isAdded) {
-                                  e.currentTarget.style.background = 'rgba(255,255,255,0.25)';
-                                }
-                              }}
                               onMouseLeave={(e) => {
                                 if (!isAdded) {
                                   e.currentTarget.style.background = 'rgba(255,255,255,0.15)';

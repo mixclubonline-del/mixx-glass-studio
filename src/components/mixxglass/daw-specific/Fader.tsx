@@ -337,9 +337,9 @@ export const MixxGlassFader: React.FC<MixxGlassFaderProps> = ({
       tabIndex={disabled ? -1 : 0}
       role="slider"
       aria-label={name}
-      aria-valuemin="0"
-      aria-valuemax="1.2"
-      aria-valuenow={String(Math.round(value * 100) / 100)}
+      aria-valuemin={0}
+      aria-valuemax={1.2}
+      aria-valuenow={Math.round(value * 100) / 100}
     >
       {/* Fill (level indicator) */}
       <div className="mixxglass-fader-fill" style={fillStyle} />

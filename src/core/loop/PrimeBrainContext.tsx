@@ -10,6 +10,7 @@ import type { SessionSignals } from './gatherSessionSignals';
 import { computeBehavior, type BehaviorState, type FlowMode } from './behaviorEngine';
 import { scheduleAITask } from '../quantum';
 import type { PrimeBrainStatus } from '../../types/primeBrainStatus';
+import { als } from '../../utils/alsFeedback';
 
 interface PrimeBrainContextValue {
   state: BehaviorState;

@@ -26,21 +26,22 @@ export interface FivePillarsPostProcessOptions {
 }
 
 const DEFAULT_PROFILE: MasteringProfile = {
+  name: 'Default Profile',
   targetLUFS: -14,
-  targetTP: -1.0,
+  truePeakCeiling: -1.0,
   velvetFloor: {
-    amount: 0.5,
-    warmth: 0.5,
-    depth: 0.5,
+    depth: 50,
+    translation: 'subtle',
+    warmth: 50,
   },
   harmonicLattice: {
-    amount: 0.5,
-    warmth: 0.5,
-    presence: 0.5,
+    character: 'neutral',
+    presence: 50,
+    airiness: 50,
   },
   phaseWeave: {
-    width: 0.5,
-    coherence: 0.5,
+    width: 50,
+    monoCompatibility: 50,
   },
 };
 

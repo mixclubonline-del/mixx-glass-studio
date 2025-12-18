@@ -14,6 +14,7 @@ const Analyzer: React.FC = () => {
         const canvas = canvasRef.current;
         if (!canvas) return;
         const ctx = canvas.getContext('2d');
+        if (!ctx) return;
         const { width, height } = canvas;
         const bars = 128;
         if (peakLevelsRef.current.length !== bars) {

@@ -83,7 +83,7 @@ const EnergyPillar: React.FC<EnergyPillarProps> = ({ level, transient, isPlaying
             {/* Main Pillar */}
             <div
                 style={composeStyles(
-                  effects.border.radius.top.full(),
+                  effects.border.radius.custom('8px 8px 0 0'),
                   transitions.transition.standard('all', 75, 'ease-out'),
                   {
                     width: '16px',

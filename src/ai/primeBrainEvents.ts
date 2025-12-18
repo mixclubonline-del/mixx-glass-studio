@@ -31,6 +31,7 @@ export type PrimeBrainEventType =
   | 'plugin-remove'
   | 'plugin-parameter-change'
   | 'view-switch'
+  | 'track-create'
   | 'error';
 
 export interface PrimeBrainEvent {

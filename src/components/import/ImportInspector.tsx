@@ -291,14 +291,14 @@ const ImportGlassPanel: React.FC<{
     initial: { scale: 0.96, opacity: 0 },
     animate: { scale: 1, opacity: 1 },
     exit: { scale: 0.96, opacity: 0 },
-    transition: { duration: 400, easing: 'cubic-bezier(0.25, 0.46, 0.45, 0.94)' },
+    transition: { duration: 400, easing: 'ease-out' },
   });
 
   return (
     <div
       className="flow-import-glass"
       style={{
-        transform: `scale(${panelAnimation.style.scale})`,
+        transform: `scale(${(panelAnimation.style as any).scale})`,
         opacity: panelAnimation.style.opacity,
       }}
     >
@@ -323,7 +323,7 @@ const ImportStep: React.FC<{
       opacity: isDone ? 1 : isActive ? 0.9 : 0.6,
       x: 0,
     },
-    transition: { duration: 300, delay: index * 100 },
+    transition: { duration: 300 },
   });
 
   const checkAnimation = useAnimatePresence({
@@ -341,7 +341,7 @@ const ImportStep: React.FC<{
       className={`flow-step ${isDone ? 'done' : ''} ${isActive ? 'active' : ''}`}
       style={{
         opacity: stepAnimation.style.opacity,
-        transform: `translateX(${stepAnimation.style.x}px)`,
+        transform: `translateX(${(stepAnimation.style as any).x}px)`,
       }}
     >
       <div className="flow-step-indicator">
@@ -349,7 +349,7 @@ const ImportStep: React.FC<{
           <div
             className="flow-step-check"
             style={{
-              transform: `scale(${checkAnimation.style.scale})`,
+              transform: `scale(${(checkAnimation.style as any).scale})`,
             }}
           >
             ✓

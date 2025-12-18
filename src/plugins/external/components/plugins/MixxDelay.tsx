@@ -12,7 +12,7 @@ import { useVstBridge } from '../../vst/useVstBridge';
 // --- VST Architecture ---
 
 interface EchoData {
-    key: number;
+    echoId: number;
     opacity: number;
     animationName: string;
     animationDuration: number;
@@ -64,7 +64,7 @@ class MixxDelayVstBridge extends VstBridge<MixxDelaySettings> {
             const color = `hsl(${300 - index * 20}, 100%, ${80 - index * 5}%)`;
             
             echos.push({
-                key: index,
+                echoId: index,
                 opacity,
                 animationName,
                 animationDuration,
@@ -114,7 +114,7 @@ export const MixxDelay: React.FC<PluginComponentProps<MixxDelaySettings>> = ({
     );
     
     const memoizedEchos = useMemo(() => {
-        return (visualizerData as DelayVisualizerData | null)?.echos.map(echoData => <Echo key={echoData.key} {...echoData} />);
+        return (visualizerData as DelayVisualizerData | null)?.echos.map(echoData => <Echo key={echoData.echoId} {...echoData} />);
     }, [visualizerData]);
 
 

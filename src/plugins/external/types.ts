@@ -1,7 +1,8 @@
 
 
 import React from 'react';
-import { PluginKey } from './constants'; 
+import { PluginKey } from './keys'; 
+export type { PluginKey };
 
 export type Mood = 'Neutral' | 'Warm' | 'Bright' | 'Dark' | 'Energetic';
 
@@ -214,6 +215,15 @@ export interface PluginPositions {
   [key: string]: PluginPosition; // Changed index signature to string
 }
 
+export interface EchoData {
+  echoId: number;
+  opacity: number;
+  animationName: string;
+  animationDuration: number;
+  animationDelay: number;
+  color: string;
+}
+
 export interface AudioSignal {
   level: number;
   peak: number;
@@ -252,7 +262,7 @@ export interface PluginComponentProps<T extends PluginState = PluginState> {
 
 // --- MIDI TYPES ---
 export interface MidiMapping {
-  pluginKey: string; // Using string to avoid circular dependency with constants.ts
+  pluginKey: PluginKey; // Using PluginKey type
   paramName: string;
   min: number;
   max: number;

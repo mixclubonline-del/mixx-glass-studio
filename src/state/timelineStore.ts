@@ -11,9 +11,17 @@ import { create } from 'zustand';
 import type { TrackData } from '../App';
 import type { ArrangeClip } from '../hooks/useArrange';
 
+export interface TimelineMarker {
+  id: string;
+  name: string;
+  time: number; // seconds
+  color: string;
+}
+
 export interface TimelineState {
   tracks: TrackData[];
   clips: ArrangeClip[];
+  markers: TimelineMarker[];
   audioBuffers: Record<string, AudioBuffer>;
 }
 
@@ -24,6 +32,9 @@ interface TimelineActions {
   removeClip: (clipId: string) => void;
   updateTrack: (trackId: string, updates: Partial<TrackData>) => void;
   updateClip: (clipId: string, updates: Partial<ArrangeClip>) => void;
+  addMarker: (marker: TimelineMarker) => void;
+  removeMarker: (markerId: string) => void;
+  updateMarker: (markerId: string, updates: Partial<TimelineMarker>) => void;
   setAudioBuffer: (bufferId: string, buffer: AudioBuffer) => void;
   // Sync helpers for React state
   getTracks: () => TrackData[];
@@ -43,6 +54,7 @@ export const useTimelineStore = create<TimelineStore>((set, get) => ({
   // Initial state
   tracks: [],
   clips: [],
+  markers: [],
   audioBuffers: {},
 
   // Actions
@@ -90,6 +102,24 @@ export const useTimelineStore = create<TimelineStore>((set, get) => ({
   setAudioBuffer: (bufferId: string, buffer: AudioBuffer) => {
     set((state) => ({
       audioBuffers: { ...state.audioBuffers, [bufferId]: buffer },
+    }));
+  },
+
+  addMarker: (marker: TimelineMarker) => {
+    set((state) => ({
+      markers: [...state.markers, marker],
+    }));
+  },
+
+  removeMarker: (markerId: string) => {
+    set((state) => ({
+      markers: state.markers.filter((m) => m.id !== markerId),
+    }));
+  },
+
+  updateMarker: (markerId: string, updates: Partial<TimelineMarker>) => {
+    set((state) => ({
+      markers: state.markers.map((m) => (m.id === markerId ? { ...m, ...updates } : m)),
     }));
   },
 

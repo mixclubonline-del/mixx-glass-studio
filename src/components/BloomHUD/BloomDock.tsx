@@ -5,9 +5,10 @@ import PluginBrowser from '../PluginBrowser';
 import { FxWindowConfig, FxWindowId } from '../../App';
 import type { PluginInventoryItem } from '../../audio/pluginTypes';
 import { hexToRgba, ALSActionPulse } from '../../utils/ALS';
-import { AuraColors, AuraEffects } from '../../theme/aura-tokens';
+import { AuraColors, AuraEffects, AuraPalette, AuraGradients, auraAlpha } from '../../theme/aura-tokens';
 import type { PulsePalette } from '../../utils/ALS';
-import type { BloomActionMeta } from '../../types/bloom';
+import type { BloomActionMeta, BloomContext } from '../../types/bloom';
+import { getSeekBehavior } from '../transport/contextualTransportItems';
 import type { PrimeBrainStatus } from '../../types/primeBrainStatus';
 import type { TranslationProfileKey, TranslationProfileInfo, CalibrationPreset } from '../../audio/TranslationMatrix';
 import type { IngestJobSnapshot } from '../../ingest/IngestQueueManager';
@@ -21,6 +22,7 @@ import { ALSEventLog } from '../dock/debug/ALSEventLog';
 import { ALSSyncMonitor } from '../dock/debug/ALSSyncMonitor';
 import { ProfessionalTransport } from '../transport/ProfessionalTransport';
 import './ArrangeBloomStrip.css';
+import './BloomDock.css';
 
 type ImportProgressLike = {
     id: string;
@@ -58,16 +60,15 @@ const MasterWaveform: React.FC<{ waveform: Uint8Array, color: string }> = ({ wav
     );
 };
 
-type DockViewMode = 'arrange' | 'sampler' | 'mixer' | 'piano' | 'edit';
+type DockViewMode = 'arrange' | 'sampler' | 'mixer' | 'piano';
 
-const VIEW_ORDER: DockViewMode[] = ['arrange', 'mixer', 'sampler', 'piano', 'edit'];
+const VIEW_ORDER: DockViewMode[] = ['arrange', 'mixer', 'sampler', 'piano'];
 
 const VIEW_META: Record<DockViewMode, { label: string; icon: React.ComponentType<{ className?: string }> }> = {
     arrange: { label: 'Arrange View', icon: ArrangeViewIcon },
     sampler: { label: 'Sampler View', icon: SamplerIcon },
     mixer: { label: 'Mix View', icon: MixerIcon },
     piano: { label: 'Piano Roll', icon: PianoIcon },
-    edit: { label: 'Clip Edit', icon: EditSurfaceIcon },
 };
 
 const ViewToggle: React.FC<{
@@ -107,9 +108,7 @@ const ViewToggle: React.FC<{
                 }
             }}
             disabled={isDisabled}
-            className={`group relative px-4 py-2 rounded-full border border-white/12 bg-glass-surface-soft text-ink/70 transition-all shadow-[0_18px_46px_rgba(4,12,26,0.38)] backdrop-blur-xl ${
-                isDisabled ? 'opacity-40 cursor-not-allowed' : 'hover:text-ink hover:border-white/18'
-            }`}
+            className={`bloom-dock-view-toggle group ${isDisabled ? 'opacity-40 cursor-not-allowed' : ''}`}
             aria-label={
                 isDisabled
                     ? `${currentLabel} view`
@@ -121,21 +120,23 @@ const ViewToggle: React.FC<{
                     : `Switch to ${nextMeta.label}`
             }
         >
-            <span className="flex items-center gap-2 tracking-[0.32em] text-[11px] uppercase">
+            <span className="flex items-center gap-2">
                 <CurrentIcon
-                    className={`w-5 h-5 ${
-                        isDisabled ? 'text-slate-500' : 'text-cyan-200 group-hover:text-ink'
+                    className={`bloom-dock-view-icon ${
+                        isDisabled ? 'text-slate-500' : 'text-cyan-200'
                     }`}
                 />
                 {currentLabel}
             </span>
-            <span
-                aria-hidden
-                className="pointer-events-none absolute inset-0 rounded-full opacity-0 group-hover:opacity-100 transition-opacity"
-                style={{
-                    boxShadow: `0 0 32px ${hexToRgba(accent, 0.45)}`,
-                }}
-            />
+            {!isDisabled && (
+                <span
+                    aria-hidden
+                    className="pointer-events-none absolute inset-0 rounded-full opacity-0 group-hover:opacity-100 transition-opacity"
+                    style={{
+                        boxShadow: `0 0 32px ${hexToRgba(accent, 0.45)}`,
+                    }}
+                />
+            )}
         </button>
     );
 };
@@ -150,6 +151,8 @@ interface BloomDockProps {
     onTransportJump: (direction: 'back' | 'forward') => void;
     onTransportNudge: (direction: 'back' | 'forward') => void;
     onToggleLoop: () => void;
+    bloomContext?: BloomContext;
+    onSeekAction?: (action: string) => void;
     masterAnalysis: { level: number; transient: boolean; waveform: Uint8Array };
     selectedClips: ArrangeClip[];
     onAction: (action: string, payload?: any, meta?: BloomActionMeta) => void;
@@ -201,6 +204,8 @@ export const BloomDock: React.FC<BloomDockProps> = (props) => {
         onPositionChange,
         alsPulseAgent,
         isPlaying, isLooping, onPlayPause, onTransportJump, onTransportNudge, onToggleLoop,
+        bloomContext = 'idle',
+        onSeekAction,
         masterAnalysis, selectedClips, onAction, isAnyTrackArmed, isHushActive, fxWindows,
         fxVisibility, onToggleFxVisibility, selectedTrackId,
         viewMode, onViewModeChange, onOpenAIHub,
@@ -331,16 +336,25 @@ export const BloomDock: React.FC<BloomDockProps> = (props) => {
     const enhancedGlowIntensity = Math.max(pulseStrength, alsGlow.glowIntensity);
     const enhancedGlowColor = alsGlow.glowColor || pulseGlow;
 
-    const haloStyle = useMemo(() => ({
-        boxShadow: `
-            0 0 ${26 + enhancedGlowIntensity * 28}px ${hexToRgba(enhancedGlowColor, isDragging ? 0.7 : 0.5)},
-            0 0 ${60 + enhancedGlowIntensity * 42}px ${hexToRgba(pulseHalo, 0.22)},
-            0 0 ${90 + enhancedGlowIntensity * 48}px ${hexToRgba(contextAccent, 0.28)},
-            inset 0 0 ${20 + alsGlow.glowIntensity * 30}px ${alsGlow.glowColor}
-        `,
-        borderColor: hexToRgba(contextAccent, 0.55),
-        background: `linear-gradient(135deg, ${hexToRgba(contextAccent, 0.22)} 0%, rgba(8,14,28,0.92) 60%, rgba(4,7,16,0.9) 100%)`,
-    }), [contextAccent, isDragging, enhancedGlowColor, pulseHalo, enhancedGlowIntensity, alsGlow]);
+    // AURA Philosophy: Tools serve the music, not the other way around
+    // Ethereal presence - there when needed, invisible when not
+    const haloStyle = useMemo(() => {
+        const baseOpacity = isDragging ? 0.5 : 0.25;
+        
+        return {
+            // Ultra-transparent - music shows through
+            background: auraAlpha(AuraPalette.violet[900], baseOpacity),
+            // Whisper borders
+            borderColor: auraAlpha(contextAccent, isDragging ? 0.3 : 0.12),
+            borderWidth: '1px',
+            borderStyle: 'solid',
+            // Subtle ambient glow - presence without dominance
+            boxShadow: `
+                0 0 ${30 + enhancedGlowIntensity * 20}px ${auraAlpha(contextAccent, 0.08)},
+                inset 0 0 30px ${auraAlpha(AuraPalette.violet.DEFAULT, 0.03)}
+            `,
+        };
+    }, [contextAccent, isDragging, enhancedGlowIntensity]);
 
     // Developer-mode ALS debug payload (reads from global ALS + current dock state)
     const alsDebugState = useMemo(() => {
@@ -488,11 +502,18 @@ export const BloomDock: React.FC<BloomDockProps> = (props) => {
             const wasHeld = hasHeldRef.current;
             clearSeekTimers();
             if (!wasHeld) {
-                onTransportJump(direction);
+                // Contextual seek action - behavior changes based on bloomContext
+                const seekBehavior = getSeekBehavior(bloomContext, direction);
+                if (onSeekAction) {
+                    onSeekAction(seekBehavior.action);
+                } else {
+                    // Fallback to standard transport jump if no onSeekAction provided
+                    onTransportJump(direction);
+                }
                 cueTransportPulse(direction === 'back' ? 'rewind' : 'forward');
             }
         },
-        [clearSeekTimers, cueTransportPulse, onTransportJump]
+        [bloomContext, clearSeekTimers, cueTransportPulse, onSeekAction, onTransportJump]
     );
 
     const hasSelection = selectedClips.length > 0;
@@ -505,18 +526,23 @@ export const BloomDock: React.FC<BloomDockProps> = (props) => {
     const canReingest = Boolean(singleSelectedClip?.sourceJobId);
     const canOpenClipEditor = Boolean(singleSelectedClip?.bufferId);
     
-    const actionButton = (icon: React.ReactNode, action: string, payload?: any, tooltip?: string, disabled?: boolean, variant: 'primary' | 'secondary' = 'secondary') => (
-        <button
-            onClick={() => onAction(action, payload, { source: "bloom-dock" })}
-            title={tooltip}
-            disabled={disabled}
-            className={`button-mixx ${variant} w-11 h-11 rounded-full bg-glass-surface-soft flex items-center justify-center text-ink/70 hover:bg-glass-surface hover:text-ink disabled:text-ink/40 disabled:bg-glass-surface disabled:cursor-not-allowed transition-colors shadow-[inset_0_0_18px_rgba(4,12,26,0.4)]`}
-        >
-            {icon}
-        </button>
-    );
+    // AURA-styled action button - ghostly, reveals on hover
+    const actionButton = (icon: React.ReactNode, action: string, payload?: any, tooltip?: string, disabled?: boolean, variant: 'primary' | 'secondary' = 'secondary') => {
+        const isPrimary = variant === 'primary';
+        
+        return (
+            <button
+                onClick={() => onAction(action, payload, { source: "bloom-dock" })}
+                title={tooltip}
+                disabled={disabled}
+                className={`bloom-dock-action-btn ${isPrimary ? 'bloom-dock-action-btn-primary' : ''}`}
+            >
+                {icon}
+            </button>
+        );
+    };
 
-    const clipEditAvailable = canOpenClipEditor || viewMode === 'edit';
+    const clipEditAvailable = canOpenClipEditor;
     const availableViewModes = useMemo(() => ({ edit: clipEditAvailable, sampler: true }), [clipEditAvailable]);
 
     const arrangeWorkflowCluster = (
@@ -554,11 +580,11 @@ export const BloomDock: React.FC<BloomDockProps> = (props) => {
     );
 
     const editingCluster =
-        singleSelectedClip || viewMode === 'edit'
+        singleSelectedClip
             ? (
                 <div className="flex items-center gap-2.5">
                     {actionButton(
-                        <EditSurfaceIcon className={`w-5 h-5 ${viewMode === 'edit' ? 'text-violet-200' : 'text-rose-200'}`} />,
+                        <EditSurfaceIcon className="w-5 h-5 text-rose-200" />,
                         'openClipEditor',
                         { clipId: singleSelectedClip?.id },
                         'Open Clip Edit Surface',
@@ -578,9 +604,7 @@ export const BloomDock: React.FC<BloomDockProps> = (props) => {
     const recordToggle = (label: string, option: 'preRoll' | 'countIn' | 'inputMonitor', Icon: React.ComponentType<{ className?: string }>, active: boolean) => (
         <button
             onClick={() => onToggleRecordingOption(option)}
-            className={`px-3 py-2 rounded-full border text-[0.55rem] uppercase tracking-[0.3em] flex items-center gap-2 transition-colors ${
-                active ? 'border-cyan-300/60 text-cyan-200 bg-[rgba(16,66,94,0.45)]' : 'border-glass-border text-ink/60 bg-glass-surface-soft hover:text-ink'
-            }`}
+            className={`bloom-dock-record-toggle ${active ? 'active' : ''}`}
         >
             <Icon className="w-4 h-4" />
             {label}
@@ -598,9 +622,7 @@ export const BloomDock: React.FC<BloomDockProps> = (props) => {
                         onToggleRecordingOption('hushGate');
                         onAction('toggleHush', undefined, { source: 'bloom-dock' });
                     }}
-                    className={`px-3 py-2 rounded-full border text-[0.55rem] uppercase tracking-[0.3em] flex items-center gap-2 transition-colors ${
-                        isHushActive ? 'border-cyan-300/60 text-cyan-200 bg-[rgba(16,66,94,0.45)]' : 'border-glass-border text-ink/60 bg-glass-surface-soft hover:text-ink'
-                    }`}
+                    className={`bloom-dock-hush-btn ${isHushActive ? 'active' : ''}`}
                 >
                     <HushIcon className="w-4 h-4" />
                     HUSH
@@ -609,7 +631,7 @@ export const BloomDock: React.FC<BloomDockProps> = (props) => {
             <div className="flex items-center gap-2.5">
                 <button
                     onClick={onDropTakeMarker}
-                    className="px-3 py-2 rounded-full border border-white/14 text-[0.55rem] uppercase tracking-[0.3em] text-amber-200 bg-[rgba(80,48,20,0.38)] hover:bg-[rgba(120,78,30,0.48)] transition-colors"
+                    className="bloom-dock-take-btn"
                     title="Drop take marker"
                 >
                     Drop Take
@@ -662,14 +684,14 @@ export const BloomDock: React.FC<BloomDockProps> = (props) => {
 
     // Flow Dock adaptive cluster selection based on intent mode
     const leftSegments: React.ReactNode[] = [];
-    const isArrangeSurface = viewMode === 'arrange' || viewMode === 'piano' || viewMode === 'edit';
+    const isArrangeSurface = viewMode === 'arrange' || viewMode === 'piano';
     
     // Flow Dock mode-based cluster priority
     if (flowMode === 'record' && isAnyTrackArmed) {
         // Record mode: prioritize recording controls
         if (recordCluster) leftSegments.push(recordCluster);
         if (isArrangeSurface) leftSegments.push(arrangeWorkflowCluster);
-    } else if (flowMode === 'edit' && (singleSelectedClip || viewMode === 'edit')) {
+    } else if (flowMode === 'edit' && singleSelectedClip) {
         // Edit mode: prioritize editing tools
         if (editingCluster) leftSegments.push(editingCluster);
         if (isArrangeSurface) leftSegments.push(arrangeWorkflowCluster);
@@ -787,10 +809,12 @@ export const BloomDock: React.FC<BloomDockProps> = (props) => {
             onPlayPointerDown={handlePlayPointerDown}
             onPlayPointerUp={() => clearSeekTimers()}
             onToggleLoop={onToggleLoop}
+            variant="dark"
         />
     );
 
     const loopActive = isLooping || transportPulse === 'loop';
+    // Loop button - whisper when off, gentle glow when on
     const loopButton = (
         <button
             type="button"
@@ -798,21 +822,9 @@ export const BloomDock: React.FC<BloomDockProps> = (props) => {
             aria-label="Toggle loop"
             title="Toggle loop"
             onClick={toggleLoop}
-            className={`relative px-4 py-2 rounded-full border transition-all uppercase tracking-[0.32em] text-[10px] flex items-center gap-2 ${
-                loopActive
-                    ? 'border-cyan-200/70 text-cyan-100 bg-[rgba(12,44,72,0.75)]'
-                    : 'border-glass-border text-ink/70 bg-glass-surface-soft hover:text-ink'
-            }`}
-            style={
-                loopActive
-                    ? {
-                          boxShadow: `0 0 28px ${hexToRgba(pulseAccent, 0.46)}, inset 0 0 18px ${hexToRgba(pulseAccent, 0.3)}`,
-                          borderColor: hexToRgba(pulseAccent, 0.58),
-                      }
-                    : undefined
-            }
+            className={`bloom-dock-loop-btn ${loopActive ? 'active' : ''}`}
         >
-            <LoopIcon className={`w-5 h-5 ${loopActive ? 'text-cyan-100' : 'text-cyan-200/70'}`} />
+            <LoopIcon className="w-4 h-4" />
             Loop
         </button>
     );
@@ -820,7 +832,7 @@ export const BloomDock: React.FC<BloomDockProps> = (props) => {
     return (
         <div
             ref={containerRef}
-            className="arrange-bloom-fixed pointer-events-none select-none"
+            className="bloom-dock-container"
             style={{
                 left: position.x,
                 top: position.y,
@@ -829,16 +841,7 @@ export const BloomDock: React.FC<BloomDockProps> = (props) => {
         >
             {/* Prime Brain Overlay */}
             {primeBrain.showOverlay && (
-                <div
-                    className="absolute -top-12 left-1/2 -translate-x-1/2 px-4 py-2 rounded-full border pointer-events-none backdrop-blur-lg shadow-[0_18px_36px_rgba(4,12,26,0.45)] flex items-center gap-2"
-                    style={{
-                        borderColor: hexToRgba(contextAccent, 0.3),
-                        background: 'rgba(20, 20, 30, 0.85)',
-                        color: 'rgba(255, 255, 255, 0.9)',
-                        fontSize: '11px',
-                        whiteSpace: 'nowrap',
-                    }}
-                >
+                <div className="bloom-dock-brain-overlay" style={{ borderColor: hexToRgba(contextAccent, 0.3) }}>
                     <div className="flex h-5 w-5 items-center justify-center rounded-full bg-white/5">
                         <PrimeBrainIcon className="w-3.5 h-3.5 text-indigo-200" />
                     </div>
@@ -847,15 +850,13 @@ export const BloomDock: React.FC<BloomDockProps> = (props) => {
             )}
             
             {/* Flow Mode Label with ALS Pulse Line */}
-            <div className="relative">
+            <div className="bloom-dock-mode-label-container">
                 <div
-                    className={`absolute -top-6 left-1/2 -translate-x-1/2 px-4 py-1.5 rounded-full border pointer-events-auto backdrop-blur-lg shadow-[0_18px_36px_rgba(4,12,26,0.45)] flex items-center gap-2 ${isDragging ? 'cursor-grabbing' : 'cursor-grab'}`}
+                    className={`bloom-dock-mode-label ${isDragging ? 'cursor-grabbing' : 'cursor-grab'}`}
                     style={{
                         borderColor: hexToRgba(contextAccent, 0.55),
                         background: `linear-gradient(135deg, ${hexToRgba(contextAccent, 0.25)} 0%, rgba(9,15,32,0.85) 100%)`,
                         color: hexToRgba(contextAccent, 0.9),
-                        letterSpacing: '0.42em',
-                        fontSize: '10px',
                     }}
                     onPointerDown={handleDragPointerDown}
                 >
@@ -868,15 +869,15 @@ export const BloomDock: React.FC<BloomDockProps> = (props) => {
                 </div>
                 {/* ALS Pulse Line */}
                 <div
-                    className="absolute -top-6 left-1/2 -translate-x-1/2 h-0.5 rounded-full pointer-events-none transition-all duration-100"
+                    className="bloom-dock-pulse-line"
                     style={{
                         width: `${alsGlow.pulse * 100}%`,
                         background: alsGlow.glowColor,
                         opacity: alsGlow.glowIntensity,
-                        transform: 'translateX(-50%) translateY(100%)',
                     }}
                 />
             </div>
+
             <div
                 className="pointer-events-auto"
                 style={{
@@ -885,13 +886,15 @@ export const BloomDock: React.FC<BloomDockProps> = (props) => {
                 }}
             >
                 <div
-                    className="grid grid-cols-[auto_1fr_auto] items-center gap-4 px-3 py-3 rounded-full border border-glass-border bg-glass-surface backdrop-blur-2xl shadow-[0_28px_80px_rgba(4,12,26,0.55)]"
-                    style={haloStyle}
+                    className="bloom-dock-main-halo"
+                    style={{
+                        ...haloStyle,
+                    }}
                 >
-                    <div className="flex items-center gap-3">
+                    <div className="bloom-dock-segment-group">
                         {leftSegments.map((segment, index) => (
                             <React.Fragment key={`dock-left-${index}`}>
-                                {index > 0 && <div className="w-px h-10 bg-[rgba(102,140,198,0.22)]" />}
+                                {index > 0 && <div className="bloom-dock-segment-divider" />}
                                 {segment}
                             </React.Fragment>
                         ))}
@@ -899,25 +902,26 @@ export const BloomDock: React.FC<BloomDockProps> = (props) => {
                     <div className="flex items-center justify-center">
                         {transportModule}
                     </div>
-                    <div className="flex items-center gap-3">
+                    <div className="bloom-dock-segment-group">
                         <div className="flex items-center gap-2">
                             {loopButton}
                         </div>
-                        <div className="w-px h-10 bg-[rgba(102,140,198,0.22)]" />
-                        <div className="flex items-center gap-2.5 relative">
+                        <div className="bloom-dock-segment-divider" />
+                        <div className="bloom-dock-segment-group relative" style={{ gap: '10px' }}>
                             <ViewToggle
                                 mode={viewMode}
                                 accent={contextAccent}
                                 onSwitch={onViewModeChange}
                                 availableModes={availableViewModes}
                             />
+                            {/* Plugin browser - ghostly, reveals on hover */}
                             <button
                                 onClick={() => setIsPluginBrowserOpen((prev) => !prev)}
-                                className="w-11 h-11 rounded-full bg-glass-surface-soft flex items-center justify-center text-ink/70 hover:bg-glass-surface hover:text-ink transition-colors shadow-[inset_0_0_15px_rgba(4,12,26,0.4)]"
+                                className="bloom-dock-plugin-browser-btn"
                                 aria-label="Open plugin browser"
                                 title="Open plugin browser"
                             >
-                                <BloomModuleIcon className="w-5 h-5" />
+                                <BloomModuleIcon className="w-4 h-4" />
                             </button>
                             {isPluginBrowserOpen && onAddPlugin && (
                                 <PluginBrowser
@@ -937,12 +941,13 @@ export const BloomDock: React.FC<BloomDockProps> = (props) => {
                                     onClose={() => setIsPluginBrowserOpen(false)}
                                 />
                             )}
+                            {/* AI Hub - slightly more visible as the AI portal, but still ethereal */}
                             <button
                                 onClick={onOpenAIHub}
-                                className="w-11 h-11 rounded-full bg-indigo-200/70 flex items-center justify-center text-indigo-700 hover:bg-indigo-300 transition-colors shadow-[0_0_20px_rgba(99,102,241,0.35)]"
+                                className="bloom-dock-ai-hub-btn"
                                 title="Open AI Hub"
                             >
-                                <SparklesIcon className="w-5 h-5" />
+                                <SparklesIcon className="w-4 h-4" />
                             </button>
                         </div>
                     </div>

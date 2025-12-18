@@ -52,7 +52,10 @@ describe('Revolutionary Stem Separation System', () => {
     // Create test classification
     testClassification = {
       type: 'twotrack',
-      confidence: 0.8,
+      confidence: 0.9,
+      spectral: { low: 0, mid: 0, high: 0 },
+      transients: { count: 0, avg: 0, density: 0 },
+      rms: 0
     };
   });
 

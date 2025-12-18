@@ -90,7 +90,7 @@ export async function runFlowStemPipeline(
   // 3) run stem separation
   // Try revolutionary system first, fall back to standard engine if needed
   const optimalMode = determineOptimalMode(classification);
-  let stemResult;
+  let stemResult: FlowImportResult['stems'];
   let quantumFeatures: any = null;
   let musicalContext: any = null;
   
@@ -125,7 +125,7 @@ export async function runFlowStemPipeline(
         useMusicalContext: true,
         useFivePillars: true,
         preferQuality: true,
-      });
+      }) as unknown as Record<string, AudioBuffer | null>;
     } catch (revolutionaryError) {
       // Revolutionary separation failed - AI model fallback will be used (expected)
       
@@ -138,7 +138,7 @@ export async function runFlowStemPipeline(
             model: 'htdemucs_6stems',
           });
           
-          const aiStems = await integration.engine.separateStems(prep.audioBuffer, {
+          const aiStems = await (integration as any).engine.separateStems(prep.audioBuffer, {
             model: 'htdemucs_6stems',
             output_format: 'wav',
             normalize: true,
@@ -159,23 +159,26 @@ export async function runFlowStemPipeline(
           if (stemResult.bass) {
             try {
               const { extractSubBass } = await import('./extractSubBass');
-              stemResult.sub = await extractSubBass(stemResult.bass);
+              const subBuffer = await extractSubBass(stemResult.bass);
+              if (subBuffer) {
+                stemResult.sub = subBuffer;
+              }
             } catch (e) {
               // Sub extraction is optional
             }
           }
         } catch (aiError) {
           // AI model fallback failed - standard engine will be used (expected)
-          stemResult = await stemSplitEngine(prep.audioBuffer, optimalMode, classification);
+          stemResult = await stemSplitEngine(prep.audioBuffer, optimalMode, classification) as unknown as Record<string, AudioBuffer | null>;
         }
       } else {
         // Use standard engine for other file types
-        stemResult = await stemSplitEngine(prep.audioBuffer, optimalMode, classification);
+        stemResult = await stemSplitEngine(prep.audioBuffer, optimalMode, classification) as unknown as Record<string, AudioBuffer | null>;
       }
     }
   } else {
     // Use standard engine for simple file types
-    stemResult = await stemSplitEngine(prep.audioBuffer, optimalMode, classification);
+    stemResult = await stemSplitEngine(prep.audioBuffer, optimalMode, classification) as unknown as Record<string, AudioBuffer | null>;
   }
   
   // Export snapshot for training (if enabled and features available)
@@ -186,7 +189,7 @@ export async function runFlowStemPipeline(
         audioBuffer: prep.audioBuffer,
         quantumFeatures,
         musicalContext: musicalContext || null,
-        stemResult,
+        stemResult: stemResult as any,
         classification,
         processingTime,
       });

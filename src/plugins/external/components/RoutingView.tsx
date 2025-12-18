@@ -110,7 +110,7 @@ export const RoutingView: React.FC<RoutingViewProps> = ({ sidechainLinks, onAddL
           <div key={tierName} className="flex flex-col items-center gap-4">
             <h3 className={`font-orbitron tracking-wider ${tierColorMap[tierName as TierName].replace('border-', 'text-')}`}>{tierName}</h3>
             {Object.keys(plugins).map(pluginKey => {
-              const plugin = plugins[pluginKey as PluginKey];
+              const plugin = (plugins as any)[pluginKey];
               const tier = plugin.tier as TierName;
               const portGlowColor = portColorMap[tier];
               

@@ -11,7 +11,7 @@ import type { TrackData, MixerBusId } from '../../App';
 import { hexToRgba } from '../../utils/ALS';
 import type { TrackALSFeedback } from '../../utils/ALS';
 import { TRACK_COLOR_SWATCH } from '../../utils/ALS';
-import { spacing, typography, layout, effects, transitions, composeStyles } from '../../design-system';
+import './FlowConsoleMatrixView.css';
 
 // Component for pulsing level indicator
 const PulsingLevelIndicator: React.FC<{
@@ -19,24 +19,20 @@ const PulsingLevelIndicator: React.FC<{
   busGlow: string;
   level: number;
 }> = ({ busColor, busGlow, level }) => {
-  const pulseOpacity = usePulseAnimation({
-    duration: 2000,
-    minOpacity: 0.4 + level * 0.4,
-    maxOpacity: 0.5 + level * 0.5,
-    easing: 'ease-in-out',
-  });
+  const pulseOpacity = usePulseAnimation(
+    0.4 + level * 0.4,
+    0.5 + level * 0.5,
+    2000,
+    'ease-in-out'
+  );
   return (
     <div
-      style={composeStyles(
-        layout.position.absolute,
-        { inset: 0 },
-        effects.border.radius.lg,
-        {
-          background: `linear-gradient(135deg, ${hexToRgba(busColor, level * 0.5)}, ${hexToRgba(busGlow, level * 0.3)})`,
-          opacity: pulseOpacity.opacity,
-          boxShadow: `0 0 ${12 * level}px ${hexToRgba(busGlow, level * 0.5)}`,
-        }
-      )}
+      className="flow-matrix-pulse-indicator"
+      style={{
+        background: `linear-gradient(135deg, ${hexToRgba(busColor, level * 0.5)}, ${hexToRgba(busGlow, level * 0.3)})`,
+        opacity: pulseOpacity,
+        boxShadow: `0 0 ${12 * level}px ${hexToRgba(busGlow, level * 0.5)}`,
+      }}
     />
   );
 };
@@ -69,60 +65,27 @@ const MatrixRow: React.FC<{
 
   return (
     <div
-      style={composeStyles(
-        layout.flex.container('row'),
-        layout.flex.align.center,
-        spacing.gap(2),
-        {
-          opacity: rowStyle.opacity,
-          transform: `translateX(${rowStyle.x}px)`,
-        }
-      )}
+      className="flow-matrix-row"
+      style={{
+        opacity: rowStyle.opacity,
+        transform: `translateX(${rowStyle.x}px)`,
+      }}
     >
       {/* Track Name */}
-      <div style={composeStyles(
-        layout.flex.container('row'),
-        layout.flex.align.center,
-        spacing.gap(2),
-        { width: '128px', flexShrink: 0 }
-      )}>
+      <div className="flow-matrix-track-cell">
         <div
-          style={composeStyles(
-            effects.border.radius.full,
-            {
-              width: '4px',
-              height: '32px',
-              background: `linear-gradient(180deg, ${hexToRgba(row.trackColor, 0.8)}, ${hexToRgba(row.trackGlow, 0.6)})`,
-              boxShadow: `0 0 12px ${hexToRgba(row.trackGlow, 0.4 * row.intensity)}`,
-              opacity: 0.6 + row.intensity * 0.4,
-            }
-          )}
+          className="flow-matrix-track-meter"
+          style={{
+            background: `linear-gradient(180deg, ${hexToRgba(row.trackColor, 0.8)}, ${hexToRgba(row.trackGlow, 0.6)})`,
+            boxShadow: `0 0 12px ${hexToRgba(row.trackGlow, 0.4 * row.intensity)}`,
+            opacity: 0.6 + row.intensity * 0.4,
+          }}
         />
-        <div style={composeStyles(
-          layout.flex.container('col'),
-          { flex: 1 }
-        )}>
-          <span style={composeStyles(
-            typography.transform('uppercase'),
-            typography.tracking.widest,
-            {
-              fontSize: '0.5rem',
-              color: 'rgba(230, 240, 255, 0.85)',
-              overflow: 'hidden',
-              textOverflow: 'ellipsis',
-              whiteSpace: 'nowrap',
-            }
-          )}>
+        <div className="flow-matrix-track-info">
+          <span className="flow-matrix-track-name">
             {row.trackName}
           </span>
-          <span style={composeStyles(
-            typography.transform('uppercase'),
-            typography.tracking.widest,
-            {
-              fontSize: '0.42rem',
-              color: 'rgba(230, 240, 255, 0.5)',
-            }
-          )}>
+          <span className="flow-matrix-track-status">
             {row.intensity >= 0.8 ? 'Hot' : row.intensity >= 0.5 ? 'Active' : row.intensity >= 0.2 ? 'Low' : 'Idle'}
           </span>
         </div>
@@ -134,57 +97,13 @@ const MatrixRow: React.FC<{
         const hasSignal = send.level > 0.01;
 
         return (
-          <div
-            key={send.busId}
-            style={composeStyles(
-              { flex: 1 },
-              layout.flex.container('row'),
-              layout.flex.align.center,
-              layout.flex.justify.center
-            )}
-          >
+          <div key={send.busId} className="flow-matrix-send-cell">
             <div
               onClick={(e) => {
                 e.stopPropagation();
                 onSendLevelChange?.(row.trackId, send.busId, send.level > 0.5 ? 0 : 0.75);
               }}
-              style={composeStyles(
-                layout.position.relative,
-                layout.flex.container('row'),
-                layout.flex.align.center,
-                layout.flex.justify.center,
-                layout.width.full,
-                effects.border.radius.lg,
-                transitions.transition.standard('all', 200, 'ease-out'),
-                {
-                  height: '40px',
-                  border: isSelected
-                    ? '1px solid rgba(103, 232, 249, 0.5)'
-                    : '1px solid rgba(102, 140, 198, 0.4)',
-                  background: hasSignal
-                    ? 'rgba(6,14,28,0.6)'
-                    : 'rgba(4,10,20,0.4)',
-                  cursor: 'pointer',
-                }
-              )}
-              onMouseEnter={(e) => {
-                e.currentTarget.style.background = hasSignal
-                  ? 'rgba(8,18,34,0.8)'
-                  : 'rgba(6,14,28,0.6)';
-                e.currentTarget.style.transform = 'scale(1.05)';
-              }}
-              onMouseLeave={(e) => {
-                e.currentTarget.style.background = hasSignal
-                  ? 'rgba(6,14,28,0.6)'
-                  : 'rgba(4,10,20,0.4)';
-                e.currentTarget.style.transform = 'scale(1)';
-              }}
-              onMouseDown={(e) => {
-                e.currentTarget.style.transform = 'scale(0.95)';
-              }}
-              onMouseUp={(e) => {
-                e.currentTarget.style.transform = 'scale(1)';
-              }}
+              className={`flow-matrix-send-knob ${isSelected ? 'flow-matrix-send-knob--selected' : ''} ${hasSignal ? 'flow-matrix-send-knob--active' : ''}`}
             >
               {/* Level Indicator */}
               {hasSignal && (
@@ -197,26 +116,14 @@ const MatrixRow: React.FC<{
 
               {/* Level Bar */}
               {hasSignal && (
-                <div style={composeStyles(
-                  layout.position.relative,
-                  layout.overflow.hidden,
-                  effects.border.radius.full,
-                  {
-                    height: '6px',
-                    width: '75%',
-                    background: 'rgba(0,0,0,0.4)',
-                  }
-                )}>
+                <div className="flow-matrix-level-bar-container">
                   <div
-                    style={composeStyles(
-                      layout.height.full,
-                      effects.border.radius.full,
-                      {
-                        background: `linear-gradient(90deg, ${hexToRgba(send.busColor, 0.9)}, ${hexToRgba(send.busGlow, 0.6)})`,
-                        width: `${send.level * 100}%`,
-                        boxShadow: `0 0 8px ${hexToRgba(send.busGlow, 0.6)}`,
-                      }
-                    )}
+                    className="flow-matrix-level-bar"
+                    style={{
+                      background: `linear-gradient(90deg, ${hexToRgba(send.busColor, 0.9)}, ${hexToRgba(send.busGlow, 0.6)})`,
+                      width: `${send.level * 100}%`,
+                      boxShadow: `0 0 8px ${hexToRgba(send.busGlow, 0.6)}`,
+                    }}
                   />
                 </div>
               )}
@@ -237,30 +144,16 @@ const MatrixRow: React.FC<{
 const PulsingEnergyIndicator: React.FC<{
   busGlow: string;
 }> = ({ busGlow }) => {
-  const pulseScale = usePulseAnimation({
-    duration: 1000,
-    minScale: 1,
-    maxScale: 1.1,
-    easing: 'ease-in-out',
-  });
-  const pulseOpacity = usePulseAnimation({
-    duration: 1000,
-    minOpacity: 0.3,
-    maxOpacity: 0.6,
-    easing: 'ease-in-out',
-  });
+  const pulseScale = usePulseAnimation(1, 1.1, 1000, 'ease-in-out');
+  const pulseOpacity = usePulseAnimation(0.3, 0.6, 1000, 'ease-in-out');
   return (
     <div
-      style={composeStyles(
-        layout.position.absolute,
-        { inset: 0 },
-        effects.border.radius.lg,
-        {
-          background: `radial-gradient(circle at center, ${hexToRgba(busGlow, 0.3)}, transparent)`,
-          transform: `scale(${pulseScale.scale})`,
-          opacity: pulseOpacity.opacity,
-        }
-      )}
+      className="flow-matrix-energy-pulse"
+      style={{
+        background: `radial-gradient(circle at center, ${hexToRgba(busGlow, 0.3)}, transparent)`,
+        transform: `scale(${pulseScale})`,
+        opacity: pulseOpacity,
+      }}
     />
   );
 };
@@ -275,6 +168,11 @@ interface FlowConsoleMatrixViewProps {
   }>;
   trackSendLevels: Record<string, Record<string, number>>;
   trackFeedbackMap: Record<string, TrackALSFeedback>;
+  onMixerChange?: (
+    trackId: string,
+    setting: keyof any,
+    value: number | boolean
+  ) => void;
   onSendLevelChange?: (trackId: string, busId: string, value: number) => void;
   selectedBusId?: MixerBusId | null;
   onSelectBus?: (busId: MixerBusId) => void;
@@ -313,166 +211,48 @@ export const FlowConsoleMatrixView: React.FC<FlowConsoleMatrixViewProps> = ({
   }, [tracks, buses, trackSendLevels, trackFeedbackMap]);
 
   return (
-    <div style={composeStyles(
-      layout.flex.container('col'),
-      { height: '100%' },
-      spacing.gap(4),
-      layout.overflow.auto,
-      spacing.px(6),
-      spacing.py(4)
-    )}>
+    <div className="flow-matrix-container">
       {/* Header */}
-      <div style={composeStyles(
-        layout.flex.container('row'),
-        layout.flex.align.center,
-        layout.flex.justify.between,
-        effects.border.bottom(),
-        spacing.pb(3),
-        {
-          borderBottom: '1px solid rgba(102, 140, 198, 0.6)',
-        }
-      )}>
+      <div className="flow-matrix-header">
         <div>
-          <h3 style={composeStyles(
-            typography.transform('uppercase'),
-            typography.tracking.widest,
-            {
-              fontSize: '0.65rem',
-              color: '#e6f0ff',
-            }
-          )}>
+          <h3 className="flow-matrix-title">
             Routing Matrix
           </h3>
-          <p style={composeStyles(
-            spacing.mt(1),
-            typography.transform('uppercase'),
-            typography.tracking.widest,
-            {
-              fontSize: '0.42rem',
-              color: 'rgba(230, 240, 255, 0.5)',
-            }
-          )}>
+          <p className="flow-matrix-subtitle">
             Track → Bus routing visualization
           </p>
         </div>
-        <div style={composeStyles(
-          layout.flex.container('row'),
-          layout.flex.align.center,
-          spacing.gap(2),
-          typography.transform('uppercase'),
-          typography.tracking.widest,
-          {
-            fontSize: '0.42rem',
-            color: 'rgba(230, 240, 255, 0.55)',
-          }
-        )}>
+        <div className="flow-matrix-active-count">
           <span>Active</span>
-          <span style={composeStyles(
-            spacing.px(2),
-            spacing.py(0.5),
-            effects.border.radius.full,
-            {
-              background: 'rgba(16, 185, 129, 0.3)',
-              color: 'rgba(110, 231, 183, 1)',
-            }
-          )}>
+          <span className="flow-matrix-count-badge">
             {matrixData.filter((row) => row.sends.some((s) => s.level > 0.01)).length}
           </span>
         </div>
       </div>
 
       {/* Matrix Grid */}
-      <div style={composeStyles(
-        { flex: 1 },
-        layout.overflow.auto
-      )}>
-        <div style={composeStyles(
-          { display: 'inline-block' },
-          { minWidth: '100%' }
-        )}>
+      <div className="flow-matrix-grid-wrapper">
+        <div className="flow-matrix-grid-content">
           {/* Column Headers (Buses) */}
-          <div style={composeStyles(
-            layout.position.sticky,
-            { top: 0, zIndex: 10 },
-            spacing.mb(2),
-            layout.flex.container('row'),
-            spacing.gap(2),
-            effects.border.bottom(),
-            spacing.pb(2),
-            {
-              borderBottom: '1px solid rgba(102, 140, 198, 0.4)',
-            }
-          )}>
-            <div style={{ width: '128px', flexShrink: 0 }} /> {/* Track name column */}
+          <div className="flow-matrix-col-headers">
+            <div className="flow-matrix-track-name-col" /> {/* Track name column */}
             {buses.map((bus) => {
               const isSelected = selectedBusId === bus.id;
               return (
                 <button
                   key={bus.id}
                   onClick={() => onSelectBus?.(bus.id)}
-                  style={composeStyles(
-                    { flex: 1 },
-                    layout.flex.container('col'),
-                    layout.flex.align.center,
-                    spacing.gap(1),
-                    spacing.px(3),
-                    spacing.py(2),
-                    effects.border.radius.xl,
-                    transitions.transition.standard('all', 200, 'ease-out'),
-                    {
-                      border: isSelected
-                        ? '1px solid rgba(103, 232, 249, 0.7)'
-                        : '1px solid rgba(102, 140, 198, 0.6)',
-                      background: isSelected
-                        ? 'rgba(16,50,95,0.7)'
-                        : 'rgba(6,14,28,0.5)',
-                      boxShadow: isSelected
-                        ? '0 0 12px rgba(56,189,248,0.3)'
-                        : 'none',
-                      cursor: 'pointer',
-                    }
-                  )}
-                  onMouseEnter={(e) => {
-                    if (!isSelected) {
-                      e.currentTarget.style.borderColor = 'rgba(102, 140, 198, 0.45)';
-                      e.currentTarget.style.transform = 'scale(1.02)';
-                    }
-                  }}
-                  onMouseLeave={(e) => {
-                    if (!isSelected) {
-                      e.currentTarget.style.borderColor = 'rgba(102, 140, 198, 0.6)';
-                      e.currentTarget.style.transform = 'scale(1)';
-                    }
-                  }}
-                  onMouseDown={(e) => {
-                    e.currentTarget.style.transform = 'scale(0.98)';
-                  }}
-                  onMouseUp={(e) => {
-                    e.currentTarget.style.transform = isSelected ? 'scale(1.02)' : 'scale(1)';
-                  }}
+                  className={`flow-matrix-bus-header ${isSelected ? 'flow-matrix-bus-header--selected' : ''}`}
                 >
-                  <span
-                    style={composeStyles(
-                      typography.transform('uppercase'),
-                      typography.tracking.widest,
-                      {
-                        fontSize: '0.5rem',
-                        color: isSelected ? 'rgba(125, 211, 252, 1)' : 'rgba(255, 255, 255, 0.7)',
-                      }
-                    )}
-                  >
+                  <span className="flow-matrix-bus-name">
                     {bus.name}
                   </span>
                   <div
-                    style={composeStyles(
-                      layout.width.full,
-                      effects.border.radius.full,
-                      {
-                        height: '4px',
-                        background: `linear-gradient(90deg, ${hexToRgba(bus.color, 0.6)}, ${hexToRgba(bus.glow, 0.4)})`,
-                        boxShadow: `0 0 8px ${hexToRgba(bus.glow, 0.3)}`,
-                      }
-                    )}
+                    className="flow-matrix-bus-indicator"
+                    style={{
+                      background: `linear-gradient(90deg, ${hexToRgba(bus.color, 0.6)}, ${hexToRgba(bus.glow, 0.4)})`,
+                      boxShadow: `0 0 8px ${hexToRgba(bus.glow, 0.3)}`,
+                    }}
                   />
                 </button>
               );
@@ -480,10 +260,7 @@ export const FlowConsoleMatrixView: React.FC<FlowConsoleMatrixViewProps> = ({
           </div>
 
           {/* Rows (Tracks) */}
-          <div style={composeStyles(
-            layout.flex.container('col'),
-            spacing.gap(2)
-          )}>
+          <div className="flow-matrix-rows">
             {matrixData.map((row, rowIndex) => (
               <MatrixRow 
                 key={row.trackId} 

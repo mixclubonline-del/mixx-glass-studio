@@ -106,7 +106,7 @@ export const MixxGlassDialog: React.FC<MixxGlassDialogProps> = ({
 
   const backdropStyle: React.CSSProperties = composeStyles(
     layout.position.fixed,
-    layout.zIndex[9998],
+    { zIndex: 9998 },
     transitions.transition.opacity(200),
     {
       inset: 0,
@@ -119,7 +119,7 @@ export const MixxGlassDialog: React.FC<MixxGlassDialogProps> = ({
   const dialogStyle: React.CSSProperties = composeStyles(
     glassSurface,
     layout.position.fixed,
-    layout.zIndex[9999],
+    { zIndex: 9999 },
     layout.overflow.auto,
     spacing.p(6),
     effects.border.radius.xl,

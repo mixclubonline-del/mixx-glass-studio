@@ -23,34 +23,7 @@
 
 import { getSmartRolls, recordTakeMemory } from './takeMemory';
 
-declare global {
-  interface Window {
-    __mixx_recordState?: {
-      recording: boolean;
-      armedTrack: boolean;
-      noiseFloor: number;
-      threshold?: number;
-      hush?: boolean;
-    };
-    __mixx_playbackState?: {
-      playing: boolean;
-      looping: boolean;
-      playCount?: number;
-      cursor?: number; // Current playhead position in seconds
-      regionLength?: number; // Loop region length in seconds
-      cursorLock?: boolean; // Cursor locked in tight region
-    };
-    __mixx_punchHistory?: Array<{
-      ts: number; // Timestamp
-      cursor: number; // Cursor position
-      duration?: number; // Punch duration
-      type?: 'fast' | 'slow' | 'end-line' | 'double' | 'bar-locked';
-    }>;
-    __mixx_recordTaps?: Array<{
-      ts: number; // Timestamp of record button tap
-    }>;
-  }
-}
+// Window interface extensions moved to src/types/globals.d.ts
 
 export interface PunchModeState {
   isPunch: boolean;
@@ -88,8 +61,8 @@ export function usePunchMode(): PunchModeState {
     };
   }
 
-  const rec = window.__mixx_recordState || {};
-  const play = window.__mixx_playbackState || {};
+  const rec = window.__mixx_recordState || ({} as any);
+  const play = window.__mixx_playbackState || ({} as any);
   const punches = window.__mixx_punchHistory || [];
   const recordTaps = window.__mixx_recordTaps || [];
   
@@ -160,7 +133,7 @@ export function recordPunchEvent(cursor?: number, duration?: number, type?: Punc
     window.__mixx_punchHistory = [];
   }
   
-  const play = window.__mixx_playbackState || {};
+  const play = window.__mixx_playbackState || ({} as any);
   
   window.__mixx_punchHistory.push({
     ts: performance.now(),

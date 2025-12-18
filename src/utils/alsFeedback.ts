@@ -77,6 +77,9 @@ export function alsLog(level: ALSMessageLevel, message: string, ...args: any[]):
         temperature: 'cold',
         guidance: '',
         pulse: 0,
+        momentum: 0,
+        pressure: 0,
+        harmony: 0,
       };
     }
     
@@ -123,9 +126,4 @@ export function clearALSMessages(): void {
   }
 }
 
-// Extend Window interface
-declare global {
-  interface Window {
-    __alsMessages?: ALSMessage[];
-  }
-}
+// Window interface extensions moved to src/types/globals.d.ts

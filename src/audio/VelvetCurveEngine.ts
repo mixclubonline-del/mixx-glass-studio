@@ -448,6 +448,8 @@ export class VelvetCurveEngine implements IAudioEngine {
 
   getWarmth(): number { return this.state.warmth; }
   setWarmth(value: number): void { this.state.warmth = Math.max(0, Math.min(1, value)); this.updateProcessingParameters(); }
+  getSilk(): number { return this.state.silkEdge; }
+  setSilk(value: number): void { this.setSilkEdge(value); }
   getSilkEdge(): number { return this.state.silkEdge; }
   setSilkEdge(value: number): void { this.state.silkEdge = Math.max(0, Math.min(1, value)); this.updateProcessingParameters(); }
   getEmotion(): number { return this.state.emotion; }

@@ -5,6 +5,16 @@
  * - AIR bus returns to MASTER (FX returns)
  */
 
+import { 
+  MixxSidechainEngine, 
+  DEFAULT_VOCAL_SIDECHAIN, 
+  DEFAULT_KICK_SIDECHAIN 
+} from './MixxSidechainEngine';
+import { 
+  MixxParallelEngine, 
+  DEFAULT_NY_SMASH 
+} from './MixxParallelEngine';
+
 export type MixxBuses = {
   twoTrack: GainNode;
   vocals: GainNode;
@@ -14,6 +24,13 @@ export type MixxBuses = {
   stemMix: GainNode;
   masterTap: GainNode;
   air: GainNode;
+  sidechain?: {
+    music: MixxSidechainEngine;
+    bass: MixxSidechainEngine;
+  };
+  parallel?: {
+    drums: MixxParallelEngine;
+  };
 };
 
 export type MixxBusAnalysers = {
@@ -77,12 +94,37 @@ export function createSignalMatrix(ctx: AudioContext, masterInput: AudioNode) {
   buses.masterTap.gain.value = 1.0;
   buses.air.gain.value = 0.5;
 
-  // Buses → Stem Mix
+  // ═══════════════════════════════════════════════════════════════════════════
+  // SIDECHAIN ORCHESTRATION
+  // ═══════════════════════════════════════════════════════════════════════════
+  
+  // 1. MUSIC DUCKING (Triggered by Vocals)
+  const musicSidechain = new MixxSidechainEngine(ctx, DEFAULT_VOCAL_SIDECHAIN);
+  buses.music.connect(musicSidechain.input);
+  musicSidechain.connectTrigger(buses.vocals);
+  musicSidechain.output.connect(buses.stemMix);
+
+  // 2. BASS DUCKING (Triggered by Drums)
+  const bassSidechain = new MixxSidechainEngine(ctx, DEFAULT_KICK_SIDECHAIN);
+  buses.bass.connect(bassSidechain.input);
+  
+  // High-pass the drum trigger slightly to focus on kick/snare transients
+  const drumTriggerFilter = ctx.createBiquadFilter();
+  drumTriggerFilter.type = 'lowpass';
+  drumTriggerFilter.frequency.value = 150; 
+  buses.drums.connect(drumTriggerFilter);
+  bassSidechain.connectTrigger(drumTriggerFilter);
+  bassSidechain.output.connect(buses.stemMix);
+
+  // 3. PARALLEL SMASH (Drums)
+  const drumSmash = new MixxParallelEngine(ctx, DEFAULT_NY_SMASH);
+  buses.drums.connect(drumSmash.input);
+  drumSmash.output.connect(buses.stemMix);
+
+  // 4. OTHER CONNECTIONS
   buses.twoTrack.connect(buses.stemMix);
   buses.vocals.connect(buses.stemMix);
-  buses.drums.connect(buses.stemMix);
-  buses.bass.connect(buses.stemMix);
-  buses.music.connect(buses.stemMix);
+  // (Note: buses.drums, buses.bass, and buses.music now connect via engines)
 
   // Air (FX returns) → Master tap
   buses.air.connect(buses.masterTap);
@@ -107,7 +149,20 @@ export function createSignalMatrix(ctx: AudioContext, masterInput: AudioNode) {
     return buses.stemMix;
   };
 
-  return { buses, routeTrack, analysers };
+  return { 
+    buses: { 
+      ...buses, 
+      sidechain: {
+        music: musicSidechain,
+        bass: bassSidechain
+      },
+      parallel: {
+        drums: drumSmash
+      }
+    }, 
+    routeTrack, 
+    analysers 
+  };
 }
 
 

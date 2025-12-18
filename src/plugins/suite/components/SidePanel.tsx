@@ -1,6 +1,6 @@
 
 import React from 'react';
-import { useAnimatePresence, AnimatePresence } from '../../../../components/mixxglass';
+import { useAnimatePresence, AnimatePresence } from '../../../components/mixxglass';
 import { SidePanelProps, Preset } from '../types';
 import { XIcon } from './shared/Icons';
 
@@ -92,9 +92,9 @@ export const SidePanel: React.FC<SidePanelProps> = (props) => {
 
     const panelAnimation = useAnimatePresence({
         isVisible: activePanel !== null && activePanel !== 'routing',
-        initial: { x: '-100%', opacity: 0 },
-        animate: { x: '0%', opacity: 1 },
-        exit: { x: '-100%', opacity: 0 },
+        initial: { x: -256, opacity: 0 },
+        animate: { x: 0, opacity: 1 },
+        exit: { x: -256, opacity: 0 },
         transition: { duration: 300, easing: 'ease-out' },
     });
 

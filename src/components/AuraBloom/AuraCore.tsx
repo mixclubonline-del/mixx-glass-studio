@@ -27,15 +27,18 @@ interface AuraCoreProps {
   isActive: boolean;
   /** Click handler */
   onClick: () => void;
+  /** Toggle handler */
+  onToggle?: () => void;
   /** Optional label override */
   label?: string;
 }
 
 export const AuraCore: React.FC<AuraCoreProps> = memo(({
-  size = 'large',
+  size = 'small',
   isOpen,
   isActive,
   onClick,
+  onToggle,
   label = 'AURA',
 }) => {
   const isLarge = size === 'large';

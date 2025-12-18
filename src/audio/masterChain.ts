@@ -61,11 +61,17 @@ export interface VelvetMasterChain {
   postLimiterAnalyser: AnalyserNode;
   panner: StereoPannerNode;
   masterGain: GainNode;
-  meters: MasterMeterStack; // Flow Meter Stack - Multi-band meters (STEP 2)
+  meters: MasterMeterStack;
   setProfile: (profile: MasteringProfile | MasterProfileKey) => void;
   getProfile: () => MasteringProfile;
   setOutputCeiling: (ceilingDb: number) => void;
   setMasterTrim: (gain: number) => void;
+  readonly master: {
+    targetLUFS: number;
+    profile: string;
+    calibrated: boolean;
+    masterVolume: number;
+  };
 }
 
 export async function buildMasterChain(
@@ -241,7 +247,9 @@ export async function buildMasterChain(
 
   setOutputCeiling(profile.truePeakCeiling);
 
-  return {
+  let currentMasterTrim = 0.8; // Default trim
+
+  const chain: VelvetMasterChain = {
     input: dc,
     output: masterGain,
     analyser: postLimiterAnalyser,
@@ -263,12 +271,26 @@ export async function buildMasterChain(
     postLimiterAnalyser,
     panner,
     masterGain,
-    meters: masterMeters, // Flow Meter Stack - Multi-band meters
+    meters: masterMeters,
     setProfile,
     getProfile,
     setOutputCeiling,
-    setMasterTrim,
+    setMasterTrim: (gain: number) => {
+      currentMasterTrim = gain;
+      setMasterTrim(gain);
+    },
+    get master() {
+      const p = currentProfile.value;
+      return {
+        targetLUFS: p.targetLUFS,
+        profile: p.name.toLowerCase().replace(/\s+/g, '-'),
+        calibrated: true,
+        masterVolume: currentMasterTrim,
+      };
+    },
   };
+
+  return chain;
 }
 
 function createGlueCompressor(

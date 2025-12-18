@@ -37,6 +37,7 @@ interface SessionCoreState {
 interface SessionCoreContextValue {
   state: SessionCoreState;
   applyBrainState: (brainState: BehaviorState) => void;
+  preparePunchRegion?: (start: number, end: number) => void;
 }
 
 const SessionCoreContext = createContext<SessionCoreContextValue | null>(null);

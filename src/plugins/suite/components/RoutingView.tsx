@@ -97,7 +97,9 @@ export const RoutingView: React.FC<RoutingViewProps> = ({ sidechainLinks, onAddL
           <div key={tierName} className="flex flex-col items-center gap-4">
             <h3 className={`font-orbitron tracking-wider ${tierColorMap[tierName as TierName].replace('border-', 'text-')}`}>{tierName}</h3>
             {Object.keys(plugins).map(pluginKey => {
-              const plugin = plugins[pluginKey as PluginKey];
+              const plugin = (plugins as any)[pluginKey];
+              const tier = plugin.tier as TierName;
+              
               return (
                 <div key={pluginKey} className={`relative bg-black/50 border ${tierColorMap[tierName as TierName]} rounded-lg w-48 p-4 text-center`}>
                   <span className="text-white/80 font-bold">{plugin.name}</span>

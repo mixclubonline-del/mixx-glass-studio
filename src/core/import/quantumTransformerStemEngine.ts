@@ -67,8 +67,8 @@ class QuantumMultiHeadAttention extends tf.layers.Layer {
   }
 
   build(inputShape: tf.Shape | tf.Shape[]): void {
-    const shape = Array.isArray(inputShape) ? inputShape[0] : inputShape;
-    const lastDim = shape[shape.length - 1] as number;
+    const shape = inputShape as tf.Shape;
+    // const lastDim = shape[shape.length - 1] as number;
 
     // Query, Key, Value projection layers
     this.wq = tf.layers.dense({
@@ -212,7 +212,7 @@ class TransformerEncoderBlock extends tf.layers.Layer {
   }
 
   build(inputShape: tf.Shape | tf.Shape[]): void {
-    const shape = Array.isArray(inputShape) ? inputShape[0] : inputShape;
+    const shape = inputShape as tf.Shape;
     this.attention.build(shape);
     this.ff.build(shape);
     this.norm1.build(shape);
@@ -348,7 +348,8 @@ export class QuantumTransformerStemModel {
   ): Promise<SeparatedStems> {
     await this.ensureInitialized();
 
-    return tf.tidy(() => {
+    // Run tensor operations within tidy to clean up intermediate tensors
+    tf.tidy(() => {
       // Convert quantum features to tensor
       // For now, use a simplified approach - real implementation would process
       // the full quantum superposition tensor
@@ -365,40 +366,29 @@ export class QuantumTransformerStemModel {
       // Reshape to sequence format: [batch, sequence, features]
       const sequenceLength = Math.min(paddedFeatures.length / this.featureDim, this.config.maxSequenceLength);
       const sequenceTensor = tf.reshape(
-        tf.tensor2d([paddedFeatures]),
+        tf.tensor2d(paddedFeatures, [1, paddedFeatures.length]),
         [1, sequenceLength, this.featureDim]
       );
-
-      // Predict stems
-      if (!this.model) {
-        throw new Error("Model not initialized");
-      }
-
-      const predictions = this.model.predict(sequenceTensor) as tf.Tensor[];
       
-      // Convert predictions back to audio buffers
-      // This is simplified - real implementation would properly reconstruct audio
-      const stems: SeparatedStems = {
-        vocals: null,
-        drums: null,
-        bass: null,
-        harmonic: null,
-        perc: null,
-        sub: null,
-      };
-
-      // For now, return null stems - full audio reconstruction would be implemented here
-      // This architecture is the foundation for training a real model
+      // Run model prediction (placeholder for now)
+      // const output = this.model.predict(sequenceTensor) as tf.Tensor;
       
-      predictions.forEach((pred, index) => {
-        pred.dispose();
-      });
-
-      sequenceTensor.dispose();
-
-      return stems;
+      return sequenceTensor;
     });
+
+    // Return null stems - full audio reconstruction would be implemented here
+    const stems: SeparatedStems = {
+      vocals: null,
+      drums: null,
+      bass: null,
+      harmonic: null,
+      perc: null,
+      sub: null,
+    };
+    
+    return stems;
   }
+
 
   /**
    * Train the model (for Prime Fabric training pipeline)
@@ -468,7 +458,13 @@ export class QuantumTransformerStemModel {
 
     // Export model weights
     const weights = await this.model.save(tf.io.withSaveHandler(async (artifacts) => {
-      return artifacts;
+      return {
+        modelArtifacts: artifacts,
+        modelArtifactsInfo: {
+          dateSaved: new Date(),
+          modelTopologyType: 'JSON',
+        }
+      };
     }));
 
     // Convert to ArrayBuffer (simplified)

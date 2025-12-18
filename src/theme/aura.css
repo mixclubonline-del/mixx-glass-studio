@@ -1,0 +1,35 @@
+
+:root {
+  /* ═══════════════════════════════════════════════════════════════════════════
+   *                        AURA IDENTITY PALETTE
+   * ═══════════════════════════════════════════════════════════════════════════ */
+
+  /* Core Palette */
+  --aura-violet: #8B5CF6;
+  --aura-cyan: #22D3EE;
+  --aura-magenta: #EC4899;
+  --aura-amber: #F59E0B;
+  --aura-indigo: #6366F1;
+  
+  /* Violet Scale */
+  --aura-violet-50: #F5F3FF;
+  --aura-violet-100: #EDE9FE;
+  --aura-violet-200: #DDD6FE;
+  --aura-violet-300: #C4B5FD;
+  --aura-violet-400: #A78BFA;
+  --aura-violet-500: #8B5CF6;
+  --aura-violet-600: #7C3AED;
+  --aura-violet-700: #6D28D9;
+  --aura-violet-800: #5B21B6;
+  --aura-violet-900: #4C1D95;
+  
+  /* Backgrounds */
+  --aura-space: #0A0A0F;
+  --aura-night: #0F0F1A;
+  --aura-twilight: #1A1033;
+  --aura-void: #050508;
+  
+  /* Typography */
+  --aura-font-sans: Inter, system-ui, -apple-system, sans-serif;
+  --aura-font-mono: JetBrains Mono, Consolas, monospace;
+}

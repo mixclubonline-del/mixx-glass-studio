@@ -5,15 +5,7 @@
  * Creates breathing, reactive glow that responds to Flow's energy.
  */
 
-declare global {
-  interface Window {
-    __als?: {
-      pulse?: number;
-      temperature?: string;
-      flow?: number;
-    };
-  }
-}
+// Window interface extensions moved to src/types/globals.d.ts
 
 export interface ALSGlowState {
   pulse: number; // 0-1
@@ -66,7 +58,7 @@ export function computeGlowIntensity(pulse: number, temperature: string): number
  * Get current ALS glow state
  */
 export function getALSGlowState(): ALSGlowState {
-  const als = window.__als || {};
+  const als = (window.__als || {}) as any;
   const pulse = (als.pulse || 0) / 100; // Normalize to 0-1
   const temperature = als.temperature || "cold";
   

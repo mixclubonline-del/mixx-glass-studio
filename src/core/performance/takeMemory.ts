@@ -18,40 +18,7 @@
  * This is what allows the Studio to catch your rhythm and keep you locked in.
  */
 
-declare global {
-  interface Window {
-    __mixx_playbackState?: {
-      playing: boolean;
-      looping: boolean;
-      playCount?: number;
-      cursor?: number;
-      regionStart?: number;
-      regionEnd?: number;
-      bar?: number;
-    };
-    __mixx_recordState?: {
-      recording: boolean;
-      armedTrack: boolean;
-      noiseFloor: number;
-      threshold?: number;
-      hush?: boolean;
-      recordStart?: number;
-      lastBreathMs?: number;
-    };
-    __mixx_punchHistory?: Array<{
-      ts: number;
-      cursor: number;
-      duration?: number;
-      type?: string;
-    }>;
-    __mixx_takeMemory?: Array<TakeMemory>;
-    __primeBrainInstance?: {
-      state?: {
-        flow?: number;
-      };
-    };
-  }
-}
+// Window interface extensions moved to src/types/globals.d.ts
 
 export interface TakeMemory {
   startTime: number; // Timestamp when recording started
@@ -75,8 +42,8 @@ export interface TakeMemory {
 export function recordTakeMemory(): TakeMemory | null {
   if (typeof window === 'undefined') return null;
   
-  const playback = window.__mixx_playbackState || {};
-  const rec = window.__mixx_recordState || {};
+  const playback = window.__mixx_playbackState || { playing: false, looping: false, cursor: 0, regionStart: 0, regionEnd: 0, bar: 0 };
+  const rec = window.__mixx_recordState || { recording: false, armedTrack: false, noiseFloor: 0, recordStart: 0, lastBreathMs: 0 };
   
   if (!window.__mixx_takeMemory) {
     window.__mixx_takeMemory = [];

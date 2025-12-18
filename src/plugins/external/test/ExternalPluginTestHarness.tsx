@@ -10,9 +10,7 @@
  */
 
 import React, { useState, useEffect, useRef, useCallback } from 'react';
-import { findPlugin, PLUGIN_TIERS } from '../constants';
 import type { 
-  PluginKey, 
   SessionContext, 
   AudioSignal,
   GlobalSettings,
@@ -20,6 +18,7 @@ import type {
   PluginStates,
   SpecificPluginSettingsMap
 } from '../types';
+import { findPlugin, PLUGIN_TIERS, type PluginKey } from '../constants';
 import { syncStateToEngine } from '../adapters/audioEngineAdapter';
 import type { IAudioEngine } from '../../../types/audio-graph';
 import { PlaceholderAudioEngine } from '../../../audio/plugins';
@@ -61,11 +60,11 @@ export const ExternalPluginTestHarness: React.FC<ExternalPluginTestHarnessProps>
   const [selectedPlugin, setSelectedPlugin] = useState<PluginKey>('MixxAura');
   const [sessionContext, setSessionContext] = useState<SessionContext>({ mood: 'Neutral' });
   const [pluginStates, setPluginStates] = useState<PluginStates>(() => {
-    const states = {} as PluginStates;
+    const states = {} as any;
     Object.keys(PLUGIN_COMPONENTS).forEach((key) => {
-      states[key as PluginKey] = getInitialPluginState(key as PluginKey);
+      states[key] = getInitialPluginState(key as PluginKey);
     });
-    return states;
+    return states as PluginStates;
   });
   const [audioSignal, setAudioSignal] = useState<AudioSignal>(createSimulatedAudioSignal());
   const [globalSettings, setGlobalSettings] = useState<GlobalSettings>({
@@ -73,6 +72,13 @@ export const ExternalPluginTestHarness: React.FC<ExternalPluginTestHarnessProps>
     animationIntensity: 75,
     visualizerComplexity: 'high',
   });
+  
+  // Performance mode state simulation
+  const [isRecording, setIsRecording] = useState(false);
+  const [isArmed, setIsArmed] = useState(false);
+  const [isPlaying, setIsPlaying] = useState(false);
+  const [playbackPosition, setPlaybackPosition] = useState(0);
+  const [bpm, setBpm] = useState(120);
   
   const engineRef = useRef<IAudioEngine | null>(null);
   const animationFrameRef = useRef<number | null>(null);
@@ -122,14 +128,28 @@ export const ExternalPluginTestHarness: React.FC<ExternalPluginTestHarnessProps>
     }
   }, [currentPluginState, engineFactory, pluginId]);
 
-  // Simulate audio signal updates
+  // Simulate audio signal updates and monitor external performance state
   useEffect(() => {
-    const updateAudioSignal = () => {
+    const updateMonitor = () => {
+      // Simulate audio signal
       setAudioSignal(createSimulatedAudioSignal());
-      animationFrameRef.current = requestAnimationFrame(updateAudioSignal);
+
+      // Monitor external performance state from global window object
+      // Monitor external performance state from global window object
+      const recordState = window.__mixx_recordState || { recording: false, armedTrack: false, noiseFloor: 0 };
+      const playbackState = window.__mixx_playbackState || { playing: false, looping: false };
+      
+      setIsRecording(recordState.recording);
+      setIsArmed(recordState.armedTrack);
+      setIsPlaying(playbackState.playing);
+      // Fallback values for position/bpm if not in global state
+      setPlaybackPosition((playbackState as any).position || 0);
+      setBpm((playbackState as any).bpm || 120);
+
+      animationFrameRef.current = requestAnimationFrame(updateMonitor);
     };
     
-    animationFrameRef.current = requestAnimationFrame(updateAudioSignal);
+    animationFrameRef.current = requestAnimationFrame(updateMonitor);
     
     return () => {
       if (animationFrameRef.current) {
@@ -138,22 +158,22 @@ export const ExternalPluginTestHarness: React.FC<ExternalPluginTestHarnessProps>
     };
   }, []);
 
-  const handlePluginStateChange = useCallback(<K extends PluginKey>(
-    newState: Partial<SpecificPluginSettingsMap[K]> | ((prev: SpecificPluginSettingsMap[K]) => Partial<SpecificPluginSettingsMap[K]>)
+  const handlePluginStateChange = useCallback((
+    newState: any // Use any for dynamic mapping in test harness
   ) => {
     setPluginStates(prev => {
-      const currentState = prev[selectedPlugin];
+      const currentState = (prev as any)[selectedPlugin];
       const updated = typeof newState === 'function' 
-        ? (newState as (prev: SpecificPluginSettingsMap[K]) => Partial<SpecificPluginSettingsMap[K]>)(currentState)
+        ? (newState as any)(currentState)
         : newState;
       
       return {
         ...prev,
         [selectedPlugin]: {
-          ...currentState,
-          ...updated,
-        } as SpecificPluginSettingsMap[K],
-      };
+          ...(currentState as any),
+          ...(updated as any),
+        },
+      } as PluginStates;
     });
   }, [selectedPlugin]);
 
@@ -197,6 +217,7 @@ export const ExternalPluginTestHarness: React.FC<ExternalPluginTestHarnessProps>
               <div className="flex items-center gap-2">
                 <label className="text-white/80 text-sm">Plugin:</label>
                 <select
+                  aria-label="Select Plugin"
                   value={selectedPlugin}
                   onChange={(e) => setSelectedPlugin(e.target.value as PluginKey)}
                   className="px-3 py-1 bg-white/10 hover:bg-white/20 rounded text-white text-sm border border-white/20"
@@ -225,18 +246,21 @@ export const ExternalPluginTestHarness: React.FC<ExternalPluginTestHarnessProps>
           </div>
           <div className="flex gap-2">
             <button
-              onClick={() => setGlobalSettings(prev => ({ ...prev, animationIntensity: Math.min(100, prev.animationIntensity + 10) }))}
+              aria-label="Increase Animation"
+              onClick={() => setGlobalSettings((prev: GlobalSettings) => ({ ...prev, animationIntensity: Math.min(100, prev.animationIntensity + 10) }))}
               className="px-3 py-1 bg-white/10 hover:bg-white/20 rounded text-white text-sm"
             >
               + Animation
             </button>
             <button
-              onClick={() => setGlobalSettings(prev => ({ ...prev, animationIntensity: Math.max(0, prev.animationIntensity - 10) }))}
+              aria-label="Decrease Animation"
+              onClick={() => setGlobalSettings((prev: GlobalSettings) => ({ ...prev, animationIntensity: Math.max(0, prev.animationIntensity - 10) }))}
               className="px-3 py-1 bg-white/10 hover:bg-white/20 rounded text-white text-sm"
             >
               - Animation
             </button>
             <select
+              aria-label="Select Mood"
               value={sessionContext.mood}
               onChange={(e) => setSessionContext({ mood: e.target.value as SessionContext['mood'] })}
               className="px-3 py-1 bg-white/10 hover:bg-white/20 rounded text-white text-sm border border-white/20"
@@ -258,7 +282,6 @@ export const ExternalPluginTestHarness: React.FC<ExternalPluginTestHarnessProps>
           </div>
         </div>
 
-        {/* Plugin Component */}
         <div className="absolute inset-0 top-24 bottom-20">
           <PluginComponent {...pluginProps} />
         </div>

@@ -4,10 +4,14 @@ import { TrackALSFeedback } from "../utils/ALS";
 type FlowChannel = "als" | "bloom" | "ingest";
 
 export interface AlsSignalPayload {
-  source: "mixer" | "arrange" | "prime-brain" | "ingest" | "sampler" | "system";
+  source: "mixer" | "arrange" | "prime-brain" | "ingest" | "sampler" | "system" | "recording-option" | "recording" | "translation-matrix";
   tracks?: Record<string, TrackALSFeedback>;
   master?: TrackALSFeedback | null;
   meta?: Record<string, unknown>;
+  option?: string;
+  active?: boolean;
+  marker?: { timestamp: string; report: any };
+  profile?: string;
 }
 
 export interface BloomSignalPayload {

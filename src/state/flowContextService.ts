@@ -93,7 +93,7 @@ const deriveActivityLevel = (
 ): "idle" | "active" | "intense" => {
   if (!sessionContext) return "idle";
   if (sessionContext.isPlaying && momentum > 0.6) return "intense";
-  if (sessionContext.isPlaying || sessionContext.hasSelection || sessionContext.selectedClips.length > 0) {
+  if (sessionContext.isPlaying || sessionContext.selection !== null || sessionContext.selectedClips.length > 0) {
     return "active";
   }
   return "idle";

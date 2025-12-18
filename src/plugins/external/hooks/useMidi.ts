@@ -16,7 +16,7 @@ export const useMidi = () => {
     if (midiAccess) {
       const availableInputs: MidiInput[] = [];
       midiAccess.inputs.forEach(input => {
-        availableInputs.push({ id: input.id, name: input.name });
+        availableInputs.push({ id: input.id, name: input.name ?? undefined });
       });
       setInputs(availableInputs);
       // If the selected device is disconnected, reset selection

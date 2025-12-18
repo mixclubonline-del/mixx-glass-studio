@@ -224,12 +224,9 @@ export const AuraBloom: React.FC<AuraBloomProps> = ({
           label="AURA"
           isOpen={isOpen}
           onToggle={handleToggle}
-          position={position}
-          onPositionChange={onPositionChange}
-          draggable={mode === 'floating'}
-          size={mode === 'welcome' ? 'large' : 'normal'}
-          bloomCharge={bloomCharge}
-          temperature={temperature}
+          onClick={handleToggle}
+          isActive={false}
+          size={mode === 'welcome' ? 'large' : 'small'}
         />
       </div>
     </div>

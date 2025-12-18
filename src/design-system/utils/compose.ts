@@ -12,10 +12,12 @@ import type { CSSProperties } from 'react';
  * Later styles override earlier ones
  */
 export function composeStyles(...styles: (CSSProperties | undefined | null | false)[]): CSSProperties {
-  return styles.reduce((acc, style) => {
-    if (!style) return acc;
-    return { ...acc, ...style };
-  }, {} as CSSProperties);
+  return styles.reduce<CSSProperties>((acc, style) => {
+    if (style && typeof style === 'object') {
+      return { ...acc, ...style };
+    }
+    return acc;
+  }, {});
 }
 
 /**
@@ -81,5 +83,3 @@ export function createStyleBuilder(): StyleBuilder {
  * Shorthand for composing styles
  */
 export const style = composeStyles;
-
-

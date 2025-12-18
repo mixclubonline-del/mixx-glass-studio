@@ -450,7 +450,7 @@ export const FlowConsoleAnalyzerView: React.FC<FlowConsoleAnalyzerViewProps> = (
                     key={i}
                     style={composeStyles(
                       { flex: 1 },
-                      effects.border.radius.top(),
+                      effects.border.radius.custom('4px 4px 0 0'),
                       {
                         height: `${height * 100}%`,
                         background: `linear-gradient(180deg, hsl(${hue}, 70%, 55%), hsl(${hue}, 90%, 70%))`,
@@ -469,14 +469,16 @@ export const FlowConsoleAnalyzerView: React.FC<FlowConsoleAnalyzerViewProps> = (
   );
 
   return (
-    <div style={composeStyles(
-      layout.flex.container('col'),
-      { height: '100%' },
-      spacing.gap(4),
-      spacing.px(6),
-      spacing.py(4),
-      ...(className ? { className } : {}),
-    )}>
+    <div 
+      className={className}
+      style={composeStyles(
+        layout.flex.container('col'),
+        { height: '100%' },
+        spacing.gap(4),
+        spacing.px(6),
+        spacing.py(4),
+      )}
+    >
       {analyzerType === 'spectrum' && renderSpectrum()}
       {analyzerType === 'correlation' && renderCorrelation()}
       {analyzerType === 'lufs' && renderLUFS()}
@@ -501,17 +503,12 @@ const PulsingLUFSIndicator: React.FC<{
   value: number;
   label: string;
 }> = ({ value, label }) => {
-  const pulseGlow = usePulseAnimation({
-    duration: 2000,
-    minOpacity: 0.3,
-    maxOpacity: 0.5,
-    easing: 'ease-in-out',
-  });
+  const pulseGlow = usePulseAnimation(0.3, 0.5, 2000, 'ease-in-out');
   const color = value > -16 ? 'red' : value > -18 ? 'yellow' : 'green';
   const colorValue = color === 'red' ? '#ef4444' : color === 'yellow' ? '#eab308' : '#10b981';
   
   const boxShadow = value > -16
-    ? `0 0 ${8 + pulseGlow.opacity * 8}px rgba(239,68,68, ${0.3 + pulseGlow.opacity * 0.2})`
+    ? `0 0 ${8 + pulseGlow * 8}px rgba(239,68,68, ${0.3 + pulseGlow * 0.2})`
     : undefined;
 
   return (

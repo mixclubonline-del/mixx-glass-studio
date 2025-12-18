@@ -1,8 +1,4 @@
-/**
- * MixxGlass Layout System
- * 
- * Proprietary layout utilities replacing Tailwind layout classes
- */
+import React from 'react';
 
 export type Display = 'block' | 'inline-block' | 'inline' | 'flex' | 'inline-flex' | 'grid' | 'inline-grid' | 'none';
 export type FlexDirection = 'row' | 'row-reverse' | 'col' | 'col-reverse';
@@ -15,7 +11,7 @@ export type Position = 'static' | 'relative' | 'absolute' | 'fixed' | 'sticky';
 /**
  * Display utilities
  */
-export const display = {
+export const display: Record<Display, React.CSSProperties> = {
   block: { display: 'block' },
   'inline-block': { display: 'inline-block' },
   inline: { display: 'inline' },
@@ -34,87 +30,93 @@ export const flex = {
    * Flex direction
    */
   direction: {
-    row: { flexDirection: 'row' },
-    'row-reverse': { flexDirection: 'row-reverse' },
-    col: { flexDirection: 'column' },
-    'col-reverse': { flexDirection: 'column-reverse' },
+    row: { flexDirection: 'row' } as React.CSSProperties,
+    'row-reverse': { flexDirection: 'row-reverse' } as React.CSSProperties,
+    col: { flexDirection: 'column' } as React.CSSProperties,
+    'col-reverse': { flexDirection: 'column-reverse' } as React.CSSProperties,
   },
   
   /**
    * Flex wrap
    */
   wrap: {
-    nowrap: { flexWrap: 'nowrap' },
-    wrap: { flexWrap: 'wrap' },
-    'wrap-reverse': { flexWrap: 'wrap-reverse' },
+    nowrap: { flexWrap: 'nowrap' } as React.CSSProperties,
+    wrap: { flexWrap: 'wrap' } as React.CSSProperties,
+    'wrap-reverse': { flexWrap: 'wrap-reverse' } as React.CSSProperties,
   },
   
   /**
    * Justify content
    */
   justify: {
-    start: { justifyContent: 'flex-start' },
-    end: { justifyContent: 'flex-end' },
-    center: { justifyContent: 'center' },
-    between: { justifyContent: 'space-between' },
-    around: { justifyContent: 'space-around' },
-    evenly: { justifyContent: 'space-evenly' },
+    start: { justifyContent: 'flex-start' } as React.CSSProperties,
+    end: { justifyContent: 'flex-end' } as React.CSSProperties,
+    center: { justifyContent: 'center' } as React.CSSProperties,
+    between: { justifyContent: 'space-between' } as React.CSSProperties,
+    around: { justifyContent: 'space-around' } as React.CSSProperties,
+    evenly: { justifyContent: 'space-evenly' } as React.CSSProperties,
   },
   
   /**
    * Align items
    */
   align: {
-    start: { alignItems: 'flex-start' },
-    end: { alignItems: 'flex-end' },
-    center: { alignItems: 'center' },
-    baseline: { alignItems: 'baseline' },
-    stretch: { alignItems: 'stretch' },
+    start: { alignItems: 'flex-start' } as React.CSSProperties,
+    end: { alignItems: 'flex-end' } as React.CSSProperties,
+    center: { alignItems: 'center' } as React.CSSProperties,
+    baseline: { alignItems: 'baseline' } as React.CSSProperties,
+    stretch: { alignItems: 'stretch' } as React.CSSProperties,
   },
   
   /**
    * Align content
    */
   content: {
-    start: { alignContent: 'flex-start' },
-    end: { alignContent: 'flex-end' },
-    center: { alignContent: 'center' },
-    between: { alignContent: 'space-between' },
-    around: { alignContent: 'space-around' },
-    evenly: { alignContent: 'space-evenly' },
-    stretch: { alignContent: 'stretch' },
+    start: { alignContent: 'flex-start' } as React.CSSProperties,
+    end: { alignContent: 'flex-end' } as React.CSSProperties,
+    center: { alignContent: 'center' } as React.CSSProperties,
+    between: { alignContent: 'space-between' } as React.CSSProperties,
+    around: { alignContent: 'space-around' } as React.CSSProperties,
+    evenly: { alignContent: 'space-evenly' } as React.CSSProperties,
+    stretch: { alignContent: 'stretch' } as React.CSSProperties,
   },
   
   /**
    * Flex grow
    */
-  grow: (value: number = 1) => ({
+  grow: (value: number = 1): React.CSSProperties => ({
     flexGrow: value,
   }),
   
   /**
    * Flex shrink
    */
-  shrink: (value: number = 1) => ({
+  shrink: (value: number = 1): React.CSSProperties => ({
     flexShrink: value,
   }),
   
   /**
    * Flex basis
    */
-  basis: (value: string | number) => ({
+  basis: (value: string | number): React.CSSProperties => ({
     flexBasis: typeof value === 'number' ? `${value}px` : value,
   }),
   
   /**
    * Preset flex container
    */
-  container: (direction: FlexDirection = 'row') => ({
-    display: 'flex',
-    flexDirection: direction === 'row' || direction === 'row-reverse' ? 'row' : 'column',
-    ...(direction === 'row-reverse' && { flexDirection: 'row-reverse' }),
-    ...(direction === 'col-reverse' && { flexDirection: 'column-reverse' }),
-  }),
+  container: (direction: FlexDirection = 'row'): React.CSSProperties => {
+    const styles: React.CSSProperties = {
+      display: 'flex',
+    };
+    
+    if (direction === 'row') styles.flexDirection = 'row';
+    else if (direction === 'row-reverse') styles.flexDirection = 'row-reverse';
+    else if (direction === 'col') styles.flexDirection = 'column';
+    else if (direction === 'col-reverse') styles.flexDirection = 'column-reverse';
+    
+    return styles;
+  },
 };
 
 /**
@@ -124,35 +126,35 @@ export const grid = {
   /**
    * Grid template columns
    */
-  cols: (count: number | string) => ({
+  cols: (count: number | string): React.CSSProperties => ({
     gridTemplateColumns: typeof count === 'number' ? `repeat(${count}, minmax(0, 1fr))` : count,
   }),
   
   /**
    * Grid template rows
    */
-  rows: (count: number | string) => ({
+  rows: (count: number | string): React.CSSProperties => ({
     gridTemplateRows: typeof count === 'number' ? `repeat(${count}, minmax(0, 1fr))` : count,
   }),
   
   /**
    * Grid column span
    */
-  colSpan: (span: number | string) => ({
+  colSpan: (span: number | string): React.CSSProperties => ({
     gridColumn: typeof span === 'number' ? `span ${span} / span ${span}` : span,
   }),
   
   /**
    * Grid row span
    */
-  rowSpan: (span: number | string) => ({
+  rowSpan: (span: number | string): React.CSSProperties => ({
     gridRow: typeof span === 'number' ? `span ${span} / span ${span}` : span,
   }),
   
   /**
    * Preset grid container
    */
-  container: (cols?: number | string, rows?: number | string) => ({
+  container: (cols?: number | string, rows?: number | string): React.CSSProperties => ({
     display: 'grid',
     ...(cols && grid.cols(cols)),
     ...(rows && grid.rows(rows)),
@@ -162,7 +164,7 @@ export const grid = {
 /**
  * Position utilities
  */
-export const position = {
+export const position: Record<Position, React.CSSProperties> = {
   static: { position: 'static' },
   relative: { position: 'relative' },
   absolute: { position: 'absolute' },
@@ -174,27 +176,27 @@ export const position = {
  * Z-index utilities
  */
 export const zIndex = {
-  auto: { zIndex: 'auto' },
-  0: { zIndex: 0 },
-  10: { zIndex: 10 },
-  20: { zIndex: 20 },
-  30: { zIndex: 30 },
-  40: { zIndex: 40 },
-  50: { zIndex: 50 },
-  max: { zIndex: 2147483647 },
+  auto: { zIndex: 'auto' } as React.CSSProperties,
+  0: { zIndex: 0 } as React.CSSProperties,
+  10: { zIndex: 10 } as React.CSSProperties,
+  20: { zIndex: 20 } as React.CSSProperties,
+  30: { zIndex: 30 } as React.CSSProperties,
+  40: { zIndex: 40 } as React.CSSProperties,
+  50: { zIndex: 50 } as React.CSSProperties,
+  max: { zIndex: 2147483647 } as React.CSSProperties,
 };
 
 /**
  * Width utilities
  */
 export const width = {
-  auto: { width: 'auto' },
-  full: { width: '100%' },
-  screen: { width: '100vw' },
-  min: { width: 'min-content' },
-  max: { width: 'max-content' },
-  fit: { width: 'fit-content' },
-  custom: (value: string | number) => ({
+  auto: { width: 'auto' } as React.CSSProperties,
+  full: { width: '100%' } as React.CSSProperties,
+  screen: { width: '100vw' } as React.CSSProperties,
+  min: { width: 'min-content' } as React.CSSProperties,
+  max: { width: 'max-content' } as React.CSSProperties,
+  fit: { width: 'fit-content' } as React.CSSProperties,
+  custom: (value: string | number): React.CSSProperties => ({
     width: typeof value === 'number' ? `${value}px` : value,
   }),
 };
@@ -203,13 +205,13 @@ export const width = {
  * Height utilities
  */
 export const height = {
-  auto: { height: 'auto' },
-  full: { height: '100%' },
-  screen: { height: '100vh' },
-  min: { height: 'min-content' },
-  max: { height: 'max-content' },
-  fit: { height: 'fit-content' },
-  custom: (value: string | number) => ({
+  auto: { height: 'auto' } as React.CSSProperties,
+  full: { height: '100%' } as React.CSSProperties,
+  screen: { height: '100vh' } as React.CSSProperties,
+  min: { height: 'min-content' } as React.CSSProperties,
+  max: { height: 'max-content' } as React.CSSProperties,
+  fit: { height: 'fit-content' } as React.CSSProperties,
+  custom: (value: string | number): React.CSSProperties => ({
     height: typeof value === 'number' ? `${value}px` : value,
   }),
 };
@@ -218,21 +220,21 @@ export const height = {
  * Overflow utilities
  */
 export const overflow = {
-  auto: { overflow: 'auto' },
-  hidden: { overflow: 'hidden' },
-  visible: { overflow: 'visible' },
-  scroll: { overflow: 'scroll' },
+  auto: { overflow: 'auto' } as React.CSSProperties,
+  hidden: { overflow: 'hidden' } as React.CSSProperties,
+  visible: { overflow: 'visible' } as React.CSSProperties,
+  scroll: { overflow: 'scroll' } as React.CSSProperties,
   x: {
-    auto: { overflowX: 'auto' },
-    hidden: { overflowX: 'hidden' },
-    visible: { overflowX: 'visible' },
-    scroll: { overflowX: 'scroll' },
+    auto: { overflowX: 'auto' } as React.CSSProperties,
+    hidden: { overflowX: 'hidden' } as React.CSSProperties,
+    visible: { overflowX: 'visible' } as React.CSSProperties,
+    scroll: { overflowX: 'scroll' } as React.CSSProperties,
   },
   y: {
-    auto: { overflowY: 'auto' },
-    hidden: { overflowY: 'hidden' },
-    visible: { overflowY: 'visible' },
-    scroll: { overflowY: 'scroll' },
+    auto: { overflowY: 'auto' } as React.CSSProperties,
+    hidden: { overflowY: 'hidden' } as React.CSSProperties,
+    visible: { overflowY: 'visible' } as React.CSSProperties,
+    scroll: { overflowY: 'scroll' } as React.CSSProperties,
   },
 };
 

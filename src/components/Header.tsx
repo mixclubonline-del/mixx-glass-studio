@@ -3,7 +3,7 @@ import clsx from "clsx";
 import type { PrimeBrainStatus } from "../types/primeBrainStatus";
 import { PrimeBrainIcon } from "./flowdock/glyphs/PrimeBrainIcon";
 import { FlowPulseBar } from "./visualizers/FlowPulseBar";
-import { ALSSpine } from "./transport/ALSSpine";
+import ALSSpine from "./transport/ALSSpine";
 
 interface HeaderProps {
   primeBrainStatus: PrimeBrainStatus;

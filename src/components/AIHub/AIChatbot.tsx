@@ -242,7 +242,7 @@ Be helpful, concise, and accurate about the studio's automatic stem separation w
             checked={isThinkingMode}
             onChange={() => setIsThinkingMode(!isThinkingMode)}
             style={composeStyles(
-              effects.border.radius.default,
+              effects.border.radius.md,
               {
                 width: '16px',
                 height: '16px',

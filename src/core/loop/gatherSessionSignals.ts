@@ -10,32 +10,7 @@
  */
 
 // Type definitions for window globals
-declare global {
-  interface Window {
-    __mixx_editEvents?: Array<{ distance: number; timestamp: number }>;
-    __mixx_toolSwitches?: Array<{ tool: string; timestamp: number }>;
-    __mixx_zoomEvents?: Array<{ delta: number; pos: number; timestamp: number }>;
-    __mixx_playbackState?: {
-      playing: boolean;
-      looping: boolean;
-      playCount?: number;
-    };
-    __mixx_recordState?: {
-      recording: boolean;
-      armedTrack: boolean;
-      noiseFloor: number;
-      threshold?: number;
-      hush?: boolean;
-    };
-    __mixx_viewSwitches?: Array<{ view: string; timestamp: number }>;
-    __mixx_masterChain?: {
-      targetLUFS: number;
-      profile: string;
-      calibrated: boolean;
-      masterVolume: number;
-    };
-  }
-}
+// Window interface extensions moved to src/types/globals.d.ts
 
 export interface SessionSignals {
   // Editing + tools
@@ -142,7 +117,7 @@ export function gatherSessionSignals(): SessionSignals {
   // ==========================
   // PLAYBACK SIGNALS
   // ==========================
-  const playback = window.__mixx_playbackState || {};
+  const playback = window.__mixx_playbackState || { playing: false, looping: false };
   signals.playing = !!playback.playing;
   signals.looping = !!playback.looping;
   
@@ -153,13 +128,13 @@ export function gatherSessionSignals(): SessionSignals {
   // ==========================
   // RECORDING SIGNALS
   // ==========================
-  const rec = window.__mixx_recordState || {};
+  const rec = window.__mixx_recordState || { recording: false, armedTrack: false, noiseFloor: 0 };
   signals.recording = !!rec.recording;
   signals.armedTrack = !!rec.armedTrack;
   // Use explicit hush flag if available, otherwise compute from noise floor
   signals.hush = rec.hush !== undefined 
     ? rec.hush 
-    : rec.noiseFloor > (rec.threshold || 0.2);
+    : (rec.noiseFloor || 0) > (rec.threshold || 0.2);
 
   // ==========================
   // NAVIGATION SIGNALS

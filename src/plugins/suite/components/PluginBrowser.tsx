@@ -1,6 +1,6 @@
 
 import React, { useMemo } from 'react';
-import { useFlowMotion } from '../../../../components/mixxglass';
+import { useFlowMotion } from '../../../components/mixxglass';
 import { PLUGIN_TIERS, TierName, PluginKey } from '../constants';
 import { pluginPreviews } from './shared/MiniVisualizers';
 import { PluginBrowserProps } from '../types';

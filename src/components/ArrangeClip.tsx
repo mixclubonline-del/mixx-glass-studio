@@ -2,6 +2,7 @@
 import React, { useMemo, useRef, useState } from "react";
 import { ArrangeClip as ArrangeClipModel } from "../hooks/useArrange";
 import { TrackALSFeedback, hexToRgba } from "../utils/ALS";
+import { AuraColors, AuraEffects, AuraGradients, AuraMotion, auraAlpha } from "../theme/aura-tokens";
 import { WaveformRenderer } from "./WaveformRenderer";
 import { TimelineTool } from "../utils/timelineTools";
 
@@ -176,9 +177,22 @@ export const ArrangeClip: React.FC<Props> = ({
   return (
     <div
       ref={ref}
-      className={`absolute rounded-md border group ${selected ? 'border-white/80 ring-2 ring-white/50 z-10' : 'border-white/20'} 
-      bg-black/40 backdrop-blur-sm overflow-hidden shadow-lg transition-all duration-150`}
-      style={{...style, cursor: getCursorStyle()}}
+      className={`absolute rounded-xl border group transition-all duration-300 ease-out
+      ${selected 
+        ? 'z-10 shadow-[0_0_20px_rgba(255,255,255,0.4)]' 
+        : 'hover:shadow-[0_0_12px_rgba(255,255,255,0.15)]'} 
+      backdrop-blur-md overflow-hidden animate-aura-bloom-in`}
+      style={{
+        ...style, 
+        cursor: getCursorStyle(),
+        backgroundColor: auraAlpha(AuraColors.void, 0.5),
+        border: selected 
+          ? `1px solid ${auraAlpha('#ffffff', 0.8)}` 
+          : `1px solid ${auraAlpha('#ffffff', 0.15)}`,
+        boxShadow: selected 
+          ? `${AuraEffects.neon.cyan}, 0 12px 32px rgba(0,0,0,0.5)` 
+          : '0 4px 12px rgba(0,0,0,0.3)',
+      }}
       onMouseDown={onLocalMouseDown}
       onMouseMove={onMouseMove}
       onMouseLeave={() => setHoverRegion(null)}
@@ -229,19 +243,18 @@ export const ArrangeClip: React.FC<Props> = ({
         <div className="absolute inset-0 pointer-events-none rounded-md ring-2 ring-cyan-400/60 animate-pulse" style={{ mixBlendMode: 'screen' }} />
       )}
 
-      {/* Plasma Background */}
-      <div className="absolute inset-0 opacity-40" style={{
-        background: `linear-gradient(135deg, ${color}99, #03040B 70%), linear-gradient(225deg, ${color}33, #03040B 70%)`,
-        backgroundSize: '400% 400%',
-        animation: 'plasma 15s ease infinite',
+      {/* Aura Gradient Background */}
+      <div className="absolute inset-0 opacity-60" style={{
+        background: selected ? AuraGradients.aurora : `linear-gradient(135deg, ${auraAlpha(color, 0.5)} 0%, ${AuraColors.void} 70%)`,
+        mixBlendMode: 'screen',
       }} />
       {audioBuffer && waveformWidth > 6 && (
-        <div className="absolute inset-x-3 top-3 bottom-3 pointer-events-none opacity-90">
+        <div className="absolute inset-x-2 top-2 bottom-2 pointer-events-none opacity-80" style={{ filter: 'drop-shadow(0 0 4px rgba(255,255,255,0.2))' }}>
           <WaveformRenderer
             audioBuffer={audioBuffer}
             width={waveformWidth}
             height={waveformHeight}
-            color={waveformColor}
+            color={selected ? '#ffffff' : waveformColor}
             startTime={Math.min(sourceStartSec, Math.max(0, audioBuffer.duration - 0.01))}
             duration={Math.min(
               sourceDurationSec,

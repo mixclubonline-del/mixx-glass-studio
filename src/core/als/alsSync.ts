@@ -144,12 +144,15 @@ export function updateGlobalALS(
   }
   
   // Initialize window.__als with ALL properties at zero
-  window.__als = window.__als || {
+  window.__als = (window.__als || {
     flow: 0,
     temperature: 'cold',
     guidance: '',
     pulse: 0,
-  };
+    momentum: 0,
+    pressure: 0,
+    harmony: 0,
+  }) as any;
   
   // Initialize momentum, pressure, harmony to 0 if they don't exist
   if (!(window.__als as any).momentum) (window.__als as any).momentum = 0;
@@ -160,9 +163,9 @@ export function updateGlobalALS(
   // This ensures ALS is contextual - it only shows values when there's real sound
   if (hasAudio || (syncResult.pulse === 0 && syncResult.flow === 0 && syncResult.momentum === 0 && syncResult.harmony === 0)) {
     // Update all ALS properties
-    window.__als.pulse = syncResult.pulse;
-    window.__als.flow = syncResult.flow;
-    window.__als.temperature = syncResult.temperature;
+    window.__als!.pulse = syncResult.pulse;
+    window.__als!.flow = syncResult.flow;
+    window.__als!.temperature = syncResult.temperature;
     
     // Add new ALS properties
     (window.__als as any).momentum = syncResult.momentum;
@@ -170,9 +173,9 @@ export function updateGlobalALS(
     (window.__als as any).harmony = syncResult.harmony;
   } else {
     // No audio - reset to zero
-    window.__als.pulse = 0;
-    window.__als.flow = 0;
-    window.__als.temperature = 'cold';
+    window.__als!.pulse = 0;
+    window.__als!.flow = 0;
+    window.__als!.temperature = 'cold';
     (window.__als as any).momentum = 0;
     (window.__als as any).pressure = 0;
     (window.__als as any).harmony = 0;

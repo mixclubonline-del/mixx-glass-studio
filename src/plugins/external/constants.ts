@@ -4,6 +4,8 @@ import type {
   Plugin, PluginStates, SpecificPluginSettingsMap,
   PluginSizes, PluginPositions
 } from './types'; 
+import { PluginKey } from './keys';
+export type { PluginKey };
 
 // --- CORE TIER ---
 import { MixxTune } from './components/plugins/MixxTune';
@@ -40,6 +42,8 @@ import { MixxPort } from './components/plugins/MixxPort';
 import { TelemetryCollector } from './components/plugins/TelemetryCollector';
 import { PrimeBotConsole } from './components/plugins/PrimeBotConsole';
 
+
+export type TierName = keyof typeof PLUGIN_TIERS;
 
 export const PLUGIN_TIERS = {
   'Core Tier': {
@@ -79,10 +83,7 @@ export const PLUGIN_TIERS = {
   }
 } as const;
 
-export type TierName = keyof typeof PLUGIN_TIERS;
-// FIX: Correctly generate a union of all plugin keys. The previous method incorrectly
-// created an intersection of keys from different tiers, which resolved to `never`.
-export type PluginKey = { [T in TierName]: keyof typeof PLUGIN_TIERS[T] }[TierName];
+// PluginKey is now imported from keys.ts
 
 const allPlugins = Object.values(PLUGIN_TIERS).reduce(
   (acc, tier) => ({ ...acc, ...tier }),
@@ -109,7 +110,7 @@ export const INITIAL_PLUGIN_SIZES: PluginSizes = Object.keys(allPlugins).reduce(
     } else if (key === 'MixxTune' || key === 'MixxVerb' || key === 'MixxPolish' || key === 'MixxLimiter' || key === 'MixxBalance') {
       defaultWidth = 600;
     }
-    (acc as any)[key as PluginKey] = { width: defaultWidth, height: Math.round(defaultWidth * (9 / 16)) }; 
+    (acc as any)[key as PluginKey] = { width: defaultWidth, height: Math.round(defaultWidth * (9 / 16)) };
     return acc;
 }, {} as PluginSizes);
 

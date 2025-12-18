@@ -8,15 +8,7 @@
 import { useEffect } from 'react';
 import { applyThermalColorToRoot, getThermalColor } from './colors';
 
-declare global {
-  interface Window {
-    __als?: {
-      temperature?: string;
-      flow?: number;
-      pulse?: number;
-    };
-  }
-}
+// Window interface extensions moved to src/types/globals.d.ts
 
 /**
  * Initialize thermal color sync.
@@ -67,4 +59,3 @@ export function useThermalSync(enabled: boolean = true, updateInterval: number =
     return initThermalSync(updateInterval);
   }, [enabled, updateInterval]);
 }
-

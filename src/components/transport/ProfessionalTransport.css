@@ -1,0 +1,210 @@
+/* ProfessionalTransport.css */
+
+/* Keyframes extracted from AuraKeyframes */
+@keyframes aura-breathe {
+  0%, 100% { opacity: 0.7; transform: scale(1); }
+  50% { opacity: 1; transform: scale(1.1); }
+}
+
+@keyframes aura-glow-pulse {
+  0%, 100% { 
+    box-shadow: 
+      0 0 20px rgba(139, 92, 246, 0.3),
+      0 0 40px rgba(34, 211, 238, 0.2),
+      0 0 60px rgba(236, 72, 153, 0.1);
+  }
+  50% { 
+    box-shadow: 
+      0 0 40px rgba(139, 92, 246, 0.5),
+      0 0 70px rgba(34, 211, 238, 0.35),
+      0 0 100px rgba(236, 72, 153, 0.2);
+  }
+}
+
+/* Base Slab Structure */
+.transport-slab {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  /* Default to light variant if no modifier */
+  gap: 12px;
+  padding: 10px 16px;
+  border-radius: 12px;
+  background: linear-gradient(180deg, rgba(255,255,255,0.82), rgba(240,238,255,0.6));
+  box-shadow: 0 6px 18px rgba(68,54,120,0.08), inset 0 1px 0 rgba(255,255,255,0.5);
+  border: 1px solid var(--glass-border, rgba(255, 255, 255, 0.2));
+  backdrop-filter: blur(12px);
+}
+
+.transport-slab--dark {
+  gap: 10px;
+  padding: 8px 14px;
+  border-radius: 999px;
+  background: rgba(5, 5, 8, 0.35); /* AuraColors.void 0.35 */
+  box-shadow: 
+    0 0 40px rgba(139, 92, 246, 0.08),
+    inset 0 0 20px rgba(139, 92, 246, 0.05);
+  border: 1px solid rgba(139, 92, 246, 0.15);
+  backdrop-filter: blur(20px) saturate(120%);
+}
+
+/* Secondary Buttons (Rewind, Forward) */
+.transport-btn-secondary {
+  width: 40px;
+  height: 40px;
+  border-radius: 10px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: rgba(255,255,255,0.4);
+  border: 1px solid var(--glass-border, rgba(255, 255, 255, 0.2));
+  color: var(--muted, rgba(100, 116, 139, 1));
+  cursor: pointer;
+  transition: all 0.15s ease;
+}
+
+.transport-slab--dark .transport-btn-secondary {
+  width: 36px;
+  height: 36px;
+  background: rgba(76, 29, 149, 0.2); /* violet-900 0.2 */
+  border: 1px solid rgba(139, 92, 246, 0.12); /* violet 0.12 */
+  color: rgba(165, 243, 252, 0.6); /* cyan-200 0.6 */
+  transition: all 0.25s ease;
+}
+
+.transport-btn-secondary:hover {
+  background: rgba(255, 255, 255, 0.6);
+  transform: translateY(-1px);
+}
+
+.transport-slab--dark .transport-btn-secondary:hover {
+  background: rgba(139, 92, 246, 0.3);
+  border-color: rgba(139, 92, 246, 0.3);
+  color: rgba(34, 211, 238, 0.8);
+}
+
+.transport-btn-secondary:active {
+  transform: translateY(0) scale(0.95);
+}
+
+/* Play Button */
+.transport-btn-play {
+  width: 48px;
+  height: 48px;
+  border-radius: 12px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: linear-gradient(180deg, #8B5CF6, #6366F1); /* violet -> indigo */
+  box-shadow: 0 6px 18px rgba(139, 92, 246, 0.18);
+  border: none;
+  color: white;
+  cursor: pointer;
+  transform-origin: center;
+  transition: all 0.15s ease;
+}
+
+.transport-slab--dark .transport-btn-play {
+  width: 42px;
+  height: 42px;
+  background: rgba(76, 29, 149, 0.3); /* violet-900 0.3 */
+  box-shadow: 0 0 15px rgba(139, 92, 246, 0.1);
+  border: 1px solid rgba(139, 92, 246, 0.15);
+  color: rgba(255, 255, 255, 0.6);
+  transition: all 0.3s ease;
+}
+
+.transport-btn-play--playing {
+  animation: aura-glow-pulse 1.5s ease-in-out infinite;
+  box-shadow: 0 6px 24px rgba(139, 92, 246, 0.35), 0 0 12px rgba(139, 92, 246, 0.3);
+}
+
+.transport-slab--dark .transport-btn-play--playing {
+  background: radial-gradient(circle at 50% 50%, rgba(139, 92, 246, 0.7), rgba(55, 48, 163, 0.5));
+  box-shadow: 0 0 25px rgba(139, 92, 246, 0.4), 0 0 50px rgba(236, 72, 153, 0.15);
+  border: 1px solid rgba(139, 92, 246, 0.4);
+  color: rgba(255, 255, 255, 0.9);
+  animation: aura-breathe 3s ease-in-out infinite;
+}
+
+.transport-btn-play:hover {
+  transform: scale(1.05);
+}
+
+.transport-btn-play:active {
+  transform: scale(0.95);
+}
+
+/* Timecode */
+.transport-timecode {
+  min-width: 120px;
+  padding: 6px 12px;
+  border-radius: 8px;
+  background: rgba(255, 255, 255, 0.3);
+  border: 1px solid var(--glass-border, rgba(255, 255, 255, 0.2));
+  font-family: monospace;
+  font-size: 13px;
+  font-weight: 500;
+  color: var(--ink-foreground, #0F172A);
+  text-align: center;
+  letter-spacing: 0.05em;
+}
+
+.transport-slab--dark .transport-timecode {
+  min-width: 90px;
+  padding: 4px 10px;
+  border-radius: 6px;
+  background: rgba(49, 46, 129, 0.25); /* indigo-900 0.25 */
+  border: 1px solid rgba(139, 92, 246, 0.1);
+  font-family: 'JetBrains Mono', monospace;
+  font-size: 11px;
+  font-weight: 400;
+  color: rgba(165, 243, 252, 0.5); /* cyan-200 0.5 */
+  letter-spacing: 0.08em;
+}
+
+/* Loop Toggle */
+.transport-btn-loop {
+  width: 40px;
+  height: 40px;
+  border-radius: 10px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: rgba(255, 255, 255, 0.4);
+  border: 1px solid var(--glass-border, rgba(255, 255, 255, 0.2));
+  color: var(--muted, rgba(100, 116, 139, 1));
+  cursor: pointer;
+  position: relative;
+  transition: all 0.15s ease;
+}
+
+.transport-slab--dark .transport-btn-loop {
+  background: rgba(76, 29, 149, 0.4); /* violet-900 0.4 */
+  border: 1px solid rgba(139, 92, 246, 0.2);
+  color: rgba(165, 243, 252, 0.6);
+}
+
+.transport-btn-loop--active {
+  background: rgba(139, 92, 246, 0.2);
+  border-color: #8B5CF6; /* violet.DEFAULT */
+  color: #6366F1; /* indigo.DEFAULT */
+  animation: aura-glow-pulse 2s ease-in-out infinite;
+}
+
+.transport-slab--dark .transport-btn-loop--active {
+  background: rgba(139, 92, 246, 0.25);
+  border-color: #8B5CF6;
+  color: #C4B5FD; /* violet-300 */
+}
+
+.transport-loop-dot {
+  position: absolute;
+  top: 2px;
+  right: 2px;
+  width: 6px;
+  height: 6px;
+  border-radius: 50%;
+  background: #8B5CF6;
+  box-shadow: 0 0 8px #8B5CF6;
+}

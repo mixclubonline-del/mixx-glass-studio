@@ -10,9 +10,7 @@
 // ------------------------------------------------------------
 
 // Optional WASM assets (safe if missing; fallback DSP kicks in)
-// @ts-expect-error - Vite URL import syntax not recognized by TypeScript
 import demucsWasmUrl from '../ai/models/fake-demucs.wasm?url';
-// @ts-expect-error - Vite URL import syntax not recognized by TypeScript
 import modelConfigUrl from '../ai/models/model.json?url';
 
 let model: any = null;

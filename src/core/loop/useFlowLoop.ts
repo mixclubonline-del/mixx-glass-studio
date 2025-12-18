@@ -212,6 +212,9 @@ export function useFlowLoop() {
               temperature: 'cold',
               guidance: '',
               pulse: 0,
+              momentum: 0,
+              pressure: 0,
+              harmony: 0,
             };
             window.__als.pulse = 0;
             window.__als.flow = 0;
