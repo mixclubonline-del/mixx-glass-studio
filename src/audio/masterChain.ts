@@ -1,11 +1,24 @@
 import { MasteringProfile, MASTERING_PROFILES } from '../types/sonic-architecture';
+import { rustMasterBridge } from './RustMasterBridge';
 import {
   createHarmonicLatticeStage,
   createPhaseWeaveStage,
   createVelvetCurveStage,
   createVelvetFloorStage,
   createSaturationCurve,
+  PillarStage,
+  VelvetFloorSettings,
+  HarmonicLatticeSettings,
+  PhaseWeaveSettings,
 } from './fivePillars';
+import {
+  registerFivePillarsWorklets,
+  createVelvetFloorWorklet,
+  createHarmonicLatticeWorklet,
+  createPhaseWeaveWorklet,
+  createVelvetCurveWorklet,
+  areAllPillarsRegistered,
+} from './FivePillarsWorklet';
 import { createDcBlocker } from './utils';
 import { createTruePeakLimiterNode } from './VelvetTruePeakLimiter';
 import { createDitherNode } from './DitherNode';
@@ -39,6 +52,13 @@ export interface MasterMeterStack {
   silk: AnalyserNode; // High-end (Silk) - > 12kHz
 }
 
+// Flexible pillar stage type that works with both GainNode and AudioWorkletNode
+interface FlexiblePillarStage {
+  input: AudioNode;
+  output: AudioNode;
+  setSettings?: (settings: any) => void;
+}
+
 export interface VelvetMasterChain {
   input: AudioNode;
   output: GainNode;
@@ -46,11 +66,12 @@ export interface VelvetMasterChain {
   complianceTap: GainNode;
   midSideStage: MidSideStage;
   multiBandStage: MultiBandStage;
-  velvetFloor: ReturnType<typeof createVelvetFloorStage>;
-  harmonicLattice: ReturnType<typeof createHarmonicLatticeStage>;
-  phaseWeave: ReturnType<typeof createPhaseWeaveStage>;
-  velvetCurve: ReturnType<typeof createVelvetCurveStage>;
+  velvetFloor: FlexiblePillarStage;
+  harmonicLattice: FlexiblePillarStage;
+  phaseWeave: FlexiblePillarStage;
+  velvetCurve: FlexiblePillarStage;
   glue: DynamicsCompressorNode;
+
   colorDrive: GainNode;
   colorShaper: WaveShaperNode;
   softLimiter: DynamicsCompressorNode;
@@ -74,18 +95,81 @@ export interface VelvetMasterChain {
   };
 }
 
+export interface BuildMasterChainOptions {
+  /** Use AudioWorklet-based pillar stages (default: true for AudioContext) */
+  useWorklets?: boolean;
+}
+
 export async function buildMasterChain(
-  ctx: AudioContext | OfflineAudioContext
+  ctx: AudioContext | OfflineAudioContext,
+  options: BuildMasterChainOptions = {}
 ): Promise<VelvetMasterChain> {
   const profile = MASTERING_PROFILES[DEFAULT_PROFILE_KEY];
+  const { useWorklets = true } = options;
 
   const dc = createDcBlocker(ctx);
-  const velvetFloor = createVelvetFloorStage(ctx, profile.velvetFloor);
-  const harmonicLattice = createHarmonicLatticeStage(ctx, profile.harmonicLattice);
-  const phaseWeave = createPhaseWeaveStage(ctx, profile.phaseWeave);
-  const velvetCurve = createVelvetCurveStage(ctx);
+  
+  // Attempt to use AudioWorklet-based pillars for AudioContext
+  let usingWorklets = false;
+  let velvetFloor!: FlexiblePillarStage;
+  let harmonicLattice!: FlexiblePillarStage;
+  let phaseWeave!: FlexiblePillarStage;
+  let velvetCurve!: FlexiblePillarStage;
+
+
+  if (useWorklets && ctx instanceof AudioContext) {
+    try {
+      await registerFivePillarsWorklets(ctx);
+      
+      if (areAllPillarsRegistered()) {
+        const vfWorklet = await createVelvetFloorWorklet(ctx, profile.velvetFloor);
+        const hlWorklet = await createHarmonicLatticeWorklet(ctx, profile.harmonicLattice);
+        const pwWorklet = await createPhaseWeaveWorklet(ctx, profile.phaseWeave);
+        const vcWorklet = await createVelvetCurveWorklet(ctx, {});
+
+        if (vfWorklet && hlWorklet && pwWorklet && vcWorklet) {
+          // Wrap worklet nodes to match PillarStage interface
+          velvetFloor = {
+            input: vfWorklet.node,
+            output: vfWorklet.node,
+            setSettings: vfWorklet.setSettings,
+          };
+          harmonicLattice = {
+            input: hlWorklet.node,
+            output: hlWorklet.node,
+            setSettings: hlWorklet.setSettings,
+          };
+          phaseWeave = {
+            input: pwWorklet.node,
+            output: pwWorklet.node,
+            setSettings: pwWorklet.setSettings,
+          };
+          velvetCurve = {
+            input: vcWorklet.node,
+            output: vcWorklet.node,
+          };
+          
+          usingWorklets = true;
+          console.log('[masterChain] ✅ Using AudioWorklet-based Five Pillars');
+        }
+      }
+    } catch (error) {
+      console.warn('[masterChain] Worklet init failed, using Web Audio nodes:', error);
+    }
+  }
+
+  // Fallback to Web Audio nodes
+  if (!usingWorklets) {
+    velvetFloor = createVelvetFloorStage(ctx, profile.velvetFloor);
+    harmonicLattice = createHarmonicLatticeStage(ctx, profile.harmonicLattice);
+    phaseWeave = createPhaseWeaveStage(ctx, profile.phaseWeave);
+    velvetCurve = createVelvetCurveStage(ctx);
+    console.log('[masterChain] Using Web Audio node-based Five Pillars');
+  }
+
   const midSideStage = createMidSideStage(ctx);
   const multiBandStage = createMultiBandStage(ctx);
+
 
   const glue = createGlueCompressor(ctx);
   const { drive: colorDrive, shaper: colorShaper } = createVelvetSaturator(ctx);
@@ -204,10 +288,14 @@ export async function buildMasterChain(
       typeof next === 'string' ? MASTERING_PROFILES[next] : next;
 
     currentProfile.value = resolved;
+    
+    // Sync to Rust Backend
+    rustMasterBridge.setProfile(resolved.name);
 
-    velvetFloor.setSettings(resolved.velvetFloor);
-    harmonicLattice.setSettings(resolved.harmonicLattice);
-    phaseWeave.setSettings(resolved.phaseWeave);
+    velvetFloor.setSettings?.(resolved.velvetFloor);
+    harmonicLattice.setSettings?.(resolved.harmonicLattice);
+    phaseWeave.setSettings?.(resolved.phaseWeave);
+
     masterGain.gain.setTargetAtTime(
       gainForLUFS(resolved.targetLUFS),
       ctx.currentTime,

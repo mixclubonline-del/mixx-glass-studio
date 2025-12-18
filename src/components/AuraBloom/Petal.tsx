@@ -162,10 +162,15 @@ export const Petal: React.FC<PetalProps> = memo(({
             filter: `blur(${glowRadius}px)`,
             opacity: isOpen ? 1 : 0,
             transition: 'opacity 0.6s ease, filter 0.3s ease',
-            animation: isOpen && !isHovered ? 'aura-breathe 4s ease-in-out infinite' : 'none',
+            // Use separate animation properties to avoid React warning about mixing shorthand with non-shorthand
+            animationName: isOpen && !isHovered ? 'aura-breathe' : 'none',
+            animationDuration: '4s',
+            animationTimingFunction: 'ease-in-out',
+            animationIterationCount: 'infinite',
             animationDelay: `${index * 200}ms`,
           }}
         />
+
 
         {/* ===== SVG PETAL SHAPE ===== */}
         <svg 

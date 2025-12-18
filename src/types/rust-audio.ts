@@ -88,7 +88,22 @@ export const rustAudio = {
     
     setParameter: (name: string, value: number): Promise<string> =>
       invoke('master_chain_set_parameter', { name, value }),
+    
+    /**
+     * Process audio samples through the Rust MasterChain for native-quality mastering
+     * @param samples - Interleaved stereo Float32Array
+     * @param profile - Optional mastering profile (0=Streaming, 1=Club, 2=Broadcast, 3=Vinyl, 4=Audiophile)
+     * @returns Processed samples as number array (convert back to Float32Array)
+     */
+    process: async (samples: Float32Array, profile?: number): Promise<Float32Array> => {
+      const result = await invoke<number[]>('master_chain_process_samples', {
+        samples: Array.from(samples),
+        profile,
+      });
+      return new Float32Array(result);
+    },
   },
+
   
   // Audio Export
   export: {

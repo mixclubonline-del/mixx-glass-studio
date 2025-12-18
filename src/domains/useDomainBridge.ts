@@ -20,6 +20,8 @@ import { useMixer } from './mixer';
 import { usePlugins } from './plugins';
 import { useAI } from './ai';
 import { useUI } from './ui';
+import { useProject } from './project';
+import { useSession } from './session';
 
 // Type for FlowRuntime state that we'll sync from
 export interface FlowRuntimeState {
@@ -45,6 +47,14 @@ export interface FlowRuntimeState {
   
   // Audio
   masterReady: boolean;
+
+  // Session (Panel visibility)
+  isPianoRollOpen?: boolean;
+  isSpectralEditorOpen?: boolean;
+  followPlayhead?: boolean;
+
+  // Project
+  getProjectState?: () => any;
 }
 
 /**
@@ -52,29 +62,12 @@ export interface FlowRuntimeState {
  * Call this in FlowRuntime to enable child components to use domain hooks
  */
 export function useDomainBridgeSync(state: Partial<FlowRuntimeState>) {
-  // Get domain contexts - these will throw if not wrapped in DomainBridge
-  // Use try/catch for graceful degradation during migration
-  let transport: ReturnType<typeof useTransport> | null = null;
-  let tracks: ReturnType<typeof useTracks> | null = null;
-  let mixer: ReturnType<typeof useMixer> | null = null;
-  
-  try {
-    transport = useTransport();
-  } catch {
-    // Not wrapped in DomainBridge yet - that's OK during migration
-  }
-  
-  try {
-    tracks = useTracks();
-  } catch {
-    // Not wrapped in DomainBridge yet
-  }
-  
-  try {
-    mixer = useMixer();
-  } catch {
-    // Not wrapped in DomainBridge yet
-  }
+  // Get domain contexts - call them at the top level to follow hook rules
+  const transport = useTransport();
+  const tracks = useTracks();
+  const mixer = useMixer();
+  const project = useProject();
+  const session = useSession();
 
   // Sync transport state
   useEffect(() => {
@@ -118,10 +111,42 @@ export function useDomainBridgeSync(state: Partial<FlowRuntimeState>) {
     });
   }, [mixer, state.mixerSettings]);
 
+  // Sync Project state
+  useEffect(() => {
+    if (state.getProjectState) {
+      project.setStateGetter(state.getProjectState);
+    }
+  }, [project, state.getProjectState]);
+
+  // Sync Session state
+  useEffect(() => {
+    if (state.isPianoRollOpen !== undefined && state.isPianoRollOpen !== session.isPianoRollOpen) {
+      if (state.isPianoRollOpen) {
+        // We don't have trackId/clipId here in the simplified sync, 
+        // but session.isPianoRollOpen can be updated.
+        // During transition, App.tsx still opens it.
+      } else {
+        session.closePianoRoll();
+      }
+    }
+    
+    if (state.isSpectralEditorOpen !== undefined && state.isSpectralEditorOpen !== session.isSpectralEditorOpen) {
+      if (!state.isSpectralEditorOpen) {
+        session.closeSpectralEditor();
+      }
+    }
+
+    if (state.followPlayhead !== undefined && state.followPlayhead !== session.followPlayhead) {
+      session.setFollowPlayhead(state.followPlayhead);
+    }
+  }, [session, state.isPianoRollOpen, state.isSpectralEditorOpen, state.followPlayhead]);
+
   return {
     transport,
     tracks,
     mixer,
+    project,
+    session,
     isBridgeActive: !!(transport || tracks || mixer),
   };
 }

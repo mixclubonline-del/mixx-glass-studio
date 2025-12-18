@@ -1,5 +1,6 @@
-import React, { useMemo, useState, useRef, useEffect } from "react";
+import React, { useMemo } from "react";
 import { AudioBlob as AudioBlobType } from "../../types/spectral";
+import { AuraColors, auraAlpha } from "../../theme/aura-tokens";
 import "./AudioBlob.css";
 
 interface AudioBlobProps {
@@ -8,8 +9,6 @@ interface AudioBlobProps {
   pixelsPerNote: number;
   canvasHeight: number;
   onClick?: (id: string) => void;
-  onEdit?: (id: string, deltaPitch: number, deltaTime: number, deltaDuration: number) => void;
-  onEditCommitted?: (id: string, deltaPitch: number, deltaTime: number, deltaDuration: number) => void;
 }
 
 export const AudioBlob: React.FC<AudioBlobProps> = ({
@@ -18,24 +17,21 @@ export const AudioBlob: React.FC<AudioBlobProps> = ({
   pixelsPerNote,
   canvasHeight,
   onClick,
-  onEdit,
-  onEditCommitted,
 }) => {
-  const [isDragging, setIsDragging] = useState(false);
-  const [isResizing, setIsResizing] = useState<"left" | "right" | null>(null);
-  const dragStartRef = useRef<{ x: number; y: number; startTime: number; note: number; duration: number } | null>(null);
-
   const styles = useMemo(() => {
     const x = blob.startTime * pixelsPerSecond;
     const width = blob.duration * pixelsPerSecond;
     
-    // Convert MIDI note to Y coordinate (note 60 = middle C)
-    const y = canvasHeight - (blob.note * pixelsPerNote);
+    // Note 127 is at top (y=0), Note 0 is at bottom (y = canvasHeight)
+    // gridHeight is 127 * pixelsPerNote
+    const y = (127 - blob.note) * pixelsPerNote;
 
     // Create SVG path for drift
+    // The drift is relative to the blob's center note frequency
     const driftPath = blob.drift.map((p, i) => {
       const dx = (p.time - blob.startTime) * pixelsPerSecond;
-      const dy = (Math.log2(p.frequency / blob.pitch) * 12) * pixelsPerNote;
+      // semitoneDiff is 12 * log2(f/f0)
+      const dy = -(Math.log2(p.frequency / blob.pitch) * 12) * pixelsPerNote;
       return `${i === 0 ? "M" : "L"} ${dx} ${dy}`;
     }).join(" ");
 
@@ -48,116 +44,56 @@ export const AudioBlob: React.FC<AudioBlobProps> = ({
     };
   }, [blob, pixelsPerSecond, pixelsPerNote, canvasHeight]);
 
-  const handleMouseDown = (e: React.MouseEvent, type: "move" | "left" | "right") => {
-    e.stopPropagation();
-    e.preventDefault();
-    
-    dragStartRef.current = {
-      x: e.clientX,
-      y: e.clientY,
-      startTime: blob.startTime,
-      note: blob.note,
-      duration: blob.duration,
-    };
-
-    if (type === "move") {
-      setIsDragging(true);
-    } else {
-      setIsResizing(type);
-    }
-  };
-
-  useEffect(() => {
-    const handleMouseMove = (e: MouseEvent) => {
-      if (!dragStartRef.current) return;
-      if (!isDragging && !isResizing) return;
-
-      const deltaX = (e.clientX - dragStartRef.current.x) / pixelsPerSecond;
-      const deltaY = (dragStartRef.current.y - e.clientY) / pixelsPerNote; // Invert Y delta for pitch
-
-      if (isDragging) {
-        onEdit?.(blob.id, deltaY, deltaX, 0);
-      } else if (isResizing === "right") {
-        onEdit?.(blob.id, 0, 0, deltaX);
-      } else if (isResizing === "left") {
-        onEdit?.(blob.id, 0, deltaX, -deltaX);
-      }
-    };
-
-    const handleMouseUp = () => {
-      if (dragStartRef.current && (isDragging || isResizing)) {
-        // Calculate final deltas
-        // Note: For move/pitch, we commit the final position
-        // For simplicity, we just trigger onEditCommitted with final state in parent
-        onEditCommitted?.(blob.id, 0, 0, 0); // Parent should know current temp state
-      }
-      setIsDragging(false);
-      setIsResizing(null);
-      dragStartRef.current = null;
-    };
-
-    if (isDragging || isResizing) {
-      window.addEventListener("mousemove", handleMouseMove);
-      window.addEventListener("mouseup", handleMouseUp);
-    }
-
-    return () => {
-      window.removeEventListener("mousemove", handleMouseMove);
-      window.removeEventListener("mouseup", handleMouseUp);
-    };
-  }, [isDragging, isResizing, blob.id, pixelsPerSecond, pixelsPerNote, onEdit, onEditCommitted]);
-
   return (
     <div 
-      className={`audio-blob-container ${isDragging ? "dragging" : ""} ${isResizing ? "resizing" : ""}`}
+      className="audio-blob" 
       style={{
-        transform: `translate(${styles.left}px, ${styles.top}px)`,
+        left: styles.left,
+        top: styles.top,
         width: styles.width,
         height: styles.height,
-        position: 'absolute',
-      }}
+      } as React.CSSProperties}
       onClick={() => onClick?.(blob.id)}
-      onMouseDown={(e) => handleMouseDown(e, "move")}
     >
-      {/* Resize handles */}
-      <div className="resize-handle left" onMouseDown={(e) => handleMouseDown(e, "left")} />
-      <div className="resize-handle right" onMouseDown={(e) => handleMouseDown(e, "right")} />
-
-      <svg 
-        className="audio-blob-svg" 
-        width="100%" 
-        height="100%" 
-        viewBox={`0 -${pixelsPerNote/2} ${styles.width} ${pixelsPerNote}`}
-        preserveAspectRatio="none"
-      >
+      <svg className="audio-blob__svg" width="100%" height="100%" viewBox={`0 -${pixelsPerNote} ${styles.width} ${pixelsPerNote * 2}`}>
         <defs>
           <linearGradient id={`grad-${blob.id}`} x1="0%" y1="0%" x2="0%" y2="100%">
-            <stop offset="0%" stopColor="#ff4d4d" stopOpacity="0.8" />
-            <stop offset="50%" stopColor="#ffdb4d" stopOpacity="0.8" />
-            <stop offset="100%" stopColor="#4dff4d" stopOpacity="0.8" />
+            <stop offset="0%" stopColor={auraAlpha(AuraColors.cyan, 0.8)} />
+            <stop offset="50%" stopColor={AuraColors.cyan} />
+            <stop offset="100%" stopColor={auraAlpha(AuraColors.cyan, 0.8)} />
           </linearGradient>
+          <filter id={`glow-${blob.id}`}>
+            <feGaussianBlur stdDeviation="2" result="coloredBlur"/>
+            <feMerge>
+                <feMergeNode in="coloredBlur"/>
+                <feMergeNode in="SourceGraphic"/>
+            </feMerge>
+          </filter>
         </defs>
-        
+
+        {/* The Blob Body */}
         <rect 
-          className="blob-body"
+          className="audio-blob__body"
           width="100%" 
           height="80%" 
-          rx={pixelsPerNote / 4}
+          rx={pixelsPerNote / 2}
           y="-40%"
           fill={`url(#grad-${blob.id})`}
         />
         
+        {/* The Pitch Drift Line */}
         <path 
-          className="pitch-drift-line"
+          className="audio-blob__drift-line"
           d={styles.driftPath}
           fill="none"
-          stroke="rgba(255,255,255,0.9)"
-          strokeWidth="2"
+          stroke="white"
+          strokeWidth="1.5"
           vectorEffect="non-scaling-stroke"
+          filter={`url(#glow-${blob.id})`}
         />
       </svg>
-      <div className="blob-label-container">
-        <span className="blob-label">{blob.note}</span>
+      <div className="audio-blob__label-container">
+        <span className="audio-blob__label">{blob.note}</span>
       </div>
     </div>
   );

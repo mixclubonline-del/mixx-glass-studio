@@ -4,8 +4,10 @@
  * Optimized AudioWorklet processor for Velvet Floor stage.
  * Provides native-speed sub-harmonic foundation processing.
  * 
+ * Phase 34: Full stereo support with isolated L/R filter states.
+ * 
  * @author Prime (Mixx Club)
- * @version 1.0.0 - Phase 3 WASM DSP
+ * @version 2.0.0 - Phase 34 Stereo Migration
  */
 
 class VelvetFloorProcessor extends AudioWorkletProcessor {
@@ -47,10 +49,9 @@ class VelvetFloorProcessor extends AudioWorkletProcessor {
     
     this.sampleRate = sampleRate;
     
-    // Lowpass filter state (simple IIR)
-    this.lowpassState = {
-      x1: 0, x2: 0, y1: 0, y2: 0,
-    };
+    // Stereo lowpass filter states (isolated L/R to prevent crosstalk)
+    this.lowpassStateL = { x1: 0, x2: 0, y1: 0, y2: 0 };
+    this.lowpassStateR = { x1: 0, x2: 0, y1: 0, y2: 0 };
     
     // Saturation curve cache
     this.saturationCurve = null;
@@ -88,9 +89,9 @@ class VelvetFloorProcessor extends AudioWorkletProcessor {
   }
 
   /**
-   * Apply lowpass filter (simplified biquad)
+   * Apply lowpass filter (simplified biquad) with channel-isolated state
    */
-  applyLowpass(input, frequency, q, sampleRate) {
+  applyLowpass(input, frequency, q, sampleRate, state) {
     const omega = 2 * Math.PI * frequency / sampleRate;
     const cosOmega = Math.cos(omega);
     const sinOmega = Math.sin(omega);
@@ -107,15 +108,15 @@ class VelvetFloorProcessor extends AudioWorkletProcessor {
     
     for (let i = 0; i < input.length; i++) {
       const x = input[i];
-      const y = (b0 / a0) * x + (b1 / a0) * this.lowpassState.x1 + 
-                (b2 / a0) * this.lowpassState.x2 - 
-                (a1 / a0) * this.lowpassState.y1 - 
-                (a2 / a0) * this.lowpassState.y2;
+      const y = (b0 / a0) * x + (b1 / a0) * state.x1 + 
+                (b2 / a0) * state.x2 - 
+                (a1 / a0) * state.y1 - 
+                (a2 / a0) * state.y2;
       
-      this.lowpassState.x2 = this.lowpassState.x1;
-      this.lowpassState.x1 = x;
-      this.lowpassState.y2 = this.lowpassState.y1;
-      this.lowpassState.y1 = y;
+      state.x2 = state.x1;
+      state.x1 = x;
+      state.y2 = state.y1;
+      state.y1 = y;
       
       output[i] = y;
     }
@@ -148,26 +149,34 @@ class VelvetFloorProcessor extends AudioWorkletProcessor {
       return true;
     }
     
-    const inputChannel = input[0];
-    const outputChannel = output[0];
-    
-    if (!inputChannel || !outputChannel) {
-      return true;
-    }
-    
     const warmth = parameters.warmth[0] || 0.5;
     const depth = parameters.depth[0] || 0.5;
     const frequency = parameters.frequency[0] || 150;
     const q = parameters.q[0] || 0.7;
     
-    // Process: Lowpass → Saturation → Makeup Gain
-    const lowpassed = this.applyLowpass(inputChannel, frequency, q, this.sampleRate);
-    const saturated = this.applySaturation(lowpassed, warmth);
-    
-    // Apply makeup gain (depth)
+    // Makeup gain (depth)
     const makeupGain = 1 + depth;
-    for (let i = 0; i < outputChannel.length; i++) {
-      outputChannel[i] = saturated[i] * makeupGain;
+    
+    // Process all channels (stereo support)
+    const numChannels = Math.min(input.length, output.length);
+    
+    for (let channel = 0; channel < numChannels; channel++) {
+      const inputChannel = input[channel];
+      const outputChannel = output[channel];
+      
+      if (!inputChannel || !outputChannel) continue;
+      
+      // Select channel-specific filter state
+      const filterState = channel === 0 ? this.lowpassStateL : this.lowpassStateR;
+      
+      // Process: Lowpass → Saturation → Makeup Gain
+      const lowpassed = this.applyLowpass(inputChannel, frequency, q, this.sampleRate, filterState);
+      const saturated = this.applySaturation(lowpassed, warmth);
+      
+      // Apply makeup gain
+      for (let i = 0; i < outputChannel.length; i++) {
+        outputChannel[i] = saturated[i] * makeupGain;
+      }
     }
     
     return true;

@@ -1,5 +1,5 @@
 import React, { useState, useRef, createRef, useCallback, useEffect, useMemo } from 'react';
-import { DomainBridge, useMixerBridgeSync, useTransportBridgeSync } from './domains';
+import { DomainBridge, useDomainBridgeSync, useSession, useAudioDomain, useTransport, useMixer } from './domains';
 import FXWindow from './components/FXWindow';
 import FXRack from './components/FXRack';
 import AdaptiveWaveformHeader from './components/AdaptiveWaveformHeader';
@@ -108,6 +108,7 @@ import IngestQueueManager, {
 } from './ingest/IngestQueueManager';
 import StemSeparationIntegration from './audio/StemSeparationIntegration';
 import { createSignalMatrix } from './audio/SignalMatrix';
+import { rustMasterBridge } from './audio/RustMasterBridge';
 import StemSeparationModal from './components/modals/StemSeparationModal';
 import { FileInput } from './components/import/FileInput';
 import { useTimelineStore } from './state/timelineStore';
@@ -600,17 +601,8 @@ export interface MixerSettings {
     pan: number;
     isMuted: boolean;
 }
-export interface TrackAnalysisData {
-    level: number;
-    transient: boolean;
-    rms?: number;
-    peak?: number;
-    crestFactor?: number;
-    spectralTilt?: number;
-    lowBandEnergy?: number;
-    automationActive?: boolean;
-    automationTargets?: string[];
-}
+// TrackAnalysisData moved to MixerDomain.tsx
+import type { TrackAnalysisData, MasterAnalysisData } from './domains/mixer/MixerDomain';
 type MasterNodes = VelvetMasterChain;
 
 
@@ -1204,20 +1196,42 @@ interface FlowRuntimeProps {
 }
 
 const FlowRuntime: React.FC<FlowRuntimeProps> = ({ arrangeFocusToken }) => {
+  const audio = useAudioDomain();
+  const session = useSession();
+  const transport = useTransport();
+  const mixer = useMixer();
+  
+  const { isPlaying, currentTime, isLooping, bpm } = transport;
+  const { setIsPlaying, setCurrentTime, setIsLooping, setBpm } = transport;
+
+  const { 
+    mixerSettings, soloedTracks, masterVolume, masterBalance, 
+    trackAnalysis, masterAnalysis, busLevels, translationProfile
+  } = mixer;
+  const { fxNodesRef } = mixer;
+  const { 
+    setTrackVolume, setTrackPan, setTrackMute, setTrackSolo,
+    setMasterVolume, setMasterBalance, setTrackAnalysis, setMasterAnalysis,
+    setTranslationProfile, setBusLevels, setAllMixerSettings, setAllSoloedTracks,
+    removeTrackSettings
+  } = mixer;
+  
   // --- STATE MANAGEMENT ---
   const [tracks, setTracks] = useState<TrackData[]>(() => buildInitialTracks());
-  const stemIntegrationRef = useRef<StemSeparationIntegration | null>(null);
   const tracksRef = useRef<TrackData[]>(tracks);
   const clipsRef = useRef<ArrangeClip[]>([]);
   const [isStemModalOpen, setIsStemModalOpen] = useState(false);
+  
+  const animationFrameRef = useRef<number | null>(null);
+  const lastUpdateTimeRef = useRef<number>(0);
+  const activeSourcesRef = useRef<{ source: AudioBufferSourceNode, gain: GainNode }[]>([]);
+  
+  const trackMeterBuffersRef = useRef<Record<string, TrackMeterBuffers>>({});
+  const busMeterBuffersRef = useRef<Record<string, TrackMeterBuffers>>({});
+  const masterMeterBufferRef = useRef<MasterMeterBuffers | null>(null);
   const [pendingStemRequest, setPendingStemRequest] = useState<PendingStemRequest | null>(null);
   const [lastStemSelection, setLastStemSelection] = useState<string[]>([...DEFAULT_STEM_SELECTION]);
   const [audioBuffers, setAudioBuffers] = useState<Record<string, AudioBuffer>>({});
-  const [isPlaying, setIsPlaying] = useState(false);
-  const [currentTime, setCurrentTime] = useState(0);
-  const [isLooping, setIsLooping] = useState(false);
-  const [bpm, setBpm] = useState(120);
-  const audioContextRef = useRef<AudioContext | null>(null);
   const trackNodesRef = useRef<{ [key: string]: AudioNodes }>({});
   
   // Send Routing Nodes - Map<`${trackId}-${busId}`, GainNode>
@@ -1225,10 +1239,8 @@ const FlowRuntime: React.FC<FlowRuntimeProps> = ({ arrangeFocusToken }) => {
   const sendNodesRef = useRef<Map<string, GainNode>>(new Map());
   
   // Master Ready Gate - prevents routing until master chain is fully initialized
-  // MUST be declared before any useEffect that uses it
-  const [masterReady, setMasterReady] = useState(false);
+  // Managed by AudioDomain
   const queuedRoutesRef = useRef<Array<{ trackId: string; outputNode: AudioNode }>>([]);
-  const signalMatrixRef = useRef<ReturnType<typeof createSignalMatrix> | null>(null);
   
   // Initialize Thermal Sync (Part A) - Global thermal color filters
   useEffect(() => {
@@ -1257,9 +1269,9 @@ const FlowRuntime: React.FC<FlowRuntimeProps> = ({ arrangeFocusToken }) => {
   
   // Flush queued routes the moment master becomes ready
   useEffect(() => {
-    if (masterReady && queuedRoutesRef.current.length > 0 && masterNodesRef.current) {
-      const matrix = signalMatrixRef.current;
-      const masterInput = masterNodesRef.current.input;
+    if (audio.masterReady && queuedRoutesRef.current.length > 0 && audio.getMasterNodes()) {
+      const matrix = audio.getSignalMatrix();
+      const masterInput = audio.getMasterNodes()?.input;
       
       queuedRoutesRef.current.forEach(({ trackId, outputNode }) => {
         const track = tracksRef.current.find(t => t.id === trackId);
@@ -1300,7 +1312,7 @@ const FlowRuntime: React.FC<FlowRuntimeProps> = ({ arrangeFocusToken }) => {
       });
       queuedRoutesRef.current = [];
     }
-  }, [masterReady]);
+  }, [audio.masterReady]);
 
   useEffect(() => {
     setTrackSendLevels((prev) => {
@@ -1359,48 +1371,15 @@ const FlowRuntime: React.FC<FlowRuntimeProps> = ({ arrangeFocusToken }) => {
     });
   }, [tracks]);
 
-  const fxNodesRef = useRef<{[key: string]: FxNode}>({}); // This will manage instances of ALL plugins
-  const masterNodesRef = useRef<MasterNodes | null>(null);
-  const translationMatrixRef = useRef<TranslationMatrix | null>(null);
-  const velvetLoudnessMeterRef = useRef<VelvetLoudnessMeter | null>(null);
-  const loudnessListenerRef = useRef<((event: Event) => void) | null>(null);
-  const translationProfileRef = useRef<TranslationProfileKey>('flat');
-  const animationFrameRef = useRef<number | null>(null);
-  const activeSourcesRef = useRef<{ source: AudioBufferSourceNode, gain: GainNode }[]>([]);
-  const lastUpdateTimeRef = useRef<number>(0);
-  const trackMeterBuffersRef = useRef<Record<string, TrackMeterBuffers>>({});
-  const masterMeterBufferRef = useRef<MasterMeterBuffers | null>(null);
-  const busMeterBuffersRef = useRef<Record<string, TrackMeterBuffers>>({});
-  const [busLevels, setBusLevels] = useState<Record<string, { level: number; peak: number; transient: boolean }>>({});
-  
   const [isAddTrackModalOpen, setIsAddTrackModalModalOpen] = useState(false);
-  const [mixerSettings, setMixerSettings] = useState<{ [key: string]: MixerSettings }>(() => createInitialMixerSettings());
-  const [soloedTracks, setSoloedTracks] = useState(new Set<string>());
-  const [masterVolume, setMasterVolume] = useState(0.8);
 
   // --- DOMAIN BRIDGE SYNC ---
-  // Sync FlowRuntime state to domain contexts for child components
-  useMixerBridgeSync({
-    mixerSettings,
-    soloedTracks,
-    masterVolume,
-  });
-  useTransportBridgeSync({
-    isPlaying,
-    currentTime,
-    bpm,
-    isLooping,
-  });
+  // Managed via unified useDomainBridgeSync at the bottom of FlowRuntime
 
-  const [masterBalance, setMasterBalance] = useState(0);
-  const [translationProfile, setTranslationProfile] = useState<TranslationProfileKey>('flat');
   const [recordingOptions, setRecordingOptions] = useState(() => ({ ...INITIAL_RECORDING_OPTIONS }));
-  const [trackAnalysis, setTrackAnalysis] = useState<{ [key: string]: TrackAnalysisData }>({});
   const [waveformHeaderSettings, setWaveformHeaderSettings] = useState<WaveformHeaderSettings>(() => ({ ...DEFAULT_WAVEFORM_HEADER_SETTINGS }));
   const [isWaveformSettingsOpen, setIsWaveformSettingsOpen] = useState(false);
-  const [masterAnalysis, setMasterAnalysis] = useState({ level: 0, transient: false, waveform: new Uint8Array(128) });
   const [isRecoveryOpen, setIsRecoveryOpen] = useState(false);
-  const [loudnessMetrics, setLoudnessMetrics] = useState(DEFAULT_VELVET_LOUDNESS_METRICS);
   const masterLevelAvg = useRef(0.01);
   const [analysisResult, setAnalysisResult] = useState<FourAnchors | null>(null);
   const [trackSendLevels, setTrackSendLevels] = useState<Record<string, Record<MixerBusId, number>>>(() => createInitialTrackSendLevels());
@@ -1409,7 +1388,6 @@ const FlowRuntime: React.FC<FlowRuntimeProps> = ({ arrangeFocusToken }) => {
   const [selectedBusId, setSelectedBusId] = useState<MixerBusId | null>(null);
   const [armedTracks, setArmedTracks] = useState<Set<string>>(new Set());
   const fileInputRef = useRef<HTMLInputElement>(null);
-  const [importMessage, setImportMessage] = useState<string | null>(null);
   const [fileInputContext, setFileInputContext] = useState<'import' | 'load' | 'reingest'>('import');
   const [importProgress, setImportProgress] = useState<ImportProgressEntry[]>([]);
   const [mixerActionPulse, setMixerActionPulse] = useState<{
@@ -1570,23 +1548,13 @@ const FlowRuntime: React.FC<FlowRuntimeProps> = ({ arrangeFocusToken }) => {
     }
   }
 
-  useEffect(() => {
-    return () => {
-      const meter = velvetLoudnessMeterRef.current;
-      const listener = loudnessListenerRef.current;
-      if (meter && listener) {
-        meter.removeEventListener('metrics', listener as EventListener);
-      }
-    };
-  }, []);
 
   useEffect(() => {
-    translationProfileRef.current = translationProfile;
-    const matrix = translationMatrixRef.current;
+    const matrix = audio.getTranslationMatrix();
     if (matrix) {
-      matrix.activate(translationProfile);
+      matrix.activate(translationProfile as any);
     }
-  }, [translationProfile]);
+  }, [translationProfile, audio]);
 
   const handleToggleRecordingOption = useCallback((option: RecordingOptionKey) => {
     setRecordingOptions((prev) => {
@@ -1602,8 +1570,8 @@ const FlowRuntime: React.FC<FlowRuntimeProps> = ({ arrangeFocusToken }) => {
 
   const handleDropTakeMarker = useCallback(() => {
     const timestamp = new Date().toISOString();
-    const report = evaluateCapture(loudnessMetrics, masterAnalysis.waveform);
-    const summary = `Take marker • Δ${(report.integratedLUFS - (masterNodesRef.current?.getProfile()?.targetLUFS ?? -14)).toFixed(1)} LUFS • Crest ${report.crestFactor.toFixed(1)} dB`;
+    const report = evaluateCapture(audio.loudnessMetrics, masterAnalysis.waveform);
+    const summary = `Take marker • Δ${(report.integratedLUFS - (audio.getMasterNodes()?.getProfile()?.targetLUFS ?? -14)).toFixed(1)} LUFS • Crest ${report.crestFactor.toFixed(1)} dB`;
     appendHistoryNote({
       id: `take-marker-${timestamp}`,
       timestamp: Date.now(),
@@ -1615,7 +1583,7 @@ const FlowRuntime: React.FC<FlowRuntimeProps> = ({ arrangeFocusToken }) => {
       source: 'recording',
       marker: { timestamp, report },
     });
-  }, [appendHistoryNote, loudnessMetrics, masterAnalysis.waveform, publishAlsSignal]);
+  }, [appendHistoryNote, audio.loudnessMetrics, masterAnalysis.waveform, publishAlsSignal]);
 
   const logPrimeBrainAction = useCallback(
     (label: string) => {
@@ -1677,8 +1645,8 @@ const FlowRuntime: React.FC<FlowRuntimeProps> = ({ arrangeFocusToken }) => {
   );
 
   const captureReport = useMemo(
-    () => evaluateCapture(loudnessMetrics, masterAnalysis.waveform),
-    [loudnessMetrics, masterAnalysis.waveform],
+    () => evaluateCapture(audio.loudnessMetrics, masterAnalysis.waveform),
+    [audio.loudnessMetrics, masterAnalysis.waveform],
   );
 
   const handleTogglePrimeBrainTelemetry = useCallback(() => {
@@ -1727,7 +1695,7 @@ const FlowRuntime: React.FC<FlowRuntimeProps> = ({ arrangeFocusToken }) => {
     const pressureBase =
       (masterAnalysis.transient ? 0.55 + masterAnalysis.level * 0.4 : masterAnalysis.level * 0.6) +
       flowContext.momentumTrend * 0.35;
-    const pressure = clamp01(importMessage ? Math.max(pressureBase, 0.65) : pressureBase);
+    const pressure = clamp01(audio.importMessage ? Math.max(pressureBase, 0.65) : pressureBase);
     // Contextual harmony: Only compute if there's actual audio
     const harmony = hasAudio && analysisResult
       ? clamp01((analysisResult.soul / 100) * 0.6 + (analysisResult.silk / 100) * 0.4)
@@ -1775,11 +1743,11 @@ const FlowRuntime: React.FC<FlowRuntimeProps> = ({ arrangeFocusToken }) => {
       };
     });
 
-    if (importMessage) {
+    if (audio.importMessage) {
       aiAnalysisFlags.push({
         category: 'ingest',
         severity: 'info',
-        message: importMessage,
+        message: audio.importMessage,
       });
     }
 
@@ -1845,7 +1813,7 @@ const FlowRuntime: React.FC<FlowRuntimeProps> = ({ arrangeFocusToken }) => {
       mode = 'optimizing';
     } else if (modeHints.armedTrackCount > 0) {
       mode = 'learning';
-    } else if (modeHints.isPlaying || modeHints.activeBloomActions > 0 || Boolean(importMessage)) {
+    } else if (modeHints.isPlaying || modeHints.activeBloomActions > 0 || Boolean(audio.importMessage)) {
       mode = 'active';
     } else if (flowContext.sessionContext?.activityLevel === 'intense') {
       mode = 'active';
@@ -1924,7 +1892,7 @@ const FlowRuntime: React.FC<FlowRuntimeProps> = ({ arrangeFocusToken }) => {
     masterAnalysis.transient,
     isPlaying,
     mixerActionPulse,
-    importMessage,
+    audio.importMessage,
     analysisResult,
     captureReport,
     armedTracks,
@@ -2243,15 +2211,17 @@ const FlowRuntime: React.FC<FlowRuntimeProps> = ({ arrangeFocusToken }) => {
   const setPianoRollState = pianoRollBinding.setState;
   const loadPianoNotes = pianoRollBinding.loadNotes;
   const exportPianoNotes = pianoRollBinding.exportNotes;
+  // --- SESSION DOMAIN ---
+  
+  // Note: Local pianoRollStore is still needed for actual MIDI data sketches
   const [pianoRollStore, setPianoRollStore] = useState<Record<string, MidiNote[]>>({});
-  const [isPianoRollOpen, setIsPianoRollOpen] = useState(false);
-  const [isSpectralEditorOpen, setIsSpectralEditorOpen] = useState(false);
-  const [activeSpectralClip, setActiveSpectralClip] = useState<ArrangeClip | null>(null);
-  const [activeSpectralTrack, setActiveSpectralTrack] = useState<TrackData | null>(null);
-  const [pianoRollClipId, setPianoRollClipId] = useState<ClipId | null>(null);
-  const [pianoRollTrackId, setPianoRollTrackId] = useState<string | null>(null);
   const [activeCapsuleTrackId, setActiveCapsuleTrackId] = useState<string | null>(null);
-  const [followPlayhead, setFollowPlayhead] = useState(true);
+  
+  // These are now handled by session domain:
+  // isPianoRollOpen, setIsPianoRollOpen
+  // isSpectralEditorOpen, setIsSpectralEditorOpen
+  // session.followPlayhead, session.setFollowPlayhead
+  // pianoRollClipId, pianoRollTrackId -> session.activePanelClipId, session.activePanelTrackId
 
   useEffect(() => {
     setTrackUiState((prev) => {
@@ -2395,7 +2365,7 @@ const FlowRuntime: React.FC<FlowRuntimeProps> = ({ arrangeFocusToken }) => {
   }, [floatingBloomPosition]);
 
   const handleManualTimelineScroll = useCallback(() => {
-    setFollowPlayhead((prev) => {
+    session.setFollowPlayhead((prev: boolean) => {
       if (!prev) return prev;
       appendHistoryNote({
         id: `timeline-follow-${Date.now()}`,
@@ -2478,7 +2448,7 @@ const FlowRuntime: React.FC<FlowRuntimeProps> = ({ arrangeFocusToken }) => {
 
   // --- CONTEXTUAL ENGINE STATE ---
   // --- AI Hub State ---
-  const [isAIHubOpen, setIsAIHubOpen] = useState(false);
+  // AI Hub state is now in session domain
 
   const { clips, setClips, selection, setSelection, clearSelection, ppsAPI, scrollX, setScrollX, moveClip, resizeClip, onSplitAt, setClipsSelect, duplicateClips, updateClipProperties, undo, redo, canUndo, canRedo } = useArrange({
     clips: []
@@ -2577,7 +2547,7 @@ const FlowRuntime: React.FC<FlowRuntimeProps> = ({ arrangeFocusToken }) => {
 
   // All FX Window configurations based on the registry (excluding core processors from UI)
   const fxWindows: FxWindowConfig[] = useMemo(() => {
-    if (!audioContextRef.current) return [];
+    if (!audio.getAudioContext()) return [];
     
     return pluginRegistry
       .filter(plugin => !CORE_PROCESSOR_IDS.includes(plugin.id))
@@ -2732,10 +2702,10 @@ const FlowRuntime: React.FC<FlowRuntimeProps> = ({ arrangeFocusToken }) => {
       allowedStemKeys: string[],
       jobIdOverride?: string
     ) => {
-       const integration = stemIntegrationRef.current;
+       const integration = audio.getStemIntegration();
        if (!integration) {
          console.warn('[STEMS] Integration not ready, skipping stem separation.');
-         setImportMessage(null);
+         audio.setImportMessage(null);
          setTracks((prev) =>
            prev.map((track) =>
              track.id === request.originalTrackId ? { ...track, isProcessing: false } : track
@@ -2768,7 +2738,7 @@ const FlowRuntime: React.FC<FlowRuntimeProps> = ({ arrangeFocusToken }) => {
        }
        try {
          const originalIndex = tracksRef.current.findIndex((track) => track.id === request.originalTrackId);
-         setImportMessage('Prime Brain is analyzing stems...');
+         audio.setImportMessage('Prime Brain is analyzing stems...');
          const separationResult = await integration.importAudioWithStemSeparation(
            request.buffer,
            request.fileName,
@@ -2796,9 +2766,12 @@ const FlowRuntime: React.FC<FlowRuntimeProps> = ({ arrangeFocusToken }) => {
               metadata: { stemsCreated: 0 },
             });
            }
-          request.resolve?.();
+           request.resolve?.();
            return;
          }
+ 
+         const next = { ...mixerSettings, ...separationResult.mixerSettings };
+         setAllMixerSettings(next);
  
          setAudioBuffers((prev) => ({
            ...prev,
@@ -2813,15 +2786,6 @@ const FlowRuntime: React.FC<FlowRuntimeProps> = ({ arrangeFocusToken }) => {
            updated.splice(index + 1, 0, ...separationResult.newTracks);
            tracksRef.current = updated;
            return updated;
-         });
- 
-         setMixerSettings((prev) => {
-           const next = { ...prev, ...separationResult.mixerSettings };
-           next[request.originalTrackId] = {
-             ...(next[request.originalTrackId] ?? { volume: 0.75, pan: 0, isMuted: false }),
-             isMuted: true,
-           };
-           return next;
          });
  
         setInserts((prev) => {
@@ -2869,7 +2833,7 @@ const FlowRuntime: React.FC<FlowRuntimeProps> = ({ arrangeFocusToken }) => {
 
         setClips((prev) => [...prev, ...separationResult.newClips]);
  
-         setTimeout(() => setImportMessage(null), 1200);
+         setTimeout(() => audio.setImportMessage(null), 1200);
          if (jobId) {
            canonicalAllowed.forEach((stemKey) => {
              upsertImportProgress({
@@ -2899,8 +2863,8 @@ const FlowRuntime: React.FC<FlowRuntimeProps> = ({ arrangeFocusToken }) => {
              track.id === request.originalTrackId ? { ...track, isProcessing: false } : track
            )
          );
-         setImportMessage('Stem separation failed');
-         setTimeout(() => setImportMessage(null), 3000);
+         audio.setImportMessage('Stem separation failed');
+         setTimeout(() => audio.setImportMessage(null), 3000);
          if (jobId) {
            upsertImportProgress({ id: jobId, label: `${request.fileName} • Failed`, percent: 100, type: 'file', color: '#f87171' });
            setTimeout(() => {
@@ -2917,7 +2881,7 @@ const FlowRuntime: React.FC<FlowRuntimeProps> = ({ arrangeFocusToken }) => {
         request.reject?.(error instanceof Error ? error : new Error('Stem separation failed'));
        }
      },
-     [removeImportProgressById, removeImportProgressByPrefix, setAudioBuffers, setClips, setImportMessage, setInserts, setMixerSettings, setTracks, upsertImportProgress]
+     [removeImportProgressById, removeImportProgressByPrefix, setAudioBuffers, setClips, audio.setImportMessage, setInserts, setMixerSettings, setTracks, upsertImportProgress]
    );
 
   const handleStemModalConfirm = useCallback(
@@ -2943,7 +2907,7 @@ const FlowRuntime: React.FC<FlowRuntimeProps> = ({ arrangeFocusToken }) => {
       return;
     }
     setPendingStemRequest(null);
-    setImportMessage(null);
+    audio.setImportMessage(null);
     ingestQueueRef.current?.cancel(request.jobId);
     request.reject?.(new Error('Stem separation cancelled by user'));
     removeImportProgressByPrefix(request.jobId);
@@ -2955,7 +2919,7 @@ const FlowRuntime: React.FC<FlowRuntimeProps> = ({ arrangeFocusToken }) => {
         track.id === request.originalTrackId ? { ...track, isProcessing: false } : track
       )
     );
-  }, [pendingStemRequest, removeImportProgressByPrefix, setImportMessage, setTracks]);
+  }, [pendingStemRequest, removeImportProgressByPrefix, audio.setImportMessage, setTracks]);
 
   const handleToggleLoop = useCallback(() => {
     setIsLooping((prev) => {
@@ -2987,7 +2951,7 @@ const FlowRuntime: React.FC<FlowRuntimeProps> = ({ arrangeFocusToken }) => {
         reject: deferred?.reject ?? (() => {}),
       });
       setIsStemModalOpen(true);
-      setImportMessage(null);
+      audio.setImportMessage(null);
     },
     [upsertImportProgress]
   );
@@ -2999,14 +2963,16 @@ const FlowRuntime: React.FC<FlowRuntimeProps> = ({ arrangeFocusToken }) => {
     fileName: string,
     options: { resetSession?: boolean; reingestClipId?: ClipId } = {}
   ) => {
-    if (!audioContextRef.current) return;
+    if (!audio.getAudioContext()) return;
     const { resetSession = false, reingestClipId } = options;
 
     const displayName = stripFileExtension(fileName);
-    setImportMessage(`Applying Velvet Sonics: ${displayName}`);
+    audio.setImportMessage(`Applying Velvet Sonics: ${displayName}`);
     upsertImportProgress({ id: jobId, label: displayName, percent: 10, type: 'file' });
 
-    const velvetProcessor = new VelvetProcessor(audioContextRef.current);
+    const ctx = audio.getContext();
+    if (!ctx) return;
+    const velvetProcessor = new VelvetProcessor(ctx);
     const processedBuffer = await velvetProcessor.processAudioBuffer(buffer, {
       profile: {
         name: 'Streaming Standard',
@@ -3086,7 +3052,7 @@ const FlowRuntime: React.FC<FlowRuntimeProps> = ({ arrangeFocusToken }) => {
       );
       setTracks(seededWithProcessing);
       tracksRef.current = seededWithProcessing;
-      setMixerSettings(createInitialMixerSettings());
+      setAllMixerSettings(createInitialMixerSettings());
       setTrackSendLevels(createInitialTrackSendLevels());
       setChannelDynamicsSettings(createInitialDynamicsSettings());
       setChannelEQSettings(createInitialEQSettings());
@@ -3096,7 +3062,7 @@ const FlowRuntime: React.FC<FlowRuntimeProps> = ({ arrangeFocusToken }) => {
       setAutomationData({});
       setVisibleAutomationLanes({});
       setFxBypassState({});
-      setSoloedTracks(new Set<string>());
+      setAllSoloedTracks(new Set<string>());
       setArmedTracks(new Set<string>());
       setClips([]);
       targetTrackId = TRACK_ROLE_TO_ID.twoTrack;
@@ -3127,10 +3093,9 @@ const FlowRuntime: React.FC<FlowRuntimeProps> = ({ arrangeFocusToken }) => {
       });
       targetTrackId = newTrackId;
       targetTrackMeta = newTrack;
-      setMixerSettings((prev) => ({
-        ...prev,
-        [newTrackId]: { volume: 0.75, pan: 0, isMuted: false },
-      }));
+      setTrackVolume(newTrackId, 0.75);
+      setTrackPan(newTrackId, 0);
+      setTrackMute(newTrackId, false);
       setInserts((prev) => {
         const next = { ...prev, [newTrackId]: newInsertsForTrack };
         insertsRef.current = next;
@@ -3191,7 +3156,7 @@ const FlowRuntime: React.FC<FlowRuntimeProps> = ({ arrangeFocusToken }) => {
     setSelectedTrackId(assignedTrackId);
     upsertImportProgress({ id: jobId, label: `${displayName} • Track seeded`, percent: 45, type: 'file' });
 
-    setImportMessage('Prime Brain is analyzing stems...');
+    audio.setImportMessage('Prime Brain is analyzing stems...');
     await new Promise<void>((resolve, reject) => {
       startBackgroundStemSeparation(assignedTrackId, processedBuffer, displayName, jobId, { resolve, reject });
     });
@@ -3223,7 +3188,7 @@ const FlowRuntime: React.FC<FlowRuntimeProps> = ({ arrangeFocusToken }) => {
       floatingBloomPosition,
       ingestSnapshot: queueSnapshot,
       ingestHistoryEntries: historySnapshot,
-      followPlayhead,
+      followPlayhead: session.followPlayhead,
       pianoRollSketches: pianoRollStore,
       pianoRollZoom: {
         scrollX: pianoRollState.scrollX,
@@ -3249,7 +3214,7 @@ const FlowRuntime: React.FC<FlowRuntimeProps> = ({ arrangeFocusToken }) => {
     bloomPosition,
     floatingBloomPosition,
     ingestSnapshot, // Used as fallback when ingestQueueRef is null
-    followPlayhead,
+    session.followPlayhead,
     pianoRollStore, // Piano roll sketches state
     pianoRollState, // Piano roll zoom/scroll state
     // Note: ingestHistoryStore is a stable store reference, exportAll() gets current state
@@ -3281,12 +3246,22 @@ const FlowRuntime: React.FC<FlowRuntimeProps> = ({ arrangeFocusToken }) => {
     bloomPosition,
     floatingBloomPosition,
     ingestSnapshot, // Used as fallback when ingestQueueRef is null
-    followPlayhead,
+    session.followPlayhead,
     pianoRollStore, // Piano roll sketches state
     pianoRollState, // Piano roll zoom/scroll state
     autoSave.isEnabled,
     // Note: autoSave.saveNow is stable (useCallback with empty deps) and called directly, not needed in deps
   ]);
+
+  // Sync state to domain contexts (Phase 31)
+  useDomainBridgeSync({
+    tracks,
+    masterReady: audio.masterReady,
+    isPianoRollOpen: session.isPianoRollOpen,
+    isSpectralEditorOpen: session.isSpectralEditorOpen,
+    followPlayhead: session.followPlayhead,
+    getProjectState,
+  });
 
   // Define handleSaveProject before keyboard shortcuts to avoid forward reference
   const handleSaveProject = useCallback(async () => {
@@ -3315,7 +3290,7 @@ const FlowRuntime: React.FC<FlowRuntimeProps> = ({ arrangeFocusToken }) => {
           floatingBloomPosition,
           ingestSnapshot: queueSnapshot,
           ingestHistoryEntries: historySnapshot,
-          followPlayhead,
+          followPlayhead: session.followPlayhead,
           pianoRollSketches: pianoRollStore,
           pianoRollZoom: {
             scrollX: pianoRollState.scrollX,
@@ -3351,7 +3326,7 @@ const FlowRuntime: React.FC<FlowRuntimeProps> = ({ arrangeFocusToken }) => {
     bloomPosition,
     floatingBloomPosition,
     ingestSnapshot,
-    followPlayhead,
+    session.followPlayhead,
     pianoRollStore,
     pianoRollState,
   ]);
@@ -3486,7 +3461,7 @@ const FlowRuntime: React.FC<FlowRuntimeProps> = ({ arrangeFocusToken }) => {
 
     // Restore mixer settings
     if (state.mixerSettings) {
-      setMixerSettings(state.mixerSettings);
+      setAllMixerSettings(state.mixerSettings);
     }
 
     // Restore inserts
@@ -3512,9 +3487,9 @@ const FlowRuntime: React.FC<FlowRuntimeProps> = ({ arrangeFocusToken }) => {
 
     // Restore pixels-per-second zoom level
     if (state.ppsValue !== undefined) {
-      const ppsValue = typeof state.ppsValue === 'string' ? parseFloat(state.ppsValue) : state.ppsValue;
-      if (!isNaN(ppsValue) && ppsAPI) {
-        ppsAPI.set(ppsValue);
+      const ppsVal = typeof state.ppsValue === 'string' ? parseFloat(state.ppsValue) : state.ppsValue;
+      if (!isNaN(ppsVal) && ppsAPI) {
+        ppsAPI.set(ppsVal);
       }
     }
 
@@ -3551,7 +3526,7 @@ const FlowRuntime: React.FC<FlowRuntimeProps> = ({ arrangeFocusToken }) => {
 
     // Restore follow playhead
     if (state.followPlayhead !== undefined) {
-      setFollowPlayhead(state.followPlayhead);
+      session.setFollowPlayhead(state.followPlayhead);
     }
 
     // Restore ingest queue snapshot
@@ -3596,7 +3571,7 @@ const FlowRuntime: React.FC<FlowRuntimeProps> = ({ arrangeFocusToken }) => {
     setFxBypassState,
     setBloomPosition,
     setFloatingBloomPosition,
-    setFollowPlayhead,
+    session.setFollowPlayhead,
     setIngestSnapshot,
     setPianoRollStore,
     setPianoRollState,
@@ -3606,7 +3581,7 @@ const FlowRuntime: React.FC<FlowRuntimeProps> = ({ arrangeFocusToken }) => {
     job: IngestRuntimeJob,
     controls: IngestJobControls
   ): Promise<void | IngestJobOutcome> => {
-    const ctx = audioContextRef.current;
+    const ctx = audio.getAudioContext();
     if (!ctx) {
       controls.markFailed('Audio engine not initialized');
       return { status: 'failed', summary: { error: 'Audio engine not initialized' } };
@@ -3634,13 +3609,13 @@ const FlowRuntime: React.FC<FlowRuntimeProps> = ({ arrangeFocusToken }) => {
         // Re-ingest: use legacy path for now (replaces existing clip buffer)
         controls.reportProgress({ percent: 5, message: `Decoding ${displayName}` });
         upsertImportProgress({ id: job.id, label: displayName, percent: 5, type: 'file' });
-        setImportMessage(`Decoding ${displayName}…`);
+        audio.setImportMessage(`Decoding ${displayName}…`);
 
         const arrayBuffer = await job.file.arrayBuffer();
         if (controls.isCancelled()) {
           controls.markCancelled('User cancelled import');
           removeImportProgressByPrefix(job.id);
-          setImportMessage(null);
+          audio.setImportMessage(null);
           return { status: 'cancelled' };
         }
 
@@ -3648,7 +3623,7 @@ const FlowRuntime: React.FC<FlowRuntimeProps> = ({ arrangeFocusToken }) => {
         if (controls.isCancelled()) {
           controls.markCancelled('User cancelled import');
           removeImportProgressByPrefix(job.id);
-          setImportMessage(null);
+          audio.setImportMessage(null);
           return { status: 'cancelled' };
         }
 
@@ -3658,7 +3633,7 @@ const FlowRuntime: React.FC<FlowRuntimeProps> = ({ arrangeFocusToken }) => {
           reingestClipId,
         });
         controls.reportProgress({ percent: 100, message: `${displayName} • Complete` });
-        setImportMessage(null);
+        audio.setImportMessage(null);
         return;
       }
 
@@ -3666,7 +3641,7 @@ const FlowRuntime: React.FC<FlowRuntimeProps> = ({ arrangeFocusToken }) => {
       // Audio files are immediately stem-separated and placed on individual tracks
       controls.reportProgress({ percent: 5, message: `Stem separating ${displayName}…` });
       upsertImportProgress({ id: job.id, label: displayName, percent: 5, type: 'file' });
-      setImportMessage(`Stem separating ${displayName}…`);
+      audio.setImportMessage(`Stem separating ${displayName}…`);
 
       // If resetSession is true, clear existing tracks/clips first
       if (job.resetSession) {
@@ -3693,7 +3668,7 @@ const FlowRuntime: React.FC<FlowRuntimeProps> = ({ arrangeFocusToken }) => {
       if (controls.isCancelled()) {
         controls.markCancelled('User cancelled import');
         removeImportProgressByPrefix(job.id);
-        setImportMessage(null);
+        audio.setImportMessage(null);
         return { status: 'cancelled' };
       }
 
@@ -3707,8 +3682,8 @@ const FlowRuntime: React.FC<FlowRuntimeProps> = ({ arrangeFocusToken }) => {
       const stemsCreated = Object.keys(result.stems).filter(k => result.stems[k] !== null).length;
       if (stemsCreated === 0) {
         controls.reportProgress({ percent: 100, message: `${displayName} • No stems detected` });
-        setImportMessage(`${displayName} • No stems detected`);
-        setTimeout(() => setImportMessage(null), 3000);
+        audio.setImportMessage(`${displayName} • No stems detected`);
+        setTimeout(() => audio.setImportMessage(null), 3000);
         return {
           status: 'completed',
           summary: {
@@ -3766,7 +3741,7 @@ const FlowRuntime: React.FC<FlowRuntimeProps> = ({ arrangeFocusToken }) => {
         setAudioBuffers(prev => ({ ...prev, ...zustandBuffers }));
 
         // Initialize all track state for imported tracks
-        setMixerSettings(prev => {
+        setAllMixerSettings(prev => {
           const next = { ...prev };
           zustandTracks.forEach(track => {
             if (!next[track.id]) {
@@ -3824,7 +3799,7 @@ const FlowRuntime: React.FC<FlowRuntimeProps> = ({ arrangeFocusToken }) => {
       }
 
       controls.reportProgress({ percent: 100, message: `${displayName} • Complete` });
-      setImportMessage(null);
+      audio.setImportMessage(null);
       return {
         status: 'completed',
         summary: {
@@ -3840,13 +3815,13 @@ const FlowRuntime: React.FC<FlowRuntimeProps> = ({ arrangeFocusToken }) => {
       if (controls.isCancelled()) {
         controls.markCancelled(message);
         removeImportProgressByPrefix(job.id);
-        setImportMessage(null);
+        audio.setImportMessage(null);
         return { status: 'cancelled', summary: { error: message } };
       }
       controls.markFailed(message);
       removeImportProgressByPrefix(job.id);
-      setImportMessage(message);
-      setTimeout(() => setImportMessage(null), 3000);
+      audio.setImportMessage(message);
+      setTimeout(() => audio.setImportMessage(null), 3000);
       return { status: 'failed', summary: { error: message } };
     }
   };
@@ -3892,12 +3867,12 @@ const FlowRuntime: React.FC<FlowRuntimeProps> = ({ arrangeFocusToken }) => {
   }, []);
 
   const handleProjectLoad = async (projectState: PersistedProjectState) => {
-      if (!audioContextRef.current) return;
+      if (!audio.getAudioContext()) return;
       stopPlayback();
       setIsPlaying(false);
 
       const serializedBuffers = projectState.audioBuffers ?? {};
-      const deserializedBuffers = await deserializeAudioBuffers(serializedBuffers, audioContextRef.current);
+      const deserializedBuffers = await deserializeAudioBuffers(serializedBuffers, audio.getAudioContext());
 
       setTracks(projectState.tracks || []);
       // FIX: Ensure numeric properties of clips are correctly parsed as numbers during load
@@ -3917,7 +3892,7 @@ const FlowRuntime: React.FC<FlowRuntimeProps> = ({ arrangeFocusToken }) => {
                 .filter((anchor: number) => Number.isFinite(anchor) && anchor >= 0)
             : [],
       })) || []);
-      setMixerSettings(projectState.mixerSettings || {});
+      setAllMixerSettings(projectState.mixerSettings || {});
       setInserts(projectState.inserts || {}); // Load the inserts state
       // FIX: Ensure masterVolume is parsed as a number
       setMasterVolume(parseFloat(`${projectState.masterVolume ?? 0.8}`));
@@ -3935,7 +3910,7 @@ const FlowRuntime: React.FC<FlowRuntimeProps> = ({ arrangeFocusToken }) => {
       setVisibleAutomationLanes(projectState.visibleAutomationLanes || {});
       setMusicalContext(projectState.musicalContext || { genre: 'Streaming', mood: 'Balanced' });
       setFxBypassState(projectState.fxBypassState || {}); // Load FX bypass state
-      setFollowPlayhead(
+      session.setFollowPlayhead(
         projectState.followPlayhead === undefined ? true : Boolean(projectState.followPlayhead)
       );
       setPianoRollStore(
@@ -3993,7 +3968,7 @@ const FlowRuntime: React.FC<FlowRuntimeProps> = ({ arrangeFocusToken }) => {
 
   const handleFileLoad = async (event: React.ChangeEvent<HTMLInputElement>) => {
     const files = event.target.files;
-    if (!files || files.length === 0 || !audioContextRef.current) return;
+    if (!files || files.length === 0 || !audio.getAudioContext()) return;
 
     try {
       if (fileInputContext === 'import') {
@@ -4008,8 +3983,8 @@ const FlowRuntime: React.FC<FlowRuntimeProps> = ({ arrangeFocusToken }) => {
         });
 
         if (audioFiles.length === 0) {
-          setImportMessage('No audio files were imported.');
-          setTimeout(() => setImportMessage(null), 3000);
+          audio.setImportMessage('No audio files were imported.');
+          setTimeout(() => audio.setImportMessage(null), 3000);
           return;
         }
 
@@ -4067,19 +4042,19 @@ const FlowRuntime: React.FC<FlowRuntimeProps> = ({ arrangeFocusToken }) => {
           );
         }
         if (statusMessages.length > 0) {
-          setImportMessage(statusMessages.join(' '));
-          setTimeout(() => setImportMessage(null), 2500);
+          audio.setImportMessage(statusMessages.join(' '));
+          setTimeout(() => audio.setImportMessage(null), 2500);
         }
       } else if (fileInputContext === 'load') {
         const file = files[0];
         if (!file.name.toLowerCase().endsWith('.json')) {
           throw new Error('Invalid file type: Please select a .json project file.');
         }
-        setImportMessage('Loading Project...');
+        audio.setImportMessage('Loading Project...');
         const fileContent = await file.text();
         const projectState = JSON.parse(fileContent);
         handleProjectLoad(projectState as PersistedProjectState);
-        setImportMessage(null);
+        audio.setImportMessage(null);
       } else if (fileInputContext === 'reingest') {
         const file = files[0];
         const manager = ingestQueueRef.current;
@@ -4087,8 +4062,8 @@ const FlowRuntime: React.FC<FlowRuntimeProps> = ({ arrangeFocusToken }) => {
           throw new Error('Ingest queue manager is not available.');
         }
         if (!pendingReingest) {
-          setImportMessage('No clip selected for re-ingest.');
-          setTimeout(() => setImportMessage(null), 2500);
+          audio.setImportMessage('No clip selected for re-ingest.');
+          setTimeout(() => audio.setImportMessage(null), 2500);
           return;
         }
         manager.enqueue({
@@ -4099,8 +4074,8 @@ const FlowRuntime: React.FC<FlowRuntimeProps> = ({ arrangeFocusToken }) => {
         });
         setPendingReingest(null);
         setFileInputContext('import');
-        setImportMessage(`Queued re-ingest for ${file.name}`);
-        setTimeout(() => setImportMessage(null), 2000);
+        audio.setImportMessage(`Queued re-ingest for ${file.name}`);
+        setTimeout(() => audio.setImportMessage(null), 2000);
       }
     } catch (error) {
       console.error('Error handling file:', error);
@@ -4110,8 +4085,8 @@ const FlowRuntime: React.FC<FlowRuntimeProps> = ({ arrangeFocusToken }) => {
       } else if (typeof error === 'string') {
         errorMessage = error;
       }
-      setImportMessage(errorMessage);
-      setTimeout(() => setImportMessage(null), 3000);
+      audio.setImportMessage(errorMessage);
+      setTimeout(() => audio.setImportMessage(null), 3000);
     } finally {
       if (event.target) event.target.value = '';
     }
@@ -4127,7 +4102,7 @@ const FlowRuntime: React.FC<FlowRuntimeProps> = ({ arrangeFocusToken }) => {
     
     setIsPlaying((prevIsPlaying) => {
       const newIsPlaying = !prevIsPlaying;
-      const ctx = audioContextRef.current;
+      const ctx = audio.getAudioContext();
       if (ctx && (ctx.state as string) !== 'closed') {
         if (newIsPlaying) {
           ctx.resume().catch((error) => {
@@ -4216,8 +4191,6 @@ const FlowRuntime: React.FC<FlowRuntimeProps> = ({ arrangeFocusToken }) => {
 
                 if (firstPartPoints.length > 0 || secondPartPoints.length > 0) {
                   newPoints.push(
-                    ...firstPartPoints,
-                    { time, value: splitValue },
                     { time, value: splitValue },
                     ...secondPartPoints
                   );
@@ -4303,8 +4276,8 @@ const FlowRuntime: React.FC<FlowRuntimeProps> = ({ arrangeFocusToken }) => {
   const handleRecallLastImport = useCallback(() => {
     const latest = ingestHistoryEntries[0];
     if (!latest) {
-      setImportMessage('No ingest history yet.');
-      setTimeout(() => setImportMessage(null), 2000);
+      audio.setImportMessage('No ingest history yet.');
+      setTimeout(() => audio.setImportMessage(null), 2000);
       return;
     }
     const targetClipIds = latest.clipIds;
@@ -4324,26 +4297,26 @@ const FlowRuntime: React.FC<FlowRuntimeProps> = ({ arrangeFocusToken }) => {
       setRecallHighlightClipIds([]);
       recallHighlightTimeoutRef.current = null;
     }, 1800);
-    setImportMessage(`Recalled ${latest.fileName}`);
-    setTimeout(() => setImportMessage(null), 2000);
-  }, [ingestHistoryEntries, setClips, setImportMessage]);
+    audio.setImportMessage(`Recalled ${latest.fileName}`);
+    setTimeout(() => audio.setImportMessage(null), 2000);
+  }, [ingestHistoryEntries, setClips, audio.setImportMessage]);
 
   const handleReingestClip = useCallback(
     (clipId?: ClipId) => {
       if (!clipId) return;
       const clip = clips.find((entry) => entry.id === clipId);
       if (!clip) {
-        setImportMessage('Clip not found for re-ingest.');
-        setTimeout(() => setImportMessage(null), 2000);
+        audio.setImportMessage('Clip not found for re-ingest.');
+        setTimeout(() => audio.setImportMessage(null), 2000);
         return;
       }
       setPendingReingest({ clipId });
       setFileInputContext('reingest');
-      setImportMessage(`Select new audio for ${clip.name}.`);
-      setTimeout(() => setImportMessage(null), 2500);
+      audio.setImportMessage(`Select new audio for ${clip.name}.`);
+      setTimeout(() => audio.setImportMessage(null), 2500);
       fileInputRef.current?.click();
     },
-    [clips, setFileInputContext, setImportMessage]
+    [clips, setFileInputContext, audio.setImportMessage]
   );
 
   const isAnyTrackArmed = armedTracks.size > 0; // Define isAnyTrackArmed here
@@ -4432,12 +4405,9 @@ const FlowRuntime: React.FC<FlowRuntimeProps> = ({ arrangeFocusToken }) => {
               }
               break;
           case 'resetMix':
-              setMixerSettings(prev => {
-                  const newSettings = { ...prev };
-                  tracks.forEach(t => {
-                      newSettings[t.id] = { ...newSettings[t.id], volume: 0.75, pan: 0 };
-                  });
-                  return newSettings;
+              tracks.forEach(t => {
+                  setTrackVolume(t.id, 0.75);
+                  setTrackPan(t.id, 0);
               });
               setMasterVolume(0.8);
               setMasterBalance(0);
@@ -4447,12 +4417,12 @@ const FlowRuntime: React.FC<FlowRuntimeProps> = ({ arrangeFocusToken }) => {
                   const firstClip = clips[0];
                   if (!firstClip || !audioBuffers[firstClip.bufferId]) {
                       console.warn("Prime Brain: No audio on timeline to analyze.");
-                      setImportMessage(null);
+                      audio.setImportMessage(null);
                       return;
                   }
                   const bufferToAnalyze = audioBuffers[firstClip.bufferId];
 
-                  setImportMessage("Prime Brain Analyzing...");
+                  audio.setImportMessage("Prime Brain Analyzing...");
 
                   const analysis = await analyzeVelvetCurve(bufferToAnalyze);
                   
@@ -4469,7 +4439,7 @@ const FlowRuntime: React.FC<FlowRuntimeProps> = ({ arrangeFocusToken }) => {
                   const emotionalBias = (analysis.soul / 100 + analysis.silk / 100) / 2;
                   harmonicLatticeEngine.setEmotionalBias(emotionalBias);
 
-                  setImportMessage(null);
+                  audio.setImportMessage(null);
               })();
               break;
           case 'manageFx':
@@ -4519,10 +4489,10 @@ const FlowRuntime: React.FC<FlowRuntimeProps> = ({ arrangeFocusToken }) => {
               });
               break;
           case 'openAIHub':
-              setIsAIHubOpen(true);
+              session.openAIHub();
               break;
           case 'toggleFollowPlayhead':
-              setFollowPlayhead((prev) => {
+              session.setFollowPlayhead((prev: boolean) => {
                 const next = !prev;
                 appendHistoryNote({
                   id: `timeline-follow-${Date.now()}`,
@@ -4559,10 +4529,9 @@ const FlowRuntime: React.FC<FlowRuntimeProps> = ({ arrangeFocusToken }) => {
         locked: false,
     };
     setTracks(prev => [...prev, newTrackData]);
-    setMixerSettings(prev => ({
-        ...prev,
-        [newTrackData.id]: { volume: 0.75, pan: 0, isMuted: false }
-    }));
+    setTrackVolume(newTrackData.id, 0.75);
+    setTrackPan(newTrackData.id, 0);
+    setTrackMute(newTrackData.id, false);
     setInserts(prev => ({ // Initialize inserts for new track
       ...prev,
       [newTrackData.id]: []
@@ -4592,14 +4561,14 @@ const FlowRuntime: React.FC<FlowRuntimeProps> = ({ arrangeFocusToken }) => {
   }, []);
 
   const handleMixerChange = useCallback((trackId: string, setting: keyof MixerSettings, value: number | boolean) => {
-    setMixerSettings(prev => ({
-      ...prev,
-      [trackId]: {
-        ...prev[trackId],
-        [setting]: value
-      }
-    }));
-  }, []);
+    if (setting === 'volume') {
+      setTrackVolume(trackId, value as number);
+    } else if (setting === 'pan') {
+      setTrackPan(trackId, value as number);
+    } else if (setting === 'isMuted') {
+      setTrackMute(trackId, value as boolean);
+    }
+  }, [setTrackVolume, setTrackPan, setTrackMute]);
 
   const isMixerSettingKey = (setting: string | number | symbol): setting is keyof MixerSettings => {
     return typeof setting === 'string' && (setting === 'volume' || setting === 'pan' || setting === 'isMuted');
@@ -4682,28 +4651,11 @@ const FlowRuntime: React.FC<FlowRuntimeProps> = ({ arrangeFocusToken }) => {
   );
 
   const handleToggleMute = useCallback((trackId: string) => {
-    setMixerSettings(prev => {
-      const current = prev[trackId] || { volume: 0.75, pan: 0, isMuted: false };
-      return {
-        ...prev,
-        [trackId]: {
-          ...current,
-          isMuted: !current.isMuted,
-        },
-      };
-    });
-  }, []);
+    setTrackMute(trackId, !mixerSettings[trackId]?.isMuted);
+  }, [mixerSettings, setTrackMute]);
 
   const handleToggleSolo = (trackId: string) => {
-    setSoloedTracks(prev => {
-        const newSet = new Set(prev);
-        if (newSet.has(trackId)) {
-            newSet.delete(trackId);
-        } else {
-            newSet.add(trackId);
-        }
-        return newSet;
-    });
+    setTrackSolo(trackId, !soloedTracks.has(trackId));
   };
 
   const handleToggleArm = useCallback((trackId: string) => {
@@ -4775,24 +4727,24 @@ const FlowRuntime: React.FC<FlowRuntimeProps> = ({ arrangeFocusToken }) => {
   }, []);
 
   const persistCurrentPianoRoll = useCallback((): MidiNote[] => {
-    if (!pianoRollClipId) return [];
+    if (!session.activePanelClipId) return [];
     const exported = exportPianoNotes();
     setPianoRollStore((prev) => {
       if (!exported.length) {
-        if (!prev[pianoRollClipId]) {
+        if (!prev[session.activePanelClipId!]) {
           return prev;
         }
         const next = { ...prev };
-        delete next[pianoRollClipId];
+        delete next[session.activePanelClipId!];
         return next;
       }
       return {
         ...prev,
-        [pianoRollClipId]: exported,
+        [session.activePanelClipId!]: exported,
       };
     });
     return exported;
-  }, [exportPianoNotes, pianoRollClipId]);
+  }, [exportPianoNotes, session.activePanelClipId]);
 
   const applyWarpAnchorsToClip = useCallback(
     (
@@ -4879,10 +4831,7 @@ const FlowRuntime: React.FC<FlowRuntimeProps> = ({ arrangeFocusToken }) => {
     (targetClip: ArrangeClip) => {
       // Check if it's an audio clip - if so, open Spectral Editor
       if (targetClip.bufferId && targetClip.bufferId !== 'default') {
-        setActiveSpectralClip(targetClip);
-        const trackMatch = tracks.find(t => t.id === targetClip.trackId) ?? null;
-        setActiveSpectralTrack(trackMatch);
-        setIsSpectralEditorOpen(true);
+        session.openSpectralEditor(targetClip.trackId, targetClip.id);
         
         handleTrackContextChange(targetClip.trackId, "edit");
         publishBloomSignal({
@@ -4892,6 +4841,8 @@ const FlowRuntime: React.FC<FlowRuntimeProps> = ({ arrangeFocusToken }) => {
         });
         return;
       }
+
+      if (!targetClip) return;
 
       persistCurrentPianoRoll();
       const trackMatch =
@@ -4918,9 +4869,9 @@ const FlowRuntime: React.FC<FlowRuntimeProps> = ({ arrangeFocusToken }) => {
         action: "openPianoRoll",
         payload: { clipId: targetClip.id, trackId: targetClip.trackId },
       });
-      setPianoRollTrackId(targetClip.trackId);
-      setPianoRollClipId(targetClip.id);
-      setIsPianoRollOpen(true);
+      
+      // Use Session Domain
+      session.openPianoRoll(targetClip.trackId, targetClip.id);
     },
     [
       appendHistoryNote,
@@ -4931,32 +4882,35 @@ const FlowRuntime: React.FC<FlowRuntimeProps> = ({ arrangeFocusToken }) => {
       publishBloomSignal,
       setPianoRollState,
       tracks,
+      session,
     ]
   );
 
   const handleClosePianoRoll = useCallback(() => {
     persistCurrentPianoRoll();
-    if (pianoRollTrackId) {
-      handleTrackContextChange(pianoRollTrackId, DEFAULT_TRACK_CONTEXT);
+    if (session.activePanelTrackId) {
+      handleTrackContextChange(session.activePanelTrackId, DEFAULT_TRACK_CONTEXT);
     }
-    setIsPianoRollOpen(false);
-    setPianoRollClipId(null);
-    setPianoRollTrackId(null);
-  }, [handleTrackContextChange, persistCurrentPianoRoll, pianoRollTrackId]);
+    session.closePianoRoll();
+  }, [handleTrackContextChange, persistCurrentPianoRoll, session]);
 
   const handleCommitPianoRoll = useCallback(() => {
     const notes = persistCurrentPianoRoll();
-    applyWarpAnchorsToClip(pianoRollClipId, notes, "commit");
-  }, [applyWarpAnchorsToClip, persistCurrentPianoRoll, pianoRollClipId]);
+    if (session.activePanelClipId) {
+      applyWarpAnchorsToClip(session.activePanelClipId, notes, "commit");
+    }
+  }, [applyWarpAnchorsToClip, persistCurrentPianoRoll, session.activePanelClipId]);
 
   const handleApplyWarpAnchors = useCallback(() => {
     const notes = persistCurrentPianoRoll();
-    applyWarpAnchorsToClip(pianoRollClipId, notes, "warp");
-  }, [applyWarpAnchorsToClip, persistCurrentPianoRoll, pianoRollClipId]);
+    if (session.activePanelClipId) {
+      applyWarpAnchorsToClip(session.activePanelClipId, notes, "warp");
+    }
+  }, [applyWarpAnchorsToClip, persistCurrentPianoRoll, session.activePanelClipId]);
 
   const handleExportPianoRollMidi = useCallback(() => {
     const notes = persistCurrentPianoRoll();
-    const { clip } = applyWarpAnchorsToClip(pianoRollClipId, notes, "export");
+    const { clip } = applyWarpAnchorsToClip(session.activePanelClipId, notes, "export");
     if (!clip || !notes.length) {
       return;
     }
@@ -4978,29 +4932,29 @@ const FlowRuntime: React.FC<FlowRuntimeProps> = ({ arrangeFocusToken }) => {
     } catch (error) {
       console.warn("[PIANO ROLL] Failed to export MIDI sketch:", error);
     }
-  }, [applyWarpAnchorsToClip, persistCurrentPianoRoll, pianoRollClipId, resolveTrackDefaults]);
+  }, [applyWarpAnchorsToClip, persistCurrentPianoRoll, session.activePanelClipId, resolveTrackDefaults]);
 
   const activePianoClip = useMemo(
     () =>
-      pianoRollClipId
-        ? clips.find((clip) => clip.id === pianoRollClipId) ?? null
+      session.activePanelClipId
+        ? clips.find((clip) => clip.id === session.activePanelClipId) ?? null
         : null,
-    [clips, pianoRollClipId]
+    [clips, session.activePanelClipId]
   );
 
   const activePianoTrack = useMemo(
     () =>
-      pianoRollTrackId
-        ? tracks.find((track) => track.id === pianoRollTrackId) ?? null
+      session.activePanelTrackId
+        ? tracks.find((track) => track.id === session.activePanelTrackId) ?? null
         : null,
-    [tracks, pianoRollTrackId]
+    [tracks, session.activePanelTrackId]
   );
 
   useEffect(() => {
-    if (viewMode !== "arrange" && isPianoRollOpen) {
+    if (viewMode !== "arrange" && session.isPianoRollOpen) {
       handleClosePianoRoll();
     }
-  }, [handleClosePianoRoll, isPianoRollOpen, viewMode]);
+  }, [handleClosePianoRoll, session.isPianoRollOpen, viewMode]);
 
   const handleResizeTrack = useCallback((trackId: string, height: number) => {
     const clamped = Math.max(
@@ -5058,7 +5012,7 @@ const FlowRuntime: React.FC<FlowRuntimeProps> = ({ arrangeFocusToken }) => {
     }
     setTracks(prev => prev.filter(t => t.id !== trackId));
     setClips(prev => prev.filter(c => c.trackId !== trackId));
-    setMixerSettings(prev => { const { [trackId]: _, ...rest } = prev; return rest; });
+    removeTrackSettings(trackId);
     setInserts(prev => { const { [trackId]: _, ...rest } = prev; return rest; });
     setTrackSendLevels(prev => {
       const { [trackId]: _, ...rest } = prev;
@@ -5074,7 +5028,7 @@ const FlowRuntime: React.FC<FlowRuntimeProps> = ({ arrangeFocusToken }) => {
     });
     setAutomationData(prev => { const { [trackId]: _, ...rest } = prev; return rest; });
     setVisibleAutomationLanes(prev => { const { [trackId]: _, ...rest } = prev; return rest; });
-    setSoloedTracks(prev => { const newSet = new Set(prev); newSet.delete(trackId); return newSet; });
+    // removeTrackSettings handles soloedTracks too
     setArmedTracks(prev => { const newSet = new Set(prev); newSet.delete(trackId); return newSet; });
     setContextMenu(null);
     if (selectedTrackId === trackId) setSelectedTrackId(null);
@@ -5103,8 +5057,8 @@ const FlowRuntime: React.FC<FlowRuntimeProps> = ({ arrangeFocusToken }) => {
   };
   
   const rebuildTrackRouting = useCallback((trackId: string) => {
-    const ctx = audioContextRef.current;
-    const master = masterNodesRef.current;
+    const ctx = audio.getAudioContext();
+    const master = audio.getMasterNodes();
     if (!ctx || !master) return;
 
     const trackNodes = trackNodesRef.current[trackId];
@@ -5137,7 +5091,7 @@ const FlowRuntime: React.FC<FlowRuntimeProps> = ({ arrangeFocusToken }) => {
     });
 
     currentOutput.connect(trackNodes.analyser);
-    const bus = signalMatrixRef.current?.routeTrack(trackId, tracksRef.current.find(t => t.id === trackId)?.role as any);
+    const bus = audio.getSignalMatrix()?.routeTrack(trackId, tracksRef.current.find(t => t.id === trackId)?.role as any);
     if (bus) {
       currentOutput.connect(bus);
     } else {
@@ -5501,379 +5455,86 @@ const FlowRuntime: React.FC<FlowRuntimeProps> = ({ arrangeFocusToken }) => {
       return;
     }
     let isCancelled = false;
-    let ctx: AudioContext | null = null;
 
-    const setupAudio = async () => {
-        const AudioCtx = (window.AudioContext || (window as any).webkitAudioContext) as typeof AudioContext;
-        const createdCtx = new AudioCtx();
+    const init = async () => {
+      await audio.initializeAudio();
+      if (isCancelled) return;
+      
+      const ctx = audio.getAudioContext();
+      if (!ctx) return;
 
-        if (isCancelled) {
-            await createdCtx.close().catch(() => {});
-            return;
-        }
+      const initialPluginRegistry = getPluginRegistry(ctx);
+      setPluginRegistry(initialPluginRegistry);
+      setFxBypassState(() => {
+        const initialState: Record<FxWindowId, boolean> = {};
+        initialPluginRegistry.forEach(plugin => (initialState[plugin.id] = false));
+        return initialState;
+      });
 
-        // Reset graph containers before wiring up the new context
-        trackNodesRef.current = {};
-        fxNodesRef.current = {};
-        engineInstancesRef.current.clear();
-        // Clean up send nodes
-        sendNodesRef.current.forEach(sendNode => {
-          try {
-            sendNode.disconnect();
-          } catch (e) {}
-        });
-        sendNodesRef.current.clear();
-        masterNodesRef.current = null;
-        trackMeterBuffersRef.current = {};
-        busMeterBuffersRef.current = {};
-        masterMeterBufferRef.current = null;
-        setMasterReady(false); // Reset master ready gate
-        queuedRoutesRef.current = []; // Clear queued routes
-        audioContextRef.current = createdCtx;
-        ctx = createdCtx;
-
-        const duration = 1;
-        const sampleRate = createdCtx.sampleRate;
-        const frameCount = sampleRate * duration;
-        const buffer = createdCtx.createBuffer(1, frameCount, sampleRate);
-        const data = buffer.getChannelData(0);
-        for (let i = 0; i < frameCount; i++) {
-            data[i] = Math.sin(2 * Math.PI * 440 * i / sampleRate) * 0.2; // A4 tone
-        }
-        if (isCancelled) {
-            await createdCtx.close().catch(() => {});
-            return;
-        }
-        setAudioBuffers({ 'default': buffer });
-
-        masterNodesRef.current = await buildMasterChain(createdCtx);
-        if (isCancelled || (createdCtx.state as string) === "closed") {
-          return;
-        }
-        // Initialize Mixx Club Signal Matrix (buses -> master)
+      // Initialize engines
+      engineInstancesRef.current.clear();
+      for (const plugin of initialPluginRegistry) {
+        if (isCancelled) break;
         try {
-          signalMatrixRef.current = createSignalMatrix(createdCtx, masterNodesRef.current.input);
-          
-          // Expose routing verification utility (dev/testing)
-          if (typeof window !== 'undefined') {
-            (window as any).__mixx_verifyRouting = () => {
-              if (!signalMatrixRef.current) {
-                console.error('[ROUTING TEST] SignalMatrix not initialized');
-                return;
-              }
-              
-              console.group('[ROUTING VERIFICATION]');
-              
-              // Verify bus structure
-              const buses = signalMatrixRef.current.buses;
-              const busNames = Object.keys(buses);
-              console.log('✅ Available buses:', busNames.join(', '));
-              
-              // Test routing for known track patterns
-              const testCases = [
-                { id: 'track-two-track', role: undefined, expected: 'twoTrack' },
-                { id: 'track-stem-vocals', role: undefined, expected: 'vocals' },
-                { id: 'track-stem-drums', role: undefined, expected: 'drums' },
-                { id: 'track-stem-bass', role: undefined, expected: 'bass' },
-                { id: 'track-stem-harmonic', role: undefined, expected: 'music' },
-                { id: 'track-hush-record', role: undefined, expected: 'vocals' },
-                { id: 'track-unknown', role: 'standard', expected: 'stemMix' },
-              ];
-              
-              let passed = 0;
-              let failed = 0;
-              
-              testCases.forEach(({ id, role, expected }) => {
-                const bus = signalMatrixRef.current!.routeTrack(id, role);
-                const actualBus = Object.entries(buses).find(([_, node]) => node === bus)?.[0] || 'unknown';
-                const passedTest = actualBus === expected;
-                
-                if (passedTest) {
-                  passed++;
-                  console.log(`✅ ${id} (role: ${role || 'none'}) → ${actualBus}`);
-                } else {
-                  failed++;
-                  console.error(`❌ ${id} (role: ${role || 'none'}) → Expected ${expected}, got ${actualBus}`);
-                }
-              });
-              
-              console.log(`\n📊 Results: ${passed} passed, ${failed} failed`);
-              
-              // Verify gain staging
-              console.group('Bus Gain Staging:');
-              console.log(`  twoTrack: ${buses.twoTrack.gain.value} (expected: 0.65)`);
-              console.log(`  vocals: ${buses.vocals.gain.value} (expected: 1.15)`);
-              console.log(`  drums: ${buses.drums.gain.value} (expected: 1.0)`);
-              console.log(`  bass: ${buses.bass.gain.value} (expected: 0.85)`);
-              console.log(`  music: ${buses.music.gain.value} (expected: 0.9)`);
-              console.log(`  stemMix: ${buses.stemMix.gain.value} (expected: 1.0)`);
-              console.log(`  masterTap: ${buses.masterTap.gain.value} (expected: 1.0)`);
-              console.log(`  air: ${buses.air.gain.value} (expected: 0.5)`);
-              console.groupEnd();
-              
-              console.groupEnd();
-            };
+          const engine = plugin.engineInstance(ctx);
+          engineInstancesRef.current.set(plugin.id, engine);
+          if (typeof engine.initialize === 'function' && !engine.getIsInitialized()) {
+            await engine.initialize(ctx);
           }
-        } catch (err) {
-          console.warn('[AUDIO] Failed to initialize Mixx Signal Matrix', err);
+        } catch (error) {
+          console.error(`[FX] Failed to create engine for '${plugin.id}':`, error);
         }
-
-        // Apply initial master volume calibration (trim on top of LUFS gain)
-        masterNodesRef.current.setMasterTrim(masterVolume);
-
-        // Expose master chain state to Prime Brain (via window global)
-        const profile = masterNodesRef.current.getProfile();
-        if (typeof window !== 'undefined') {
-          window.__mixx_masterChain = {
-            targetLUFS: profile.targetLUFS,
-            profile: profile.name.toLowerCase().replace(/\s+/g, '-'),
-            calibrated: true, // Master chain is calibrated on build
-            masterVolume: masterVolume,
-          };
-        }
-        const translationMatrix = new TranslationMatrix(createdCtx);
-        translationMatrix.attach(masterNodesRef.current.output, createdCtx.destination);
-        translationMatrix.activate(translationProfileRef.current);
-        translationMatrixRef.current = translationMatrix;
-        const masterAnalyser = masterNodesRef.current.analyser;
-        masterAnalyser.fftSize = TRACK_ANALYSER_FFT;
-        masterAnalyser.smoothingTimeConstant = MASTER_ANALYSER_SMOOTHING;
-        masterAnalyser.minDecibels = MIN_DECIBELS;
-        masterAnalyser.maxDecibels = MAX_DECIBELS;
-        
-        // Expose master analyser to flow loop for contextual audio detection
-        // This is the "listening" part - flow loop can check for actual audio
-        if (typeof window !== 'undefined') {
-          (window as any).__mixx_masterAnalyser = masterAnalyser;
-        }
-        masterMeterBufferRef.current = ensureMasterMeterBuffers(
-          masterMeterBufferRef.current,
-          masterAnalyser
-        );
-        if (velvetLoudnessMeterRef.current && loudnessListenerRef.current) {
-          velvetLoudnessMeterRef.current.removeEventListener(
-            "metrics",
-            loudnessListenerRef.current as EventListener
-          );
-          loudnessListenerRef.current = null;
-        }
-        velvetLoudnessMeterRef.current = new VelvetLoudnessMeter();
-        const meter = velvetLoudnessMeterRef.current;
-        if (meter) {
-          if (loudnessListenerRef.current) {
-            meter.removeEventListener('metrics', loudnessListenerRef.current as EventListener);
-          }
-          if (isCancelled || (createdCtx.state as string) === "closed") {
-            return;
-          }
-          await meter.initialize(createdCtx);
-          if (isCancelled || (createdCtx.state as string) === "closed") {
-            return;
-          }
-          meter.reset();
-          setLoudnessMetrics(DEFAULT_VELVET_LOUDNESS_METRICS);
-          const handler = (event: Event) => {
-            if (isCancelled) return;
-            const metricsEvent = event as CustomEvent<VelvetLoudnessMetrics>;
-            if (metricsEvent.detail) {
-              setLoudnessMetrics(metricsEvent.detail);
-            }
-          };
-          meter.addEventListener('metrics', handler as EventListener);
-          loudnessListenerRef.current = handler;
-
-          if (isCancelled || (createdCtx.state as string) === "closed" || !masterNodesRef.current) {
-            return;
-          }
-          const complianceTap = masterNodesRef.current.complianceTap;
-          const softLimiterNode = masterNodesRef.current.softLimiter;
-          const meterNode = meter.getNode();
-          try {
-            complianceTap.disconnect();
-          } catch (err) {
-            console.warn('[AUDIO] Compliance tap disconnect issue', err);
-          }
-          if (meterNode) {
-            try {
-              meterNode.disconnect();
-            } catch (err) {
-              // Ignore stale disconnect attempts
-            }
-            complianceTap.connect(meterNode as AudioNode);
-            (meterNode as AudioNode).connect(softLimiterNode);
-          } else {
-            complianceTap.connect(softLimiterNode);
-          }
-        }
-
-        setMasterReady(true);
-        
-        if (isCancelled || (createdCtx.state as string) === "closed") {
-          return;
-        }
-        const initialPluginRegistry = getPluginRegistry(createdCtx);
-        if (isCancelled) {
-            await createdCtx.close().catch(() => {});
-            return;
-        }
-        // Initialize engines FIRST, then set plugin registry
-        // This ensures engines are ready when routing graph rebuilds
-        engineInstancesRef.current.clear();
-        for (const plugin of initialPluginRegistry) {
-            if (isCancelled) break;
-            if ((createdCtx.state as string) === "closed") {
-              break;
-            }
-            
-            // Ensure context is in a valid state before creating engine
-            if ((createdCtx.state as string) === 'interrupted') {
-              console.warn(`[FX] Cannot create engine for '${plugin.id}' - context is ${createdCtx.state}`);
-              break;
-            }
-            
-            try {
-              const engine = plugin.engineInstance(createdCtx);
-              // Verify engine nodes belong to the correct context
-              if (engine.input && engine.output && 
-                  engine.input.context === createdCtx && engine.output.context === createdCtx) {
-                engineInstancesRef.current.set(plugin.id, engine);
-                if (typeof engine.initialize === 'function' && !engine.getIsInitialized()) {
-                    if (isCancelled || (createdCtx.state as string) === "closed") {
-                      break;
-                    }
-                    await engine.initialize(createdCtx);
-                }
-              } else {
-                console.warn(`[FX] Plugin '${plugin.id}' engine created with wrong context, skipping.`);
-              }
-            } catch (error) {
-              console.error(`[FX] Failed to create engine for '${plugin.id}':`, error);
-              // Continue with other plugins
-            }
-        }
-        if (isCancelled) {
-            return;
-        }
-        
-        // Set plugin registry AFTER engines are initialized
-        // This ensures routing graph rebuild has engines available
-        setPluginRegistry(initialPluginRegistry);
-
-        setFxBypassState(() => {
-          const initialState: Record<FxWindowId, boolean> = {};
-          initialPluginRegistry.forEach(plugin => (initialState[plugin.id] = false));
-          return initialState;
-        });
-        if (!stemIntegrationRef.current) {
-          const integration = new StemSeparationIntegration(createdCtx);
-          integration.onProgress((message, percent) => {
-            const suffix = typeof percent === 'number' ? ` (${Math.round(percent)}%)` : '';
-            setImportMessage(`${message}${suffix}`);
-            const jobId = activeStemJobRef.current;
-            if (!jobId) {
-              return;
-            }
-            ingestQueueRef.current?.reportProgress(jobId, {
-              percent: typeof percent === 'number' ? percent : undefined,
-              message,
-            });
-            const normalizedMessage = message.toLowerCase();
-            const match = STEM_MESSAGE_MATCHERS.find((matcher) =>
-              matcher.keywords.some((keyword) => normalizedMessage.includes(keyword))
-            );
-            if (match) {
-              const colorKey = STEM_COLOR_BY_KEY[match.key] ?? 'cyan';
-              const accent = TRACK_COLOR_SWATCH[colorKey].glow;
-              upsertImportProgress({
-                id: `${jobId}::${match.key}`,
-                parentId: jobId,
-                label: `${match.key.toUpperCase()} LANE`,
-                percent: typeof percent === 'number' ? percent : 0,
-                type: 'stem',
-                color: accent,
-              });
-            } else {
-              upsertImportProgress({
-                id: jobId,
-                label: message,
-                percent: typeof percent === 'number' ? percent : 0,
-                type: 'file',
-              });
-            }
-          });
-          stemIntegrationRef.current = integration;
-          // Pre-warm stem model worker immediately
-          try {
-            integration.prewarm();
-          } catch (err) {
-            console.warn('[STEMS] prewarm not available', err);
-          }
-        }
+      }
     };
-    setupAudio();
+
+    init();
 
     return () => {
-        isCancelled = true;
+      isCancelled = true;
+      // Partial cleanup - the domain handles core audio context closing
+      Object.values(trackNodesRef.current).forEach(nodes => {
+        try {
+          nodes.input.disconnect();
+          nodes.gain.disconnect();
+          nodes.panner.disconnect();
+          nodes.analyser.disconnect();
+          nodes.preFaderMeter.disconnect();
+        } catch (err) {}
+      });
+      trackNodesRef.current = {};
+      
+      Object.values(fxNodesRef.current).forEach(fxNode => {
+        try {
+          fxNode.input.disconnect();
+          fxNode.output.disconnect();
+          fxNode.bypass.disconnect();
+          fxNode.direct.disconnect();
+          fxNode.engine?.dispose?.();
+        } catch (err) {}
+      });
+      fxNodesRef.current = {};
 
-        // Disconnect track nodes
-        Object.values(trackNodesRef.current).forEach(nodes => {
-            try {
-                nodes.input.disconnect();
-                nodes.gain.disconnect();
-                nodes.panner.disconnect();
-                nodes.analyser.disconnect();
-                nodes.preFaderMeter.disconnect(); // Flow Meter Stack cleanup
-            } catch (err) {
-                console.warn("Error disconnecting track nodes during cleanup:", err);
-            }
-        });
-        trackNodesRef.current = {};
-
-        // Disconnect FX nodes
-        Object.values(fxNodesRef.current).forEach(fxNode => {
-            try {
-                fxNode.input.disconnect();
-                fxNode.output.disconnect();
-                fxNode.bypass.disconnect();
-                fxNode.direct.disconnect();
-                fxNode.engine?.dispose?.();
-            } catch (err) {
-                console.warn("Error disconnecting FX nodes during cleanup:", err);
-            }
-        });
-        fxNodesRef.current = {};
-
-        engineInstancesRef.current.forEach(engine => {
-            if (engine && typeof engine.dispose === 'function') {
-                try {
-                    engine.dispose();
-                } catch (err) {
-                    console.warn("Error disposing engine during cleanup:", err);
-                }
-            }
-        });
-        engineInstancesRef.current.clear();
-
-        masterNodesRef.current = null;
-        masterMeterBufferRef.current = null;
-        trackMeterBuffersRef.current = {};
-        translationMatrixRef.current?.dispose();
-        translationMatrixRef.current = null;
-        hushProcessorNodeRef.current = null;
-        micSourceNodeRef.current = null;
-
-        const contextToClose = ctx ?? audioContextRef.current;
-        audioContextRef.current = null;
-        if (contextToClose) {
-            contextToClose.close().catch(() => {});
+      engineInstancesRef.current.forEach(engine => {
+        if (engine && typeof engine.dispose === 'function') {
+          try {
+            engine.dispose();
+          } catch (err) {}
         }
+      });
+      engineInstancesRef.current.clear();
+
+      masterMeterBufferRef.current = null;
+      trackMeterBuffersRef.current = {};
+      hushProcessorNodeRef.current = null;
+      micSourceNodeRef.current = null;
     };
   }, [upsertImportProgress]);
 
 
   // Set clock for beat-locked LFOs
   useEffect(() => {
-    if (!audioContextRef.current || pluginRegistry.length === 0) return;
+    const ctx = audio.getAudioContext();
+    if (!ctx || pluginRegistry.length === 0) return;
 
     const getBeatPhase = () => {
       if (!isPlaying) return 0;
@@ -5900,7 +5561,7 @@ const FlowRuntime: React.FC<FlowRuntimeProps> = ({ arrangeFocusToken }) => {
 
   // Create/Destroy track audio nodes when tracks change
   useEffect(() => {
-    const ctx = audioContextRef.current;
+    const ctx = audio.getAudioContext();
     if (!ctx) return;
 
     const currentTrackIds = new Set(tracks.map(t => t.id));
@@ -5964,10 +5625,9 @@ const FlowRuntime: React.FC<FlowRuntimeProps> = ({ arrangeFocusToken }) => {
         tracks.forEach(track => {
             const nodes = trackNodesRef.current[track.id];
             const settings = mixerSettings[track.id];
-            if (nodes && settings && audioContextRef.current) {
-                // Volume automation handles nodes.gain.gain.value
-                // Pan is still controlled by mixer settings if not automated
-                nodes.panner.pan.setTargetAtTime(settings.pan, audioContextRef.current.currentTime, 0.01);
+            const ctx = audio.getAudioContext();
+            if (nodes && settings && ctx) {
+                nodes.panner.pan.setTargetAtTime(settings.pan, ctx.currentTime, 0.01);
             }
         });
     }, [mixerSettings, tracks]);
@@ -5975,20 +5635,22 @@ const FlowRuntime: React.FC<FlowRuntimeProps> = ({ arrangeFocusToken }) => {
     // Connect master volume and pan controls to the audio engine
     // Master volume is a trim on top of calibrated LUFS gain (via setMasterTrim)
     useEffect(() => {
-        if (masterNodesRef.current && audioContextRef.current) {
-            const now = audioContextRef.current.currentTime;
+        if (audio.getMasterNodes() && audio.getAudioContext()) {
+            const now = audio.getAudioContext()?.currentTime ?? 0;
             // Use setMasterTrim to apply volume as trim on calibrated gain
-            masterNodesRef.current.setMasterTrim(masterVolume);
-            if (masterNodesRef.current.panner) {
-                masterNodesRef.current.panner.pan.setTargetAtTime(masterBalance, now, 0.01);
+            audio.getMasterNodes()?.setMasterTrim(masterVolume);
+            if (audio.getMasterNodes()?.panner) {
+                audio.getMasterNodes()?.panner?.pan.setTargetAtTime(masterBalance, now, 0.01);
             }
             
             // Update Prime Brain with current master chain state
             if (typeof window !== 'undefined' && window.__mixx_masterChain) {
-                const profile = masterNodesRef.current.getProfile();
-                window.__mixx_masterChain.masterVolume = masterVolume;
-                window.__mixx_masterChain.targetLUFS = profile.targetLUFS;
-                window.__mixx_masterChain.calibrated = true;
+                const profile = audio.getMasterNodes()?.getProfile();
+                if (profile) {
+                    window.__mixx_masterChain.masterVolume = masterVolume;
+                    window.__mixx_masterChain.targetLUFS = profile.targetLUFS;
+                    window.__mixx_masterChain.calibrated = true;
+                }
             }
         }
     }, [masterVolume, masterBalance]);
@@ -5996,7 +5658,7 @@ const FlowRuntime: React.FC<FlowRuntimeProps> = ({ arrangeFocusToken }) => {
 
     // Create/Update FX nodes for ALL plugins in registry with proper bypass circuit
     useEffect(() => {
-      const ctx = audioContextRef.current;
+      const ctx = audio.getAudioContext();
       if (!ctx || pluginRegistry.length === 0) return;
       
       // Guard: Only run if context state is running or suspended (not closed)
@@ -6026,7 +5688,7 @@ const FlowRuntime: React.FC<FlowRuntimeProps> = ({ arrangeFocusToken }) => {
 
             // Connect wet path
             input.connect(bypass); 
-            if (engine && engine.input && engine.output) {
+            if (engine && engine.input && engine.output && engine.makeup) {
               // Guard: Ensure engine nodes belong to the same context
               if (engine.input.context === ctx && engine.output.context === ctx) {
                 // If an IAudioEngine is available, connect it into the wet path
@@ -6041,7 +5703,7 @@ const FlowRuntime: React.FC<FlowRuntimeProps> = ({ arrangeFocusToken }) => {
             } else {
                // If no engine or no proper input/output, wet path is still there but passes directly
                bypass.connect(output);
-               console.warn(`%c[FX] Plugin '${id}' has no IAudioEngine, or engine missing input/output. Wet path will be direct.`, "color: yellow");
+               console.warn(`%c[FX] Plugin '${id}' has no IAudioEngine, or engine missing input/output/makeup. Wet path will be direct.`, "color: yellow");
             }
             
             fxNodesRef.current[id] = { input, output, bypass, direct, engine };
@@ -6050,7 +5712,7 @@ const FlowRuntime: React.FC<FlowRuntimeProps> = ({ arrangeFocusToken }) => {
           }
         }
       });
-    }, [pluginRegistry]); // Removed audioContextRef.current from deps - refs don't trigger re-renders
+    }, [pluginRegistry]); // Removed audio.getAudioContext() from deps - refs don't trigger re-renders
 
     // Update FX bypass state
     const handleToggleBypass = useCallback((fxId: FxWindowId, trackId?: string) => {
@@ -6072,8 +5734,9 @@ const FlowRuntime: React.FC<FlowRuntimeProps> = ({ arrangeFocusToken }) => {
     useEffect(() => {
         Object.entries(fxBypassState).forEach(([id, isBypassed]) => {
             const fxNode = fxNodesRef.current[id as FxWindowId];
-            if (fxNode && audioContextRef.current) {
-                const now = audioContextRef.current.currentTime;
+            const ctx = audio.getAudioContext();
+            if (fxNode && ctx) {
+                const now = ctx.currentTime;
                 // Crossfade between direct (dry) and bypass (wet)
                 fxNode.direct.gain.setTargetAtTime(isBypassed ? 1.0 : 0.0, now, 0.015);
                 fxNode.bypass.gain.setTargetAtTime(isBypassed ? 0.0 : 1.0, now, 0.015);
@@ -6083,18 +5746,18 @@ const FlowRuntime: React.FC<FlowRuntimeProps> = ({ arrangeFocusToken }) => {
 
     // --- Dynamic Audio Routing (Inserts based, Including Mic Input) ---
     useEffect(() => {
-        const ctx = audioContextRef.current;
+        const ctx = audio.getAudioContext();
         if (!ctx) {
           // Audio context not yet initialized - expected during startup
           return;
         }
         
-        if (!masterNodesRef.current) {
+        if (!audio.getMasterNodes()) {
           // Master chain not yet initialized - expected during startup
           return;
         }
         
-        if (!masterReady) {
+        if (!audio.masterReady) {
           // Master not ready yet - queue routing for when it becomes ready
           // Queue all tracks for routing when master becomes ready
           tracks.forEach(track => {
@@ -6118,7 +5781,7 @@ const FlowRuntime: React.FC<FlowRuntimeProps> = ({ arrangeFocusToken }) => {
           return;
         }
 
-        const masterInput = masterNodesRef.current.input;
+        const masterInput = audio.getMasterNodes()?.input;
         
         if (!masterInput) {
           console.error('[MIXER] Master input node not found in master chain');
@@ -6192,15 +5855,15 @@ const FlowRuntime: React.FC<FlowRuntimeProps> = ({ arrangeFocusToken }) => {
         currentOutput.connect(trackNodes.analyser);
         
         // Route through SignalMatrix bus system (Two Track → Vocals → Drums → Bass → Music → Stem Mix → Master)
-        // masterReady gate ensures this only happens when stable
-        if (masterReady) {
-          const bus = signalMatrixRef.current?.routeTrack(track.id, track.role);
+        // audio.masterReady gate ensures this only happens when stable
+        if (audio.masterReady) {
+          const bus = audio.getSignalMatrix()?.routeTrack(track.id, track.role);
           if (bus) {
             try {
               currentOutput.connect(bus);
               // Routing verification log (can be removed in production)
-              const busName = signalMatrixRef.current 
-                ? Object.entries(signalMatrixRef.current.buses).find(([_, node]) => node === bus)?.[0] 
+              const busName = audio.getSignalMatrix() 
+                ? Object.entries(audio.getSignalMatrix().buses).find(([_, node]) => node === bus)?.[0] 
                 : 'unknown';
               console.log(`[MIXER ROUTING] Track "${track.trackName}" (${track.id}, role: ${track.role}) → ${busName} bus`);
             } catch (err) {
@@ -6229,9 +5892,9 @@ const FlowRuntime: React.FC<FlowRuntimeProps> = ({ arrangeFocusToken }) => {
           
           // Route sends to AIR bus (FX returns)
           // Sends allow tracks to send a portion of their signal to FX buses
-          if (signalMatrixRef.current && availableSendPalette.length > 0) {
+          if (audio.getSignalMatrix() && availableSendPalette.length > 0) {
             const trackSends = trackSendLevels[track.id] || {};
-            const ctx = audioContextRef.current;
+            const ctx = audio.getAudioContext();
             
             if (ctx) {
               availableSendPalette.forEach(sendBus => {
@@ -6243,13 +5906,13 @@ const FlowRuntime: React.FC<FlowRuntimeProps> = ({ arrangeFocusToken }) => {
                   let sendNode = sendNodesRef.current.get(sendKey);
                   
                   // Create send node if it doesn't exist
-                  if (!sendNode && signalMatrixRef.current) {
+                  if (!sendNode && audio.getSignalMatrix()) {
                     sendNode = ctx.createGain();
                     sendNodesRef.current.set(sendKey, sendNode);
                     
                     // Connect send node to AIR bus (FX returns)
                     try {
-                      sendNode.connect(signalMatrixRef.current.buses.air);
+                      sendNode.connect(audio.getSignalMatrix().buses.air);
                       console.log(`[MIXER SEND] Created send routing: Track "${track.trackName}" → ${sendBus.name} → AIR bus`);
                     } catch (err) {
                       console.error(`[MIXER SEND] Failed to connect send to AIR bus:`, sendKey, err);
@@ -6297,14 +5960,14 @@ const FlowRuntime: React.FC<FlowRuntimeProps> = ({ arrangeFocusToken }) => {
         }
     });
 
-}, [tracks, armedTracks, pluginRegistry, masterReady, trackSendLevels, availableSendPalette]);
+}, [tracks, armedTracks, pluginRegistry, audio.masterReady, trackSendLevels, availableSendPalette]);
 
     // Update send levels dynamically (without rebuilding entire routing)
     // This allows real-time send level changes without disconnecting/reconnecting everything
     useEffect(() => {
-      if (!masterReady || !signalMatrixRef.current || !audioContextRef.current) return;
+      if (!audio.masterReady || !audio.getSignalMatrix() || !audio.getAudioContext()) return;
       
-      const ctx = audioContextRef.current;
+      const ctx = audio.getAudioContext();
       
       // Update send node gain values for all existing sends
       // Note: Send nodes are created in the main routing effect, this only updates levels
@@ -6323,12 +5986,12 @@ const FlowRuntime: React.FC<FlowRuntimeProps> = ({ arrangeFocusToken }) => {
           // If send node doesn't exist, it will be created in the main routing effect
         });
       });
-    }, [trackSendLevels, tracks, availableSendPalette, masterReady]);
+    }, [trackSendLevels, tracks, availableSendPalette, audio.masterReady]);
 
     // Manage Microphone Stream
     useEffect(() => {
         const manageStream = async () => {
-            const ctx = audioContextRef.current;
+            const ctx = audio.getAudioContext();
             if (armedTracks.size > 0 && !microphoneStreamRef.current && ctx) {
                 try {
                     const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
@@ -6430,7 +6093,7 @@ const FlowRuntime: React.FC<FlowRuntimeProps> = ({ arrangeFocusToken }) => {
             cancelAnimationFrame(animationFrameRef.current);
             animationFrameRef.current = null;
         }
-        const ctx = audioContextRef.current;
+        const ctx = audio.getAudioContext();
         if (ctx && (ctx.state as string) !== 'closed') {
             ctx.suspend().catch((error) => {
                 console.warn('[AUDIO] Failed to suspend context:', error);
@@ -6439,7 +6102,7 @@ const FlowRuntime: React.FC<FlowRuntimeProps> = ({ arrangeFocusToken }) => {
     }, []);
 
     const scheduleClips = useCallback((transportTime: number) => {
-        const ctx = audioContextRef.current;
+        const ctx = audio.getAudioContext();
         if (!ctx || Object.keys(audioBuffers).length === 0) return;
     
         // Stop all previously scheduled sources
@@ -6556,7 +6219,7 @@ const FlowRuntime: React.FC<FlowRuntimeProps> = ({ arrangeFocusToken }) => {
     }, []);
 
     useEffect(() => {
-        const ctx = audioContextRef.current;
+        const ctx = audio.getAudioContext();
         if (!ctx || (ctx.state as string) === 'closed') return;
 
         const analysisLoop = () => {
@@ -6662,7 +6325,7 @@ const FlowRuntime: React.FC<FlowRuntimeProps> = ({ arrangeFocusToken }) => {
                 });
             });
 
-            const masterAnalyser = masterNodesRef.current?.analyser ?? null;
+            const masterAnalyser = audio.getMasterNodes()?.analyser ?? null;
             if (masterAnalyser) {
                 const masterBuffers = ensureMasterMeterBuffers(masterMeterBufferRef.current, masterAnalyser);
                 masterMeterBufferRef.current = masterBuffers;
@@ -6685,8 +6348,8 @@ const FlowRuntime: React.FC<FlowRuntimeProps> = ({ arrangeFocusToken }) => {
 
             // Read bus levels from SignalMatrix analysers
             const nextBusLevels: Record<string, { level: number; peak: number; transient: boolean }> = {};
-            if (signalMatrixRef.current) {
-              const busAnalysers = signalMatrixRef.current.analysers;
+            if (audio.getSignalMatrix()) {
+              const busAnalysers = audio.getSignalMatrix().analysers;
               const busNames: Array<keyof typeof busAnalysers> = ['twoTrack', 'vocals', 'drums', 'bass', 'music', 'stemMix', 'masterTap', 'air'];
               
               busNames.forEach(busName => {
@@ -6727,7 +6390,7 @@ const FlowRuntime: React.FC<FlowRuntimeProps> = ({ arrangeFocusToken }) => {
                     console.warn('[AUDIO] Failed to suspend context:', error);
                 });
             }
-        }
+        };
 
         return () => {
             stopPlayback();
@@ -6746,7 +6409,7 @@ const FlowRuntime: React.FC<FlowRuntimeProps> = ({ arrangeFocusToken }) => {
         setCurrentTime(clamped);
         if (isPlayingRef.current) {
           scheduleClips(clamped);
-          const ctx = audioContextRef.current;
+          const ctx = audio.getAudioContext();
           if (ctx && ctx.state === 'suspended') {
             ctx.resume().catch(() => {});
           }
@@ -6940,7 +6603,7 @@ const FlowRuntime: React.FC<FlowRuntimeProps> = ({ arrangeFocusToken }) => {
   }, [mixerSettings, trackAnalysis, tracks]);
 
   const bloomPulseAgent = useMemo<PulsePalette>(() => {
-    if (importMessage) {
+    if (audio.importMessage) {
       return derivePulsePalette('magenta', 0.85, clamp01(0.55 + flowContext.momentum * 0.25));
     }
 
@@ -6984,7 +6647,7 @@ const FlowRuntime: React.FC<FlowRuntimeProps> = ({ arrangeFocusToken }) => {
     flowContext.intensity,
     flowContext.momentum,
     flowContext.momentumTrend,
-    importMessage,
+    audio.importMessage,
     isHushActive,
     isPlaying,
     mixerPulseAgent,
@@ -6998,7 +6661,7 @@ const FlowRuntime: React.FC<FlowRuntimeProps> = ({ arrangeFocusToken }) => {
       ingestJobs.some((job) => ['processing', 'awaiting-user', 'pending'].includes(job.status));
 
     if (ingestActive) return 'ingest';
-    if (isAIHubOpen) return 'ai';
+    if (session.isAIHubOpen) return 'ai';
     if (isAnyTrackArmed || isHushActive) return 'record';
     if (viewMode === 'mixer') return 'mix';
     if (viewMode === 'sampler') return 'sampler';
@@ -7009,7 +6672,7 @@ const FlowRuntime: React.FC<FlowRuntimeProps> = ({ arrangeFocusToken }) => {
     analysisResult,
     importProgress,
     ingestJobs,
-    isAIHubOpen,
+    session.isAIHubOpen,
     isAnyTrackArmed,
     isHushActive,
     viewMode,
@@ -7024,7 +6687,7 @@ const FlowRuntime: React.FC<FlowRuntimeProps> = ({ arrangeFocusToken }) => {
       selection,
       pixelsPerSecond,
       scrollX,
-      followPlayhead,
+      followPlayhead: session.followPlayhead,
       viewMode,
       bloomContext,
       selectedClips: selectedClipSummaries,
@@ -7036,7 +6699,7 @@ const FlowRuntime: React.FC<FlowRuntimeProps> = ({ arrangeFocusToken }) => {
       selection,
       pixelsPerSecond,
       scrollX,
-      followPlayhead,
+      session.followPlayhead,
       viewMode,
       bloomContext,
       selectedClipSummaries,
@@ -7322,12 +6985,12 @@ const FlowRuntime: React.FC<FlowRuntimeProps> = ({ arrangeFocusToken }) => {
             accentColor: '#c6a2ff',
           },
           {
-            name: followPlayhead ? 'Follow On' : 'Follow Off',
-            description: followPlayhead
+            name: session.followPlayhead ? 'Follow On' : 'Follow Off',
+            description: session.followPlayhead
               ? 'Timeline glides with the playhead.'
               : 'Manual navigation engaged.',
             action: () => handleBloomAction('toggleFollowPlayhead', undefined, meta),
-            progressPercent: followPlayhead ? 95 : 24,
+            progressPercent: session.followPlayhead ? 95 : 24,
             accentColor: '#8be4ff',
           },
           {
@@ -7388,12 +7051,12 @@ const FlowRuntime: React.FC<FlowRuntimeProps> = ({ arrangeFocusToken }) => {
             accentColor: '#ffb86b',
           },
           {
-            name: followPlayhead ? 'Follow On' : 'Follow Off',
-            description: followPlayhead
+            name: session.followPlayhead ? 'Follow On' : 'Follow Off',
+            description: session.followPlayhead
               ? 'Transport is synced to the playhead.'
               : 'Manual ride—tap again to follow.',
             action: () => handleBloomAction('toggleFollowPlayhead', undefined, meta),
-            progressPercent: followPlayhead ? 90 : 30,
+            progressPercent: session.followPlayhead ? 90 : 30,
             accentColor: '#ffd478',
           },
           {
@@ -7536,7 +7199,7 @@ const FlowRuntime: React.FC<FlowRuntimeProps> = ({ arrangeFocusToken }) => {
     handleTogglePrimeBrainTelemetry,
     importProgress,
     ingestJobs,
-    isAIHubOpen,
+    session.isAIHubOpen,
     isAnyTrackArmed,
     isHushActive,
     selectedClipIds,
@@ -7544,7 +7207,7 @@ const FlowRuntime: React.FC<FlowRuntimeProps> = ({ arrangeFocusToken }) => {
     canConsolidateSelection,
     canRecallLastImport,
     currentTime,
-    followPlayhead,
+    session.followPlayhead,
     primeBrainStatus,
     primeBrainTelemetryEnabled,
     flowContext.adaptiveSuggestions,
@@ -7562,7 +7225,7 @@ const FlowRuntime: React.FC<FlowRuntimeProps> = ({ arrangeFocusToken }) => {
   }, []);
 
   const currentMasterProfile =
-    masterNodesRef.current?.getProfile() ?? MASTERING_PROFILES.streaming;
+    audio.getMasterNodes()?.getProfile() ?? MASTERING_PROFILES.streaming;
   const contentHeight = Math.max(420, viewportHeight - headerHeight);
 
   // Initialize window globals for flow loop
@@ -7651,7 +7314,7 @@ const FlowRuntime: React.FC<FlowRuntimeProps> = ({ arrangeFocusToken }) => {
           hushFeedback={hushFeedback}
           isPlaying={isPlaying}
           masterAnalysis={masterAnalysis}
-          loudnessMetrics={loudnessMetrics}
+          loudnessMetrics={audio.loudnessMetrics}
           onHeightChange={setHeaderHeight}
           settings={waveformHeaderSettings}
         />
@@ -7728,7 +7391,7 @@ const FlowRuntime: React.FC<FlowRuntimeProps> = ({ arrangeFocusToken }) => {
                     style={arrangeBorderGlowStyle}
                     trackAnalysis={trackAnalysis}
                     highlightClipIds={recallHighlightClipIds}
-                    followPlayhead={followPlayhead}
+                    followPlayhead={session.followPlayhead}
                     onManualScroll={handleManualTimelineScroll}
                     trackUiState={trackUiState}
                     onToggleTrackCollapse={handleToggleTrackCollapse}
@@ -7803,7 +7466,7 @@ const FlowRuntime: React.FC<FlowRuntimeProps> = ({ arrangeFocusToken }) => {
                     pluginPresets={pluginPresets}
                     isPlaying={isPlaying}
                     currentTime={currentTime}
-                    followPlayhead={followPlayhead}
+                    followPlayhead={session.followPlayhead}
                     onSavePluginPreset={handleSavePluginPreset}
                     onLoadPluginPreset={handleLoadPluginPreset}
                     onDeletePluginPreset={handleDeletePluginPreset}
@@ -7883,7 +7546,7 @@ const FlowRuntime: React.FC<FlowRuntimeProps> = ({ arrangeFocusToken }) => {
                                 style={arrangeBorderGlowStyle}
                                 trackAnalysis={trackAnalysis}
                                 highlightClipIds={recallHighlightClipIds}
-                                followPlayhead={followPlayhead}
+                                followPlayhead={session.followPlayhead}
                                 onManualScroll={handleManualTimelineScroll}
                                 trackUiState={trackUiState}
                                 onToggleTrackCollapse={handleToggleTrackCollapse}
@@ -7913,7 +7576,7 @@ const FlowRuntime: React.FC<FlowRuntimeProps> = ({ arrangeFocusToken }) => {
           </FlowTransitionEngine>
         </main>
 
-        <VelvetComplianceHUD metrics={loudnessMetrics} profile={currentMasterProfile} />
+        <VelvetComplianceHUD metrics={audio.loudnessMetrics} profile={currentMasterProfile} />
 
         <OverlayPortal
           containerId="mixx-fx-portal"
@@ -7966,10 +7629,10 @@ const FlowRuntime: React.FC<FlowRuntimeProps> = ({ arrangeFocusToken }) => {
             onAddPlugin={handleAddPlugin}
             onTogglePluginFavorite={handleTogglePluginFavorite}
             tracks={tracks}
-            onOpenAIHub={() => setIsAIHubOpen(true)}
+            onOpenAIHub={() => session.openAIHub()}
             currentTime={currentTime}
             canRecallLastImport={ingestHistoryEntries.length > 0}
-            followPlayhead={followPlayhead}
+            followPlayhead={session.followPlayhead}
             contextLabel={bloomLabel}
             contextAccent={bloomAccent}
             recordingOptions={recordingOptions}
@@ -7995,6 +7658,7 @@ const FlowRuntime: React.FC<FlowRuntimeProps> = ({ arrangeFocusToken }) => {
                 <button
                   onClick={() => setIsWaveformSettingsOpen(false)}
                   className="p-2 rounded-full hover:bg-white/10 text-white/60 hover:text-white transition-colors"
+                  title="Close settings"
                 >
                   <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                     <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
@@ -8025,7 +7689,7 @@ const FlowRuntime: React.FC<FlowRuntimeProps> = ({ arrangeFocusToken }) => {
                 onSeparate={handleStemModalConfirm}
             />
         )}
-        {importMessage && <ImportModal message={importMessage} />}
+        {audio.importMessage && <ImportModal message={audio.importMessage} />}
         {contextMenu && (
             <TrackContextMenu
                 x={contextMenu.x}
@@ -8152,17 +7816,12 @@ const FlowRuntime: React.FC<FlowRuntimeProps> = ({ arrangeFocusToken }) => {
                 });
                 
                 // Initialize mixer settings for all Zustand tracks (merge with existing)
-                setMixerSettings(prev => {
-                  const next = { ...prev };
-                  zustandTracks.forEach(track => {
-                    if (!next[track.id]) {
-                      // Default volume based on track role
-                      const volume = track.role === 'twoTrack' ? 0.82 : 
-                                   track.role === 'hushRecord' ? 0.78 : 0.75;
-                      next[track.id] = { volume, pan: 0, isMuted: false };
-                    }
-                  });
-                  return next;
+                zustandTracks.forEach(track => {
+                  const volume = track.role === 'twoTrack' ? 0.82 : 
+                               track.role === 'hushRecord' ? 0.78 : 0.75;
+                  setTrackVolume(track.id, volume);
+                  setTrackPan(track.id, 0);
+                  setTrackMute(track.id, false);
                 });
                 
                 // Initialize inserts for all Zustand tracks (merge with existing)
@@ -8322,14 +7981,10 @@ const FlowRuntime: React.FC<FlowRuntimeProps> = ({ arrangeFocusToken }) => {
               
               // CRITICAL: Initialize mixer settings FIRST before adding tracks
               // This prevents ArrangeTrackHeader from receiving undefined mixerSettings
-              setMixerSettings(prev => {
-                const next = { ...prev };
-                newTracks.forEach(track => {
-                  if (!next[track.id]) {
-                    next[track.id] = { volume: 0.75, pan: 0, isMuted: false };
-                  }
-                });
-                return next;
+              newTracks.forEach(track => {
+                setTrackVolume(track.id, 0.75);
+                setTrackPan(track.id, 0);
+                setTrackMute(track.id, false);
               });
               
               // React 18+ automatically batches these, but we ensure immutability
@@ -8428,17 +8083,17 @@ const FlowRuntime: React.FC<FlowRuntimeProps> = ({ arrangeFocusToken }) => {
           aria-label="Load audio or project file"
         />
 
-        {isAIHubOpen && (
+        {session.isAIHubOpen && (
             <AIHub
-                onClose={() => setIsAIHubOpen(false)}
-                audioContext={audioContextRef.current}
+                onClose={() => session.closeAIHub()}
+                audioContext={audio.getAudioContext()}
                 clips={clips} 
                 tracks={tracks}
                 selectedTrackId={selectedTrackId}
             />
         )}
         <PianoRollPanel
-          isOpen={isPianoRollOpen}
+          isOpen={session.isPianoRollOpen}
           clip={activePianoClip}
           track={activePianoTrack}
           binding={pianoRollBinding}
@@ -8447,7 +8102,7 @@ const FlowRuntime: React.FC<FlowRuntimeProps> = ({ arrangeFocusToken }) => {
           onClose={handleClosePianoRoll}
           onCommit={handleCommitPianoRoll}
           currentTime={currentTime}
-          followPlayhead={followPlayhead}
+          followPlayhead={session.followPlayhead}
           analysis={
             activePianoTrack ? trackAnalysis[activePianoTrack.id] : undefined
           }
@@ -8456,10 +8111,10 @@ const FlowRuntime: React.FC<FlowRuntimeProps> = ({ arrangeFocusToken }) => {
         />
 
         <SpectralEditorPanel
-          isOpen={isSpectralEditorOpen}
-          clip={activeSpectralClip}
-          track={activeSpectralTrack}
-          onClose={() => setIsSpectralEditorOpen(false)}
+          isOpen={session.isSpectralEditorOpen}
+          clip={useMemo(() => session.activePanelClipId ? clips.find(c => c.id === session.activePanelClipId) ?? null : null, [clips, session.activePanelClipId])}
+          track={useMemo(() => session.activePanelTrackId ? tracks.find(t => t.id === session.activePanelTrackId) ?? null : null, [tracks, session.activePanelTrackId])}
+          onClose={() => session.closeSpectralEditor()}
           currentTime={currentTime}
         />
         

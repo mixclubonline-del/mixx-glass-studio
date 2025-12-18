@@ -176,14 +176,98 @@ export function useAudioExport() {
     setState(prev => ({ ...prev, error: null }));
   }, []);
 
+  /**
+   * Export with native Rust mastering applied
+   * Processes samples through MasterChain before export
+   */
+  const exportWithMastering = useCallback(async (options: ExportOptions & { profile?: number }) => {
+    const {
+      sampleRate = 48000,
+      channels = 2,
+      bitDepth = 24,
+      samples,
+      profile,
+    } = options;
+
+    try {
+      setState(prev => ({
+        ...prev,
+        isExporting: true,
+        progress: 10,
+        error: null,
+      }));
+
+      // Step 1: Process through Rust MasterChain
+      console.log('[AudioExport] Processing through Rust MasterChain...');
+      const masteredSamples = await rustAudio.masterChain.process(samples, profile);
+      
+      setState(prev => ({ ...prev, progress: 50 }));
+
+      // Step 2: Show file dialog
+      let path: string | null = null;
+      const dialogModule = await getTauriDialog();
+      if (dialogModule) {
+        path = await dialogModule.save({
+          filters: [{
+            name: 'Audio Files',
+            extensions: ['wav'],
+          }],
+          defaultPath: `mastered_${Date.now()}.wav`,
+        });
+      }
+
+      if (!path && !isTauri) {
+        path = `mastered_${Date.now()}.wav`;
+      }
+
+      if (!path) {
+        setState(prev => ({ ...prev, isExporting: false, progress: 0 }));
+        return null;
+      }
+
+      setState(prev => ({ ...prev, progress: 75 }));
+
+      // Step 3: Export mastered audio
+      console.log('[AudioExport] Exporting mastered audio...');
+      const result = await rustAudio.export.wav({
+        path,
+        sampleRate,
+        channels,
+        bitDepth,
+        samples: masteredSamples,
+      });
+
+      setState(prev => ({
+        ...prev,
+        isExporting: false,
+        progress: 100,
+        lastExportPath: path,
+      }));
+
+      console.log('[AudioExport] Mastered export complete:', path);
+      return { path, result };
+    } catch (err) {
+      const errorMsg = err instanceof Error ? err.message : String(err);
+      console.error('[AudioExport] Mastering export failed:', errorMsg);
+      setState(prev => ({
+        ...prev,
+        isExporting: false,
+        error: errorMsg,
+      }));
+      throw err;
+    }
+  }, []);
+
   return {
     ...state,
     formats,
     loadFormats,
     exportWithDialog,
     exportToPath,
+    exportWithMastering,
     clearError,
   };
 }
+
 
 export default useAudioExport;

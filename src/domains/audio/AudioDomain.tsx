@@ -3,20 +3,28 @@
  * Phase 31: App.tsx Decomposition
  */
 
-import React, { createContext, useContext, useRef, useState, useCallback, ReactNode } from 'react';
+import React, { createContext, useContext, useRef, useState, useCallback, ReactNode, useEffect } from 'react';
 import { createSignalMatrix } from '../../audio/SignalMatrix';
+import { buildMasterChain, VelvetMasterChain } from '../../audio/masterChain';
+import { VelvetLoudnessMeter, DEFAULT_VELVET_LOUDNESS_METRICS } from '../../audio/VelvetLoudnessMeter';
+import type { VelvetLoudnessMetrics } from '../../audio/VelvetLoudnessMeter';
+import { TranslationMatrix, type TranslationProfileKey } from '../../audio/TranslationMatrix';
+import { rustMasterBridge } from '../../audio/RustMasterBridge';
+import StemSeparationIntegration from '../../audio/StemSeparationIntegration';
+import { PLUGIN_CATALOG } from '../../audio/pluginCatalog';
+import { getPluginRegistry, PluginId } from '../../audio/plugins';
+import { 
+  TRACK_ANALYSER_FFT, 
+  MASTER_ANALYSER_SMOOTHING, 
+  MIN_DECIBELS, 
+  MAX_DECIBELS,
+  ensureMasterMeterBuffers,
+  MasterMeterBuffers
+} from './metering';
 
 // ============================================================================
 // Types
 // ============================================================================
-
-export interface MasterNodes {
-  input: GainNode;
-  compressor: DynamicsCompressorNode;
-  limiter: DynamicsCompressorNode;
-  meter: AnalyserNode;
-  output: GainNode;
-}
 
 export interface AudioDomainState {
   // Core audio context
@@ -24,27 +32,37 @@ export interface AudioDomainState {
   isAudioReady: boolean;
   sampleRate: number;
   
-  // Master chain
-  masterNodes: MasterNodes | null;
+  // Master chain & Analysis
+  masterNodes: VelvetMasterChain | null;
   signalMatrix: ReturnType<typeof createSignalMatrix> | null;
+  loudnessMetrics: VelvetLoudnessMetrics;
   masterVolume: number;
-  masterMuted: boolean;
+  translationProfile: TranslationProfileKey;
+  
+  // Progress/Status
+  masterReady: boolean;
+  importMessage: string | null;
 }
 
 export interface AudioDomainActions {
   // Audio context management
-  initializeAudio: () => Promise<AudioContext>;
+  initializeAudio: () => Promise<void>;
   closeAudio: () => Promise<void>;
-  resumeAudio: () => Promise<void>;
   
   // Master controls
   setMasterVolume: (volume: number) => void;
-  setMasterMuted: (muted: boolean) => void;
+  recalibrateMaster: () => void;
+  setTranslationProfile: (profile: TranslationProfileKey) => void;
   
-  // Getters (for components that need refs)
+  // Getters (for components that need refs or current values)
   getAudioContext: () => AudioContext | null;
   getSignalMatrix: () => ReturnType<typeof createSignalMatrix> | null;
-  getMasterNodes: () => MasterNodes | null;
+  getMasterNodes: () => VelvetMasterChain | null;
+  getTranslationMatrix: () => TranslationMatrix | null;
+  getStemIntegration: () => StemSeparationIntegration | null;
+  
+  // Progress setters
+  setImportMessage: (msg: string | null) => void;
 }
 
 export interface AudioDomainContextType extends AudioDomainState, AudioDomainActions {}
@@ -76,133 +94,212 @@ interface AudioDomainProviderProps {
 }
 
 export function AudioDomainProvider({ children }: AudioDomainProviderProps) {
-  // Refs (not state - don't trigger re-renders)
+  // Refs for audio bridge components
   const audioContextRef = useRef<AudioContext | null>(null);
-  const masterNodesRef = useRef<MasterNodes | null>(null);
+  const masterNodesRef = useRef<VelvetMasterChain | null>(null);
   const signalMatrixRef = useRef<ReturnType<typeof createSignalMatrix> | null>(null);
+  const translationMatrixRef = useRef<TranslationMatrix | null>(null);
+  const velvetLoudnessMeterRef = useRef<VelvetLoudnessMeter | null>(null);
+  const stemIntegrationRef = useRef<StemSeparationIntegration | null>(null);
+  const masterMeterBufferRef = useRef<MasterMeterBuffers | null>(null);
+  const loudnessListenerRef = useRef<((event: Event) => void) | null>(null);
   
-  // State (triggers re-renders for UI updates)
+  // State
   const [isAudioReady, setIsAudioReady] = useState(false);
+  const [masterReady, setMasterReady] = useState(false);
   const [sampleRate, setSampleRate] = useState(48000);
   const [masterVolume, setMasterVolumeState] = useState(0.85);
-  const [masterMuted, setMasterMutedState] = useState(false);
+  const [translationProfile, setTranslationProfileState] = useState<TranslationProfileKey>('flat');
+  const [loudnessMetrics, setLoudnessMetrics] = useState<VelvetLoudnessMetrics>(DEFAULT_VELVET_LOUDNESS_METRICS);
+  const [importMessage, setImportMessageState] = useState<string | null>(null);
 
-  // Initialize audio context and master chain
-  const initializeAudio = useCallback(async (): Promise<AudioContext> => {
+  // Audio setup function migrated from App.tsx
+  const initializeAudio = useCallback(async () => {
     if (audioContextRef.current && audioContextRef.current.state !== 'closed') {
-      return audioContextRef.current;
+      return;
     }
 
-    // Create audio context
-    const ctx = new AudioContext({ sampleRate: 48000 });
+    const AudioCtx = (window.AudioContext || (window as any).webkitAudioContext) as typeof AudioContext;
+    const ctx = new AudioCtx();
     audioContextRef.current = ctx;
     setSampleRate(ctx.sampleRate);
 
-    // Create master nodes
-    const input = ctx.createGain();
-    const compressor = ctx.createDynamicsCompressor();
-    const limiter = ctx.createDynamicsCompressor();
-    const meter = ctx.createAnalyser();
-    const output = ctx.createGain();
+    try {
+      // 1. Build Master Chain
+      const masterChain = await buildMasterChain(ctx);
+      masterNodesRef.current = masterChain;
+      
+      // Initialize Rust Backend Master Chain
+      const profile = masterChain.getProfile();
+      rustMasterBridge.initialize(ctx.sampleRate, profile.name);
 
-    // Configure compressor
-    compressor.threshold.value = -24;
-    compressor.knee.value = 30;
-    compressor.ratio.value = 4;
-    compressor.attack.value = 0.003;
-    compressor.release.value = 0.25;
+      // 2. Initialize Signal Matrix
+      signalMatrixRef.current = createSignalMatrix(ctx, masterChain.input);
 
-    // Configure limiter
-    limiter.threshold.value = -1;
-    limiter.knee.value = 0;
-    limiter.ratio.value = 20;
-    limiter.attack.value = 0.001;
-    limiter.release.value = 0.1;
+      // 3. Setup Translation Matrix
+      const translationMatrix = new TranslationMatrix(ctx);
+      translationMatrix.attach(masterChain.output, ctx.destination);
+      translationMatrixRef.current = translationMatrix;
 
-    // Configure meter
-    meter.fftSize = 2048;
+      // 4. Setup Master Analyser
+      const masterAnalyser = masterChain.analyser;
+      masterAnalyser.fftSize = TRACK_ANALYSER_FFT;
+      masterAnalyser.smoothingTimeConstant = MASTER_ANALYSER_SMOOTHING;
+      masterAnalyser.minDecibels = MIN_DECIBELS;
+      masterAnalyser.maxDecibels = MAX_DECIBELS;
 
-    // Chain: input -> compressor -> limiter -> meter -> output -> destination
-    input.connect(compressor);
-    compressor.connect(limiter);
-    limiter.connect(meter);
-    meter.connect(output);
-    output.connect(ctx.destination);
+      if (typeof window !== 'undefined') {
+        (window as any).__mixx_masterAnalyser = masterAnalyser;
+        (window as any).__mixx_masterChain = {
+          targetLUFS: profile.targetLUFS,
+          profile: profile.name.toLowerCase().replace(/\s+/g, '-'),
+          calibrated: true,
+          masterVolume: masterVolume,
+        };
+      }
 
-    masterNodesRef.current = { input, compressor, limiter, meter, output };
+      masterMeterBufferRef.current = ensureMasterMeterBuffers(
+        masterMeterBufferRef.current,
+        masterAnalyser
+      );
 
-    // Create signal matrix
-    signalMatrixRef.current = createSignalMatrix(ctx, input);
+      // 5. Setup Loudness Meter
+      if (velvetLoudnessMeterRef.current && loudnessListenerRef.current) {
+        velvetLoudnessMeterRef.current.removeEventListener(
+          "metrics",
+          loudnessListenerRef.current as EventListener
+        );
+      }
+      
+      const meter = new VelvetLoudnessMeter();
+      velvetLoudnessMeterRef.current = meter;
+      await meter.initialize(ctx);
+      meter.reset();
+      
+      const handler = (event: Event) => {
+        const metricsEvent = event as CustomEvent<VelvetLoudnessMetrics>;
+        if (metricsEvent.detail) {
+          setLoudnessMetrics(metricsEvent.detail);
+        }
+      };
+      meter.addEventListener('metrics', handler as EventListener);
+      loudnessListenerRef.current = handler;
 
-    setIsAudioReady(true);
-    return ctx;
-  }, []);
+      // Wire meter into master chain tapping points
+      const complianceTap = masterChain.complianceTap;
+      const softLimiterNode = masterChain.softLimiter;
+      const meterNode = meter.getNode();
+      
+      if (meterNode) {
+        complianceTap.connect(meterNode as AudioNode);
+        (meterNode as AudioNode).connect(softLimiterNode);
+      } else {
+        complianceTap.connect(softLimiterNode);
+      }
 
-  // Close audio context
+      // 6. Apply initial translation profile
+      translationMatrix.activate(translationProfile);
+
+      // 7. Setup Stem Integration
+      const stemIntegration = new StemSeparationIntegration(ctx);
+      stemIntegrationRef.current = stemIntegration;
+      try {
+        stemIntegration.prewarm();
+      } catch (err) {
+        console.warn('[AUDIO] Stem prewarm not available', err);
+      }
+
+      setIsAudioReady(true);
+      setMasterReady(true);
+      console.log('[AudioDomain] ✅ Audio context and orchestration initialized');
+    } catch (err) {
+      console.error('[AudioDomain] ❌ Failed to initialize audio:', err);
+      throw err;
+    }
+  }, [masterVolume]);
+
   const closeAudio = useCallback(async () => {
     if (audioContextRef.current) {
       await audioContextRef.current.close();
       audioContextRef.current = null;
       masterNodesRef.current = null;
       signalMatrixRef.current = null;
+      translationMatrixRef.current = null;
+      
+      if (velvetLoudnessMeterRef.current && loudnessListenerRef.current) {
+        velvetLoudnessMeterRef.current.removeEventListener('metrics', loudnessListenerRef.current);
+      }
+      velvetLoudnessMeterRef.current = null;
       setIsAudioReady(false);
+      setMasterReady(false);
     }
   }, []);
 
-  // Resume audio context (after user gesture)
-  const resumeAudio = useCallback(async () => {
-    if (audioContextRef.current?.state === 'suspended') {
-      await audioContextRef.current.resume();
-    }
-  }, []);
-
-  // Set master volume
   const setMasterVolume = useCallback((volume: number) => {
     setMasterVolumeState(volume);
-    if (masterNodesRef.current && audioContextRef.current) {
-      const now = audioContextRef.current.currentTime;
-      masterNodesRef.current.output.gain.setTargetAtTime(volume, now, 0.01);
+    if (masterNodesRef.current) {
+      masterNodesRef.current.setMasterTrim(volume);
     }
   }, []);
 
-  // Set master muted
-  const setMasterMuted = useCallback((muted: boolean) => {
-    setMasterMutedState(muted);
-    if (masterNodesRef.current && audioContextRef.current) {
-      const now = audioContextRef.current.currentTime;
-      masterNodesRef.current.output.gain.setTargetAtTime(muted ? 0 : masterVolume, now, 0.01);
+  const recalibrateMaster = useCallback(() => {
+    if (masterNodesRef.current) {
+      const profile = masterNodesRef.current.getProfile();
+      masterNodesRef.current.setProfile(profile);
     }
-  }, [masterVolume]);
+  }, []);
 
-  // Getters for ref access
+  const setTranslationProfile = useCallback((profile: TranslationProfileKey) => {
+    setTranslationProfileState(profile);
+    if (translationMatrixRef.current) {
+      translationMatrixRef.current.activate(profile);
+    }
+  }, []);
+
   const getAudioContext = useCallback(() => audioContextRef.current, []);
   const getSignalMatrix = useCallback(() => signalMatrixRef.current, []);
   const getMasterNodes = useCallback(() => masterNodesRef.current, []);
+  const getTranslationMatrix = useCallback(() => translationMatrixRef.current, []);
+  const getStemIntegration = useCallback(() => stemIntegrationRef.current, []);
+  
+  const setImportMessage = useCallback((msg: string | null) => {
+    setImportMessageState(msg);
+  }, []);
 
-  // Context value
-  const contextValue: AudioDomainContextType = {
-    // State
+  // Cleanup on unmount
+  useEffect(() => {
+    return () => {
+      closeAudio();
+    };
+  }, [closeAudio]);
+
+  const value: AudioDomainContextType = {
     audioContext: audioContextRef.current,
     isAudioReady,
+    masterReady,
     sampleRate,
     masterNodes: masterNodesRef.current,
     signalMatrix: signalMatrixRef.current,
+    loudnessMetrics,
     masterVolume,
-    masterMuted,
+    translationProfile,
+    importMessage,
     
-    // Actions
     initializeAudio,
     closeAudio,
-    resumeAudio,
     setMasterVolume,
-    setMasterMuted,
+    recalibrateMaster,
+    setTranslationProfile,
     getAudioContext,
     getSignalMatrix,
     getMasterNodes,
+    getTranslationMatrix,
+    getStemIntegration,
+    setImportMessage,
   };
 
   return (
-    <AudioDomainContext.Provider value={contextValue}>
+    <AudioDomainContext.Provider value={value}>
       {children}
     </AudioDomainContext.Provider>
   );

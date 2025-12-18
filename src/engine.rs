@@ -22,6 +22,7 @@ use crate::mixx_audio_core::history::HistoryManager;
 use crate::mixx_audio_core::session::SessionManager;
 use crate::mixx_audio_core::tempo_map::TempoMap;
 use crate::mixx_audio_core::master_chain::{MasterChain, MasteringProfile};
+use crate::mixx_audio_core::simd_utils;
 
 static ENGINE_STATE: LazyLock<Mutex<Option<EngineState>>> =
     LazyLock::new(|| Mutex::new(None));
@@ -383,6 +384,42 @@ pub fn master_chain_set_enabled(enabled: bool) {
             chain.set_parameter("enabled", if enabled { 1.0 } else { 0.0 });
         }
     }
+}
+
+/// Process audio samples through the MasterChain for export
+/// 
+/// Takes interleaved stereo samples, processes through all mastering stages,
+/// and returns the processed samples.
+pub fn master_chain_process_samples(samples: &mut [f32], profile_id: Option<u32>) -> bool {
+    let guard = ENGINE_STATE
+        .lock()
+        .expect("MixxEngine global mutex poisoned");
+    
+    if let Some(state) = guard.as_ref() {
+        if let Ok(mut chain) = state.engine.master_chain.lock() {
+            // Optionally set profile for this export
+            if let Some(pid) = profile_id {
+                let profile = MasteringProfile::from_value(pid);
+                chain.apply_profile(profile);
+            }
+            
+            // Process through the master chain
+            use crate::mixx_audio_core::audio_processor::AudioProcessor;
+            chain.process(samples, 2); // Stereo
+            
+            info!("MasterChain: Processed {} samples for export", samples.len() / 2);
+            return true;
+        }
+    }
+    
+    false
+}
+
+
+/// Global toggle for SIMD optimizations
+pub fn simd_set_enabled(enabled: bool) {
+    simd_utils::set_simd_enabled(enabled);
+    info!("SIMD Optimizations: {}", if enabled { "ENABLED" } else { "DISABLED" });
 }
 
 impl MixxEngine {

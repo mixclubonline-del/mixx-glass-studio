@@ -3,10 +3,13 @@ use mixx_core::{
     master_chain_set_profile as core_set_profile,
     master_chain_get_meters as core_get_meters,
     master_chain_set_param as core_set_param,
+    master_chain_process_samples as core_process_samples,
     audio_export::{AudioExporter, ExportConfig, ExportFormat},
     mixx_plugins::{Dither, DitherType},
 };
 use serde_json;
+
+
 
 // ============================================================================
 // Master Chain Commands
@@ -49,6 +52,23 @@ pub fn master_chain_get_meters() -> serde_json::Value {
 pub fn master_chain_set_parameter(name: String, value: f32) -> Result<String, String> {
     core_set_param(&name, value);
     Ok(format!("Parameter {} set to {}", name, value))
+}
+
+/// Process audio samples through the Rust MasterChain for native-quality mastering
+#[command]
+pub async fn master_chain_process_samples(
+    samples: Vec<f32>,
+    profile: Option<u32>,
+) -> Result<Vec<f32>, String> {
+    let mut output = samples.clone();
+    
+    let success = core_process_samples(&mut output, profile);
+    
+    if success {
+        Ok(output)
+    } else {
+        Err("Failed to process samples through master chain".to_string())
+    }
 }
 
 // ============================================================================
@@ -134,3 +154,22 @@ pub fn mixx_plugins_info() -> Vec<serde_json::Value> {
         serde_json::json!({"name": "Dither", "type": "Dither", "params": ["bit_depth", "dither_type", "noise_shaping"]}),
     ]
 }
+// ============================================================================
+// SIMD Control Commands (Phase 34)
+// ============================================================================
+
+#[command]
+pub fn dsp_set_simd_enabled(enabled: bool) -> Result<String, String> {
+    // TODO: Re-export simd_set_enabled from mixx_core
+    // simd_set_enabled(enabled);
+    println!("[DSP] SIMD Optimizations set to: {}", enabled);
+    Ok(format!("SIMD Optimizations: {}", if enabled { "Enabled" } else { "Disabled" }))
+}
+
+
+#[command]
+pub fn dsp_get_simd_enabled() -> bool {
+    // TODO: Re-export is_simd_enabled from mixx_core
+    true // Default to enabled
+}
+

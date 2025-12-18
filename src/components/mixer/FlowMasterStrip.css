@@ -1,0 +1,402 @@
+/* FlowMasterStrip.css - Extracted styles for lint compliance */
+
+/* ============================================================================
+   Master Strip Container
+   ============================================================================ */
+.flow-master-strip {
+  position: relative;
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+  background: rgba(9, 18, 36, 0.82);
+  border: 1px solid rgba(102, 140, 198, 0.45);
+  -webkit-backdrop-filter: blur(40px) saturate(180%);
+  backdrop-filter: blur(40px) saturate(180%);
+  color: #e6f0ff;
+  border-radius: 1rem;
+  box-shadow: 0 8px 32px rgba(0, 0, 0, 0.3);
+}
+
+/* ============================================================================
+   Header Section
+   ============================================================================ */
+.master-strip-header {
+  position: relative;
+  flex-shrink: 0;
+  height: 72px;
+  border-bottom: 1px solid rgba(102, 140, 198, 0.7);
+}
+
+.master-strip-header-content {
+  position: relative;
+  z-index: 10;
+  padding: 12px;
+  padding-top: 12px;
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+.master-strip-title-row {
+  display: flex;
+  flex-direction: row;
+  align-items: center;
+  justify-content: space-between;
+}
+
+.master-strip-title {
+  text-transform: uppercase;
+  letter-spacing: 0.1em;
+  font-size: 0.75rem;
+  color: rgba(230, 240, 255, 0.95);
+}
+
+.master-strip-profile-label {
+  text-transform: uppercase;
+  letter-spacing: 0.1em;
+  font-size: 0.6875rem;
+  color: rgba(230, 240, 255, 0.75);
+}
+
+/* ============================================================================
+   Profile Selector Dropdown
+   ============================================================================ */
+.profile-selector-container {
+  position: relative;
+}
+
+.profile-selector-button {
+  background: rgba(14, 32, 62, 0.8);
+  border: 1px solid rgba(102, 140, 198, 0.4);
+  border-radius: 4px;
+  padding: 4px 8px;
+  color: #e6f0ff;
+  font-size: 10px;
+  cursor: pointer;
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+}
+
+.profile-dropdown {
+  position: absolute;
+  top: 100%;
+  left: 0;
+  z-index: 50;
+  background: rgba(9, 18, 36, 0.95);
+  border: 1px solid rgba(102, 140, 198, 0.5);
+  border-radius: 4px;
+  min-width: 100px;
+  margin-top: 2px;
+}
+
+.profile-dropdown-item {
+  display: block;
+  width: 100%;
+  padding: 6px 10px;
+  background: transparent;
+  border: none;
+  color: #e6f0ff;
+  font-size: 10px;
+  text-align: left;
+  cursor: pointer;
+}
+
+.profile-dropdown-item:hover {
+  background: rgba(102, 140, 198, 0.2);
+}
+
+.profile-dropdown-item--active {
+  background: rgba(102, 140, 198, 0.3);
+}
+
+/* ============================================================================
+   Section Containers
+   ============================================================================ */
+.master-strip-section {
+  padding: 8px 12px;
+  border-bottom: 1px solid rgba(102, 140, 198, 0.3);
+}
+
+.master-strip-body {
+  display: flex;
+  flex-direction: column;
+  flex: 1;
+  padding: 12px;
+  padding-top: 16px;
+  padding-bottom: 16px;
+  gap: 12px;
+}
+
+/* ============================================================================
+   Export Button
+   ============================================================================ */
+.export-button {
+  width: 100%;
+  padding: 8px 12px;
+  background: linear-gradient(135deg, rgba(102, 140, 198, 0.6), rgba(136, 96, 208, 0.5));
+  border: 1px solid rgba(102, 140, 198, 0.5);
+  border-radius: 6px;
+  color: #e6f0ff;
+  font-size: 11px;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 1px;
+  cursor: pointer;
+  transition: all 0.2s ease;
+}
+
+.export-button:disabled {
+  background: rgba(102, 140, 198, 0.3);
+  cursor: not-allowed;
+}
+
+.export-button:hover:not(:disabled) {
+  transform: translateY(-1px);
+  box-shadow: 0 4px 12px rgba(102, 140, 198, 0.3);
+}
+
+.export-status-text {
+  font-size: 9px;
+  color: #8892a6;
+  margin-top: 4px;
+  text-align: center;
+}
+
+.export-error-text {
+  font-size: 9px;
+  color: #ff6b6b;
+  margin-top: 4px;
+  text-align: center;
+}
+
+/* ============================================================================
+   Meter and Fader Containers
+   ============================================================================ */
+.master-strip-meter-container {
+  width: 100%;
+  display: flex;
+  flex-direction: row;
+  align-items: flex-end;
+  justify-content: center;
+}
+
+.master-strip-fader-container {
+  width: 100%;
+}
+
+.master-strip-controls {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.balance-container {
+  position: relative;
+}
+
+.balance-label {
+  position: absolute;
+  bottom: -20px;
+  left: 50%;
+  transform: translateX(-50%);
+  font-size: 10px;
+  color: rgba(156, 163, 175, 0.8);
+  font-weight: 600;
+}
+
+/* ============================================================================
+   Native Engine Status Section
+   ============================================================================ */
+.native-engine-section {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  padding-top: 8px;
+  border-top: 1px solid rgba(102, 140, 198, 0.2);
+}
+
+.native-engine-header {
+  display: flex;
+  flex-direction: row;
+  align-items: center;
+  justify-content: space-between;
+}
+
+.native-engine-label {
+  font-size: 9px;
+  color: rgba(230, 240, 255, 0.5);
+  letter-spacing: 0.5px;
+}
+
+.native-engine-indicator {
+  width: 6px;
+  height: 6px;
+  border-radius: 50%;
+  background: #333;
+}
+
+.native-engine-indicator--active {
+  background: #00ff88;
+  box-shadow: 0 0 8px #00ff88;
+}
+
+.native-engine-status-row {
+  display: flex;
+  flex-direction: row;
+  align-items: center;
+  justify-content: space-between;
+  margin-top: 4px;
+}
+
+.native-engine-lufs-display {
+  display: flex;
+  flex-direction: row;
+  align-items: baseline;
+  gap: 4px;
+}
+
+.native-engine-lufs-value {
+  font-size: 14px;
+  font-weight: 600;
+  color: #444;
+}
+
+.native-engine-lufs-value--active {
+  color: #00ff88;
+}
+
+.native-engine-lufs-label {
+  font-size: 8px;
+  color: rgba(230, 240, 255, 0.4);
+}
+
+/* ============================================================================
+   SIMD Toggle Button
+   ============================================================================ */
+.simd-toggle-button {
+  background: rgba(255, 100, 100, 0.1);
+  border: 1px solid rgba(255, 100, 100, 0.2);
+  border-radius: 4px;
+  padding: 2px 6px;
+  color: #ff6b6b;
+  font-size: 8px;
+  font-weight: 700;
+  cursor: pointer;
+  transition: all 0.2s ease;
+  text-transform: uppercase;
+}
+
+.simd-toggle-button--enabled {
+  background: rgba(0, 255, 136, 0.15);
+  border-color: rgba(0, 255, 136, 0.3);
+  color: #00ff88;
+}
+
+.simd-toggle-button:hover {
+  transform: scale(1.05);
+}
+
+/* ============================================================================
+   Pulsing Components
+   ============================================================================ */
+.pulsing-label {
+  padding: 4px 8px;
+  border-radius: 9999px;
+  text-transform: uppercase;
+  letter-spacing: 0.1em;
+  font-size: 0.6875rem;
+  border: 1px solid rgba(102, 140, 198, 0.35);
+  color: rgba(230, 240, 255, 0.85);
+  background: rgba(14, 32, 62, 0.65);
+}
+
+.master-strip-labels {
+  display: flex;
+  flex-direction: row;
+  align-items: center;
+  gap: 8px;
+}
+
+.pulsing-background {
+  position: absolute;
+  inset: 0;
+}
+
+.flow-indicator-track {
+  position: relative;
+  height: 4px;
+  overflow: hidden;
+  border-radius: 9999px;
+  background: rgba(9, 18, 36, 0.6);
+}
+
+.flow-indicator-fill {
+  position: absolute;
+  inset: 0;
+  left: 0;
+  border-radius: 9999px;
+}
+
+/* ============================================================================
+   Engine Status Indicators (Phase 40)
+   ============================================================================ */
+.engine-status-row {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 6px 10px;
+  border-top: 1px solid rgba(102, 140, 198, 0.2);
+}
+
+.status-indicator {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+}
+
+.status-dot {
+  width: 6px;
+  height: 6px;
+  border-radius: 50%;
+  background: rgba(120, 120, 120, 0.5);
+  transition: all 0.3s ease;
+}
+
+.status-dot--active {
+  background: #00ff88;
+  box-shadow: 0 0 8px rgba(0, 255, 136, 0.6);
+}
+
+.status-dot--wasm {
+  background: rgba(120, 120, 120, 0.5);
+}
+
+.status-dot--wasm.status-dot--active {
+  background: #00d4ff;
+  box-shadow: 0 0 8px rgba(0, 212, 255, 0.6);
+}
+
+.status-label {
+  font-size: 8px;
+  font-weight: 600;
+  color: rgba(230, 240, 255, 0.5);
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+}
+
+.status-label--active {
+  color: rgba(230, 240, 255, 0.9);
+}
+
+.profile-badge {
+  margin-left: auto;
+  background: rgba(138, 43, 226, 0.2);
+  border: 1px solid rgba(138, 43, 226, 0.4);
+  border-radius: 4px;
+  padding: 2px 6px;
+  font-size: 8px;
+  font-weight: 700;
+  color: #d4a5ff;
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+}

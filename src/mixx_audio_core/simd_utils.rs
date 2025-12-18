@@ -15,13 +15,29 @@ use std::arch::x86_64::*;
 #[cfg(target_arch = "aarch64")]
 use std::arch::aarch64::*;
 
+use std::sync::atomic::{AtomicBool, Ordering};
+
+/// Global toggle for SIMD optimizations
+static SIMD_ENABLED: AtomicBool = AtomicBool::new(true);
+
+/// Set whether SIMD optimizations are enabled
+pub fn set_simd_enabled(enabled: bool) {
+    SIMD_ENABLED.store(enabled, Ordering::Relaxed);
+}
+
+/// Check if SIMD optimizations are globally enabled
+pub fn is_simd_enabled() -> bool {
+    SIMD_ENABLED.load(Ordering::Relaxed)
+}
+
 // ============================================================================
 // Feature Detection
 // ============================================================================
 
-/// Check if AVX2 is available (x86_64)
+/// Check if AVX2 is available (x86_64) and enabled
 #[inline]
 pub fn has_avx2() -> bool {
+    if !is_simd_enabled() { return false; }
     #[cfg(any(target_arch = "x86", target_arch = "x86_64"))]
     {
         is_x86_feature_detected!("avx2") && is_x86_feature_detected!("fma")
@@ -32,9 +48,10 @@ pub fn has_avx2() -> bool {
     }
 }
 
-/// Check if NEON is available (AArch64 - always true on standard ARMv8)
+/// Check if NEON is available (AArch64) and enabled
 #[inline]
 pub fn has_neon() -> bool {
+    if !is_simd_enabled() { return false; }
     #[cfg(target_arch = "aarch64")]
     {
         true
@@ -507,7 +524,7 @@ unsafe fn peak_neon(buffer: &[f32]) -> f32 {
         i += 4;
     }
     
-    let max_pair = vpmaxq_f32(max_vec, max_vec);
+    let _max_pair = vpmaxq_f32(max_vec, max_vec);
     let max_scalar = vpmaxs_f32(vget_low_f32(vpmaxq_f32(max_vec, max_vec)));
     let mut peak = max_scalar;
     

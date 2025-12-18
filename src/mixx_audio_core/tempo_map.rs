@@ -459,7 +459,7 @@ mod tests {
         let mut map = TempoMap::new(48000, 120.0);
         
         let id1 = map.add_marker(0, "Intro", MarkerType::Section);
-        let id2 = map.add_marker(48000 * 10, "Verse", MarkerType::Section);
+        let _id2 = map.add_marker(48000 * 10, "Verse", MarkerType::Section);
         
         assert_eq!(map.markers().len(), 2);
         assert_eq!(map.get_marker(id1).unwrap().name, "Intro");

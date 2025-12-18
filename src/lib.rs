@@ -24,6 +24,8 @@ pub use engine::{
     tempo_position_to_bar_beat, tempo_snap_to_grid, tempo_stats,
     // Phase 26: Master Chain
     master_chain_set_profile, master_chain_get_meters, master_chain_set_param, master_chain_set_enabled,
+    master_chain_process_samples,
+
     EngineConfig, EngineError, EngineMetric, EngineStats,
 };
 pub use ffi::{

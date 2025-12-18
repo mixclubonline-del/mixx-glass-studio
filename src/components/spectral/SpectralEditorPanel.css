@@ -1,50 +1,537 @@
-.spectral-editor-panel {
+/* SpectralEditorPanel.css */
+
+.spectral-editor {
   z-index: 1000;
   position: absolute;
   top: 0;
   right: 0;
   bottom: 0;
   height: 100%;
+  width: 640px;
+  transition: transform 0.4s var(--aura-ease-smooth), opacity 0.4s var(--aura-ease-smooth);
 }
 
-.spectral-editor-panel aside {
+.spectral-editor--open {
+  transform: translateX(0);
+  opacity: 1;
+  pointer-events: auto;
+}
+
+.spectral-editor--closed {
+  transform: translateX(660px);
+  opacity: 0;
+  pointer-events: none;
+}
+
+.spectral-editor__container {
+  display: flex;
+  flex-direction: column;
+  height: 100%;
+  width: 100%;
+  border-left: 1px solid rgba(255, 255, 255, 0.1);
+  background: rgba(5, 5, 16, 0.95);
+  backdrop-filter: blur(40px);
   box-shadow: -20px 0 50px rgba(0, 0, 0, 0.5);
+  overflow: hidden;
 }
 
-.spectral-editor-panel header {
-  background: rgba(10, 10, 30, 0.6);
+.spectral-editor__header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 1rem 1.5rem;
+  border-bottom: 1px solid rgba(255, 255, 255, 0.1);
+  background: rgba(255, 255, 255, 0.02);
 }
 
-.spectral-editor-panel footer {
-  background: rgba(10, 10, 30, 0.8);
+.spectral-editor__header-info {
+  display: flex;
+  flex-direction: column;
+  gap: 0.25rem;
 }
 
-/* Custom Scrollbar */
-.spectral-editor-panel div::-webkit-scrollbar {
+.spectral-editor__label-eyebrow {
+  font-size: 10px;
+  text-transform: uppercase;
+  letter-spacing: 0.4em;
+  color: rgba(255, 255, 255, 0.4);
+  font-weight: 700;
+}
+
+.spectral-editor__title-row {
+  display: flex;
+  align-items: center;
+  gap: 0.75rem;
+}
+
+.spectral-editor__clip-name {
+  font-size: 0.875rem;
+  font-weight: 600;
+  letter-spacing: 0.025em;
+  color: rgba(255, 255, 255, 0.9);
+}
+
+.spectral-editor__track-badge {
+  border-radius: 9999px;
+  padding: 0.125rem 0.75rem;
+  font-size: 9px;
+  text-transform: uppercase;
+  letter-spacing: 0.2em;
+  font-weight: 700;
+  border-width: 1px;
+}
+
+.spectral-editor__header-actions {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+}
+
+.spectral-editor__analyzing {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  margin-right: 1rem;
+}
+
+.spectral-editor__progress-track {
+  height: 6px;
+  width: 48px;
+  border-radius: 9999px;
+  background: rgba(255, 255, 255, 0.05);
+  overflow: hidden;
+}
+
+.spectral-editor__progress-fill {
+  height: 100%;
+  width: 100%;
+  background: var(--aura-cyan);
+  animation: aura-pulse 1.5s infinite;
+}
+
+.spectral-editor__status-text {
+  font-size: 9px;
+  text-transform: uppercase;
+  letter-spacing: 0.1em;
+  color: var(--aura-cyan);
+}
+
+.spectral-editor__close-btn {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  height: 2rem;
+  width: 2rem;
+  border-radius: 9999px;
+  border: 1px solid rgba(255, 255, 255, 0.05);
+  background: rgba(255, 255, 255, 0.05);
+  color: rgba(255, 255, 255, 0.4);
+  transition: all 0.2s ease;
+}
+
+.spectral-editor__close-btn:hover {
+  background: rgba(255, 255, 255, 0.1);
+  color: rgba(255, 255, 255, 0.8);
+}
+
+.spectral-editor__icon-sm {
+  height: 1rem;
+  width: 1rem;
+}
+
+.spectral-editor__content {
+  flex: 1;
+  overflow: hidden;
+  display: flex;
+  flex-direction: column;
+}
+
+.spectral-editor__grid-layout {
+  flex: 1;
+  display: flex;
+  overflow: hidden;
+}
+
+.spectral-editor__sidebar {
+  width: 3rem;
+  border-right: 1px solid rgba(255, 255, 255, 0.05);
+  background: rgba(255, 255, 255, 0.01);
+  overflow: hidden;
+  position: relative;
+}
+
+.spectral-editor__sidebar-scroller {
+  position: absolute;
+  inset: 0;
+  transition: transform 0.1s linear;
+}
+
+.spectral-editor__note-label {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border-bottom: 1px solid rgba(255, 255, 255, 0.02);
+  font-size: 9px;
+  color: rgba(255, 255, 255, 0.25);
+  font-family: 'JetBrains Mono', monospace;
+}
+
+.spectral-editor__viewport {
+  flex: 1;
+  overflow: auto;
+  position: relative;
+  background: #080815;
+}
+
+.spectral-editor__grid-canvas {
+  position: relative;
+  transition: transform 0.1s linear;
+}
+
+.spectral-editor__grid-line {
+  position: absolute;
+  left: 0;
+  right: 0;
+  border-bottom: 1px solid rgba(255, 255, 255, 0.03);
+  pointer-events: none;
+}
+
+.spectral-editor__grid-line--octave {
+  border-bottom-color: rgba(255, 255, 255, 0.1);
+}
+
+.spectral-editor__blobs-container {
+  position: absolute;
+  inset: 0;
+}
+
+.spectral-editor__playhead {
+  position: absolute;
+  top: 0;
+  bottom: 0;
+  width: 1.5px;
+  background: var(--aura-cyan);
+  z-index: 20;
+  pointer-events: none;
+}
+
+.spectral-editor__playhead-glow {
+  position: absolute;
+  inset: 0;
+  width: 6px;
+  left: -2.25px;
+  background: linear-gradient(90deg, transparent, var(--aura-cyan), transparent);
+  opacity: 0.6;
+  filter: blur(4px);
+  animation: aura-pulse 2s infinite ease-in-out;
+}
+
+.spectral-editor__footer {
+  padding: 0.75rem 1.5rem;
+  border-top: 1px solid rgba(255, 255, 255, 0.1);
+  background: rgba(8, 8, 21, 0.8);
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+}
+
+.spectral-editor__controls {
+  display: flex;
+  align-items: center;
+  gap: 1.5rem;
+}
+
+.spectral-editor__control-group {
+  display: flex;
+  flex-direction: column;
+  gap: 0.125rem;
+}
+
+.spectral-editor__control-label {
+  font-size: 9px;
+  text-transform: uppercase;
+  letter-spacing: 0.15em;
+  color: rgba(255, 255, 255, 0.3);
+}
+
+.spectral-editor__range {
+  width: 8rem;
+  appearance: none;
+  background: rgba(255, 255, 255, 0.05);
+  height: 4px;
+  border-radius: 9999px;
+  outline: none;
+}
+
+.spectral-editor__range::-webkit-slider-thumb {
+  appearance: none;
+  width: 12px;
+  height: 12px;
+  border-radius: 50%;
+  cursor: pointer;
+  transition: transform 0.1s ease;
+}
+
+.spectral-editor__range--cyan::-webkit-slider-thumb { background: var(--aura-cyan); box-shadow: 0 0 10px var(--aura-cyan); }
+.spectral-editor__range--violet::-webkit-slider-thumb { background: var(--aura-violet); box-shadow: 0 0 10px var(--aura-violet); }
+
+.spectral-editor__range:active::-webkit-slider-thumb {
+  transform: scale(1.2);
+}
+
+.spectral-editor__harmonize-btn {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  border-radius: 9999px;
+  background: linear-gradient(135deg, var(--aura-violet), var(--aura-blue));
+  padding: 0.5rem 1.25rem;
+  font-size: 11px;
+  text-transform: uppercase;
+  letter-spacing: 0.2em;
+  font-weight: 700;
+  color: white;
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.3);
+  transition: all 0.2s ease;
+}
+
+.spectral-editor__harmonize-btn:hover {
+  filter: brightness(1.1);
+  transform: translateY(-1px);
+}
+
+.spectral-editor__harmonize-btn:active {
+  transform: scale(0.95);
+}
+
+/* Custom Scrollbar for Viewport */
+.spectral-editor__viewport::-webkit-scrollbar {
   width: 6px;
   height: 6px;
 }
 
-.spectral-editor-panel div::-webkit-scrollbar-track {
+.spectral-editor__viewport::-webkit-scrollbar-track {
   background: rgba(255, 255, 255, 0.02);
 }
 
-.spectral-editor-panel div::-webkit-scrollbar-thumb {
+.spectral-editor__viewport::-webkit-scrollbar-thumb {
   background: rgba(255, 255, 255, 0.1);
   border-radius: 3px;
 }
 
-.spectral-editor-panel div::-webkit-scrollbar-thumb:hover {
+.spectral-editor__viewport::-webkit-scrollbar-thumb:hover {
   background: rgba(255, 255, 255, 0.2);
 }
 
-/* Animation for playhead shadow */
-@keyframes playhead-glow {
-  0% { opacity: 0.6; }
-  50% { opacity: 1; }
-  100% { opacity: 0.6; }
+/* Key Badge */
+.spectral-editor__key-badge {
+  padding: 0.125rem 0.5rem;
+  border-radius: 6px;
+  background: rgba(136, 132, 216, 0.15);
+  color: var(--aura-violet, #8884d8);
+  font-size: 10px;
+  font-weight: 600;
+  letter-spacing: 0.05em;
+  border: 1px solid rgba(136, 132, 216, 0.3);
 }
 
-.spectral-editor-panel .playhead-shadow {
-  animation: playhead-glow 2s infinite ease-in-out;
+/* Lock to Scale Button */
+.spectral-editor__lock-btn {
+  display: flex;
+  align-items: center;
+  gap: 0.375rem;
+  padding: 0.375rem 0.75rem;
+  border-radius: 9999px;
+  border: 1px solid rgba(255, 255, 255, 0.08);
+  background: rgba(255, 255, 255, 0.04);
+  color: rgba(255, 255, 255, 0.5);
+  font-size: 9px;
+  text-transform: uppercase;
+  letter-spacing: 0.1em;
+  font-weight: 600;
+  transition: all 0.2s ease;
+  cursor: pointer;
+}
+
+.spectral-editor__lock-btn:hover {
+  background: rgba(255, 255, 255, 0.08);
+  color: rgba(255, 255, 255, 0.7);
+}
+
+.spectral-editor__lock-btn--active {
+  background: rgba(0, 255, 200, 0.12);
+  border-color: rgba(0, 255, 200, 0.3);
+  color: var(--aura-cyan, #00ffc8);
+}
+
+.spectral-editor__lock-btn--active:hover {
+  background: rgba(0, 255, 200, 0.18);
+}
+
+/* In-Scale Note Highlighting */
+.spectral-editor__note-label--in-scale {
+  background: rgba(0, 255, 200, 0.06);
+  color: var(--aura-cyan, #00ffc8);
+}
+
+.spectral-editor__grid-line--in-scale {
+  background: rgba(0, 255, 200, 0.03);
+  border-bottom-color: rgba(0, 255, 200, 0.15);
+}
+
+/* Select Dropdowns */
+.spectral-editor__select {
+  appearance: none;
+  background: rgba(255, 255, 255, 0.05);
+  border: 1px solid rgba(255, 255, 255, 0.1);
+  border-radius: 6px;
+  padding: 0.25rem 1.5rem 0.25rem 0.5rem;
+  font-size: 11px;
+  color: rgba(255, 255, 255, 0.8);
+  cursor: pointer;
+  outline: none;
+  background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='10' height='6' fill='none'%3E%3Cpath d='M1 1l4 4 4-4' stroke='%23888' stroke-width='1.5' stroke-linecap='round' stroke-linejoin='round'/%3E%3C/svg%3E");
+  background-repeat: no-repeat;
+  background-position: right 0.4rem center;
+  min-width: 70px;
+  transition: all 0.15s ease;
+}
+
+.spectral-editor__select:hover {
+  background-color: rgba(255, 255, 255, 0.08);
+  border-color: rgba(255, 255, 255, 0.15);
+}
+
+.spectral-editor__select:focus {
+  border-color: var(--aura-cyan, #00ffc8);
+  box-shadow: 0 0 0 2px rgba(0, 255, 200, 0.15);
+}
+
+.spectral-editor__select option {
+  background: #1a1a2e;
+  color: white;
+}
+
+/* Harmonize button disabled state */
+.spectral-editor__harmonize-btn:disabled {
+  opacity: 0.6;
+  cursor: not-allowed;
+  filter: grayscale(0.3);
+}
+
+.spectral-editor__harmonize-btn:disabled:hover {
+  transform: none;
+  filter: grayscale(0.3);
+}
+
+/* Harmony Results Panel */
+.spectral-editor__harmony-panel {
+  padding: 0.75rem 1rem;
+  background: rgba(136, 132, 216, 0.08);
+  border-top: 1px solid rgba(136, 132, 216, 0.2);
+  border-bottom: 1px solid rgba(136, 132, 216, 0.2);
+  animation: harmony-slide-in 0.3s ease-out;
+}
+
+@keyframes harmony-slide-in {
+  from {
+    opacity: 0;
+    transform: translateY(-10px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+.spectral-editor__harmony-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-bottom: 0.5rem;
+}
+
+.spectral-editor__harmony-title {
+  font-size: 11px;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.1em;
+  color: var(--aura-violet, #8884d8);
+}
+
+.spectral-editor__harmony-close {
+  background: none;
+  border: none;
+  color: rgba(255, 255, 255, 0.4);
+  font-size: 18px;
+  cursor: pointer;
+  padding: 0 0.25rem;
+  line-height: 1;
+}
+
+.spectral-editor__harmony-close:hover {
+  color: rgba(255, 255, 255, 0.8);
+}
+
+.spectral-editor__harmony-analysis {
+  display: flex;
+  gap: 1rem;
+  margin-bottom: 0.5rem;
+}
+
+.spectral-editor__harmony-chord {
+  font-size: 12px;
+  font-weight: 600;
+  color: rgba(255, 255, 255, 0.9);
+  background: rgba(0, 255, 200, 0.1);
+  padding: 0.125rem 0.5rem;
+  border-radius: 4px;
+}
+
+.spectral-editor__harmony-scale {
+  font-size: 11px;
+  color: rgba(255, 255, 255, 0.5);
+}
+
+.spectral-editor__harmony-suggestions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.5rem;
+  margin-bottom: 0.5rem;
+}
+
+.spectral-editor__harmony-suggestion {
+  display: flex;
+  align-items: center;
+  gap: 0.375rem;
+  padding: 0.25rem 0.5rem;
+  background: rgba(255, 255, 255, 0.05);
+  border: 1px solid rgba(255, 255, 255, 0.08);
+  border-radius: 6px;
+  font-size: 10px;
+}
+
+.spectral-editor__harmony-note {
+  font-family: 'JetBrains Mono', monospace;
+  color: rgba(255, 255, 255, 0.9);
+}
+
+.spectral-editor__harmony-shift {
+  color: var(--aura-cyan, #00ffc8);
+  font-weight: 600;
+}
+
+.spectral-editor__harmony-type {
+  color: rgba(255, 255, 255, 0.4);
+  text-transform: uppercase;
+  font-size: 8px;
+  letter-spacing: 0.05em;
+}
+
+.spectral-editor__harmony-advice {
+  font-size: 10px;
+  color: rgba(255, 255, 255, 0.6);
+  line-height: 1.4;
+  margin: 0;
+  font-style: italic;
 }

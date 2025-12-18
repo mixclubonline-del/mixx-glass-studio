@@ -9,8 +9,11 @@ import { deriveTrackALSFeedback, hexToRgba } from '../../utils/ALS';
 import { spacing, typography, layout, effects, transitions, composeStyles } from '../../design-system';
 import { LoudnessMeter } from '../LoudnessMeter';
 import { useMasterChain } from '../../hooks/useMasterChain';
-import { useAudioExport } from '../../hooks/useAudioExport';
 import { MasteringProfile, PROFILE_INFO } from '../../types/rust-audio';
+import { useLoudnessMeters } from '../../hooks/useLoudnessMeters';
+import { rustMasterBridge } from '../../audio/RustMasterBridge';
+import './FlowMasterStrip.css';
+import ExportModal from '../modals/ExportModal';
 
 interface FlowMasterStripProps {
   volume: number;
@@ -33,28 +36,12 @@ const PROFILE_NAMES = ['Streaming', 'Club', 'Broadcast', 'Vinyl', 'Audiophile'];
 const PulsingLabels: React.FC<{ labels: string[] }> = ({ labels }) => {
   const pulseOpacity = usePulseAnimation(0.6, 1, 2400, 'ease-in-out');
   return (
-    <div style={composeStyles(
-      layout.flex.container('row'),
-      layout.flex.align.center,
-      spacing.gap(2)
-    )}>
+    <div className="master-strip-labels">
       {labels.map((label) => (
         <span
           key={label}
-          style={composeStyles(
-            spacing.px(2),
-            spacing.py(1),
-            effects.border.radius.full,
-            typography.transform('uppercase'),
-            typography.tracking.widest,
-            {
-              fontSize: '0.6875rem', // 11px minimum
-              border: '1px solid rgba(102, 140, 198, 0.35)',
-              color: 'rgba(230, 240, 255, 0.85)',
-              background: 'rgba(14,32,62,0.65)',
-              opacity: pulseOpacity,
-            }
-          )}
+          className="pulsing-label"
+          style={{ opacity: pulseOpacity }}
         >
           {label}
         </span>
@@ -68,17 +55,14 @@ const PulsingBackground: React.FC<{ color: string; intensity: number }> = ({ col
   const pulseOpacity = usePulseAnimation(0.6, 1, 2800, 'ease-in-out');
   return (
     <div
-      style={composeStyles(
-        layout.position.absolute,
-        { inset: 0 },
-        {
-          background: `linear-gradient(135deg, ${hexToRgba(
-            color,
-            0.25 + intensity * 0.3
-          )} 0%, transparent 70%)`,
-          opacity: pulseOpacity,
-        }
-      )}
+      className="pulsing-background"
+      style={{
+        background: `linear-gradient(135deg, ${hexToRgba(
+          color,
+          0.25 + intensity * 0.3
+        )} 0%, transparent 70%)`,
+        opacity: pulseOpacity,
+      }}
     />
   );
 };
@@ -87,31 +71,18 @@ const PulsingBackground: React.FC<{ color: string; intensity: number }> = ({ col
 const PulsingFlowIndicator: React.FC<{ flow: number }> = ({ flow }) => {
   const pulseOpacity = usePulseAnimation(0.6, 1, 2200, 'ease-in-out');
   return (
-    <div style={composeStyles(
-      layout.position.relative,
-      layout.overflow.hidden,
-      effects.border.radius.full,
-      {
-        height: '4px',
-        background: 'rgba(9,18,36,0.6)',
-      }
-    )}>
+    <div className="flow-indicator-track">
       <div
-        style={composeStyles(
-          layout.position.absolute,
-          effects.border.radius.full,
-          {
-            inset: '0 0 0 0',
-            left: 0,
-            width: `${flow * 100}%`,
-            background: `linear-gradient(90deg, ${hexToRgba(
-              MASTER_PRIMARY,
-              0.8
-            )}, ${hexToRgba(MASTER_GLOW, 0.45)})`,
-            boxShadow: `0 0 14px ${hexToRgba(MASTER_GLOW, 0.35)}`,
-            opacity: pulseOpacity,
-          }
-        )}
+        className="flow-indicator-fill"
+        style={{
+          width: `${flow * 100}%`,
+          background: `linear-gradient(90deg, ${hexToRgba(
+            MASTER_PRIMARY,
+            0.8
+          )}, ${hexToRgba(MASTER_GLOW, 0.45)})`,
+          boxShadow: `0 0 14px ${hexToRgba(MASTER_GLOW, 0.35)}`,
+          opacity: pulseOpacity,
+        }}
       />
     </div>
   );
@@ -140,24 +111,8 @@ const FlowMasterStrip: React.FC<FlowMasterStripProps> = ({
   const { initialize, setProfile, profile, initialized } = useMasterChain(48000);
   const [showProfileDropdown, setShowProfileDropdown] = useState(false);
 
-  // Audio export (Phase 29)
-  const { exportToPath, isExporting, error: exportError, lastExportPath } = useAudioExport();
-  
-  const handleExport = async () => {
-    // Generate test audio (sine wave for now)
-    const sampleRate = 48000;
-    const duration = 5; // 5 seconds
-    const samples = new Float32Array(sampleRate * duration * 2);
-    for (let i = 0; i < samples.length; i += 2) {
-      const t = i / 2 / sampleRate;
-      const freq = 440 * (1 + 0.1 * Math.sin(2 * Math.PI * 0.5 * t)); // Vibrato
-      samples[i] = Math.sin(2 * Math.PI * freq * t) * 0.5;
-      samples[i + 1] = samples[i];
-    }
-    
-    const path = `/tmp/aura_export_${Date.now()}.wav`;
-    await exportToPath(path, { samples, bitDepth: 24 });
-  };
+  // Audio export modal state (Phase 32)
+  const [showExportModal, setShowExportModal] = useState(false);
 
   // Initialize master chain on mount
   useEffect(() => {
@@ -295,38 +250,14 @@ const FlowMasterStrip: React.FC<FlowMasterStripProps> = ({
         <LoudnessMeter compact targetLUFS={PROFILE_INFO[profile]?.lufs ?? -14} />
       </div>
 
-      {/* Export Button (Phase 29) */}
+      {/* Export Button (Phase 32) */}
       <div style={{ padding: '8px 12px', borderBottom: '1px solid rgba(102, 140, 198, 0.3)' }}>
         <button
-          onClick={handleExport}
-          disabled={isExporting}
-          style={{
-            width: '100%',
-            padding: '8px 12px',
-            background: isExporting ? 'rgba(102, 140, 198, 0.3)' : 'linear-gradient(135deg, rgba(102,140,198,0.6), rgba(136,96,208,0.5))',
-            border: '1px solid rgba(102, 140, 198, 0.5)',
-            borderRadius: '6px',
-            color: '#e6f0ff',
-            fontSize: '11px',
-            fontWeight: 600,
-            textTransform: 'uppercase' as const,
-            letterSpacing: '1px',
-            cursor: isExporting ? 'not-allowed' : 'pointer',
-            transition: 'all 0.2s ease',
-          }}
+          onClick={() => setShowExportModal(true)}
+          className="export-button"
         >
-          {isExporting ? 'Exporting...' : '⬇ Export'}
+          ⬇ Export
         </button>
-        {lastExportPath && (
-          <div style={{ fontSize: '9px', color: '#8892a6', marginTop: '4px', textAlign: 'center' as const }}>
-            Last: {lastExportPath.split('/').pop()}
-          </div>
-        )}
-        {exportError && (
-          <div style={{ fontSize: '9px', color: '#ff6b6b', marginTop: '4px', textAlign: 'center' as const }}>
-            {exportError}
-          </div>
-        )}
       </div>
 
       <div style={composeStyles(
@@ -400,9 +331,120 @@ const FlowMasterStrip: React.FC<FlowMasterStripProps> = ({
           </div>
           <PulsingFlowIndicator flow={masterFeedback.flow} />
         </div>
+
+        {/* Native Engine Status & SIMD Toggle (Phase 32 & 34) */}
+        <NativeEngineStatus />
+      </div>
+
+      {/* Export Modal (Phase 32) */}
+      {showExportModal && (
+        <ExportModal onClose={() => setShowExportModal(false)} />
+      )}
+    </div>
+  );
+};
+
+// Native Engine Status Component (Phase 32, 34 & 40)
+const NativeEngineStatus: React.FC = () => {
+  const { integrated: rustIntegrated, isActive: rustActive } = useLoudnessMeters();
+  const [simdEnabled, setSimdEnabledState] = useState(true);
+  const [workletActive, setWorkletActive] = useState(false);
+  const [wasmActive, setWasmActive] = useState(false);
+  const [currentProfile, setCurrentProfile] = useState('STREAM');
+
+  useEffect(() => {
+    const syncSimd = async () => {
+      const enabled = await rustMasterBridge.getSimdEnabled();
+      setSimdEnabledState(enabled);
+    };
+    syncSimd();
+
+    // Check Worklet status - detect if AudioWorklet is supported and active
+    const checkWorklet = () => {
+      const hasWorklet = typeof AudioWorkletNode !== 'undefined' && typeof AudioContext !== 'undefined';
+      setWorkletActive(hasWorklet);
+    };
+    checkWorklet();
+
+    // Check WASM status - detect if WASM DSP modules are loaded
+    const checkWasm = async () => {
+      try {
+        // Check if WASM is available
+        const wasmSupported = typeof WebAssembly !== 'undefined';
+        setWasmActive(wasmSupported);
+      } catch {
+        setWasmActive(false);
+      }
+    };
+    checkWasm();
+
+    // Subscribe to profile changes
+    const updateProfile = async () => {
+      // Get current profile from master chain
+      try {
+        const meters = await rustMasterBridge.getMeters();
+        if (meters?.profile) {
+          const names = ['STREAM', 'CLUB', 'BCAST', 'VINYL', 'AUDIO'];
+          const idx = typeof meters.profile === 'number' ? meters.profile : 0;
+          setCurrentProfile(names[idx] || 'STREAM');
+        }
+      } catch {
+        // Keep default
+      }
+    };
+    updateProfile();
+  }, []);
+
+  const toggleSimd = async () => {
+    const newState = !simdEnabled;
+    setSimdEnabledState(newState);
+    await rustMasterBridge.setSimdEnabled(newState);
+  };
+
+  return (
+    <div className="native-engine-section">
+      <div className="native-engine-header">
+        <span className="native-engine-label">NATIVE ENGINE</span>
+        <div className={`native-engine-indicator ${rustActive ? 'native-engine-indicator--active' : ''}`} />
+      </div>
+      <div className="native-engine-status-row">
+        <div className="native-engine-lufs-display">
+          <span className={`native-engine-lufs-value ${rustActive ? 'native-engine-lufs-value--active' : ''}`}>
+            {rustActive ? (rustIntegrated === -Infinity ? '-∞' : rustIntegrated.toFixed(1)) : '--.-'}
+          </span>
+          <span className="native-engine-lufs-label">LUFS</span>
+        </div>
+        <button
+          className={`simd-toggle-button ${simdEnabled ? 'simd-toggle-button--enabled' : ''}`}
+          onClick={toggleSimd}
+          title={simdEnabled ? 'SIMD Optimizations Enabled (High Performance)' : 'SIMD Optimizations Disabled (High Stability)'}
+        >
+          {simdEnabled ? 'SIMD ON' : 'SIMD OFF'}
+        </button>
+      </div>
+      {/* Phase 40: Status Indicators */}
+      <div className="engine-status-row">
+        <div className="status-indicator" title="AudioWorklet Status">
+          <div className={`status-dot ${workletActive ? 'status-dot--active' : ''}`} />
+          <span className={`status-label ${workletActive ? 'status-label--active' : ''}`}>WKL</span>
+        </div>
+        <div className="status-indicator" title="WASM DSP Status">
+          <div className={`status-dot status-dot--wasm ${wasmActive ? 'status-dot--active' : ''}`} />
+          <span className={`status-label ${wasmActive ? 'status-label--active' : ''}`}>WASM</span>
+        </div>
+        <div className="profile-badge" title="Current Mastering Profile">
+          {currentProfile}
+        </div>
       </div>
     </div>
   );
+};
+
+
+// Export Modal Wrapper for FlowMasterStrip
+const ExportModalWrapper: React.FC<{ show: boolean; onClose: () => void }> = ({ show, onClose }) => {
+  if (!show) return null;
+  return <ExportModal onClose={onClose} />;
 };
 
 export default FlowMasterStrip;

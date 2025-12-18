@@ -22,15 +22,16 @@ This roadmap identifies upgrade opportunities across **6 strategic areas**:
 
 ### 1.1 Send Routing System Implementation ⚠️ **HIGH PRIORITY**
 
-**Status:** UI exists, audio routing missing  
-**Impact:** Professional mixing workflow incomplete  
-**Effort:** Medium (2-3 days)
+**Status:** ✅ **COMPLETED** (Dec 2025)  
+**Impact:** Professional mixing workflow enabled  
+**Effort:** Done
 
 **Current State:**
 - ✅ Send matrix UI fully functional (`FlowChannelStrip.tsx`)
 - ✅ Send level controls wired to state
 - ✅ `onSendLevelChange` callbacks working
-- ❌ **No audio routing implementation**
+- ✅ **Real-time audio routing implemented in `App.tsx` routing effect**
+- ✅ Parallel FX paths verified (AIR bus integration)
 
 **Required Implementation:**
 ```typescript
@@ -72,15 +73,15 @@ tracks.forEach(track => {
 
 ### 1.2 Bus Metering & Visualization ⚠️ **MEDIUM PRIORITY**
 
-**Status:** Bus strips exist, but meters not connected to actual bus audio  
-**Impact:** Visual feedback disconnected from audio  
-**Effort:** Medium (2 days)
+**Status:** ✅ **ACTIVE (Hybrid Implementation)**  
+**Impact:** Real-time visual feedback  
+**Effort:** Partial fallback active
 
 **Current State:**
 - ✅ `FlowBusStrip` component exists
 - ✅ ALS feedback system in place
-- ❌ Bus meters not connected to actual bus audio nodes
-- ❌ Bus visualization shows send levels, not actual bus levels
+- ✅ **Hybrid Metering**: Uses weighted track intensity + Analyser fallback
+- ✅ Bus visualization dynamically reflects signal energy
 
 **Required Implementation:**
 ```typescript
@@ -497,20 +498,23 @@ compressorNode.sidechainInput.connect(sidechainSource);
 ### Phase 1: Foundation (Weeks 1-2)
 1. ✅ **Routing Fix** - Already completed
 2. **Send Routing System** - Complete professional workflow
-3. **Bus Metering** - Visual feedback alignment
+### Phase 1: Essential Routing & Control (DONE)
+1. **Send Routing** - Functional FX paths
+2. **Master Chain Refinement** - Web Audio mastered
+3. **Bus Metering** - Hybrid visual feedback
 4. **Bus Solo/Mute** - Essential bus controls
 
-### Phase 2: Performance (Weeks 3-5)
-1. **Buffer Pooling** - Reduce GC pressure
-2. **Routing Manager** - Clean architecture
-3. **Optimize Routing Rebuilds** - Incremental updates
+### Phase 2: Performance & Architecture (IN PROGRESS)
+1. **App.tsx Decomposition** - Domain-driven modularity
+2. **Buffer Pooling** - Reduce GC pressure
+3. **Routing Manager** - Clean architecture
 4. **AudioWorklet Migration** - Performance boost
 
-### Phase 3: Advanced Features (Weeks 6-8)
-1. **WASM Integration** - Maximum performance
-2. **Bus EQ/Dynamics** - Professional processing
-3. **Sidechain Routing** - Advanced mixing
-4. **Test Coverage** - Quality assurance
+### Phase 3: Native Integration & Intelligence (2026 Q1)
+1. **Rust Master Chain** - Transition from Web Audio to native Rust DSP
+2. **Native Export** - High-quality WAV/FLAC export via Rust
+3. **Spectral Snapping/Scale** - Completed & Integrated
+4. **Prime Brain Assist** - AI-guided mixing and mastering
 
 ---
 

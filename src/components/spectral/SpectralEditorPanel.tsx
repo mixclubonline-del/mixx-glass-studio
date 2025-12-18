@@ -2,8 +2,11 @@ import React, { useCallback, useEffect, useMemo, useRef, useState } from "react"
 import { SpectralAnalysisResult, AudioBlob as AudioBlobType } from "../../types/spectral";
 import { MelodyneEngine } from "../../audio/MelodyneEngine";
 import { AudioBlob } from "./AudioBlob";
+import { AuraColors, AuraEffects, AuraGradients, AuraMotion, auraAlpha } from "../../theme/aura-tokens";
 import { XIcon, SparklesIcon, SaveIcon } from "../icons";
 import { TRACK_COLOR_SWATCH, hexToRgba } from "../../utils/ALS";
+import { useMusicalContext, getAvailableScales, getNoteNames, type ScaleType } from "../../hooks/useMusicalContext";
+import { analyzeAndSuggestHarmonies, type HarmonizeResult } from "../../ai/SpectralIntelligence";
 import type { TrackData, TrackAnalysisData } from "../../App";
 import type { ArrangeClip as ArrangeClipModel } from "../../hooks/useArrange";
 import "./SpectralEditorPanel.css";
@@ -15,6 +18,7 @@ interface SpectralEditorPanelProps {
   onClose: () => void;
   onCommit?: () => void;
   currentTime: number;
+  audioBuffer?: AudioBuffer; // Optional buffer for key detection
 }
 
 const NOTE_NAMES = ["C", "C#", "D", "D#", "E", "F", "F#", "G", "G#", "A", "A#", "B"];
@@ -25,6 +29,14 @@ const midiNoteName = (pitch: number) => {
   return `${name}${octave}`;
 };
 
+// Lock icon for toggle button
+const LockIcon: React.FC<{ className?: string }> = ({ className }) => (
+  <svg className={className} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+    <rect x="3" y="11" width="18" height="11" rx="2" ry="2" />
+    <path d="M7 11V7a5 5 0 0 1 10 0v4" />
+  </svg>
+);
+
 export const SpectralEditorPanel: React.FC<SpectralEditorPanelProps> = ({
   isOpen,
   clip,
@@ -32,22 +44,35 @@ export const SpectralEditorPanel: React.FC<SpectralEditorPanelProps> = ({
   onClose,
   onCommit,
   currentTime,
+  audioBuffer,
 }) => {
   const [analysis, setAnalysis] = useState<SpectralAnalysisResult | null>(null);
   const [isAnalyzing, setIsAnalyzing] = useState(false);
-  const [tempEdits, setTempEdits] = useState<Record<string, { deltaPitch: number, deltaTime: number, deltaDuration: number }>>({});
+  const [lockToScale, setLockToScale] = useState(false);
+  const [isHarmonizing, setIsHarmonizing] = useState(false);
+  const [harmonyResult, setHarmonyResult] = useState<HarmonizeResult | null>(null);
   const viewportRef = useRef<HTMLDivElement>(null);
 
   const [zoomX, setZoomX] = useState(100); // pixels per second
   const [zoomY, setZoomY] = useState(20);  // pixels per note
   const [scrollY, setScrollY] = useState(60); // middle C
 
+  // Musical context hook for key/scale awareness
+  const {
+    context: musicalContext,
+    setKey,
+    setScale,
+    isInScale,
+    nearestInScale,
+    getScaleNotes,
+  } = useMusicalContext(audioBuffer);
+
   // Analyze clip on mount or when clip changes
   useEffect(() => {
     if (isOpen && clip && !analysis && !isAnalyzing) {
       setIsAnalyzing(true);
       const engine = MelodyneEngine.getInstance();
-      engine.analyzeClip(parseInt(clip.id.split('-')[1]) || 0) // Basic ID extraction
+      engine.analyzeClip(parseInt(clip.id.split('-')[1]) || 0)
         .then((result) => {
           setAnalysis(result);
           setIsAnalyzing(false);
@@ -59,78 +84,6 @@ export const SpectralEditorPanel: React.FC<SpectralEditorPanelProps> = ({
     }
   }, [isOpen, clip, analysis, isAnalyzing]);
 
-  const handleBlobEdit = useCallback((id: string, deltaPitch: number, deltaTime: number, deltaDuration: number) => {
-    setTempEdits(prev => ({
-      ...prev,
-      [id]: { deltaPitch, deltaTime, deltaDuration }
-    }));
-  }, []);
-
-  const handleBlobEditCommitted = useCallback(async (id: string) => {
-    const edit = tempEdits[id];
-    if (!edit || !analysis || !clip) return;
-
-    const blob = analysis.blobs.find(b => b.id === id);
-    if (!blob) return;
-
-    // Apply edit to engine
-    const engine = MelodyneEngine.getInstance();
-    const clipId = parseInt(clip.id.split('-')[1]) || 0;
-    
-    // Snapping pitch to nearest semitone for the commit
-    const snappedDeltaPitch = Math.round(edit.deltaPitch);
-    const timeStretchFactor = 1.0 + edit.deltaDuration / blob.duration;
-
-    try {
-      await engine.applySpectralEdit(clipId, blob, snappedDeltaPitch, timeStretchFactor);
-      
-      // Update local state
-      const newBlobs = analysis.blobs.map(b => {
-        if (b.id === id) {
-          const newPitch = b.pitch * Math.pow(2, snappedDeltaPitch / 12);
-          const newNote = Math.round(12 * Math.log2(newPitch / 440) + 69);
-          return {
-            ...b,
-            startTime: b.startTime + edit.deltaTime,
-            duration: b.duration + edit.deltaDuration,
-            pitch: newPitch,
-            note: newNote,
-            isManuallyEdited: true,
-          };
-        }
-        return b;
-      });
-
-      setAnalysis({ ...analysis, blobs: newBlobs });
-      setTempEdits(prev => {
-        const next = { ...prev };
-        delete next[id];
-        return next;
-      });
-    } catch (err) {
-      console.error("Edit failed:", err);
-    }
-  }, [analysis, clip, tempEdits]);
-
-  const editedBlobs = useMemo(() => {
-    if (!analysis) return [];
-    return analysis.blobs.map(blob => {
-      const edit = tempEdits[blob.id];
-      if (!edit) return blob;
-      
-      const newPitch = blob.pitch * Math.pow(2, edit.deltaPitch / 12);
-      const newNote = Math.round(12 * Math.log2(newPitch / 440) + 69);
-      
-      return {
-        ...blob,
-        startTime: blob.startTime + edit.deltaTime,
-        duration: Math.max(0.01, blob.duration + edit.deltaDuration),
-        pitch: newPitch,
-        note: newNote,
-      };
-    });
-  }, [analysis, tempEdits]);
-
   const noteBaseColor = track ? TRACK_COLOR_SWATCH[track.trackColor].base : "#ff7800";
   const noteGlowColor = track ? TRACK_COLOR_SWATCH[track.trackColor].glow : "#ffcc00";
 
@@ -140,69 +93,128 @@ export const SpectralEditorPanel: React.FC<SpectralEditorPanelProps> = ({
 
   const playheadX = Math.max(0, (currentTime - (clip?.start ?? 0)) * zoomX);
 
+  // Handle harmonize button click - calls Prime Brain for AI harmony suggestions
+  const handleHarmonize = useCallback(async () => {
+    if (!analysis?.blobs.length) {
+      console.warn('[SpectralEditor] No blobs to analyze');
+      return;
+    }
+    
+    setIsHarmonizing(true);
+    setHarmonyResult(null);
+    
+    try {
+      console.log('[SpectralEditor] Requesting AI harmony analysis - Key:', musicalContext.key, 'Scale:', musicalContext.scale);
+      
+      const result = await analyzeAndSuggestHarmonies({
+        key: musicalContext.key,
+        scale: musicalContext.scale,
+        blobs: analysis.blobs,
+        clipName: clip?.name,
+      });
+      
+      setHarmonyResult(result);
+      console.log('[SpectralEditor] Harmony suggestions received:', result.suggestions.length);
+    } catch (error) {
+      console.error('[SpectralEditor] Harmony analysis failed:', error);
+    } finally {
+      setIsHarmonizing(false);
+    }
+  }, [musicalContext, analysis, clip]);
+
+  // Get scale notes for visual highlighting
+  const scaleNotes = useMemo(() => getScaleNotes(), [getScaleNotes]);
+
   const panelClasses = [
-    "spectral-editor-panel relative h-full w-[640px] transition-all duration-400 ease-out",
-    isOpen ? "translate-x-0 opacity-100 pointer-events-auto" : "translate-x-[660px] opacity-0 pointer-events-none",
+    "spectral-editor",
+    isOpen ? "spectral-editor--open" : "spectral-editor--closed",
   ].join(" ");
+
+  const availableScales = getAvailableScales();
+  const availableNotes = getNoteNames();
 
   return (
     <aside className={panelClasses}>
-      <div className="flex h-full w-full flex-col border-l border-white/10 bg-[#050510]/95 backdrop-blur-3xl shadow-2xl">
-        <header className="flex items-center justify-between border-b border-white/10 px-6 py-4">
-          <div className="flex flex-col gap-1">
-            <p className="text-[10px] uppercase tracking-[0.4em] text-white/40 font-bold">Spectral Analysis</p>
-            <div className="flex items-center gap-3">
-              <span className="text-sm font-semibold tracking-wide text-white/90">{clip?.name ?? "No Clip"}</span>
+      <div className="spectral-editor__container">
+        <header className="spectral-editor__header">
+          <div className="spectral-editor__header-info">
+            <p className="spectral-editor__label-eyebrow">Spectral Analysis</p>
+            <div className="spectral-editor__title-row">
+              <span className="spectral-editor__clip-name">{clip?.name ?? "No Clip"}</span>
               {track && (
                 <span 
-                  className="rounded-full px-3 py-0.5 text-[9px] uppercase tracking-[0.2em] font-bold"
-                  style={{ backgroundColor: hexToRgba(noteBaseColor, 0.2), color: noteBaseColor, border: `1px solid ${hexToRgba(noteBaseColor, 0.3)}` }}
+                  className="spectral-editor__track-badge"
+                  style={{ 
+                    backgroundColor: auraAlpha(noteBaseColor, 0.15), 
+                    color: noteBaseColor, 
+                    borderColor: auraAlpha(noteBaseColor, 0.3) 
+                  } as React.CSSProperties}
                 >
                   {track.trackName}
                 </span>
               )}
+              {/* Musical Context Badge */}
+              <span 
+                className="spectral-editor__key-badge"
+                title={`Detected: ${musicalContext.key} ${musicalContext.scale}${musicalContext.isAutoDetected ? ' (auto)' : ''}`}
+              >
+                🎵 {musicalContext.key} {musicalContext.scale}
+              </span>
             </div>
           </div>
-          <div className="flex items-center gap-2">
+          <div className="spectral-editor__header-actions">
+            {/* Lock to Scale Toggle */}
+            <button
+              onClick={() => setLockToScale(!lockToScale)}
+              className={`spectral-editor__lock-btn ${lockToScale ? 'spectral-editor__lock-btn--active' : ''}`}
+              title={lockToScale ? 'Unlock from Scale' : 'Lock to Scale'}
+              aria-pressed={lockToScale}
+            >
+              <LockIcon className="spectral-editor__icon-sm" />
+              {lockToScale ? 'Locked' : 'Lock'}
+            </button>
             {isAnalyzing && (
-              <div className="flex items-center gap-2 mr-4">
-                <div className="h-1.5 w-12 rounded-full bg-white/5 overflow-hidden">
-                  <div className="h-full bg-cyan-400 animate-pulse w-full" />
+              <div className="spectral-editor__analyzing">
+                <div className="spectral-editor__progress-track">
+                  <div className="spectral-editor__progress-fill" />
                 </div>
-                <span className="text-[9px] uppercase tracking-widest text-cyan-400">Analyzing...</span>
+                <span className="spectral-editor__status-text">Analyzing...</span>
               </div>
             )}
             <button
               onClick={onClose}
-              className="flex h-8 w-8 items-center justify-center rounded-full border border-white/5 bg-white/5 text-white/40 transition hover:bg-white/10"
+              className="spectral-editor__close-btn"
               aria-label="Close spectral analysis"
             >
-              <XIcon className="h-4 w-4" />
+              <XIcon className="spectral-editor__icon-sm" />
             </button>
           </div>
         </header>
 
-        <div className="flex-1 overflow-hidden flex flex-col">
-          <div className="flex-1 flex overflow-hidden">
+        <div className="spectral-editor__content">
+          <div className="spectral-editor__grid-layout">
              {/* Note Labels Sidebar */}
-             <div className="w-12 border-r border-white/5 bg-white/[0.02] overflow-hidden relative">
-                <div className="absolute inset-0" style={{ transform: `translateY(-${scrollY * zoomY}px)` }}>
-                  {Array.from({ length: 128 }, (_, i) => 127 - i).map((pitch) => (
-                    <div 
-                      key={pitch}
-                      className="flex items-center justify-center border-b border-white/[0.03] text-[9px] text-white/30"
-                      style={{ height: zoomY }}
-                    >
-                      {pitch % 12 === 0 ? midiNoteName(pitch) : ""}
-                    </div>
-                  ))}
+             <div className="spectral-editor__sidebar">
+                <div className="spectral-editor__sidebar-scroller" style={{ transform: `translateY(-${scrollY * zoomY}px)` }}>
+                  {Array.from({ length: 128 }, (_, i) => 127 - i).map((pitch) => {
+                    const inScale = isInScale(pitch);
+                    return (
+                      <div 
+                        key={pitch}
+                        className={`spectral-editor__note-label ${inScale && lockToScale ? 'spectral-editor__note-label--in-scale' : ''}`}
+                        style={{ height: zoomY }}
+                      >
+                        {pitch % 12 === 0 ? midiNoteName(pitch) : ""}
+                      </div>
+                    );
+                  })}
                 </div>
              </div>
 
              {/* Main Editing Grid */}
-             <div className="flex-1 overflow-auto relative bg-[#080815]" ref={viewportRef}>
+             <div className="spectral-editor__viewport" ref={viewportRef}>
                 <div 
-                  className="relative" 
+                  className="spectral-editor__grid-canvas" 
                   style={{ 
                     width: gridWidth, 
                     height: gridHeight,
@@ -210,62 +222,133 @@ export const SpectralEditorPanel: React.FC<SpectralEditorPanelProps> = ({
                   }}
                 >
                   {/* Grid Lines */}
-                  {Array.from({ length: 128 }).map((_, i) => (
-                    <div 
-                      key={i}
-                      className={`absolute left-0 right-0 border-b ${i % 12 === 0 ? 'border-white/10' : 'border-white/[0.03]'}`}
-                      style={{ top: i * zoomY, height: zoomY }}
-                    />
-                  ))}
+                  {Array.from({ length: 128 }).map((_, i) => {
+                    const pitch = 127 - i;
+                    const inScale = isInScale(pitch);
+                    return (
+                      <div 
+                        key={i}
+                        className={`spectral-editor__grid-line ${pitch % 12 === 0 ? 'spectral-editor__grid-line--octave' : ''} ${inScale && lockToScale ? 'spectral-editor__grid-line--in-scale' : ''}`}
+                        style={{ top: i * zoomY, height: zoomY }}
+                      />
+                    );
+                  })}
 
                   {/* Blobs Container */}
-                  <div className="absolute inset-0">
-                    {editedBlobs.map((blob) => (
+                  <div className="spectral-editor__blobs-container">
+                    {analysis?.blobs.map((blob) => (
                       <AudioBlob 
                         key={blob.id}
                         blob={blob}
                         pixelsPerSecond={zoomX}
                         pixelsPerNote={zoomY}
                         canvasHeight={gridHeight}
-                        onEdit={handleBlobEdit}
-                        onEditCommitted={handleBlobEditCommitted}
                       />
                     ))}
                   </div>
 
                   {/* Playhead */}
                   <div 
-                    className="absolute top-0 bottom-0 w-px bg-cyan-400 shadow-[0_0_10px_rgba(34,211,238,0.8)] z-20"
+                    className="spectral-editor__playhead"
                     style={{ left: playheadX }}
-                  />
+                  >
+                    <div className="spectral-editor__playhead-glow" />
+                  </div>
                 </div>
              </div>
           </div>
         </div>
         
-        <footer className="border-t border-white/10 bg-[#080815] px-6 py-3 flex items-center justify-between">
-            <div className="flex items-center gap-4">
-              <div className="flex flex-col">
-                <span className="text-[9px] uppercase tracking-widest text-white/30">Temporal Zoom</span>
+        {/* Harmony Results Panel */}
+        {harmonyResult && (
+          <div className="spectral-editor__harmony-panel">
+            <div className="spectral-editor__harmony-header">
+              <span className="spectral-editor__harmony-title">✨ AI Harmony Suggestions</span>
+              <button 
+                className="spectral-editor__harmony-close"
+                onClick={() => setHarmonyResult(null)}
+              >
+                ×
+              </button>
+            </div>
+            <div className="spectral-editor__harmony-analysis">
+              <span className="spectral-editor__harmony-chord">{harmonyResult.detectedChord}</span>
+              <span className="spectral-editor__harmony-scale">{harmonyResult.scaleAnalysis}</span>
+            </div>
+            <div className="spectral-editor__harmony-suggestions">
+              {harmonyResult.suggestions.slice(0, 5).map((s, i) => (
+                <div key={i} className="spectral-editor__harmony-suggestion">
+                  <span className="spectral-editor__harmony-note">
+                    {midiNoteName(s.originalPitch)} → {midiNoteName(s.suggestedPitch)}
+                  </span>
+                  <span className="spectral-editor__harmony-shift">
+                    {s.pitchShift > 0 ? '+' : ''}{s.pitchShift} st
+                  </span>
+                  <span className="spectral-editor__harmony-type">{s.harmonyType}</span>
+                </div>
+              ))}
+            </div>
+            {harmonyResult.overallAdvice && (
+              <p className="spectral-editor__harmony-advice">{harmonyResult.overallAdvice}</p>
+            )}
+          </div>
+        )}
+        
+        <footer className="spectral-editor__footer">
+            <div className="spectral-editor__controls">
+              {/* Key Selector */}
+              <div className="spectral-editor__control-group">
+                <span className="spectral-editor__control-label">Key</span>
+                <select 
+                  value={musicalContext.key}
+                  onChange={(e) => setKey(e.target.value)}
+                  className="spectral-editor__select"
+                  title="Select key"
+                >
+                  {availableNotes.map(note => (
+                    <option key={note} value={note}>{note}</option>
+                  ))}
+                </select>
+              </div>
+              {/* Scale Selector */}
+              <div className="spectral-editor__control-group">
+                <span className="spectral-editor__control-label">Scale</span>
+                <select 
+                  value={musicalContext.scale}
+                  onChange={(e) => setScale(e.target.value as ScaleType)}
+                  className="spectral-editor__select"
+                  title="Select scale"
+                >
+                  {availableScales.map(scale => (
+                    <option key={scale.id} value={scale.id}>{scale.name}</option>
+                  ))}
+                </select>
+              </div>
+              <div className="spectral-editor__control-group">
+                <span className="spectral-editor__control-label">Temporal Zoom</span>
                 <input 
                   type="range" min="50" max="500" value={zoomX} 
                   onChange={(e) => setZoomX(parseInt(e.target.value))}
-                  className="w-32 accent-cyan-500"
+                  className="spectral-editor__range spectral-editor__range--cyan"
                 />
               </div>
-              <div className="flex flex-col">
-                <span className="text-[9px] uppercase tracking-widest text-white/30">Pitch Focus</span>
+              <div className="spectral-editor__control-group">
+                <span className="spectral-editor__control-label">Pitch Focus</span>
                 <input 
                   type="range" min="0" max="120" value={scrollY} 
                   onChange={(e) => setScrollY(parseInt(e.target.value))}
-                  className="w-32 accent-violet-500"
+                  className="spectral-editor__range spectral-editor__range--violet"
                 />
               </div>
             </div>
             
-            <button className="flex items-center gap-2 rounded-full bg-gradient-to-r from-violet-600 to-indigo-600 px-5 py-2 text-[11px] uppercase tracking-[0.2em] font-bold text-white shadow-lg hover:brightness-110 active:scale-95 transition-all">
-              <SparklesIcon className="h-4 w-4" />
-              Harmonize
+            <button 
+              className="spectral-editor__harmonize-btn"
+              onClick={handleHarmonize}
+              disabled={isHarmonizing}
+            >
+              <SparklesIcon className="spectral-editor__icon-sm" />
+              {isHarmonizing ? 'Analyzing...' : 'Harmonize'}
             </button>
         </footer>
       </div>

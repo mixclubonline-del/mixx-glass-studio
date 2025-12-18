@@ -696,6 +696,8 @@ fn main() {
             master_chain_set_profile,
             master_chain_get_meters,
             master_chain_set_parameter,
+            master_chain_process_samples,
+
             // Phase 24: Audio Export Commands
             audio_export_wav,
             audio_export_formats,

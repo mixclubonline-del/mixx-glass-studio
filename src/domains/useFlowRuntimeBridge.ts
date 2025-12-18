@@ -99,13 +99,13 @@ export function useTransportBridgeSync(state: FlowRuntimeTransportState) {
     }
 
     // Sync tempo
-    if (state.bpm !== transport.tempo) {
-      transport.setTempo(state.bpm);
+    if (state.bpm !== transport.bpm) {
+      transport.setBpm(state.bpm);
     }
 
     // Sync loop
-    if (state.isLooping !== transport.loopEnabled) {
-      transport.toggleLoop();
+    if (state.isLooping !== transport.isLooping) {
+      transport.setIsLooping(state.isLooping);
     }
   }, [state.isPlaying, state.bpm, state.isLooping, transport]);
 }

@@ -14,6 +14,8 @@ import { MixerDomainProvider } from './mixer';
 import { PluginsDomainProvider } from './plugins';
 import { AIDomainProvider } from './ai';
 import { UIDomainProvider } from './ui';
+import { ProjectDomainProvider } from './project';
+import { SessionDomainProvider } from './session';
 
 interface DomainBridgeProps {
   children: ReactNode;
@@ -23,31 +25,37 @@ interface DomainBridgeProps {
  * DomainBridge composes all domain providers in the correct order.
  * 
  * Provider order (innermost to outermost dependencies):
- * 1. UI (no deps)
- * 2. AI (no deps)
- * 3. Plugins (no deps)
- * 4. Mixer (no deps)
- * 5. Tracks (no deps)
- * 6. Transport (needs AudioContext optional)
- * 7. Audio (outermost - provides AudioContext to all)
+ * 1. Session (no deps - innermost for panel state)
+ * 2. UI (no deps)
+ * 3. AI (no deps)
+ * 4. Plugins (no deps)
+ * 5. Mixer (no deps)
+ * 6. Tracks (no deps)
+ * 7. Transport (needs AudioContext optional)
+ * 8. Audio (provides AudioContext to all)
+ * 9. Project (outermost - manages persistence)
  */
 export function DomainBridge({ children }: DomainBridgeProps) {
   return (
-    <AudioDomainProvider>
-      <TransportDomainProvider>
-        <TracksDomainProvider>
-          <MixerDomainProvider>
-            <PluginsDomainProvider>
-              <AIDomainProvider>
-                <UIDomainProvider>
-                  {children}
-                </UIDomainProvider>
-              </AIDomainProvider>
-            </PluginsDomainProvider>
-          </MixerDomainProvider>
-        </TracksDomainProvider>
-      </TransportDomainProvider>
-    </AudioDomainProvider>
+    <ProjectDomainProvider>
+      <AudioDomainProvider>
+        <TransportDomainProvider>
+          <TracksDomainProvider>
+            <MixerDomainProvider>
+              <PluginsDomainProvider>
+                <AIDomainProvider>
+                  <UIDomainProvider>
+                    <SessionDomainProvider>
+                      {children}
+                    </SessionDomainProvider>
+                  </UIDomainProvider>
+                </AIDomainProvider>
+              </PluginsDomainProvider>
+            </MixerDomainProvider>
+          </TracksDomainProvider>
+        </TransportDomainProvider>
+      </AudioDomainProvider>
+    </ProjectDomainProvider>
   );
 }
 

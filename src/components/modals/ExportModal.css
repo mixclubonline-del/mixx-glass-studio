@@ -1,0 +1,232 @@
+/* ExportModal.css - Styles for audio export modal */
+
+/* ============================================================================
+   Modal Overlay and Container
+   ============================================================================ */
+.export-modal-overlay {
+  position: fixed;
+  inset: 0;
+  z-index: 100;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: rgba(0, 0, 0, 0.7);
+  -webkit-backdrop-filter: blur(12px);
+  backdrop-filter: blur(12px);
+}
+
+.export-modal-container {
+  position: relative;
+  display: flex;
+  flex-direction: column;
+  max-height: 80vh;
+  width: 420px;
+  border-radius: 1rem;
+  border: 1px solid rgba(0, 255, 200, 0.4);
+  background: linear-gradient(135deg, rgba(15, 23, 42, 0.95), rgba(0, 77, 64, 0.3));
+  padding: 1.5rem;
+  box-shadow: 0 25px 50px rgba(0, 255, 200, 0.1);
+}
+
+/* ============================================================================
+   Header
+   ============================================================================ */
+.export-modal-title {
+  margin-bottom: 0.5rem;
+  text-align: center;
+  font-size: 1.125rem;
+  font-weight: 700;
+  letter-spacing: 0.3em;
+  color: rgba(207, 250, 254, 1);
+}
+
+.export-modal-subtitle {
+  margin-bottom: 1.5rem;
+  text-align: center;
+  font-size: 0.75rem;
+  color: rgba(103, 232, 249, 0.6);
+}
+
+/* ============================================================================
+   Form Elements
+   ============================================================================ */
+.export-modal-section {
+  margin-bottom: 1rem;
+}
+
+.export-modal-label {
+  display: block;
+  margin-bottom: 0.5rem;
+  font-size: 0.75rem;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  color: rgba(165, 243, 252, 0.7);
+}
+
+.export-modal-select {
+  width: 100%;
+  border-radius: 0.5rem;
+  border: 1px solid rgba(0, 255, 200, 0.3);
+  background: rgba(30, 41, 59, 0.8);
+  padding: 0.625rem 0.75rem;
+  font-size: 0.875rem;
+  color: rgba(207, 250, 254, 1);
+}
+
+.export-modal-select:focus {
+  border-color: rgba(0, 255, 200, 0.6);
+  outline: none;
+  box-shadow: 0 0 0 2px rgba(0, 255, 200, 0.2);
+}
+
+.export-modal-select:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+
+.export-modal-select option {
+  background: #1e293b;
+  color: white;
+}
+
+/* ============================================================================
+   Format Grid
+   ============================================================================ */
+.export-format-grid {
+  display: grid;
+  grid-template-columns: repeat(2, 1fr);
+  gap: 0.5rem;
+}
+
+.export-format-button {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 0.25rem;
+  padding: 0.75rem;
+  border-radius: 0.5rem;
+  border: 1px solid rgba(0, 255, 200, 0.2);
+  background: rgba(30, 41, 59, 0.6);
+  color: rgba(148, 163, 184, 1);
+  font-size: 0.75rem;
+  cursor: pointer;
+  transition: all 0.2s ease;
+}
+
+.export-format-button:hover:not(:disabled) {
+  border-color: rgba(0, 255, 200, 0.4);
+  background: rgba(30, 41, 59, 0.8);
+}
+
+.export-format-button--selected {
+  border-color: rgba(0, 255, 200, 0.6);
+  background: rgba(0, 255, 200, 0.1);
+  color: rgba(0, 255, 200, 1);
+}
+
+.export-format-button:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+
+.export-format-name {
+  font-weight: 600;
+  font-size: 0.875rem;
+}
+
+.export-format-detail {
+  font-size: 0.625rem;
+  opacity: 0.7;
+}
+
+/* ============================================================================
+   Export Button
+   ============================================================================ */
+.export-modal-button {
+  width: 100%;
+  padding: 0.75rem 1rem;
+  border-radius: 0.5rem;
+  border: 1px solid rgba(0, 255, 200, 0.5);
+  background: linear-gradient(135deg, rgba(0, 255, 200, 0.2), rgba(0, 128, 128, 0.3));
+  color: rgba(0, 255, 200, 1);
+  font-size: 0.875rem;
+  font-weight: 600;
+  letter-spacing: 0.1em;
+  cursor: pointer;
+  transition: all 0.2s ease;
+}
+
+.export-modal-button:hover:not(:disabled) {
+  background: linear-gradient(135deg, rgba(0, 255, 200, 0.3), rgba(0, 128, 128, 0.4));
+  transform: translateY(-1px);
+  box-shadow: 0 4px 12px rgba(0, 255, 200, 0.2);
+}
+
+.export-modal-button:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+
+/* ============================================================================
+   Progress Bar
+   ============================================================================ */
+.export-progress-container {
+  width: 100%;
+  height: 4px;
+  border-radius: 9999px;
+  background: rgba(30, 41, 59, 0.8);
+  overflow: hidden;
+  margin-top: 0.5rem;
+}
+
+.export-progress-bar {
+  height: 100%;
+  border-radius: 9999px;
+  background: linear-gradient(90deg, rgba(0, 255, 200, 0.8), rgba(103, 232, 249, 0.8));
+  transition: width 0.3s ease;
+}
+
+/* ============================================================================
+   Status Messages
+   ============================================================================ */
+.export-status-message {
+  margin-top: 0.5rem;
+  text-align: center;
+  font-size: 0.75rem;
+  color: rgba(148, 163, 184, 1);
+}
+
+.export-error-message {
+  margin-top: 0.5rem;
+  text-align: center;
+  font-size: 0.75rem;
+  color: rgba(248, 113, 113, 1);
+}
+
+.export-success-message {
+  margin-top: 0.5rem;
+  text-align: center;
+  font-size: 0.75rem;
+  color: rgba(0, 255, 200, 1);
+}
+
+/* ============================================================================
+   Close Button
+   ============================================================================ */
+.export-modal-close {
+  position: absolute;
+  top: 0.75rem;
+  right: 0.75rem;
+  padding: 0.25rem;
+  background: none;
+  border: none;
+  color: rgba(148, 163, 184, 0.6);
+  cursor: pointer;
+  transition: color 0.2s ease;
+}
+
+.export-modal-close:hover {
+  color: rgba(148, 163, 184, 1);
+}

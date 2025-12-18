@@ -34,6 +34,14 @@ export type { AIDomainContextType, PrimeBrainMode, BloomContext } from './ai';
 export { UIDomainProvider, useUI } from './ui';
 export type { UIDomainContextType, UILayout, DockState, Point } from './ui';
 
+// Project Domain (Phase 31)
+export { ProjectDomainProvider, useProject } from './project';
+export type { ProjectDomainContextType, PersistedProjectState } from './project';
+
+// Session Domain (Phase 31)
+export { SessionDomainProvider, useSession } from './session';
+export type { SessionDomainContextType } from './session';
+
 // Domain Bridge (composes all providers)
 export { DomainBridge } from './DomainBridge';
 
@@ -48,3 +56,4 @@ export {
   useTransportBridgeSync, 
   useAIBridgeSync 
 } from './useFlowRuntimeBridge';
+

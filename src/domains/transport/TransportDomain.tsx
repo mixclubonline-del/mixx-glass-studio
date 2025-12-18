@@ -13,11 +13,11 @@ export interface TransportState {
   isPlaying: boolean;
   isPaused: boolean;
   isRecording: boolean;
-  playheadPosition: number; // in seconds
+  currentTime: number; // in seconds
   loopStart: number;
   loopEnd: number;
-  loopEnabled: boolean;
-  tempo: number; // BPM
+  isLooping: boolean;
+  bpm: number;
   timeSignature: [number, number]; // [beats, noteValue] e.g., [4, 4]
   currentBeat: number;
   currentBar: number;
@@ -27,11 +27,14 @@ export interface TransportActions {
   play: () => void;
   pause: () => void;
   stop: () => void;
+  setIsPlaying: (playing: boolean | ((prev: boolean) => boolean)) => void;
   toggleRecord: () => void;
   seek: (position: number) => void;
-  setTempo: (bpm: number) => void;
+  setCurrentTime: (time: number | ((prev: number) => number)) => void;
+  setBpm: (bpm: number | ((prev: number) => number)) => void;
   setTimeSignature: (beats: number, noteValue: number) => void;
   setLoop: (start: number, end: number) => void;
+  setIsLooping: (looping: boolean | ((prev: boolean) => boolean)) => void;
   toggleLoop: () => void;
 }
 
@@ -66,14 +69,14 @@ interface TransportDomainProviderProps {
 
 export function TransportDomainProvider({ children, audioContext }: TransportDomainProviderProps) {
   // State
-  const [isPlaying, setIsPlaying] = useState(false);
+  const [isPlaying, setIsPlayingState] = useState(false);
   const [isPaused, setIsPaused] = useState(false);
   const [isRecording, setIsRecording] = useState(false);
-  const [playheadPosition, setPlayheadPosition] = useState(0);
+  const [currentTime, setCurrentTimeState] = useState(0);
   const [loopStart, setLoopStart] = useState(0);
   const [loopEnd, setLoopEnd] = useState(0);
-  const [loopEnabled, setLoopEnabled] = useState(false);
-  const [tempo, setTempoState] = useState(120);
+  const [isLooping, setIsLoopingState] = useState(false);
+  const [bpm, setBpmState] = useState(120);
   const [timeSignature, setTimeSignatureState] = useState<[number, number]>([4, 4]);
   const [currentBeat, setCurrentBeat] = useState(1);
   const [currentBar, setCurrentBar] = useState(1);
@@ -84,16 +87,16 @@ export function TransportDomainProvider({ children, audioContext }: TransportDom
 
   // Play
   const play = useCallback(() => {
-    setIsPlaying(true);
+    setIsPlayingState(true);
     setIsPaused(false);
     if (audioContext) {
-      startTimeRef.current = audioContext.currentTime - playheadPosition;
+      startTimeRef.current = audioContext.currentTime - currentTime;
     }
-  }, [audioContext, playheadPosition]);
+  }, [audioContext, currentTime]);
 
   // Pause
   const pause = useCallback(() => {
-    setIsPlaying(false);
+    setIsPlayingState(false);
     setIsPaused(true);
     if (animationFrameRef.current) {
       cancelAnimationFrame(animationFrameRef.current);
@@ -101,10 +104,14 @@ export function TransportDomainProvider({ children, audioContext }: TransportDom
   }, []);
 
   // Stop
+  const setIsPlaying = useCallback((playing: boolean | ((prev: boolean) => boolean)) => {
+    setIsPlayingState(playing);
+  }, []);
+
   const stop = useCallback(() => {
-    setIsPlaying(false);
+    setIsPlayingState(false);
     setIsPaused(false);
-    setPlayheadPosition(0);
+    setCurrentTimeState(0);
     setCurrentBeat(1);
     setCurrentBar(1);
     if (animationFrameRef.current) {
@@ -119,15 +126,25 @@ export function TransportDomainProvider({ children, audioContext }: TransportDom
 
   // Seek
   const seek = useCallback((position: number) => {
-    setPlayheadPosition(Math.max(0, position));
+    setCurrentTimeState(Math.max(0, position));
     if (audioContext && isPlaying) {
       startTimeRef.current = audioContext.currentTime - position;
     }
   }, [audioContext, isPlaying]);
 
-  // Set tempo
-  const setTempo = useCallback((bpm: number) => {
-    setTempoState(Math.max(20, Math.min(300, bpm)));
+  const setCurrentTime = useCallback((time: number | ((prev: number) => number)) => {
+    setCurrentTimeState(time);
+  }, []);
+
+  const setBpm = useCallback((bpm: number | ((prev: number) => number)) => {
+    if (typeof bpm === 'function') {
+      setBpmState(prev => {
+        const next = bpm(prev);
+        return Math.max(20, Math.min(300, next));
+      });
+    } else {
+      setBpmState(Math.max(20, Math.min(300, bpm)));
+    }
   }, []);
 
   // Set time signature
@@ -142,8 +159,12 @@ export function TransportDomainProvider({ children, audioContext }: TransportDom
   }, []);
 
   // Toggle loop
+  const setIsLooping = useCallback((looping: boolean | ((prev: boolean) => boolean)) => {
+    setIsLoopingState(looping);
+  }, []);
+
   const toggleLoop = useCallback(() => {
-    setLoopEnabled(prev => !prev);
+    setIsLoopingState(prev => !prev);
   }, []);
 
   // Context value
@@ -152,11 +173,11 @@ export function TransportDomainProvider({ children, audioContext }: TransportDom
     isPlaying,
     isPaused,
     isRecording,
-    playheadPosition,
+    currentTime,
     loopStart,
     loopEnd,
-    loopEnabled,
-    tempo,
+    isLooping,
+    bpm,
     timeSignature,
     currentBeat,
     currentBar,
@@ -165,11 +186,14 @@ export function TransportDomainProvider({ children, audioContext }: TransportDom
     play,
     pause,
     stop,
+    setIsPlaying,
     toggleRecord,
     seek,
-    setTempo,
+    setCurrentTime,
+    setBpm,
     setTimeSignature,
     setLoop,
+    setIsLooping,
     toggleLoop,
   };
 

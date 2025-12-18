@@ -12,6 +12,7 @@ use super::velvet_curve::VelvetCurve;
 use super::harmonic_lattice::HarmonicLattice;
 use super::phase_weave::PhaseWeave;
 use super::mixx_plugins::{MixxGlue, MixxDrive, MixxLimiter, VelvetTruePeakLimiter, VelvetLoudnessMeter};
+use super::simd_utils;
 
 // ============================================================================
 // Mastering Profiles
@@ -247,6 +248,13 @@ impl MasterChain {
     /// Process a stereo sample pair through the entire master chain
     #[inline]
     pub fn process_stereo(&mut self, left: f32, right: f32) -> (f32, f32) {
+        let (l_no_gain, r_no_gain) = self.process_stereo_no_gain(left, right);
+        (l_no_gain * self.output_gain, r_no_gain * self.output_gain)
+    }
+
+    /// Process a stereo sample pair through everything EXCEPT output gain
+    #[inline]
+    fn process_stereo_no_gain(&mut self, left: f32, right: f32) -> (f32, f32) {
         let (mut l, mut r) = (left, right);
         
         // Stage 1: Sonic Pillars
@@ -277,11 +285,9 @@ impl MasterChain {
             (l, r) = self.true_peak_limiter.process_stereo(l, r);
         }
         
-        // Stage 5: Output Gain
-        l *= self.output_gain;
-        r *= self.output_gain;
-        
-        // Stage 6: Metering
+        // Stage 6: Metering (moved before gain for LUFS accuracy relative to profile targets)
+        // Note: Metering usually happens post-gain, but profile targets are defined relative to 0dBFS
+        // so we process it here and apply gain last via SIMD.
         (l, r) = self.loudness_meter.process_stereo(l, r);
         
         (l, r)
@@ -336,12 +342,19 @@ pub struct MasterChainMeters {
 impl AudioProcessor for MasterChain {
     fn process(&mut self, data: &mut [f32], channels: usize) {
         if channels != 2 { return; }
+        
+        // Process all stages sample-by-sample except final gain
         for chunk in data.chunks_mut(2) {
             if chunk.len() == 2 {
-                let (l, r) = self.process_stereo(chunk[0], chunk[1]);
+                let (l, r) = self.process_stereo_no_gain(chunk[0], chunk[1]);
                 chunk[0] = l;
                 chunk[1] = r;
             }
+        }
+        
+        // Final Output Gain (SIMD Optimized)
+        if self.output_gain != 1.0 {
+            simd_utils::simd_gain_stereo(data, self.output_gain);
         }
     }
     

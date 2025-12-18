@@ -25,11 +25,20 @@ const INITIAL_STATE: LoudnessState = {
   isActive: false,
 };
 
+// Check if we're in Tauri environment
+const isTauri = typeof window !== 'undefined' && '__TAURI__' in window && '__TAURI_INTERNALS__' in window;
+
 export function useLoudnessMeters() {
   const [state, setState] = useState<LoudnessState>(INITIAL_STATE);
   const [isListening, setIsListening] = useState(false);
 
   useEffect(() => {
+    // Skip listener setup if not in Tauri environment
+    if (!isTauri) {
+      console.log('[useLoudnessMeters] Web mode - Tauri events not available');
+      return;
+    }
+
     let unlisten: UnlistenFn | null = null;
     let lastUpdate = 0;
 
@@ -54,7 +63,7 @@ export function useLoudnessMeters() {
         
         setIsListening(true);
       } catch (err) {
-        console.error('Failed to listen to loudness-meters:', err);
+        console.error('[useLoudnessMeters] Failed to listen:', err);
       }
     };
 
@@ -67,6 +76,7 @@ export function useLoudnessMeters() {
       setIsListening(false);
     };
   }, []);
+
 
   // Reset meters
   const reset = useCallback(() => {
