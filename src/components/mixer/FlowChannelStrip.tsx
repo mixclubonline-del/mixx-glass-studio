@@ -33,6 +33,7 @@ import {
   MIXER_STRIP_GAP_PX,
 } from "./mixerConstants";
 import { spacing, typography, layout, effects, transitions, composeStyles } from "../../design-system";
+import "./FlowChannelStrip.css";
 
 interface ChannelDynamicsSettings {
   drive: number;
@@ -140,21 +141,13 @@ const PulsingSendIndicator: React.FC<{
   const pulseOpacity = usePulseAnimation(0.6, 1, 1400, 'ease-in-out');
   return (
     <div
-      style={composeStyles(
-        layout.position.absolute,
-        effects.border.radius.full,
-        {
-          inset: '0 0 0 0',
-          left: 0,
-          width: `${Math.min(1, Math.max(0, level)) * 100}%`,
-          background: `linear-gradient(90deg, ${hexToRgba(
-            color,
-            isSelected ? 0.95 : 0.75
-          )}, ${hexToRgba(glow, isSelected ? 0.55 : 0.35)})`,
-          boxShadow: `0 0 12px ${hexToRgba(glow, isSelected ? 0.45 : 0.3)}`,
-          opacity: pulseOpacity,
-        }
-      )}
+      className="pulsing-send-indicator"
+      style={{
+        '--send-level-width': `${Math.min(1, Math.max(0, level)) * 100}%`,
+        '--send-level-gradient': `linear-gradient(90deg, ${hexToRgba(color, isSelected ? 0.95 : 0.75)}, ${hexToRgba(glow, isSelected ? 0.55 : 0.35)})`,
+        '--send-level-shadow': `0 0 12px ${hexToRgba(glow, isSelected ? 0.45 : 0.3)}`,
+        '--pulse-opacity': pulseOpacity,
+      } as React.CSSProperties}
     />
   );
 };
@@ -177,18 +170,11 @@ const ActionPulseContainer: React.FC<{
 
   return (
     <div
-      style={composeStyles(
-        layout.flex.container('col'),
-        spacing.gap(2),
-        spacing.px(2),
-        spacing.py(2),
-        effects.border.radius.xl,
-        {
-          border: `1px solid ${hexToRgba(actionPulse.accent, 0.58)}`,
-          background: 'rgba(9,18,36,0.72)',
-          boxShadow,
-        }
-      )}
+      className="action-pulse-outer"
+      style={{
+        '--action-accent-alpha': hexToRgba(actionPulse.accent, 0.58),
+        '--action-pulse-shadow': boxShadow,
+      } as React.CSSProperties}
     >
       {children}
     </div>
@@ -209,18 +195,10 @@ const PickerOpenContainer: React.FC<{
 
   return (
     <div
-      style={composeStyles(
-        layout.flex.container('col'),
-        spacing.gap(1),
-        spacing.px(2),
-        spacing.py(2),
-        effects.border.radius.xl,
-        {
-          border: '1px solid rgba(102, 140, 198, 0.45)',
-          background: 'rgba(9,18,36,0.75)',
-          boxShadow,
-        }
-      )}
+      className="picker-open-outer"
+      style={{
+        '--picker-glow-shadow': boxShadow,
+      } as React.CSSProperties}
     >
       {children}
     </div>
@@ -236,53 +214,14 @@ const SendIndicator: React.FC<{
   isSelected: boolean;
   onChange?: (value: number) => void;
 }> = ({ label, fullLabel, level, color, glow, isSelected, onChange }) => (
-  <div
-    style={composeStyles(
-      layout.flex.container('row'),
-      layout.flex.align.center,
-      spacing.gap(2),
-      spacing.px(2),
-      spacing.py(1),
-      effects.border.radius.xl,
-      transitions.transition.colors(200),
-      {
-        background: isSelected ? 'rgba(12,24,46,0.68)' : 'transparent',
-      }
-    )}
-  >
+  <div className={`send-indicator-row ${isSelected ? 'send-indicator-row--selected' : ''}`}>
     <div
-      style={composeStyles(
-        layout.flex.container('row'),
-        layout.flex.align.center,
-        layout.flex.justify.center,
-        effects.border.radius.full,
-        typography.transform('uppercase'),
-        typography.tracking.widest,
-        {
-          width: '24px',
-          height: '24px',
-          fontSize: '0.45rem',
-          border: isSelected
-            ? '1px solid rgba(103, 232, 249, 0.7)'
-            : '1px solid rgba(102, 140, 198, 0.6)',
-          color: isSelected ? 'rgba(207, 250, 254, 1)' : 'rgba(230, 240, 255, 0.7)',
-          background: isSelected ? 'rgba(16,50,95,0.6)' : 'transparent',
-        }
-      )}
+      className={`send-indicator-label ${isSelected ? 'send-indicator-label--selected' : ''}`}
       title={fullLabel}
     >
       {label}
     </div>
-    <div style={composeStyles(
-      { flex: 1 },
-      layout.position.relative,
-      layout.overflow.hidden,
-      effects.border.radius.full,
-      {
-        height: '6px',
-        background: 'rgba(9,18,36,0.6)',
-      }
-    )}>
+    <div className="send-level-bar-container">
       <PulsingSendIndicator
         level={level}
         color={color}
@@ -298,16 +237,7 @@ const SendIndicator: React.FC<{
         onChange={(event) =>
           onChange?.(Math.min(1, Math.max(0, parseFloat(event.target.value))))
         }
-        style={composeStyles(
-          layout.position.absolute,
-          { inset: 0 },
-          layout.width.full,
-          layout.height.full,
-          {
-            opacity: 0,
-            cursor: 'pointer',
-          }
-        )}
+        className="send-level-range-input"
         onClick={(event) => event.stopPropagation()}
         aria-label={`Send level ${fullLabel}`}
       />
@@ -324,18 +254,12 @@ const PulsingChannelBackground: React.FC<{
   const pulseOpacity = usePulseAnimation(0.6, 1, 2500, 'ease-in-out');
   return (
     <div
-      style={composeStyles(
-        layout.position.absolute as React.CSSProperties,
-        { inset: 0 },
-        {
-          background: `radial-gradient(circle at 50% 20%, ${hexToRgba(
-            channelGlow,
-            0.25 + intensity * 0.3
-          )} 0%, transparent 100%)`,
-          boxShadow: `inset 0 0 ${20 + intensity * 15}px ${hexToRgba(channelGlow, 0.15 + intensity * 0.25)}`,
-          opacity: pulseOpacity,
-        }
-      )}
+      className="pulsing-channel-bg"
+      style={{
+        '--channel-bg-gradient': `radial-gradient(circle at 50% 20%, ${hexToRgba(channelGlow, 0.25 + intensity * 0.3)} 0%, transparent 100%)`,
+        '--channel-bg-shadow': `inset 0 0 ${20 + intensity * 15}px ${hexToRgba(channelGlow, 0.15 + intensity * 0.25)}`,
+        '--pulse-opacity': pulseOpacity,
+      } as React.CSSProperties}
     />
   );
 };
@@ -354,24 +278,13 @@ const PulsingPanIndicator: React.FC<{
   
   return (
     <div
-      style={composeStyles(
-        layout.position.absolute,
-        transitions.transform.combine('translateX(-50%)'),
-        {
-          left: `${position}%`,
-          top: '50%',
-          width: '6px',
-          height: '6px',
-          borderRadius: '50%',
-          background: `radial-gradient(circle, ${hexToRgba(
-            channelGlow,
-            0.9 + intensity * 0.1
-          )} 0%, ${hexToRgba(channelColor, 0.6 + intensity * 0.2)} 100%)`,
-          boxShadow: `0 0 ${8 + intensity * 6}px ${hexToRgba(channelGlow, 0.6 + intensity * 0.3)}`,
-          opacity: pulseOpacity,
-          pointerEvents: 'none',
-        }
-      )}
+      className="pulsing-pan-indicator"
+      style={{
+        '--pan-position': `${position}%`,
+        '--pan-gradient': `radial-gradient(circle, ${hexToRgba(channelGlow, 0.9 + intensity * 0.1)} 0%, ${hexToRgba(channelColor, 0.6 + intensity * 0.2)} 100%)`,
+        '--pan-shadow': `0 0 ${8 + intensity * 6}px ${hexToRgba(channelGlow, 0.6 + intensity * 0.3)}`,
+        '--pulse-opacity': pulseOpacity,
+      } as React.CSSProperties}
     />
   );
 };
@@ -1185,13 +1098,13 @@ const FlowChannelStrip: React.FC<FlowChannelStripProps> = memo(
     };
 
     const renderModulesSurface = () => (
-      <div style={composeStyles(
+      <div 
+        className="flow-channel-flex-1 flow-channel-accent-text"
+        style={composeStyles(
         layout.flex.container('col'),
-        { flex: 1 },
         spacing.gap(2),
         layout.overflow.y.auto,
         spacing.pr(1),
-        { color: '#e6f0ff' }
       )}>
         <PickerOpenContainer isPickerOpen={isPickerOpen} trackGlowColor={trackGlowColor}>
           <button
@@ -1199,6 +1112,7 @@ const FlowChannelStrip: React.FC<FlowChannelStripProps> = memo(
               event.stopPropagation();
               setIsPickerOpen((prev) => !prev);
             }}
+            className="flow-channel-surface-bg flow-channel-border-std flow-channel-accent-text"
             style={composeStyles(
               layout.width.full,
               layout.flex.container('row'),
@@ -1211,9 +1125,6 @@ const FlowChannelStrip: React.FC<FlowChannelStripProps> = memo(
               typography.tracking.widest,
               {
                 fontSize: '0.48rem',
-                color: '#e6f0ff',
-                background: 'rgba(12,24,46,0.68)',
-                border: '1px solid rgba(102, 140, 198, 0.45)',
                 cursor: 'pointer',
               }
             )}
@@ -1224,8 +1135,7 @@ const FlowChannelStrip: React.FC<FlowChannelStripProps> = memo(
               e.currentTarget.style.background = 'rgba(12,24,46,0.68)';
             }}
           >
-            <span>Insert picker</span>
-            <span style={{ color: 'rgba(230, 240, 255, 0.6)' }}>{isPickerOpen ? "Close" : "Open"}</span>
+            <span className="flow-channel-picker-label">{isPickerOpen ? "Close" : "Open"}</span>
           </button>
           {isPickerOpen && (
             <div style={composeStyles(
@@ -2395,7 +2305,7 @@ const FlowChannelStrip: React.FC<FlowChannelStripProps> = memo(
                   aria-label={settings.isMuted ? "Unmute channel" : "Mute channel"}
                   title={settings.isMuted ? "Unmute channel" : "Mute channel"}
                 >
-                  <MuteIcon style={{ width: '14px', height: '14px' }} />
+                  <MuteIcon className="flow-channel-icon-sm" />
                 </button>
                 <button
                   onClick={(event) => {
@@ -2431,7 +2341,7 @@ const FlowChannelStrip: React.FC<FlowChannelStripProps> = memo(
                   aria-label={isSoloed ? "Unsolo channel" : "Solo channel"}
                   title={isSoloed ? "Unsolo channel" : "Solo channel"}
                 >
-                  <SoloIcon style={{ width: '14px', height: '14px' }} />
+                  <SoloIcon className="flow-channel-icon-sm" />
                 </button>
                 <button
                   onClick={(event) => {
@@ -2467,7 +2377,7 @@ const FlowChannelStrip: React.FC<FlowChannelStripProps> = memo(
                   aria-label={isArmed ? "Disarm recording" : "Arm for recording"}
                   title={isArmed ? "Disarm recording" : "Arm for recording"}
                 >
-                  <ArmIcon style={{ width: '14px', height: '14px' }} />
+                  <ArmIcon className="flow-channel-icon-sm" />
                 </button>
               </div>
             </div>

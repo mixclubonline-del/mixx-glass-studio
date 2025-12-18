@@ -45,6 +45,7 @@ import { SidePanel } from './components/SidePanel';
 import { PrimeBrainStub } from './lib/PrimeBrainStub';
 import { NeuralGridBackground } from './components/shared/NeuralGridBackground';
 import { useSimulatedAudio } from './hooks/useSimulatedAudio';
+import './SuitePluginSurface.css';
 
 // Header with transition
 const HeaderWithTransition: React.FC<{
@@ -57,8 +58,8 @@ const HeaderWithTransition: React.FC<{
   );
   return (
     <header 
-      className="absolute top-4 left-4 right-4 flex items-center justify-between z-20"
-      style={{ opacity: headerStyle.opacity }}
+      className="absolute top-4 left-4 right-4 flex items-center justify-between z-20 suite-header-transition"
+      style={{ '--header-opacity': headerStyle.opacity } as React.CSSProperties}
     >
       {children}
     </header>
@@ -80,7 +81,13 @@ const HaloView: React.FC<{
   });
 
   return (
-    <div className="w-full h-full" style={haloAnimation.style}>
+    <div 
+      className="suite-halo-view" 
+      style={{ 
+        '--halo-opacity': haloAnimation.style.opacity,
+        '--halo-transform': haloAnimation.style.transform 
+      } as React.CSSProperties}
+    >
       <HaloSchematic 
         setActivePlugin={setActivePlugin}
         sessionContext={sessionContext}
@@ -106,7 +113,13 @@ const RoutingPanel: React.FC<{
   });
 
   return (
-    <div className="fixed inset-0 z-[100]" style={routingAnimation.style}>
+    <div 
+      className="suite-routing-panel" 
+      style={{ 
+        '--routing-opacity': routingAnimation.style.opacity,
+        '--routing-transform': routingAnimation.style.transform 
+      } as React.CSSProperties}
+    >
       <RoutingView 
         sidechainLinks={sidechainLinks}
         onAddLink={onAddLink}

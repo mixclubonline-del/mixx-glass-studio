@@ -135,6 +135,10 @@ export const AuraColors = {
     blazing: '#FF2244',
   },
   
+  // Surface Overlays / Text
+  chalk: '#E6F0FF',      // Main scannable text
+  snow: '#FFFFFF',       // Pure high contrast
+  
   // Full palette reference
   palette: AuraPalette,
 };
@@ -710,6 +714,20 @@ export const AuraCSSVars = `
     /* Typography */
     --aura-font-sans: ${AuraTypos.sans};
     --aura-font-mono: ${AuraTypos.mono};
+    
+    /* Text Colors */
+    --aura-chalk: ${AuraColors.chalk};
+    --aura-snow: ${AuraColors.snow};
+    
+    /* Motion Durations */
+    --aura-duration-fast: ${AuraMotion.duration.fast};
+    --aura-duration-normal: ${AuraMotion.duration.normal};
+    --aura-duration-slow: ${AuraMotion.duration.slow};
+    
+    /* Easing */
+    --aura-ease-smooth: ${AuraMotion.easing.smooth};
+    --aura-ease-spring: ${AuraMotion.easing.spring};
+    --aura-ease-snappy: ${AuraMotion.easing.snappy};
   }
 `;
 

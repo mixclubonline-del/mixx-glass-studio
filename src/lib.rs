@@ -5,7 +5,7 @@ mod mixx_audio_core;
 pub use engine::{
     current_stats, init_engine, pop_analysis_samples, pop_metric, shutdown_engine, start_engine,
     stop_engine, update_velvet_curve_params, update_harmonic_lattice_params,
-    update_phase_weave_params,
+    update_phase_weave_params, analyze_clip_pitch,
     quantum_set_parameter, quantum_undo_parameter, quantum_predict, quantum_get_parameter,
     plugin_chain_set_enabled, plugin_chain_set_bypass, plugin_chain_status,
     neural_analyze, neural_infer_genre, neural_infer_pattern, neural_suggest_parameters, neural_stats,
@@ -34,5 +34,15 @@ pub use ffi::{
 
 // Export MixxAudioCore modules
 pub use mixx_audio_core::*;
+
+pub fn apply_spectral_edit(
+    clip_id: u64,
+    start_sample: usize,
+    num_samples: usize,
+    pitch_shift: f32,
+    time_stretch: f32,
+) -> Result<(), String> {
+    engine::apply_spectral_edit(clip_id, start_sample, num_samples, pitch_shift, time_stretch)
+}
 
 

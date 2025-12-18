@@ -15,28 +15,28 @@ import './ProfessionalTrackHeader.css';
 import type { TrackType, TrackHeaderSettings } from '../types/trackHeader';
 
 // Additional icons for track headers
-const PhaseInvertIcon: React.FC<{ className?: string; style?: React.CSSProperties }> = ({ className, style }) => (
-  <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={1.5} className={className} style={style}>
+const PhaseInvertIcon: React.FC<{ className?: string }> = ({ className }) => (
+  <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={1.5} className={className}>
     <path d="M12 2v20M2 12h20" strokeLinecap="round" />
     <circle cx="12" cy="12" r="3" />
   </svg>
 );
 
-const StereoWidthIcon: React.FC<{ className?: string; style?: React.CSSProperties }> = ({ className, style }) => (
-  <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={1.5} className={className} style={style}>
+const StereoWidthIcon: React.FC<{ className?: string }> = ({ className }) => (
+  <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={1.5} className={className}>
     <path d="M3 12h18M6 8l-3 4 3 4M18 8l3 4-3 4" strokeLinecap="round" strokeLinejoin="round" />
   </svg>
 );
 
-const LockIcon: React.FC<{ className?: string; style?: React.CSSProperties }> = ({ className, style }) => (
-  <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={1.5} className={className} style={style}>
-    <rect x="5" y="11" width="14" height="10" rx="2" />
+const LockIcon: React.FC<{ className?: string }> = ({ className }) => (
+  <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={1.5} className={className}>
     <path d="M7 11V7a5 5 0 0 1 10 0v4" strokeLinecap="round" />
+    <rect x="5" y="11" width="14" height="10" rx="2" />
   </svg>
 );
 
-const CollapseIcon: React.FC<{ className?: string; collapsed: boolean; style?: React.CSSProperties }> = ({ className, collapsed, style }) => (
-  <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={1.5} className={className} style={style}>
+const CollapseIcon: React.FC<{ className?: string; collapsed: boolean }> = ({ className, collapsed }) => (
+  <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={1.5} className={className}>
     <path d={collapsed ? "M9 18l6-6-6-6" : "M18 15l-6-6-6 6"} strokeLinecap="round" strokeLinejoin="round" />
   </svg>
 );
@@ -166,18 +166,14 @@ const ProfessionalTrackHeader: React.FC<ProfessionalTrackHeaderProps> = ({
     recordInputLevel,
   };
 
-  const rootStyle: React.CSSProperties = {
-    background: isSelected 
-      ? `linear-gradient(90deg, ${auraAlpha(AuraColors.violet, 0.25)} 0%, ${auraAlpha(AuraColors.space, 0.95)} 100%)`
-      : `linear-gradient(90deg, ${auraAlpha(baseColor, 0.08 + intensity * 0.15)} 0%, ${auraAlpha(AuraColors.space, 0.98)} 100%)`, 
-    boxShadow: isSelected
-      ? `inset 2px 0 0 0 ${AuraColors.cyan}, 0 4px 12px rgba(0,0,0,0.4)`
-      : 'none',
-  };
-  if (isArmed) {
-    rootStyle.borderLeft = `4px solid ${auraAlpha('#f87171', 0.95)}`;
-    rootStyle.boxShadow = `0 0 32px ${auraAlpha('#ef4444', 0.45)}`;
-  }
+  // Computed styles moved to CSS variables
+  const dynamicStyles = {
+    '--track-base-color': baseColor,
+    '--track-glow-color': glowColor,
+    '--track-intensity': intensity,
+    '--track-volume': `${Math.round(volume * 100)}%`,
+    '--track-record-level': `${Math.min(100, (recordInputLevel ?? 0) * 100)}%`,
+  } as React.CSSProperties;
 
   const handleSelectTrack = useCallback(() => {
     const wasSelected = isSelected;
@@ -249,52 +245,22 @@ const ProfessionalTrackHeader: React.FC<ProfessionalTrackHeaderProps> = ({
     <div
       role="button"
       tabIndex={0}
-      className={`track-header ${isSelected ? 'track-header--selected' : ''}`}
-      style={{
-        ...rootStyle,
-        ...(isDragOver ? {
-          boxShadow: `0 0 0 2px ${AuraColors.cyan}`,
-          background: auraAlpha(AuraColors.cyan, 0.1),
-        } : {}),
-      }}
+      className={`track-header ${isSelected ? 'track-header--selected' : ''} ${isArmed ? 'track-header--armed' : ''} ${isDragOver ? 'track-header--drag-over' : ''}`}
+      style={dynamicStyles}
       onClick={handleSelectTrack}
       onKeyDown={(e) => {
         if (e.key === 'Enter' || e.key === ' ') {
           e.preventDefault();
           handleSelectTrack();
         }
-        if (e.key === 'Tab' && !e.shiftKey) {
-          e.currentTarget.style.boxShadow = '0 0 0 2px rgba(6, 182, 212, 0.7)';
-        }
-      }}
-      onKeyUp={(e) => {
-        if (e.key === 'Tab') {
-          e.currentTarget.style.boxShadow = rootStyle.boxShadow || 'none';
-        }
       }}
       onDragOver={handleDragOver}
       onDragLeave={handleDragLeave}
       onDrop={handleDrop}
-      onMouseEnter={(e) => {
-        const glowEl = e.currentTarget.querySelector('[data-hover-glow]') as HTMLElement;
-        if (glowEl) glowEl.style.opacity = '1';
-      }}
-      onMouseLeave={(e) => {
-        const glowEl = e.currentTarget.querySelector('[data-hover-glow]') as HTMLElement;
-        if (glowEl) glowEl.style.opacity = '0';
-      }}
     >
       {/* Hover glow effect */}
       <div className="track-header__hover-glow">
-        <div
-          className="track-header__glow-pill"
-          style={{
-            background: `radial-gradient(circle at 12% 18%, ${auraAlpha(
-              glowColor,
-              0.22
-            )}, transparent 65%)`,
-          }}
-        />
+        <div className="track-header__glow-pill" />
       </div>
 
       {/* Main content - Two-row layout with explicit spacing */}
@@ -335,6 +301,8 @@ const ProfessionalTrackHeader: React.FC<ProfessionalTrackHeaderProps> = ({
                 className="track-header__name-input"
                 autoFocus
                 onClick={(e) => e.stopPropagation()}
+                title="Rename track"
+                aria-label="Rename track"
               />
             ) : (
               <span 
@@ -366,7 +334,7 @@ const ProfessionalTrackHeader: React.FC<ProfessionalTrackHeaderProps> = ({
               }`}
               title={isMuted ? 'Unmute track' : 'Mute track'}
             >
-              <MuteIcon style={{ width: '14px', height: '14px' }} />
+              <MuteIcon className="track-header__icon" />
             </button>
             <button
               onClick={(e) => {
@@ -378,7 +346,7 @@ const ProfessionalTrackHeader: React.FC<ProfessionalTrackHeaderProps> = ({
               }`}
               title={isSoloed ? 'Unsolo track' : 'Solo track'}
             >
-              <SoloIcon style={{ width: '14px', height: '14px' }} />
+              <SoloIcon className="track-header__icon" />
             </button>
             <button
               onClick={(e) => {
@@ -390,7 +358,7 @@ const ProfessionalTrackHeader: React.FC<ProfessionalTrackHeaderProps> = ({
               }`}
               title={isArmed ? 'Disarm track' : 'Arm track for recording'}
             >
-              <ArmIcon style={{ width: '14px', height: '14px' }} />
+              <ArmIcon className="track-header__icon" />
             </button>
             {onToggleCollapse && (
               <button
@@ -401,7 +369,7 @@ const ProfessionalTrackHeader: React.FC<ProfessionalTrackHeaderProps> = ({
                 className="track-header__btn track-header__btn--lg track-header__btn--collapse"
                 title={collapsed ? 'Expand track' : 'Collapse track'}
               >
-                <CollapseIcon style={{ width: '12px', height: '12px' }} collapsed={collapsed} />
+                <CollapseIcon className="track-header__icon--collapse" collapsed={collapsed} />
               </button>
             )}
           </div>
@@ -422,7 +390,7 @@ const ProfessionalTrackHeader: React.FC<ProfessionalTrackHeaderProps> = ({
                 }`}
                 title={settings.inputMonitoring ? 'Disable input monitoring' : 'Enable input monitoring'}
               >
-                <InputMonitorIcon style={{ width: '12px', height: '12px' }} />
+                <InputMonitorIcon className="track-header__icon--sm" />
               </button>
             )}
             {showPhaseInvert && (
@@ -436,7 +404,7 @@ const ProfessionalTrackHeader: React.FC<ProfessionalTrackHeaderProps> = ({
                 }`}
                 title={settings.phaseInvert ? 'Phase normal' : 'Phase invert (180°)'}
               >
-                <PhaseInvertIcon style={{ width: '12px', height: '12px' }} />
+                <PhaseInvertIcon className="track-header__icon--sm" />
               </button>
             )}
             {insertCount > 0 && (
@@ -474,9 +442,6 @@ const ProfessionalTrackHeader: React.FC<ProfessionalTrackHeaderProps> = ({
               >
                 <div
                   className="track-header__vol-fill"
-                  style={{
-                    width: `${Math.round(volume * 100)}%`,
-                  }}
                 />
               </div>
               <div
@@ -497,11 +462,7 @@ const ProfessionalTrackHeader: React.FC<ProfessionalTrackHeaderProps> = ({
             <span
               key={i}
               className="track-header__chip"
-              style={{
-                color: chip.accent,
-                border: `1px solid ${auraAlpha(chip.accent, 0.45)}`,
-                boxShadow: `0 0 14px ${auraAlpha(chip.accent, 0.35)}`,
-              }}
+              style={{ '--chip-accent': chip.accent } as React.CSSProperties}
               title={chip.description}
             >
               {chip.label}
@@ -520,9 +481,6 @@ const ProfessionalTrackHeader: React.FC<ProfessionalTrackHeaderProps> = ({
         <div className="track-header__record-meter">
           <div
             className="track-header__record-meter-fill"
-            style={{
-              width: `${Math.min(100, recordInputLevel * 100)}%`,
-            }}
           />
         </div>
       )}

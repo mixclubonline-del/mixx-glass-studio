@@ -113,7 +113,7 @@ export const typography = {
       ...typography.weight('normal'),
       ...typography.leading.normal,
       ...typography.color.ink.DEFAULT,
-      color: 'rgba(230, 240, 255, 0.95)', // High contrast for readability
+      color: 'var(--aura-chalk)', // High contrast for readability
     }),
     
     /**
@@ -123,7 +123,7 @@ export const typography = {
       ...typography.size('xl'),
       ...typography.weight('semibold'),
       ...typography.leading.tight,
-      color: 'rgba(230, 240, 255, 0.95)',
+      color: 'var(--aura-chalk)',
     }),
     
     /**
@@ -133,7 +133,7 @@ export const typography = {
       ...typography.size('3xl'),
       ...typography.weight('bold'),
       ...typography.leading.tight,
-      color: 'rgba(230, 240, 255, 0.95)',
+      color: 'var(--aura-chalk)',
     }),
     
     /**
@@ -143,7 +143,7 @@ export const typography = {
       ...typography.size('2xl'),
       ...typography.weight('bold'),
       ...typography.leading.tight,
-      color: 'rgba(230, 240, 255, 0.95)',
+      color: 'var(--aura-chalk)',
     }),
     
     /**
@@ -153,7 +153,7 @@ export const typography = {
       ...typography.size('xl'),
       ...typography.weight('semibold'),
       ...typography.leading.snug,
-      color: 'rgba(230, 240, 255, 0.95)',
+      color: 'var(--aura-chalk)',
     }),
     
     /**
@@ -164,7 +164,8 @@ export const typography = {
       ...typography.weight('semibold'),
       ...typography.transform('uppercase'),
       ...typography.tracking.wide,
-      color: 'rgba(230, 240, 255, 0.85)',
+      color: 'var(--aura-chalk)',
+      opacity: 0.85,
       letterSpacing: '0.05em',
     }),
     
@@ -175,7 +176,8 @@ export const typography = {
       ...typography.size('sm'),
       ...typography.weight('normal'),
       ...typography.leading.normal,
-      color: 'rgba(230, 240, 255, 0.75)',
+      color: 'var(--aura-chalk)',
+      opacity: 0.75,
     }),
     
     /**
@@ -185,7 +187,8 @@ export const typography = {
       ...typography.size('xs'),
       ...typography.weight('normal'),
       ...typography.leading.relaxed,
-      color: 'rgba(230, 240, 255, 0.65)',
+      color: 'var(--aura-chalk)',
+      opacity: 0.65,
     }),
     
     /**
@@ -195,7 +198,8 @@ export const typography = {
       ...typography.size('base'),
       ...typography.weight('medium'),
       ...typography.leading.normal,
-      color: 'rgba(230, 240, 255, 0.9)',
+      color: 'var(--aura-chalk)',
+      opacity: 0.9,
       fontVariantNumeric: 'tabular-nums', // Aligned numbers
     }),
   },

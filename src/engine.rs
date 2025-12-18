@@ -296,6 +296,34 @@ pub fn pop_analysis_samples(max: usize) -> Vec<f32> {
     })
 }
 
+pub fn analyze_clip_pitch(clip_id: u64) -> Vec<(f32, f32, f32)> {
+    let guard = ENGINE_STATE
+        .lock()
+        .expect("MixxEngine global mutex poisoned");
+    
+    guard.as_ref().map_or(Vec::new(), |state| {
+        state.engine.analyze_clip_pitch(clip_id)
+    })
+}
+
+pub fn apply_spectral_edit(
+    clip_id: u64,
+    start_sample: usize,
+    num_samples: usize,
+    pitch_shift: f32,
+    time_stretch: f32,
+) -> Result<(), String> {
+    let guard = ENGINE_STATE
+        .lock()
+        .expect("MixxEngine global mutex poisoned");
+    
+    if let Some(state) = guard.as_ref() {
+        state.engine.apply_spectral_edit(clip_id, start_sample, num_samples, pitch_shift, time_stretch)
+    } else {
+        Err("MixxEngine not initialized".to_string())
+    }
+}
+
 // ============================================================================
 // Master Chain Control Functions (Phase 26)
 // ============================================================================
@@ -478,6 +506,112 @@ impl MixxEngine {
             tempo_map,
             master_chain,
         })
+    }
+
+    pub fn analyze_clip_pitch(&self, clip_id: u64) -> Vec<(f32, f32, f32)> {
+        let clip_manager = self.clip_manager.lock().unwrap();
+        if let Some(crate::mixx_audio_core::clip_region::ClipType::Audio(clip)) = clip_manager.get_clip(clip_id) {
+            let sample_rate = clip.sample_rate as f32;
+            let data = &clip.data;
+            let channels = clip.channels as usize;
+            
+            let mono_samples = if channels > 1 {
+                let frames = data.len() / channels;
+                let mut mono = Vec::with_capacity(frames);
+                for i in 0..frames {
+                    let mut sum = 0.0;
+                    for c in 0..channels {
+                        sum += data[i * channels + c];
+                    }
+                    mono.push(sum / channels as f32);
+                }
+                mono
+            } else {
+                data.to_vec()
+            };
+
+            let detector = crate::mixx_audio_core::pitch_analysis::YinDetector::new(sample_rate, 0.1, 2048);
+            let hop_size = 512;
+            let window_size = 2048;
+            let mut results = Vec::new();
+
+            for i in (0..mono_samples.len().saturating_sub(window_size)).step_by(hop_size) {
+                let window = &mono_samples[i..i + window_size];
+                if let Some(freq) = detector.detect(window) {
+                    let time = i as f32 / sample_rate;
+                    let confidence = 0.9;
+                    results.push((time, freq, confidence));
+                }
+            }
+            results
+        } else {
+            Vec::new()
+        }
+    }
+
+    pub fn apply_spectral_edit(
+        &self,
+        clip_id: u64,
+        start_sample: usize,
+        num_samples: usize,
+        pitch_shift: f32,
+        time_stretch: f32,
+    ) -> Result<(), String> {
+        let mut clip_manager = self.clip_manager.lock().map_err(|e| e.to_string())?;
+        
+        // Find the clip
+        if let Some(crate::mixx_audio_core::clip_region::ClipType::Audio(clip)) = clip_manager.get_clip_mut(clip_id) {
+            let sample_rate = clip.sample_rate as f32;
+            let channels = clip.channels as usize;
+            
+            // Extract the segment
+            let start = start_sample * channels;
+            let end = (start_sample + num_samples) * channels;
+            
+            if start >= clip.data.len() || end > clip.data.len() {
+                return Err("Invalid sample range".to_string());
+            }
+
+            // For now, only handle pitch shift by resampling and stretching back
+            // Process each channel independently
+            let transformer = crate::mixx_audio_core::time_warp::SpectralTransformer::new(sample_rate);
+            let params = crate::mixx_audio_core::time_warp::TransformParams {
+                pitch_shift,
+                time_stretch,
+                formant_preserve: true,
+            };
+
+            // We need a mutable reference to the data. 
+            // AudioClip uses Arc<Vec<f32>>, so we may need to make it uniquely owned if we want to mutate.
+            // However, ClipManager::get_clip_mut gives us a mutable reference if it's the only owner or we clone it.
+            
+            let mut new_data = (*clip.data).clone();
+            
+            for c in 0..channels {
+                // Extract channel samples
+                let mut channel_samples = Vec::with_capacity(num_samples);
+                for i in 0..num_samples {
+                    channel_samples.push(new_data[start + i * channels + c]);
+                }
+                
+                // Process
+                let processed = transformer.process(&channel_samples, params);
+                
+                // If the length changed (due to time stretch), we might need to handle it.
+                // For now, if pitch shifting without stretching, the length should be the same
+                // after the SOLA stretch back.
+                
+                // Write back (clipping to original length for now to avoid complexity)
+                for i in 0..num_samples.min(processed.len()) {
+                    new_data[start + i * channels + c] = processed[i];
+                }
+            }
+            
+            clip.data = Arc::new(new_data);
+            Ok(())
+        } else {
+            Err(format!("Audio clip {} not found", clip_id))
+        }
     }
 
     fn start(&mut self) -> Result<(), EngineError> {

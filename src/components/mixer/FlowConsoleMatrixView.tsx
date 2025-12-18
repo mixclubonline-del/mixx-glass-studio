@@ -29,10 +29,11 @@ const PulsingLevelIndicator: React.FC<{
     <div
       className="flow-matrix-pulse-indicator"
       style={{
-        background: `linear-gradient(135deg, ${hexToRgba(busColor, level * 0.5)}, ${hexToRgba(busGlow, level * 0.3)})`,
-        opacity: pulseOpacity,
-        boxShadow: `0 0 ${12 * level}px ${hexToRgba(busGlow, level * 0.5)}`,
-      }}
+        '--matrix-pulse-gradient': `linear-gradient(135deg, ${hexToRgba(busColor, level * 0.5)}, ${hexToRgba(busGlow, level * 0.3)})`,
+        '--matrix-pulse-opacity': pulseOpacity,
+        '--matrix-pulse-glow-size': `${12 * level}px`,
+        '--matrix-pulse-glow-color': hexToRgba(busGlow, level * 0.5),
+      } as React.CSSProperties}
     />
   );
 };
@@ -67,19 +68,19 @@ const MatrixRow: React.FC<{
     <div
       className="flow-matrix-row"
       style={{
-        opacity: rowStyle.opacity,
-        transform: `translateX(${rowStyle.x}px)`,
-      }}
+        '--matrix-row-opacity': rowStyle.opacity,
+        '--matrix-row-x': `${rowStyle.x}px`,
+      } as React.CSSProperties}
     >
       {/* Track Name */}
       <div className="flow-matrix-track-cell">
         <div
           className="flow-matrix-track-meter"
           style={{
-            background: `linear-gradient(180deg, ${hexToRgba(row.trackColor, 0.8)}, ${hexToRgba(row.trackGlow, 0.6)})`,
-            boxShadow: `0 0 12px ${hexToRgba(row.trackGlow, 0.4 * row.intensity)}`,
-            opacity: 0.6 + row.intensity * 0.4,
-          }}
+            '--matrix-track-gradient': `linear-gradient(180deg, ${hexToRgba(row.trackColor, 0.8)}, ${hexToRgba(row.trackGlow, 0.6)})`,
+            '--matrix-track-glow-alpha': hexToRgba(row.trackGlow, 0.4 * row.intensity),
+            '--matrix-track-opacity': 0.6 + row.intensity * 0.4,
+          } as React.CSSProperties}
         />
         <div className="flow-matrix-track-info">
           <span className="flow-matrix-track-name">
@@ -120,10 +121,10 @@ const MatrixRow: React.FC<{
                   <div
                     className="flow-matrix-level-bar"
                     style={{
-                      background: `linear-gradient(90deg, ${hexToRgba(send.busColor, 0.9)}, ${hexToRgba(send.busGlow, 0.6)})`,
-                      width: `${send.level * 100}%`,
-                      boxShadow: `0 0 8px ${hexToRgba(send.busGlow, 0.6)}`,
-                    }}
+                      '--matrix-level-gradient': `linear-gradient(90deg, ${hexToRgba(send.busColor, 0.9)}, ${hexToRgba(send.busGlow, 0.6)})`,
+                      '--matrix-level-width': `${send.level * 100}%`,
+                      '--matrix-level-glow-alpha': hexToRgba(send.busGlow, 0.6),
+                    } as React.CSSProperties}
                   />
                 </div>
               )}
@@ -150,10 +151,10 @@ const PulsingEnergyIndicator: React.FC<{
     <div
       className="flow-matrix-energy-pulse"
       style={{
-        background: `radial-gradient(circle at center, ${hexToRgba(busGlow, 0.3)}, transparent)`,
-        transform: `scale(${pulseScale})`,
-        opacity: pulseOpacity,
-      }}
+        '--matrix-energy-gradient': `radial-gradient(circle at center, ${hexToRgba(busGlow, 0.3)}, transparent)`,
+        '--matrix-energy-scale': pulseScale,
+        '--matrix-energy-opacity': pulseOpacity,
+      } as React.CSSProperties}
     />
   );
 };
@@ -250,9 +251,9 @@ export const FlowConsoleMatrixView: React.FC<FlowConsoleMatrixViewProps> = ({
                   <div
                     className="flow-matrix-bus-indicator"
                     style={{
-                      background: `linear-gradient(90deg, ${hexToRgba(bus.color, 0.6)}, ${hexToRgba(bus.glow, 0.4)})`,
-                      boxShadow: `0 0 8px ${hexToRgba(bus.glow, 0.3)}`,
-                    }}
+                      '--matrix-bus-gradient': `linear-gradient(90deg, ${hexToRgba(bus.color, 0.6)}, ${hexToRgba(bus.glow, 0.4)})`,
+                      '--matrix-bus-glow-alpha': hexToRgba(bus.glow, 0.3),
+                    } as React.CSSProperties}
                   />
                 </button>
               );

@@ -1,0 +1,50 @@
+.spectral-editor-panel {
+  z-index: 1000;
+  position: absolute;
+  top: 0;
+  right: 0;
+  bottom: 0;
+  height: 100%;
+}
+
+.spectral-editor-panel aside {
+  box-shadow: -20px 0 50px rgba(0, 0, 0, 0.5);
+}
+
+.spectral-editor-panel header {
+  background: rgba(10, 10, 30, 0.6);
+}
+
+.spectral-editor-panel footer {
+  background: rgba(10, 10, 30, 0.8);
+}
+
+/* Custom Scrollbar */
+.spectral-editor-panel div::-webkit-scrollbar {
+  width: 6px;
+  height: 6px;
+}
+
+.spectral-editor-panel div::-webkit-scrollbar-track {
+  background: rgba(255, 255, 255, 0.02);
+}
+
+.spectral-editor-panel div::-webkit-scrollbar-thumb {
+  background: rgba(255, 255, 255, 0.1);
+  border-radius: 3px;
+}
+
+.spectral-editor-panel div::-webkit-scrollbar-thumb:hover {
+  background: rgba(255, 255, 255, 0.2);
+}
+
+/* Animation for playhead shadow */
+@keyframes playhead-glow {
+  0% { opacity: 0.6; }
+  50% { opacity: 1; }
+  100% { opacity: 0.6; }
+}
+
+.spectral-editor-panel .playhead-shadow {
+  animation: playhead-glow 2s infinite ease-in-out;
+}

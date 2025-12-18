@@ -89,7 +89,7 @@ pub struct AudioClip {
     pub name: String,
     
     /// Sample data (interleaved if stereo)
-    data: Arc<Vec<f32>>,
+    pub data: Arc<Vec<f32>>,
     
     /// Number of channels
     pub channels: u16,
@@ -459,6 +459,11 @@ impl ClipManager {
     /// Get clip by ID
     pub fn get_clip(&self, id: u64) -> Option<&ClipType> {
         self.clips.iter().find(|c| c.id() == id)
+    }
+    
+    /// Get mutable clip by ID
+    pub fn get_clip_mut(&mut self, id: u64) -> Option<&mut ClipType> {
+        self.clips.iter_mut().find(|c| c.id() == id)
     }
     
     /// Create region from clip

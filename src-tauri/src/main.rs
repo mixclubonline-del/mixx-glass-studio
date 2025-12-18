@@ -428,6 +428,22 @@ fn clip_delete_region_cmd(region_id: u64) {
 }
 
 #[tauri::command]
+fn clip_analyze_pitch_cmd(clip_id: u64) -> Vec<(f32, f32, f32)> {
+    mixx_core::analyze_clip_pitch(clip_id)
+}
+
+#[tauri::command]
+fn clip_apply_spectral_edit_cmd(
+    clip_id: u64,
+    start_sample: usize,
+    num_samples: usize,
+    pitch_shift: f32,
+    time_stretch: f32,
+) -> Result<(), String> {
+    mixx_core::apply_spectral_edit(clip_id, start_sample, num_samples, pitch_shift, time_stretch)
+}
+
+#[tauri::command]
 fn clip_get_stats() -> (usize, usize) {
     mixx_core::clip_stats()
 }
@@ -644,6 +660,8 @@ fn main() {
             clip_create_midi_cmd,
             clip_create_region_cmd,
             clip_delete_region_cmd,
+            clip_analyze_pitch_cmd,
+            clip_apply_spectral_edit_cmd,
             clip_get_stats,
             // Mixer Commands
             mixer_add_audio_track_cmd,

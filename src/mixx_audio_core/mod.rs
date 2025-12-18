@@ -32,8 +32,12 @@ pub mod tempo_map;
 pub mod track_mixer;
 pub mod velvet_curve;
 pub mod simd_utils;
+pub mod pitch_analysis;
 pub mod master_chain;
 pub mod audio_export;
+pub mod time_warp;
 
 pub use audio_format::{AudioFile, AudioMetadata, FormatError, MixxAudioFormat};
 pub use dsp_math::Complex;
+pub use pitch_analysis::YinDetector;
+pub use time_warp::SpectralTransformer;

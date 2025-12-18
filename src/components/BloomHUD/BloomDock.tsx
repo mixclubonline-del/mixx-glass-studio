@@ -55,7 +55,13 @@ const MasterWaveform: React.FC<{ waveform: Uint8Array, color: string }> = ({ wav
                     </feMerge>
                 </filter>
             </defs>
-            <path d={pathData} stroke={color} strokeWidth="1" fill="none" style={{ filter: 'url(#core-glow-filter)', transition: 'd 16ms linear' }}/>
+            <path 
+                d={pathData} 
+                stroke={color} 
+                strokeWidth="1" 
+                fill="none" 
+                className="master-waveform-path"
+            />
         </svg>
     );
 };
@@ -119,6 +125,9 @@ const ViewToggle: React.FC<{
                     ? `${currentLabel}`
                     : `Switch to ${nextMeta.label}`
             }
+            style={{
+                '--dock-view-accent-alpha': hexToRgba(accent, 0.45),
+            } as React.CSSProperties}
         >
             <span className="flex items-center gap-2">
                 <CurrentIcon
@@ -131,10 +140,7 @@ const ViewToggle: React.FC<{
             {!isDisabled && (
                 <span
                     aria-hidden
-                    className="pointer-events-none absolute inset-0 rounded-full opacity-0 group-hover:opacity-100 transition-opacity"
-                    style={{
-                        boxShadow: `0 0 32px ${hexToRgba(accent, 0.45)}`,
-                    }}
+                    className="bloom-dock-view-toggle-glow"
                 />
             )}
         </button>
@@ -338,22 +344,15 @@ export const BloomDock: React.FC<BloomDockProps> = (props) => {
 
     // AURA Philosophy: Tools serve the music, not the other way around
     // Ethereal presence - there when needed, invisible when not
-    const haloStyle = useMemo(() => {
+    const haloVars = useMemo(() => {
         const baseOpacity = isDragging ? 0.5 : 0.25;
         
         return {
-            // Ultra-transparent - music shows through
-            background: auraAlpha(AuraPalette.violet[900], baseOpacity),
-            // Whisper borders
-            borderColor: auraAlpha(contextAccent, isDragging ? 0.3 : 0.12),
-            borderWidth: '1px',
-            borderStyle: 'solid',
-            // Subtle ambient glow - presence without dominance
-            boxShadow: `
-                0 0 ${30 + enhancedGlowIntensity * 20}px ${auraAlpha(contextAccent, 0.08)},
-                inset 0 0 30px ${auraAlpha(AuraPalette.violet.DEFAULT, 0.03)}
-            `,
-        };
+            '--dock-halo-bg': auraAlpha(AuraPalette.violet[900], baseOpacity),
+            '--dock-halo-border-color': auraAlpha(contextAccent, isDragging ? 0.3 : 0.12),
+            '--dock-glow-size': `${30 + enhancedGlowIntensity * 20}px`,
+            '--dock-glow-color': auraAlpha(contextAccent, 0.08),
+        } as React.CSSProperties;
     }, [contextAccent, isDragging, enhancedGlowIntensity]);
 
     // Developer-mode ALS debug payload (reads from global ALS + current dock state)
@@ -818,7 +817,7 @@ export const BloomDock: React.FC<BloomDockProps> = (props) => {
     const loopButton = (
         <button
             type="button"
-            aria-pressed={loopActive}
+            aria-pressed={loopActive ? "true" : "false"}
             aria-label="Toggle loop"
             title="Toggle loop"
             onClick={toggleLoop}
@@ -829,19 +828,23 @@ export const BloomDock: React.FC<BloomDockProps> = (props) => {
         </button>
     );
 
+    const containerStyles = {
+        '--dock-x': `${position.x}px`,
+        '--dock-y': `${position.y}px`,
+    } as React.CSSProperties;
+
     return (
         <div
             ref={containerRef}
-            className="bloom-dock-container"
-            style={{
-                left: position.x,
-                top: position.y,
-                transition: isDragging ? 'none' : 'transform 0.2s ease, opacity 0.2s ease',
-            }}
+            className={`bloom-dock-container ${isDragging ? 'bloom-dock-container--dragging' : ''}`}
+            style={containerStyles}
         >
             {/* Prime Brain Overlay */}
             {primeBrain.showOverlay && (
-                <div className="bloom-dock-brain-overlay" style={{ borderColor: hexToRgba(contextAccent, 0.3) }}>
+                <div 
+                    className="bloom-dock-brain-overlay" 
+                    style={{ '--dock-accent-30': hexToRgba(contextAccent, 0.3) } as React.CSSProperties}
+                >
                     <div className="flex h-5 w-5 items-center justify-center rounded-full bg-white/5">
                         <PrimeBrainIcon className="w-3.5 h-3.5 text-indigo-200" />
                     </div>
@@ -854,10 +857,10 @@ export const BloomDock: React.FC<BloomDockProps> = (props) => {
                 <div
                     className={`bloom-dock-mode-label ${isDragging ? 'cursor-grabbing' : 'cursor-grab'}`}
                     style={{
-                        borderColor: hexToRgba(contextAccent, 0.55),
-                        background: `linear-gradient(135deg, ${hexToRgba(contextAccent, 0.25)} 0%, rgba(9,15,32,0.85) 100%)`,
-                        color: hexToRgba(contextAccent, 0.9),
-                    }}
+                        '--dock-accent-55': hexToRgba(contextAccent, 0.55),
+                        '--dock-accent-25': hexToRgba(contextAccent, 0.25),
+                        '--dock-accent-90': hexToRgba(contextAccent, 0.9),
+                    } as React.CSSProperties}
                     onPointerDown={handleDragPointerDown}
                 >
                     {viewMode === 'sampler' && (
@@ -871,25 +874,23 @@ export const BloomDock: React.FC<BloomDockProps> = (props) => {
                 <div
                     className="bloom-dock-pulse-line"
                     style={{
-                        width: `${alsGlow.pulse * 100}%`,
-                        background: alsGlow.glowColor,
-                        opacity: alsGlow.glowIntensity,
-                    }}
+                        '--dock-pulse-width': `${alsGlow.pulse * 100}%`,
+                        '--dock-pulse-color': alsGlow.glowColor,
+                        '--dock-pulse-opacity': alsGlow.glowIntensity,
+                    } as React.CSSProperties}
                 />
             </div>
 
             <div
                 className="pointer-events-auto"
                 style={{
-                    transform: isDragging ? 'scale(1.05, 1.1)' : 'scale(1, 1.1)',
-                    transition: isDragging ? 'none' : 'transform 0.25s ease',
-                }}
+                    '--dock-main-transform': isDragging ? 'scale(1.05, 1.1)' : 'scale(1, 1.1)',
+                    '--dock-main-transition': isDragging ? 'none' : 'transform 0.25s ease',
+                } as React.CSSProperties}
             >
                 <div
                     className="bloom-dock-main-halo"
-                    style={{
-                        ...haloStyle,
-                    }}
+                    style={haloVars}
                 >
                     <div className="bloom-dock-segment-group">
                         {leftSegments.map((segment, index) => (

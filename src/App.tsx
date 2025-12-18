@@ -140,6 +140,8 @@ import type {
 import type { WaveformHeaderSettings } from './types/waveformHeaderSettings';
 import { DEFAULT_WAVEFORM_HEADER_SETTINGS } from './types/waveformHeaderSettings';
 import { WaveformHeaderSettingsPanel } from './components/WaveformHeaderSettingsPanel';
+import { SpectralEditorPanel } from './components/spectral/SpectralEditorPanel';
+import { SpectralAnalysisResult } from './types/spectral';
 
 
 const DEFAULT_STEM_SELECTION = ['Vocals', 'Drums', 'Bass', 'Other Instruments'] as const;
@@ -2243,6 +2245,9 @@ const FlowRuntime: React.FC<FlowRuntimeProps> = ({ arrangeFocusToken }) => {
   const exportPianoNotes = pianoRollBinding.exportNotes;
   const [pianoRollStore, setPianoRollStore] = useState<Record<string, MidiNote[]>>({});
   const [isPianoRollOpen, setIsPianoRollOpen] = useState(false);
+  const [isSpectralEditorOpen, setIsSpectralEditorOpen] = useState(false);
+  const [activeSpectralClip, setActiveSpectralClip] = useState<ArrangeClip | null>(null);
+  const [activeSpectralTrack, setActiveSpectralTrack] = useState<TrackData | null>(null);
   const [pianoRollClipId, setPianoRollClipId] = useState<ClipId | null>(null);
   const [pianoRollTrackId, setPianoRollTrackId] = useState<string | null>(null);
   const [activeCapsuleTrackId, setActiveCapsuleTrackId] = useState<string | null>(null);
@@ -4872,6 +4877,22 @@ const FlowRuntime: React.FC<FlowRuntimeProps> = ({ arrangeFocusToken }) => {
 
   const handleOpenPianoRoll = useCallback(
     (targetClip: ArrangeClip) => {
+      // Check if it's an audio clip - if so, open Spectral Editor
+      if (targetClip.bufferId && targetClip.bufferId !== 'default') {
+        setActiveSpectralClip(targetClip);
+        const trackMatch = tracks.find(t => t.id === targetClip.trackId) ?? null;
+        setActiveSpectralTrack(trackMatch);
+        setIsSpectralEditorOpen(true);
+        
+        handleTrackContextChange(targetClip.trackId, "edit");
+        publishBloomSignal({
+          source: "system",
+          action: "openSpectralEditor",
+          payload: { clipId: targetClip.id, trackId: targetClip.trackId },
+        });
+        return;
+      }
+
       persistCurrentPianoRoll();
       const trackMatch =
         tracks.find((entry) => entry.id === targetClip.trackId) ?? null;
@@ -8432,6 +8453,14 @@ const FlowRuntime: React.FC<FlowRuntimeProps> = ({ arrangeFocusToken }) => {
           }
           onWarpAnchors={handleApplyWarpAnchors}
           onExportMidi={handleExportPianoRollMidi}
+        />
+
+        <SpectralEditorPanel
+          isOpen={isSpectralEditorOpen}
+          clip={activeSpectralClip}
+          track={activeSpectralTrack}
+          onClose={() => setIsSpectralEditorOpen(false)}
+          currentTime={currentTime}
         />
         
         {/* Auto-Save Status Indicator */}

@@ -126,6 +126,8 @@
   width: 100%;
   height: 4px;
   border-radius: 9999px;
+  background: var(--matrix-bus-gradient);
+  box-shadow: 0 0 8px var(--matrix-bus-glow-alpha);
 }
 
 /* Rows (Tracks) */
@@ -139,6 +141,8 @@
   display: flex;
   align-items: center;
   gap: 8px;
+  opacity: var(--matrix-row-opacity, 1);
+  transform: translateX(var(--matrix-row-x, 0px));
 }
 
 /* Track Info Cell */
@@ -154,6 +158,9 @@
   width: 4px;
   height: 32px;
   border-radius: 9999px;
+  background: var(--matrix-track-gradient);
+  box-shadow: 0 0 12px var(--matrix-track-glow-alpha);
+  opacity: var(--matrix-track-opacity, 1);
 }
 
 .flow-matrix-track-info {
@@ -236,6 +243,9 @@
 .flow-matrix-level-bar {
   height: 100%;
   border-radius: 9999px;
+  background: var(--matrix-level-gradient);
+  width: var(--matrix-level-width, 0%);
+  box-shadow: 0 0 8px var(--matrix-level-glow-alpha);
 }
 
 /* Animations */
@@ -244,6 +254,9 @@
   inset: 0;
   border-radius: 8px;
   pointer-events: none;
+  background: var(--matrix-pulse-gradient);
+  opacity: var(--matrix-pulse-opacity, 0);
+  box-shadow: 0 0 var(--matrix-pulse-glow-size, 0px) var(--matrix-pulse-glow-color, transparent);
 }
 
 .flow-matrix-energy-pulse {
@@ -251,4 +264,7 @@
   inset: 0;
   border-radius: 8px;
   pointer-events: none;
+  background: var(--matrix-energy-gradient);
+  transform: scale(var(--matrix-energy-scale, 1));
+  opacity: var(--matrix-energy-opacity, 0);
 }

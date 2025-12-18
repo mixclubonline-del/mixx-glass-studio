@@ -1,0 +1,20 @@
+/* SuitePluginSurface.css */
+
+.suite-header-transition {
+  opacity: var(--header-opacity, 1);
+}
+
+.suite-halo-view {
+  width: 100%;
+  height: 100%;
+  opacity: var(--halo-opacity, 1);
+  transform: var(--halo-transform, none);
+}
+
+.suite-routing-panel {
+  position: fixed;
+  inset: 0;
+  z-index: 100;
+  opacity: var(--routing-opacity, 1);
+  transform: var(--routing-transform, none);
+}

@@ -119,6 +119,10 @@
   color: #22d3ee;
 }
 
+.nexus-accent-cyan {
+  color: #22d3ee !important;
+}
+
 .logic-nexus-telemetry-module {
   display: flex;
   flex-direction: column;
@@ -137,6 +141,10 @@
 .logic-nexus-gauge-bar {
   height: 100%;
   transition: width 0.3s ease-out;
+  width: var(--logic-gauge-width, 0%);
+  background: var(--logic-gauge-bg, #22d3ee);
+  box-shadow: var(--logic-gauge-shadow, none);
+  opacity: var(--logic-gauge-opacity, 1);
 }
 
 .logic-nexus-horizon-hud {
@@ -165,6 +173,7 @@
   bottom: 0;
   width: 1px;
   background: rgba(255, 255, 255, 0.1);
+  left: var(--horizon-grid-left, 0%);
 }
 
 .logic-nexus-horizon-marker {
@@ -173,6 +182,9 @@
   bottom: 0;
   width: 2px;
   z-index: 10;
+  left: var(--horizon-marker-left, 0%);
+  background: var(--horizon-marker-bg, #22d3ee);
+  box-shadow: var(--horizon-marker-shadow, none);
 }
 
 .logic-nexus-horizon-marker-label {
@@ -183,6 +195,7 @@
   font-size: 8px;
   white-space: nowrap;
   margin-top: 2px;
+  color: var(--horizon-label-color, #22d3ee);
 }
 
 .logic-nexus-firing-dot {
@@ -239,6 +252,11 @@
   padding: 16px;
   border-radius: 12px;
   transition: all 0.2s cubic-bezier(0.4, 0, 0.2, 1);
+  background: var(--logic-rule-bg);
+  border: var(--logic-rule-border);
+  box-shadow: var(--logic-rule-shadow);
+  transform: var(--logic-rule-scale, scale(1));
+  opacity: var(--logic-rule-opacity, 1);
 }
 
 .logic-nexus-rule-actions {
@@ -260,6 +278,12 @@
 
 .logic-nexus-action-btn:hover {
   background: rgba(255, 255, 255, 0.05);
+}
+
+.logic-nexus-action-btn {
+  border: var(--nexus-action-border);
+  color: var(--nexus-action-color);
+  opacity: var(--nexus-action-opacity, 1);
 }
 
 .logic-nexus-registry-header {
@@ -361,16 +385,14 @@
   opacity: 0.6;
 }
 
-.logic-nexus-rule-details {
-  display: flex;
-  flex-direction: column;
-  gap: 4px; /* spacing.gap(1) */
-}
-
 .logic-nexus-rule-header {
   display: flex;
   align-items: center;
   gap: 8px; /* spacing.gap(2) */
+}
+
+.logic-nexus-rule-name-text {
+  color: var(--logic-rule-name-color, #aaa);
 }
 
 .logic-nexus-rule-name {

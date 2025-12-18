@@ -1,0 +1,136 @@
+/* FlowChannelStrip.css */
+
+.pulsing-send-indicator {
+  position: absolute;
+  inset: 0;
+  border-radius: 9999px;
+  width: var(--send-level-width, 0%);
+  background: var(--send-level-gradient);
+  box-shadow: var(--send-level-shadow);
+  opacity: var(--pulse-opacity, 1);
+}
+
+.action-pulse-outer {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  padding: 8px;
+  border-radius: 12px;
+  border: 1px solid var(--action-accent-alpha);
+  background: rgba(9, 18, 36, 0.72);
+  box-shadow: var(--action-pulse-shadow);
+}
+
+.picker-open-outer {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  padding: 8px;
+  border-radius: 12px;
+  border: 1px solid rgba(102, 140, 198, 0.45);
+  background: rgba(9, 18, 36, 0.75);
+  box-shadow: var(--picker-glow-shadow);
+}
+
+.send-indicator-row {
+  display: flex;
+  flex-direction: row;
+  align-items: center;
+  gap: 8px;
+  padding: 4px 8px;
+  border-radius: 12px;
+  transition: background-color 0.2s ease-in-out;
+}
+
+.send-indicator-row--selected {
+  background: rgba(12, 24, 46, 0.68);
+}
+
+.send-indicator-label {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border-radius: 9999px;
+  text-transform: uppercase;
+  letter-spacing: 0.1em;
+  width: 24px;
+  height: 24px;
+  font-size: 0.45rem;
+  border: 1px solid rgba(102, 140, 198, 0.6);
+  color: rgba(230, 240, 255, 0.7);
+  background: transparent;
+}
+
+.send-indicator-label--selected {
+  border-color: rgba(103, 232, 249, 0.7);
+  color: rgba(207, 250, 254, 1);
+  background: rgba(16, 50, 95, 0.6);
+}
+
+.send-level-bar-container {
+  flex: 1;
+  position: relative;
+  overflow: hidden;
+  border-radius: 9999px;
+  height: 6px;
+  background: rgba(9, 18, 36, 0.6);
+}
+
+.send-level-range-input {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  opacity: 0;
+  cursor: pointer;
+}
+
+.pulsing-channel-bg {
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+  background: var(--channel-bg-gradient);
+  box-shadow: var(--channel-bg-shadow);
+  opacity: var(--pulse-opacity, 1);
+}
+
+.pulsing-pan-indicator {
+  position: absolute;
+  top: 50%;
+  left: var(--pan-position, 50%);
+  transform: translateX(-50%);
+  width: 6px;
+  height: 6px;
+  border-radius: 50%;
+  background: var(--pan-gradient);
+  box-shadow: var(--pan-shadow);
+  opacity: var(--pulse-opacity, 1);
+  pointer-events: none;
+}
+
+.flow-channel-icon-sm {
+  width: 14px;
+  height: 14px;
+}
+
+.flow-channel-picker-label {
+  color: var(--aura-chalk);
+  opacity: 0.6;
+}
+
+.flow-channel-flex-1 {
+  flex: 1;
+}
+
+.flow-channel-accent-text {
+  color: var(--aura-chalk);
+  opacity: 0.85;
+}
+
+.flow-channel-surface-bg {
+  background: rgba(12, 24, 46, 0.68);
+}
+
+.flow-channel-border-std {
+  border: 1px solid rgba(102, 140, 198, 0.45);
+}
