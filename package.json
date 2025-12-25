@@ -10,10 +10,17 @@
     "dev:rsbuild": "rsbuild dev",
     "build": "tsc && vite build",
     "build:rsbuild": "tsc && rsbuild build",
+    "build:wasm": "cd src-wasm && wasm-pack build --release --target bundler --out-dir ../src/audio/wasm/pkg",
+    "dev:wasm": "cd src-wasm && wasm-pack build --dev --target bundler --out-dir ../src/audio/wasm/pkg",
+    "watch:wasm": "cd src-wasm && cargo watch -s \"wasm-pack build --dev --target bundler --out-dir ../src/audio/wasm/pkg\"",
+    "dev:wasm:concurrent": "concurrently \"npm run watch:wasm\" \"npm run dev\"",
+    "prepare:wasm": "npm run build:wasm",
+    "optimize:wasm": "for f in src/audio/wasm/pkg/*.wasm; do wasm-opt -Oz \"$f\" -o \"$f.opt\" && mv \"$f.opt\" \"$f\" || true; done",
     "preview": "vite preview",
     "lint": "eslint . --report-unused-disable-directives --max-warnings 0",
     "type-check": "tsc --noEmit",
     "test": "vitest run",
+    "test:smoke": "node tests/smoke/run-smoke.cjs",
     "tauri:dev": "tauri dev",
     "tauri:dev:rsbuild": "TAURI_BEFORE_DEV_COMMAND='npm run dev:rsbuild' tauri dev",
     "tauri:build": "tauri build",
@@ -65,7 +72,9 @@
     "typescript": "^5.2.2",
     "typescript-eslint": "^8.46.4",
     "vite": "^7.2.4",
-    "vitest": "^4.0.8"
+    "vitest": "^4.0.8",
+    "concurrently": "^7.6.0",
+    "playwright": "^1.36.0"
   },
   "overrides": {
     "esbuild": "0.25.11"
